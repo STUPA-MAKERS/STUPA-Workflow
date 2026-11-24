@@ -76,7 +76,7 @@ from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.meetings.rules import MeetingRules
 from app.modules.site_config.features import Feature, active_features
-from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.access import area_scope, works_in
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.service import format_number
 from app.modules.todos.access import BoardAccess, member_gremium_ids, token_reads
@@ -734,12 +734,16 @@ class ActivityService:
         )
 
     async def _todo_events(self, me: Me, cursor: Cursor | None, limit: int, own: bool) -> list[Raw]:
-        """The timeline of the cards of the reader."""
+        """The timeline of the cards of the reader, without the archive of the cron."""
         if me.id is None or not token_reads(me.principal):
             return []
         key = _key("todo_event:", TodoEvent.id)
         stmt = _where(
-            select(TodoEvent, key).where(TodoEvent.card_id.in_(self._my_cards(me))),
+            select(TodoEvent, key).where(
+                TodoEvent.card_id.in_(self._my_cards(me)),
+                # Spec 001307: the archive cron writes ``archived`` without an actor.
+                or_(TodoEvent.kind != "archived", TodoEvent.actor_id.is_not(None)),
+            ),
             _not_by(TodoEvent.actor_id, me.id, own),
         )
         rows = (
@@ -868,24 +872,28 @@ class ActivityService:
         ]
 
     async def _gate_tickets(self, me: Me, ids: set[uuid.UUID]) -> dict[uuid.UUID, Gate]:
-        """Reuses the ticket gate: ``ticket.manage`` reads all, a reporter the own report."""
-        manage = me.principal.has(TICKET_MANAGE)
+        """Reuses the ticket gate: the work right in the Bereich, or the own report."""
+        areas = await area_scope(self.session, me.principal)
         rows = (
             await self.session.execute(
-                select(Ticket.id, Ticket.number, Ticket.title, Ticket.reporter_principal_id).where(
-                    Ticket.id.in_(ids)
-                )
+                select(
+                    Ticket.id,
+                    Ticket.number,
+                    Ticket.title,
+                    Ticket.reporter_principal_id,
+                    Ticket.area_id,
+                ).where(Ticket.id.in_(ids))
             )
         ).all()
         return {
             ticket_id: Gate(
                 title=f"{format_number(number)} · {title}",
                 url=f"/tickets/{ticket_id}",
-                internal=manage,
-                reporter=not manage,
+                internal=works_in(areas, area_id),
+                reporter=not works_in(areas, area_id),
             )
-            for ticket_id, number, title, reporter in rows
-            if manage or (me.id is not None and reporter == me.id)
+            for ticket_id, number, title, reporter, area_id in rows
+            if works_in(areas, area_id) or (me.id is not None and reporter == me.id)
         }
 
     # ------------------------------------------------------------------ meetings

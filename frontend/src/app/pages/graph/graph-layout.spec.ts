@@ -12,13 +12,15 @@ import {
   fit,
   hashUnit,
   hold,
+  joinNext,
   keep,
   nearestIn,
+  pauseFor,
   place,
   settle,
   step,
   zoomAt,
-} from './graph-layout';
+} from '@stupa-makers/ui-kit/views/graph';
 
 const body = (id: string, x: number, y: number): Body => ({ id, x, y, vx: 0, vy: 0 });
 const distance = (a: Body, b: Body): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -45,7 +47,7 @@ describe('graph layout', () => {
     expect(near.get('d')).toBeUndefined();
   });
 
-  /** § F/collaboration/graph/001426: a new node appears next to a neighbour that already shows. */
+  /** §ui-kit:F/collaboration/graph/001426: a new node appears next to a neighbour that already shows. */
   it('places a new node beside a neighbour and keeps the bodies that exist', () => {
     const old = body('a', 400, -300);
     const placed = place([old], ['a', 'b', 'c'], adjacency([{ a: 'a', b: 'b' }]));
@@ -88,7 +90,7 @@ describe('graph layout', () => {
     expect(Math.abs(moved[0].vx)).toBeLessThanOrEqual(42);
   });
 
-  /** § F/collaboration/graph/001427: the layout runs to its end in one go. */
+  /** §ui-kit:F/collaboration/graph/001427: the layout runs to its end in one go. */
   it('settles to a layout at rest with the lines near their length', () => {
     const near = adjacency([{ a: 'a', b: 'b' }]);
     const rested = settle(place([], ['a', 'b'], near), near);
@@ -99,7 +101,7 @@ describe('graph layout', () => {
     expect(ALPHA_MIN).toBeLessThan(ALPHA_START);
   });
 
-  /** § F/collaboration/graph/001433: a node that the person put somewhere stays there. */
+  /** §ui-kit:F/collaboration/graph/001433: a node that the person put somewhere stays there. */
   it('holds a node at its place while the others move', () => {
     const bodies = hold([body('a', 0, 0), body('b', 5, 0)], 'a', 40, 30);
     expect(find(bodies, 'a')).toEqual({ id: 'a', x: 40, y: 30, vx: 0, vy: 0, fixed: true });
@@ -143,7 +145,7 @@ describe('graph layout', () => {
     expect(clampZoom(1)).toBe(1);
   });
 
-  /** § F/collaboration/graph/001428: the arrow keys move to the nearest node in that direction. */
+  /** §ui-kit:F/collaboration/graph/001428: the arrow keys move to the nearest node in that direction. */
   it('finds the nearest node in a direction', () => {
     const bodies = [
       body('mid', 0, 0),
@@ -160,5 +162,28 @@ describe('graph layout', () => {
     expect(nearestIn(bodies, 'far-right', 'right')).toBeNull();
     expect(nearestIn(bodies, 'gone', 'right')).toBe('mid');
     expect(nearestIn([], 'gone', 'up')).toBeNull();
+  });
+
+  /** §ui-kit:F/collaboration/graph/001426: the pause gets shorter for a long queue, within 30 and 120 ms. */
+  it('takes a shorter pause for a longer queue', () => {
+    expect(pauseFor(0)).toBe(120);
+    expect(pauseFor(1)).toBe(120);
+    expect(pauseFor(30)).toBe(120);
+    expect(pauseFor(60)).toBe(60);
+    expect(pauseFor(120)).toBe(30);
+    expect(pauseFor(300)).toBe(30);
+    const total = Array.from({ length: 300 }, (_, i) => pauseFor(300 - i)).reduce((sum, ms) => sum + ms, 0);
+    expect(total).toBeLessThan(20000);
+  });
+
+  /** §ui-kit:F/collaboration/graph/001426: the next node has a neighbour that shows, else it is the first one. */
+  it('takes the first waiting node with a neighbour that shows', () => {
+    const near = adjacency([
+      { a: 'a', b: 'c' },
+      { a: 'b', b: 'x' },
+    ]);
+    expect(joinNext(['b', 'c'], new Set(['a']), near)).toBe('c');
+    expect(joinNext(['b', 'c'], new Set(), near)).toBe('b');
+    expect(joinNext([], new Set(['a']), near)).toBeNull();
   });
 });

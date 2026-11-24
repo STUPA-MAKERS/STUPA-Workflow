@@ -21,7 +21,7 @@
       "to": "shared"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "account",
       "to": "tickets"
     },
@@ -151,9 +151,14 @@
       "to": "meetings"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "admin",
       "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "admin",
+      "to": "paperless"
     },
     {
       "count": 1,
@@ -166,12 +171,12 @@
       "to": "protocol"
     },
     {
-      "count": 36,
+      "count": 41,
       "from": "admin",
       "to": "shared"
     },
     {
-      "count": 26,
+      "count": 28,
       "from": "admin",
       "to": "site_config"
     },
@@ -196,7 +201,7 @@
       "to": "voting"
     },
     {
-      "count": 1,
+      "count": 4,
       "from": "admin",
       "to": "webhooks"
     },
@@ -211,7 +216,7 @@
       "to": "shared"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "applications",
       "to": "application_types"
     },
@@ -236,7 +241,7 @@
       "to": "files"
     },
     {
-      "count": 32,
+      "count": 33,
       "from": "applications",
       "to": "flow"
     },
@@ -246,7 +251,7 @@
       "to": "forms"
     },
     {
-      "count": 12,
+      "count": 13,
       "from": "applications",
       "to": "gremien"
     },
@@ -256,12 +261,12 @@
       "to": "meetings"
     },
     {
-      "count": 36,
+      "count": 35,
       "from": "applications",
       "to": "notifications"
     },
     {
-      "count": 65,
+      "count": 66,
       "from": "applications",
       "to": "shared"
     },
@@ -269,6 +274,11 @@
       "count": 7,
       "from": "applications",
       "to": "voting"
+    },
+    {
+      "count": 3,
+      "from": "applications",
+      "to": "webhooks"
     },
     {
       "count": 3,
@@ -306,12 +316,12 @@
       "to": "todos"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "audit",
       "to": "auth"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "audit",
       "to": "shared"
     },
@@ -391,7 +401,7 @@
       "to": "gremien"
     },
     {
-      "count": 23,
+      "count": 26,
       "from": "auth",
       "to": "shared"
     },
@@ -431,7 +441,7 @@
       "to": "application_types"
     },
     {
-      "count": 8,
+      "count": 9,
       "from": "budget",
       "to": "applications"
     },
@@ -468,6 +478,11 @@
     {
       "count": 1,
       "from": "budget",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "budget",
       "to": "pdf"
     },
     {
@@ -482,11 +497,16 @@
     },
     {
       "count": 1,
+      "from": "budget",
+      "to": "webhooks"
+    },
+    {
+      "count": 1,
       "from": "calendar",
       "to": "applications"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "calendar",
       "to": "auth"
     },
@@ -501,7 +521,7 @@
       "to": "meetings"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "calendar",
       "to": "notifications"
     },
@@ -691,7 +711,7 @@
       "to": "application_types"
     },
     {
-      "count": 22,
+      "count": 23,
       "from": "flow",
       "to": "applications"
     },
@@ -736,7 +756,12 @@
       "to": "notifications"
     },
     {
-      "count": 27,
+      "count": 1,
+      "from": "flow",
+      "to": "paperless"
+    },
+    {
+      "count": 26,
       "from": "flow",
       "to": "shared"
     },
@@ -744,11 +769,6 @@
       "count": 4,
       "from": "flow",
       "to": "voting"
-    },
-    {
-      "count": 3,
-      "from": "flow",
-      "to": "webhooks"
     },
     {
       "count": 1,
@@ -794,6 +814,11 @@
       "count": 1,
       "from": "graph",
       "to": "meetings"
+    },
+    {
+      "count": 3,
+      "from": "graph",
+      "to": "paperless"
     },
     {
       "count": 3,
@@ -881,7 +906,7 @@
       "to": "voting"
     },
     {
-      "count": 7,
+      "count": 8,
       "from": "livevote",
       "to": "applications"
     },
@@ -911,12 +936,12 @@
       "to": "flow"
     },
     {
-      "count": 10,
+      "count": 11,
       "from": "livevote",
       "to": "gremien"
     },
     {
-      "count": 45,
+      "count": 46,
       "from": "livevote",
       "to": "meetings"
     },
@@ -952,6 +977,11 @@
     },
     {
       "count": 2,
+      "from": "livevote",
+      "to": "webhooks"
+    },
+    {
+      "count": 2,
       "from": "media",
       "to": "auth"
     },
@@ -1021,7 +1051,7 @@
       "to": "audit"
     },
     {
-      "count": 5,
+      "count": 7,
       "from": "notifications",
       "to": "auth"
     },
@@ -1031,14 +1061,89 @@
       "to": "gremien"
     },
     {
-      "count": 16,
+      "count": 24,
       "from": "notifications",
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 5,
       "from": "notifications",
       "to": "site_config"
+    },
+    {
+      "count": 4,
+      "from": "paperless",
+      "to": "audit"
+    },
+    {
+      "count": 8,
+      "from": "paperless",
+      "to": "shared"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "applications"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "auth"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "budget"
+    },
+    {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "documents"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "files"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "flow"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "gremien"
+    },
+    {
+      "count": 4,
+      "from": "paperless_filing",
+      "to": "meetings"
+    },
+    {
+      "count": 12,
+      "from": "paperless_filing",
+      "to": "paperless"
+    },
+    {
+      "count": 1,
+      "from": "paperless_filing",
+      "to": "pdf"
+    },
+    {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "protocol"
+    },
+    {
+      "count": 3,
+      "from": "paperless_filing",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "paperless_filing",
+      "to": "tickets"
     },
     {
       "count": 1,
@@ -1051,7 +1156,7 @@
       "to": "application_types"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "privacy",
       "to": "applications"
     },
@@ -1061,7 +1166,7 @@
       "to": "audit"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "privacy",
       "to": "auth"
     },
@@ -1091,9 +1196,14 @@
       "to": "meetings"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "privacy",
       "to": "notifications"
+    },
+    {
+      "count": 3,
+      "from": "privacy",
+      "to": "paperless"
     },
     {
       "count": 1,
@@ -1106,7 +1216,7 @@
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 4,
       "from": "privacy",
       "to": "tickets"
     },
@@ -1121,12 +1231,12 @@
       "to": "voting"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "protocol",
       "to": "applications"
     },
     {
-      "count": 6,
+      "count": 12,
       "from": "protocol",
       "to": "audit"
     },
@@ -1141,17 +1251,17 @@
       "to": "budget"
     },
     {
-      "count": 1,
+      "count": 2,
       "from": "protocol",
       "to": "documents"
     },
     {
-      "count": 9,
+      "count": 12,
       "from": "protocol",
       "to": "files"
     },
     {
-      "count": 4,
+      "count": 9,
       "from": "protocol",
       "to": "gremien"
     },
@@ -1166,7 +1276,7 @@
       "to": "media"
     },
     {
-      "count": 18,
+      "count": 32,
       "from": "protocol",
       "to": "meetings"
     },
@@ -1176,19 +1286,64 @@
       "to": "notifications"
     },
     {
-      "count": 4,
+      "count": 3,
+      "from": "protocol",
+      "to": "paperless"
+    },
+    {
+      "count": 5,
       "from": "protocol",
       "to": "pdf"
     },
     {
-      "count": 27,
+      "count": 35,
       "from": "protocol",
       "to": "shared"
     },
     {
-      "count": 12,
+      "count": 1,
+      "from": "protocol",
+      "to": "site_config"
+    },
+    {
+      "count": 15,
       "from": "protocol",
       "to": "voting"
+    },
+    {
+      "count": 1,
+      "from": "protocol",
+      "to": "webhooks"
+    },
+    {
+      "count": 3,
+      "from": "push_actions",
+      "to": "auth"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "calendar"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "push_actions",
+      "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "push_actions",
+      "to": "todos"
     },
     {
       "count": 1,
@@ -1246,19 +1401,29 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "tickets",
       "to": "applications"
     },
     {
-      "count": 7,
+      "count": 4,
+      "from": "tickets",
+      "to": "audit"
+    },
+    {
+      "count": 26,
       "from": "tickets",
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 17,
       "from": "tickets",
       "to": "files"
+    },
+    {
+      "count": 2,
+      "from": "tickets",
+      "to": "gremien"
     },
     {
       "count": 1,
@@ -1276,12 +1441,17 @@
       "to": "notifications"
     },
     {
-      "count": 18,
+      "count": 3,
+      "from": "tickets",
+      "to": "paperless"
+    },
+    {
+      "count": 41,
       "from": "tickets",
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "tickets",
       "to": "site_config"
     },
@@ -1291,12 +1461,17 @@
       "to": "todos"
     },
     {
+      "count": 2,
+      "from": "tickets",
+      "to": "webhooks"
+    },
+    {
       "count": 9,
       "from": "todos",
       "to": "applications"
     },
     {
-      "count": 20,
+      "count": 34,
       "from": "todos",
       "to": "auth"
     },
@@ -1341,12 +1516,17 @@
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "todos",
       "to": "notifications"
     },
     {
-      "count": 19,
+      "count": 3,
+      "from": "todos",
+      "to": "paperless"
+    },
+    {
+      "count": 31,
       "from": "todos",
       "to": "shared"
     },
@@ -1376,7 +1556,7 @@
       "to": "shared"
     },
     {
-      "count": 11,
+      "count": 12,
       "from": "voting",
       "to": "applications"
     },
@@ -1406,7 +1586,7 @@
       "to": "flow"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "voting",
       "to": "gremien"
     },
@@ -1416,7 +1596,7 @@
       "to": "meetings"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "voting",
       "to": "notifications"
     },
@@ -1426,7 +1606,12 @@
       "to": "shared"
     },
     {
-      "count": 3,
+      "count": 2,
+      "from": "voting",
+      "to": "webhooks"
+    },
+    {
+      "count": 4,
       "from": "webhooks",
       "to": "shared"
     }
@@ -1595,6 +1780,18 @@
       "path": "backend/app/modules/notifications"
     },
     {
+      "id": "paperless",
+      "layer": 5,
+      "name": "paperless",
+      "path": "backend/app/modules/paperless"
+    },
+    {
+      "id": "paperless_filing",
+      "layer": 1,
+      "name": "paperless_filing",
+      "path": "backend/app/modules/paperless_filing"
+    },
+    {
       "id": "pdf",
       "layer": 6,
       "name": "pdf",
@@ -1611,6 +1808,12 @@
       "layer": 2,
       "name": "protocol",
       "path": "backend/app/modules/protocol"
+    },
+    {
+      "id": "push_actions",
+      "layer": 1,
+      "name": "push_actions",
+      "path": "backend/app/modules/push_actions"
     },
     {
       "id": "search",

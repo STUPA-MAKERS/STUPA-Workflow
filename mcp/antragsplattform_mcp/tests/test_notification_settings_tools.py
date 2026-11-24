@@ -46,3 +46,27 @@ def test_update_notification_settings_sends_only_the_set_fields(
     assert fake_api.calls == [
         ("PUT", "/admin/notification-settings", {"taskReminderEnabled": False})
     ]
+
+
+class _FakePushApi(_FakeApi):
+    """Also record a delete."""
+
+    async def delete(self, path: str, **_kw: Any) -> Any:
+        self.calls.append(("DELETE", path, None))
+        return {}
+
+
+def test_push_tools_call_the_own_push_routes(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakePushApi()
+    monkeypatch.setattr(_common, "_client", fake)
+    prefs = [{"kind": "mention", "enabled": False}]
+    asyncio.run(admin.list_push_devices())
+    asyncio.run(admin.remove_push_device("d1"))
+    asyncio.run(admin.get_push_preferences())
+    asyncio.run(admin.set_push_preferences(prefs))
+    assert fake.calls == [
+        ("GET", "/push/devices", None),
+        ("DELETE", "/push/devices/d1", None),
+        ("GET", "/push/preferences", None),
+        ("PUT", "/push/preferences", {"preferences": prefs}),
+    ]

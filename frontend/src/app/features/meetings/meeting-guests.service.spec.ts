@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { meeting } from '../../../testing/meeting-fixtures';
 import { LINK, guestRow } from '../../../testing/guest-fixtures';
 import { MeetingGuestsService, guestName } from './meeting-guests.service';
+import { toastMock } from '../../../testing/toast';
 
 describe('MeetingGuestsService', () => {
   let svc: MeetingGuestsService;
@@ -36,7 +37,7 @@ describe('MeetingGuestsService', () => {
       admitAllMeetingGuests: jest.fn(() => of([guestRow({ status: 'admitted' })])),
       rotateJoinCode: jest.fn(() => of({ ...LINK, joinCode: '9XH2TR' })),
     };
-    toast = { success: jest.fn(), error: jest.fn() };
+    toast = toastMock();
     TestBed.configureTestingModule({
       providers: [
         MeetingGuestsService,

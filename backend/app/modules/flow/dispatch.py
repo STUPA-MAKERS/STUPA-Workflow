@@ -26,7 +26,6 @@ logger = logging.getLogger("app.flow.dispatch")
 WORKER_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "notify",
-        "webhook",
         "addToNextSession",
         "assignBudget",
         "assignBudgetFromField",
@@ -167,27 +166,26 @@ def build_worker_dispatcher(
     sessionmaker: async_sessionmaker[AsyncSession],
     settings: Settings | None = None,
 ) -> ChainActionDispatcher:
-    """Build the full flow action dispatcher: notify, webhook and the extras.
+    """Build the full flow action dispatcher: notify, the extras and Paperless.
 
     The API (`app.main`) and the arq worker use the same chain. So a transition that
     a vote close or an automatic advance fires runs the same actions as a
-    manual transition. `redis` is the arq pool. Without a pool the notify and webhook
-    dispatchers log the mails and the deliveries and keep them pending.
+    manual transition. `redis` is the arq pool. Without a pool the notify
+    dispatcher logs the mails.
 
-    The imports are local: the notify and webhook dispatchers import this module.
+    The imports are local: the notify dispatcher imports this module.
     """
     from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
     from app.modules.flow.mail_actions import NotificationActionDispatcher
-    from app.modules.flow.webhook_actions import WebhookActionDispatcher
+    from app.modules.flow.paperless_actions import PaperlessFilingDispatcher
     from app.modules.notifications.provider import mail_queue_from_pool
-    from app.modules.webhooks.queue import webhook_queue_from_pool
     from app.settings import get_settings
 
     resolved = settings or get_settings()
     return ChainActionDispatcher(
         [
             NotificationActionDispatcher(sessionmaker, mail_queue_from_pool(redis), resolved),
-            WebhookActionDispatcher(sessionmaker, webhook_queue_from_pool(redis), resolved),
             FlowExtrasActionDispatcher(sessionmaker),
+            PaperlessFilingDispatcher(redis),
         ]
     )

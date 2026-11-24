@@ -13,11 +13,18 @@ import type {
   VoteResult,
 } from '@core/api/models';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { IconComponent, MetaLineComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
-import { VoteBarsComponent } from '../voting/vote-bars.component';
-import { ElectionResultComponent } from '../voting/election-result/election-result.component';
+import {
+  IconComponent,
+  MetaLineComponent,
+  SegBarComponent,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
+import {
+  VoteBarsViewComponent,
+  ElectionResultViewComponent,
+  PollResultViewComponent,
+} from '@stupa-makers/ui-kit/views/voting';
 import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';
-import { PollResultComponent } from '../voting/poll-result/poll-result.component';
 import { pollCaption } from '../voting/poll.util';
 import {
   guestComposition,
@@ -113,11 +120,11 @@ interface BeamerText {
     TranslatePipe,
     IconComponent,
     QrCodeComponent,
-    ElectionResultComponent,
-    PollResultComponent,
+    ElectionResultViewComponent,
+    PollResultViewComponent,
     SegBarComponent,
     StatusTextComponent,
-    VoteBarsComponent,
+    VoteBarsViewComponent,
   ],
   templateUrl: './meeting-beamer.component.html',
   styleUrl: './meeting-beamer.component.scss',
@@ -211,11 +218,7 @@ export class MeetingBeamerComponent {
   }
 
   /** An election: "Wahl · 2 Posten", then "Gewählt: Anna". */
-  private describeElection(
-    v: BeamerVote,
-    election: ElectionConfig,
-    t: Translate,
-  ): BeamerText {
+  private describeElection(v: BeamerVote, election: ElectionConfig, t: Translate): BeamerText {
     const rules = electionCaption(election, v.round, t);
     const ballots = v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted });
     return {
@@ -225,7 +228,9 @@ export class MeetingBeamerComponent {
       rules,
       quorumWarning: null,
       passed: v.result === 'elected',
-      outcome: [electionResultLine(election, v.result, v.electionResult ?? null, t), ballots].join(' · '),
+      outcome: [electionResultLine(election, v.result, v.electionResult ?? null, t), ballots].join(
+        ' · ',
+      ),
       composition: null,
     };
   }

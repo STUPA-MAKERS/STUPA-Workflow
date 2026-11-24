@@ -109,7 +109,7 @@ describe('FormsListComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Gruppe anlegen' }));
       await userEvent.type(screen.getByLabelText(/Name \(DE\)/), 'Neu');
       c.patchGroup('textDe', ' T ');
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       expect(createApplicationTypeGroup).toHaveBeenCalledWith({ name: { de: 'Neu' }, text: { de: 'T' } });
       expect(c.groups().map((g: { id: string }) => g.id)).toEqual(['gA', 'gB', 'gC']);
       expect(toast.success).toHaveBeenCalled();
@@ -127,14 +127,14 @@ describe('FormsListComponent', () => {
       c.patchGroup('nameDe', 'P');
       c.patchGroup('nameEn', 'E');
       c.patchGroup('textEn', 'Text');
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       expect(updateApplicationTypeGroup).toHaveBeenCalledWith('gA', {
         name: { de: 'P', en: 'E' },
         text: { de: 'Mit **Kosten**', en: 'Text' },
       });
       expect(c.groups()[0].name).toEqual({ de: 'P', en: 'E' });
       c.groupAction(GROUPS[1], { id: 'edit', label: '' });
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       expect(toast.error).toHaveBeenCalled();
       expect(c.saving()).toBe(false);
     });
@@ -149,7 +149,7 @@ describe('FormsListComponent', () => {
       const createApplicationTypeGroup = jest.fn();
       const { c } = await setupGroups({ createApplicationTypeGroup });
       c.openGroupCreate();
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       expect(createApplicationTypeGroup).not.toHaveBeenCalled();
     });
 
@@ -230,12 +230,12 @@ describe('FormsListComponent', () => {
       const updateApplicationType = jest.fn();
       const { c } = await setupGroups({ createApplicationTypeGroup, deleteApplicationTypeGroup, updateApplicationType });
       c.patchGroup('nameDe', 'X');
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       c.deleteGroup();
       c.openGroupCreate();
       c.patchGroup('nameDe', 'X');
       c.saving.set(true);
-      c.saveGroup(new Event('submit'));
+      c.saveGroup();
       c.typeAction(grouped()[2], { id: 'group', label: '' });
       c.regroupTo.set('gA');
       c.saveRegroup();
@@ -298,7 +298,7 @@ describe('FormsListComponent', () => {
   it('navigates to the editor of the freshly created type', async () => {
     const { c, router } = await setup();
     c.patch('nameDe', 'Neuer Antrag');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(router.navigate).toHaveBeenCalledWith(['/admin/forms', 'f-new']);
   });
 });
@@ -420,7 +420,7 @@ describe('FormsListComponent — create dialog state', () => {
 
   it('refuses to submit a blank DE title', async () => {
     const { c, createApplicationType } = await setup();
-    c.submit(new Event('submit'));
+    c.submit();
     expect(createApplicationType).not.toHaveBeenCalled();
   });
 
@@ -428,7 +428,7 @@ describe('FormsListComponent — create dialog state', () => {
     const { c, createApplicationType } = await setup();
     c.patch('nameDe', 'X');
     c.saving.set(true);
-    c.submit(new Event('submit'));
+    c.submit();
     expect(createApplicationType).not.toHaveBeenCalled();
   });
 
@@ -437,7 +437,7 @@ describe('FormsListComponent — create dialog state', () => {
     c.patch('nameDe', '  Antrag  ');
     c.patch('nameEn', '  Request  ');
     c.patch('gremiumId', 'g1');
-    c.submit(new Event('submit'));
+    c.submit();
     const body = createApplicationType.mock.calls[0][0];
     expect(body.name).toEqual({ de: 'Antrag', en: 'Request' });
     expect(body.gremiumId).toBe('g1');
@@ -446,7 +446,7 @@ describe('FormsListComponent — create dialog state', () => {
   it('sends a null gremium id when none is chosen', async () => {
     const { c, createApplicationType } = await setup();
     c.patch('nameDe', 'Antrag');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(createApplicationType.mock.calls[0][0].gremiumId).toBeNull();
   });
 
@@ -455,7 +455,7 @@ describe('FormsListComponent — create dialog state', () => {
       api: { createApplicationType: jest.fn(() => throwError(() => new Error('x'))) },
     });
     c.patch('nameDe', 'Antrag');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(c.saving()).toBe(false);
     expect(toast.error).toHaveBeenCalled();
   });

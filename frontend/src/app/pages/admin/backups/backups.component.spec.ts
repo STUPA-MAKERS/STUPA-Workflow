@@ -1,11 +1,12 @@
 import { toastWith } from '../../../../testing/load-error';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Backup, BackupList } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { BackupsComponent } from './backups.component';
+import { toastMock } from '../../../../testing/toast';
 
 const DONE: Backup = {
   id: 'b-1',
@@ -60,7 +61,7 @@ function makeApi(o: ApiOverrides = {}) {
 }
 
 async function setup(api = makeApi()) {
-  const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+  const toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn() };
   const view = await render(BackupsComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
@@ -74,7 +75,7 @@ async function setup(api = makeApi()) {
 
 /** Opens the ⋮ of a row and picks one item. */
 async function pick(row: number, item: string): Promise<HTMLElement> {
-  await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[row]);
+  await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[row]);
   const entry = await screen.findByRole('menuitem', { name: item });
   await userEvent.click(entry);
   return entry;
@@ -87,7 +88,7 @@ describe('BackupsComponent', () => {
   it('loads the catalogue on init', async () => {
     const { api } = await setup();
     expect(api.listBackups).toHaveBeenCalled();
-    expect(screen.getByText('Vor der Abstimmung')).toBeInTheDocument();
+    expect(screen.getByText(/Vor der Abstimmung/)).toBeInTheDocument();
   });
 
   it('formats sizes in units a person can read', async () => {
@@ -101,6 +102,62 @@ describe('BackupsComponent', () => {
     expect(cmp.sizeLabel(3_221_225_472)).toBe('3,0 GB');
   });
 
+  it('shows the face with the error text when the list fails, and loads again on retry (002405)', async () => {
+    let fail = true;
+    const api = makeApi({
+      listBackups: jest.fn(() => (fail ? throwError(() => new Error('down')) : of(list()))),
+    });
+    const { fixture } = await setup(api);
+    expect(screen.getByText('Die Sicherungen konnten nicht geladen werden.', { selector: 'app-empty-state *' })).toBeInTheDocument();
+    fail = false;
+    (fixture.componentInstance as unknown as { retry: () => void }).retry();
+    fixture.detectChanges();
+    expect(api.listBackups).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Vor der Abstimmung/)).toBeInTheDocument();
+  });
+
+  it('builds the meta of a row from what the backup has, and ignores a menu pick of an unknown row', async () => {
+    const FAILED: Backup = { ...DONE, id: 'b-f', status: 'failed', error: 'MinIO weg', objectCount: null, sizeBytes: undefined, note: '  ' };
+    const BARE: Backup = { ...DONE, id: 'b-g', status: 'failed', error: undefined, objectCount: undefined, sizeBytes: null, note: null };
+    const api = makeApi({ listBackups: jest.fn(() => of(list({ items: [FAILED, BARE, PINNED] }))) });
+    const { fixture } = await setup(api);
+    const cmp = fixture.componentInstance as unknown as {
+      list: () => { state: string; data?: { meta: string[]; actions: unknown[] }[]; retry?: () => void };
+      onRowAction: (id: string, key: string) => void;
+    };
+    const data = cmp.list().data ?? [];
+    expect(data[0].meta).toEqual(['Manuell', 'MinIO weg']);
+    expect(data[1].meta).toEqual(['Manuell']);
+    expect(data[0].actions).toEqual([]);
+    expect(data[2].meta).toContain('angeheftet');
+    cmp.onRowAction('missing', 'pin');
+    expect(api.updateBackup).not.toHaveBeenCalled();
+    cmp.onRowAction('b-2', 'pin');
+    expect(api.updateBackup).toHaveBeenCalled();
+  });
+
+  it('retries from the error state of the list', async () => {
+    let fail = true;
+    const api = makeApi({ listBackups: jest.fn(() => (fail ? throwError(() => new Error('down')) : of(list()))) });
+    const { fixture } = await setup(api);
+    const cmp = fixture.componentInstance as unknown as { list: () => { state: string; retry?: () => void } };
+    expect(cmp.list().state).toBe('error');
+    fail = false;
+    cmp.list().retry?.();
+    expect(cmp.list().state).toBe('ready');
+  });
+
+  it('shows grey rows while the list loads', async () => {
+    const { fixture } = await setup(makeApi({ listBackups: jest.fn(() => NEVER) }));
+    expect((fixture.componentInstance as unknown as { list: () => { state: string } }).list().state).toBe('loading');
+  });
+
+  it('shows the empty face when there are no backups', async () => {
+    const api = makeApi({ listBackups: jest.fn(() => of(list({ items: [] }))) });
+    await setup(api);
+    expect(screen.getByText('Noch keine Sicherungen vorhanden.')).toBeInTheDocument();
+  });
+
   it('explains itself instead of offering a button when backups are not configured', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ enabled: false }))) });
     await setup(api);
@@ -110,7 +167,7 @@ describe('BackupsComponent', () => {
   it('hides restore when the platform cannot decrypt its own archives', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
     await setup(api);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[0]);
     await screen.findByRole('menuitem', { name: 'Herunterladen' });
     expect(screen.queryByRole('menuitem', { name: 'Wiederherstellen' })).not.toBeInTheDocument();
   });
@@ -163,10 +220,10 @@ describe('BackupsComponent', () => {
   it('names the archive in each row menu and draws a pin, not a paperclip', async () => {
     await setup();
     const labels = screen
-      .getAllByRole('button', { name: /^Aktionen: / })
+      .getAllByRole('button', { name: /^Weitere Aktionen: / })
       .map((b) => b.getAttribute('aria-label'));
     expect(labels.every((l) => /: \d{2}\.\d{2}\.\d{4}/.test(l ?? ''))).toBe(true);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[0]);
     await screen.findByRole('menuitem', { name: 'Anheften' });
     const container = document.body;
     expect(container.querySelector('[data-icon="clip"], [data-icon="clipslash"]')).toBeNull();
@@ -202,7 +259,7 @@ describe('BackupsComponent', () => {
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'RESTORE');
       await userEvent.click(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!);
       expect(api.restoreBackup).toHaveBeenCalledWith('b-1');
-      expect(toast.show).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i), 'warning');
+      expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i));
     });
   });
 
@@ -217,7 +274,7 @@ describe('BackupsComponent', () => {
     /** The second row is pinned, so its delete item is disabled. */
     it('refuses a pinned archive in the UI, not only in the API', async () => {
       await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[1]);
+      await userEvent.click(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })[1]);
       const del = await screen.findByRole('menuitem', { name: 'Löschen' });
       expect(del).toHaveAttribute('aria-disabled', 'true');
     });
@@ -345,7 +402,7 @@ describe('BackupsComponent', () => {
         listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
         getBackup: jest.fn(() => of({ ...RUNNING, status: 'failed' as const, error: 'pg_dump failed' })),
       });
-      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const toast = toastMock();
       const view = await render(BackupsComponent, {
         providers: [
           { provide: AdminApiService, useValue: api },

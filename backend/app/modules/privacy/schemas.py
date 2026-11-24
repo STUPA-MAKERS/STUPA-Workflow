@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from app.modules.paperless.schemas import FiledDocumentOut
 from app.shared.schemas import FrozenCamelModel
 
 SubjectType = Literal["applicant", "principal"]
@@ -15,7 +16,12 @@ ErasureStatus = Literal["open", "executed", "rejected"]
 
 
 class ErasureRequestOut(FrozenCamelModel, frozen=True):
-    """An erasure request."""
+    """An erasure request.
+
+    ``paperlessDocuments`` lists the documents that the platform filed in Paperless for
+    the data of the request. They stay there after the erasure
+    (§F/administration/privacy/002532).
+    """
 
     id: UUID
     created_at: datetime = Field(alias="createdAt")
@@ -28,6 +34,33 @@ class ErasureRequestOut(FrozenCamelModel, frozen=True):
     handled_by: str | None = Field(default=None, alias="handledBy")
     handled_at: datetime | None = Field(default=None, alias="handledAt")
     reason: str | None = None
+    paperless_documents: tuple[FiledDocumentOut, ...] = Field(
+        default=(), alias="paperlessDocuments"
+    )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")
+
+
+class TicketMailCountOut(FrozenCamelModel, frozen=True):
+    """The mails of an erased address in one Postfach that stay on the mail server.
+
+    ``mailbox`` is the address of the Postfach; null for a Postfach that is removed.
+    ``count`` is the number of mails that the platform imported or sent (002747).
+    """
+
+    mailbox: str | None = None
+    count: int
+
+
+class PrincipalErasureOut(FrozenCamelModel, frozen=True):
+    """What stays in Paperless and on the mail servers after the erasure of an account.
+
+    §F/administration/privacy/002532, 002747
+    """
+
+    paperless_documents: tuple[FiledDocumentOut, ...] = Field(
+        default=(), alias="paperlessDocuments"
+    )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")
 
 
 class ErasureRejectBody(FrozenCamelModel, frozen=True):
@@ -58,9 +91,14 @@ class EmailErasureOut(FrozenCamelModel, frozen=True):
     """What the erasure of an address anonymized.
 
     ``principalId`` names an account under the address. Its erasure is a separate
-    step, because it deactivates the account.
+    step, because it deactivates the account. ``paperlessDocuments`` lists the documents
+    of the anonymized Anträge that stay in Paperless (002532).
     """
 
     applications: int
     tickets: int
     principal_id: UUID | None = Field(default=None, alias="principalId")
+    paperless_documents: tuple[FiledDocumentOut, ...] = Field(
+        default=(), alias="paperlessDocuments"
+    )
+    ticket_mails: tuple[TicketMailCountOut, ...] = Field(default=(), alias="ticketMails")

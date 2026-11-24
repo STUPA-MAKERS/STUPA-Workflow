@@ -30,7 +30,6 @@ pytestmark = pytest.mark.integration
 _SETTINGS = {
     "wikiUrl": "https://wiki.example.org/hilfe",
     "publicEnabled": False,
-    "notifyNew": False,
     "retentionMonths": 3,
 }
 

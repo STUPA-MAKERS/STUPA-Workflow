@@ -16,20 +16,22 @@ from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import _REASONS
 from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
-from app.modules.site_config.branding import Branding, HelpSettings, TicketSettings
+from app.modules.site_config.branding import Branding, HelpSettings
 from app.modules.tickets import mails as mails
-from app.modules.tickets.models import Ticket, TicketNote
+from app.modules.tickets.models import PLATFORM_AREA_ID, Ticket, TicketArea, TicketNote
 from app.settings import load_settings
 from tests.unit.modules.tickets.fakes import ScriptedSession
 
 SETTINGS = load_settings()
+#: The Bereiche that the mails asked ``area_workers`` for, in call order.
+ASKED_AREAS: list[object] = []
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
 
 
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 5,
+        "number": "AAAA0005",
         "kind": "question",
         "title": "Wie?",
         "body": "b",
@@ -87,14 +89,19 @@ def branding(monkeypatch: pytest.MonkeyPatch) -> dict[str, Branding]:
 def managers(monkeypatch: pytest.MonkeyPatch) -> list[tuple[uuid.UUID, str | None, str | None]]:
     rows: list[tuple[uuid.UUID, str | None, str | None]] = []
 
-    async def _managers(_session: object) -> list[tuple[uuid.UUID, str | None, str | None]]:
+    async def _managers(
+        _session: object, areas: object = None, **_kw: object
+    ) -> list[tuple[uuid.UUID, str | None, str | None]]:
+        ASKED_AREAS.append(areas)
         return rows
 
-    monkeypatch.setattr(mails, "ticket_managers", _managers)
+    monkeypatch.setattr(mails, "area_workers", _managers)
     return rows
 
 
-async def _created(session: ScriptedSession, ticket_id: uuid.UUID) -> bool:
+async def _created(session: ScriptedSession, ticket_id: uuid.UUID, *, notify: bool = True) -> bool:
+    """Send ``ticket_created`` with the Bereich ``Plattform`` in the store."""
+    session.put(TicketArea(id=PLATFORM_AREA_ID, name="Plattform", platform=True, notify_new=notify))
     return await mails.notify_ticket_created(
         queue=None,
         settings=SETTINGS,
@@ -143,7 +150,7 @@ async def test_created_goes_to_the_managers_without_the_reporter(
     (mail,) = sent
     assert mail["to"] == ["a@x.org", "b@x.org"]
     assert mail["kind"] == "ticket_created"
-    assert mail["context"]["number"] == "T-0005"
+    assert mail["context"]["number"] == "T-AAAA0005"
     assert mail["context"]["reporter"] == "gast@x.org"
     assert mail["link"].url.endswith(f"/tickets/{ticket.id}")
 
@@ -183,18 +190,35 @@ async def test_created_skips_without_ticket_switch_or_recipients(
     session = ScriptedSession()
     session.put(ticket)
     assert await _created(session, ticket.id) is False
-    branding["value"] = Branding(tickets=TicketSettings(notifyNew=False))
     managers.append((uuid.uuid4(), "M", "m@x.org"))
-    assert await _created(session, ticket.id) is False
+    assert await _created(session, ticket.id, notify=False) is False
     assert sent == []
 
 
+async def test_created_goes_to_the_team_of_the_bereich_only(
+    sent: list[dict[str, Any]],
+    managers: list[tuple[uuid.UUID, str | None, str | None]],
+) -> None:
+    """Spec 002717: the mail asks for the persons of the Bereich of the ticket."""
+    area = TicketArea(id=uuid.uuid4(), name="Finanzen", platform=False, notify_new=True)
+    ticket = _ticket(area_id=area.id)
+    managers.append((uuid.uuid4(), "M", "m@x.org"))
+    session = ScriptedSession()
+    session.put(ticket, area)
+    assert await _created(session, ticket.id) is True
+    assert ASKED_AREAS[-1] == frozenset({area.id})
+    assert sent[-1]["to"] == ["m@x.org"]
+
+
 async def test_created_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _boom(_session: object) -> Branding:
+    async def _boom(_session: object, _areas: object = None) -> list[object]:
         raise RuntimeError("db down")
 
-    monkeypatch.setattr(mails, "active_branding", _boom)
-    assert await _created(ScriptedSession(), uuid.uuid4()) is False
+    monkeypatch.setattr(mails, "area_workers", _boom)
+    ticket = _ticket()
+    session = ScriptedSession()
+    session.put(ticket)
+    assert await _created(session, ticket.id) is False
 
 
 async def test_received_confirms_in_the_language_of_the_report(
@@ -241,13 +265,13 @@ async def test_received_leaves_out_the_title_of_a_report_without_a_session(
     env = SandboxedEnvironment()
     for lang, quoted, tab in (("de", "„Wie?“", "„Tickets“"), ("en", '"Wie?"', '"Tickets"')):
         body = env.from_string(mails.TICKET_RECEIVED_BODY[lang])
-        linked = body.render(title="Wie?", number="T-0005", wikiUrl="w", link="L")
+        linked = body.render(title="Wie?", number="T-AAAA0005", wikiUrl="w", link="L")
         assert quoted in linked
         assert tab in linked
-        bare = body.render(title="", number="T-0005", wikiUrl="w", link="")
+        bare = body.render(title="", number="T-AAAA0005", wikiUrl="w", link="")
         assert "„" not in bare
         assert '"' not in bare
-        assert "T-0005" in bare
+        assert "T-AAAA0005" in bare
 
 
 async def test_received_skips_without_ticket_or_address(
@@ -334,7 +358,7 @@ async def test_a_message_of_the_reporter_goes_to_the_assignee(
     assert mail["to"] == ["mia@x.org"]
     assert mail["kind"] == "ticket_message"
     assert mail["context"] == {
-        "number": "T-0005",
+        "number": "T-AAAA0005",
         "title": "Wie?",
         "reporter": "Rex",
         "message": "Danke!",
@@ -416,7 +440,7 @@ async def test_a_public_answer_of_the_team_goes_to_the_reporter(
     assert mail["kind"] == "ticket_answer"
     assert mail["lang"] == "en"
     assert mail["context"] == {
-        "number": "T-0005",
+        "number": "T-AAAA0005",
         "title": "Wie?",
         "author": "Mia",
         "message": "Oben rechts.",

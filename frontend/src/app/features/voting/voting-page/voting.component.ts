@@ -178,7 +178,7 @@ const LIVE_MAX_PAGES = 4;
  *   no vote is open in the detail (also on a phone, from the list), or when the detail
  *   shows an ended vote of the same meeting. A vote that the channel replays on a
  *   connect was open before, so it does not open by itself. On the load the page opens
- *   no vote by itself (§ 000664): the detail pane says "Keine Abstimmung geöffnet".
+ *   no vote by itself (§ui-kit:000664): the detail pane says "Keine Abstimmung geöffnet".
  * - One pane at a time (narrow, phone): the list, then the vote with a way back.
  * - Side by side it is a pane page (`styles.scss`): the panes fill the free height and
  *   scroll by themselves.
@@ -355,7 +355,7 @@ export class VotingComponent implements OnDestroy {
     );
   });
 
-  /** The search placeholder with the number of votes (§ 000661). */
+  /** The search placeholder with the number of votes (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,

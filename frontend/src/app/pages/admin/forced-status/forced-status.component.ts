@@ -2,25 +2,22 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ApiClient } from '@core/api/api-client.service';
 import { FORCE_REASONS, type ForcedEvent, type ForcedPathCount } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { isoDay, localToday } from '@shared/date-format';
 import { i18nLabel } from '@shared/forms/i18n-text';
-import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import {
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-  ListItemComponent,
-  PageHeaderComponent,
+  type ListRow,
+  type LoadState,
   RangeChipComponent,
   type RangeValue,
-  SkeletonComponent,
-  StickyBarComponent,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { RecordsScreenComponent, ScreenFiltersDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
+import { hitCount, listSearch } from '../list-search';
 
 /** The default period: the last 90 days (spec 001651, as the server). */
 export const DEFAULT_DAYS = 90;
@@ -37,7 +34,7 @@ export function pathValue(fromKey: string | null, toKey: string): string {
 }
 
 /**
- * "Erzwungene Status" (specs 001651, 001652): one list of the forced status changes, the
+ * "Erzwungene Statusänderungen" (specs 001651, 001652): one list of the forced status changes, the
  * newest first, with filters for the reason, the path (from state, to state) and the
  * period (the last 90 days by default). A row opens the application. A forced change from
  * before the reason list reads "Ohne Grund". The page needs `audit.read`.
@@ -47,20 +44,15 @@ export function pathValue(fromKey: string | null, toKey: string): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
     TranslatePipe,
-    LocalizedDatePipe,
-    BreadcrumbsComponent,
-    EmptyStateComponent,
     FilterSelectComponent,
-    ListItemComponent,
-    LoadStateComponent,
-    PageHeaderComponent,
     RangeChipComponent,
-    SkeletonComponent,
-    StickyBarComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
   ],
   templateUrl: './forced-status.component.html',
-  styleUrl: './forced-status.component.scss',
 })
 export class ForcedStatusComponent {
   private readonly api = inject(ApiClient);
@@ -92,9 +84,35 @@ export class ForcedStatusComponent {
   );
   readonly filtered = computed(() => !!this.reason() || !!this.path());
   /** The first load shows skeleton rows; a reload keeps the list. */
-  readonly loadState = computed<LoadState>(() =>
-    this.failed() ? 'error' : this.loading() && !this.events().length ? 'loading' : 'ok',
-  );
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
+  /** The rows of the records screen (§ui-kit:002257): a reload keeps the rows that are there. */
+  readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    const rows = this.search.filter(
+      this.events().map((e) => this.rowOf(e)),
+      (r) => [r.title, ...(r.meta ?? [])],
+    );
+    if (this.failed())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.forced.loadError'),
+        retry: () => this.load(),
+      };
+    if (this.loading()) return { state: 'loading', previous: rows };
+    if (rows.length) return { state: 'ready', data: rows };
+    if (this.search.words().length)
+      return { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('admin.list.noHits') };
+    return this.filtered()
+      ? {
+          state: 'empty',
+          icon: 'searchOff',
+          heading: this.i18n.translate('admin.forced.emptyFiltered'),
+        }
+      : { state: 'empty', icon: 'flow', heading: this.i18n.translate('admin.forced.empty') };
+  });
 
   private seq = 0;
 
@@ -177,6 +195,17 @@ export class ForcedStatusComponent {
     const lang = this.i18n.uiLocale();
     const none = this.i18n.translate('admin.forced.noState');
     return `${i18nLabel(e.fromLabel, lang, '') || none} → ${i18nLabel(e.toLabel, lang, '')}`;
+  }
+
+  /** One record: the title, then the time, the path, the reason and the note. */
+  private rowOf(e: ForcedEvent): ListRow {
+    const at = formatMoment(e.at, this.i18n.formatLocale(), 'medium');
+    return {
+      id: e.applicationId + e.at,
+      title: this.titleOf(e),
+      meta: [at, this.pathOf(e), this.reasonLabel(e.reason), ...(e.note ? [e.note] : [])],
+      link: { commands: ['/applications', e.applicationId] },
+    };
   }
 
   titleOf(e: ForcedEvent): string {

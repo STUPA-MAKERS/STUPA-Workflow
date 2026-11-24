@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { PushDeviceService, type PushSupport } from '@core/pwa/push-device.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -14,7 +15,7 @@ import {
 import type { TranslationKey } from '@core/i18n/translations';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { retryLoadError } from '../../../testing/load-error';
-import { ActivityComponent, KIND_ICON, groupByDay, splitUrl } from './activity.component';
+import { ActivityComponent, KIND_ICON, dayLabel, splitUrl } from './activity.component';
 
 const NOW = new Date();
 const at = (daysAgo: number, hour = 10): string =>
@@ -42,7 +43,22 @@ function page(entries: readonly ActivityEntry[], nextCursor: string | null = nul
   return { entries, nextCursor, seenAt: null, readAt: '2026-11-17T10:00:00Z' };
 }
 
-async function setup(answers: Array<() => Observable<ActivityPage>>) {
+/** The push state of the test device. */
+interface PushMock {
+  support: PushSupport;
+  endpoint: string | null;
+  enable: jest.Mock;
+}
+
+function pushDevice(o: Partial<PushMock> = {}) {
+  return {
+    support: jest.fn(() => o.support ?? 'unsupported'),
+    endpoint: jest.fn(() => Promise.resolve(o.endpoint ?? null)),
+    enable: o.enable ?? jest.fn(() => Promise.resolve({})),
+  };
+}
+
+async function setup(answers: Array<() => Observable<ActivityPage>>, push: Partial<PushMock> = {}) {
   localStorage.setItem('ap.locale', 'de');
   const queries: ActivityQuery[] = [];
   const api = {
@@ -54,6 +70,7 @@ async function setup(answers: Array<() => Observable<ActivityPage>>) {
     markSeen: jest.fn(() => of(undefined)),
   };
   const rail = { activitySeen: jest.fn() };
+  const device = pushDevice(push);
   const r = await render(ActivityComponent, {
     providers: [
       provideRouter([]),
@@ -62,44 +79,75 @@ async function setup(answers: Array<() => Observable<ActivityPage>>) {
       { provide: USE_MOCK_API, useValue: false },
       { provide: ActivityApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
+      { provide: PushDeviceService, useValue: device },
     ],
   });
-  return { ...r, api, rail, queries, cmp: r.fixture.componentInstance };
+  return { ...r, api, rail, queries, device, cmp: r.fixture.componentInstance };
 }
 
 describe('ActivityComponent', () => {
   afterEach(() => localStorage.clear());
 
-  /** § F/collaboration/activity/001301 and 001302: the start page parts above the list. */
-  it('shows "Antrag stellen" in the header and the live cards above the list', async () => {
+  /** § F/collaboration/notifications/002550 and F/collaboration/activity/001302. */
+  it('shows the bell as the one action of the head, no "Antrag stellen", the live cards above the list', async () => {
     const { container } = await setup([() => of(page([entry()]))]);
-    const apply = screen.getByRole('link', { name: /Antrag stellen/ });
-    expect(apply).toHaveAttribute('href', '/apply');
-    expect(apply.closest('app-page-header')).not.toBeNull();
+    const bell = screen.getByRole('button', { name: 'Benachrichtigungen' });
+    expect(bell.closest('app-page-header')).not.toBeNull();
+    expect(screen.queryByRole('link', { name: /Antrag stellen/ })).toBeNull();
     expect(container.querySelector('app-fab')).toBeNull();
     const live = container.querySelector('app-live-cards');
     expect(live?.closest('.act__scroll')).not.toBeNull();
   });
 
-  it('shows "Antrag stellen" as the floating button on a phone', async () => {
-    const original = window.matchMedia;
-    window.matchMedia = ((query: string) => ({
-      matches: query === '(max-width: 767.98px)',
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia;
-    try {
-      const { container } = await setup([() => of(page([entry()]))]);
-      expect(container.querySelector('app-page-header a[href="/apply"]')).toBeNull();
-      expect(container.querySelector('app-fab')).not.toBeNull();
-    } finally {
-      window.matchMedia = original;
-    }
+  it('switches on push first when the device can take push and has none, then opens the settings', async () => {
+    const { device, fixture } = await setup([() => of(page([]))], { support: 'ready' });
+    const nav = jest
+      .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+      .mockResolvedValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Benachrichtigungen' }));
+    await fixture.whenStable();
+    expect(device.enable).toHaveBeenCalledTimes(1);
+    expect(nav).toHaveBeenCalledWith('/account/notifications');
+  });
+
+  it('opens the settings although the browser refuses the permission', async () => {
+    const enable = jest.fn(async () => {
+      await Promise.resolve();
+      throw new Error('denied');
+    });
+    const { fixture } = await setup([() => of(page([]))], { support: 'ready', enable });
+    const nav = jest
+      .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+      .mockResolvedValue(true);
+    await fixture.componentInstance.openNotifications();
+    expect(enable).toHaveBeenCalled();
+    expect(nav).toHaveBeenCalledWith('/account/notifications');
+  });
+
+  it.each([
+    ['a device with push already', { support: 'ready', endpoint: 'https://fcm.googleapis.com/x' }],
+    ['a device without push', { support: 'unsupported' }],
+    ['blocked notifications', { support: 'blocked' }],
+  ] as const)('opens the settings at once for %s', async (_name, push) => {
+    const { device, fixture } = await setup([() => of(page([]))], push);
+    const nav = jest
+      .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+      .mockResolvedValue(true);
+    await fixture.componentInstance.openNotifications();
+    expect(device.enable).not.toHaveBeenCalled();
+    expect(nav).toHaveBeenCalledWith('/account/notifications');
+  });
+
+  it('asks for no permission while the feature push is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['push']));
+    const { device, fixture } = await setup([() => of(page([]))], { support: 'ready' });
+    localStorage.removeItem('ap.features.off');
+    const nav = jest
+      .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+      .mockResolvedValue(true);
+    await fixture.componentInstance.openNotifications();
+    expect(device.enable).not.toHaveBeenCalled();
+    expect(nav).toHaveBeenCalledWith('/account/notifications');
   });
 
   it('groups the rows by day and links each row to its item', async () => {
@@ -108,9 +156,29 @@ describe('ActivityComponent', () => {
         of(
           page([
             entry({ isNew: true }),
-            entry({ id: 'e2', at: at(1), itemKind: 'application', itemTitle: null, change: 'application.edited', actor: { kind: 'system' } }),
-            entry({ id: 'e3', at: at(9), itemKind: 'ticket', change: 'ticket.status', status: 'new', actor: { kind: 'person', name: null } }),
-            entry({ id: 'e4', at: at(9), itemTitle: 'Ersti-Gruppe anlegen', url: '/todos?card=c9', change: 'todo.archived' }),
+            entry({
+              id: 'e2',
+              at: at(1),
+              itemKind: 'application',
+              itemTitle: null,
+              change: 'application.edited',
+              actor: { kind: 'system' },
+            }),
+            entry({
+              id: 'e3',
+              at: at(9),
+              itemKind: 'ticket',
+              change: 'ticket.status',
+              status: 'new',
+              actor: { kind: 'person', name: null },
+            }),
+            entry({
+              id: 'e4',
+              at: at(9),
+              itemTitle: 'Ersti-Gruppe anlegen',
+              url: '/todos?card=c9',
+              change: 'todo.archived',
+            }),
           ]),
         ),
     ]);
@@ -120,8 +188,14 @@ describe('ActivityComponent', () => {
     expect(screen.getByText('Ohne Titel')).toBeInTheDocument();
     expect(screen.getByText('System · Angaben geändert')).toBeInTheDocument();
     expect(screen.getByText('Ohne Namen · Status: Neu')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Flyer drucken/ })[0]).toHaveAttribute('href', '/tasks/todo/c1');
-    expect(screen.getAllByRole('link', { name: /Ersti-Gruppe anlegen/ })[0]).toHaveAttribute('href', '/todos?card=c9');
+    expect(screen.getAllByRole('link', { name: /Flyer drucken/ })[0]).toHaveAttribute(
+      'href',
+      '/tasks/todo/c1',
+    );
+    expect(screen.getAllByRole('link', { name: /Ersti-Gruppe anlegen/ })[0]).toHaveAttribute(
+      'href',
+      '/todos?card=c9',
+    );
     expect(screen.getAllByText(/Neu:/).length).toBe(1);
     expect(rail.activitySeen).toHaveBeenCalledTimes(1);
     expect(api.markSeen).toHaveBeenCalledWith('2026-11-17T10:00:00Z');
@@ -132,7 +206,9 @@ describe('ActivityComponent', () => {
     expect(cmp.actor(entry({ own: true }))).toBe('Du');
     expect(cmp.actor(entry({ actor: { kind: 'applicant' } }))).toBe('Antragsteller:in');
     expect(cmp.actor(entry({ actor: { kind: 'committee' } }))).toBe('Gremium');
-    expect(cmp.change(entry({ itemKind: 'meeting', change: 'meeting.status', status: 'live' }))).toBe('Status: Live');
+    expect(
+      cmp.change(entry({ itemKind: 'meeting', change: 'meeting.status', status: 'live' })),
+    ).toBe('Status: Live');
     expect(cmp.change(entry({ change: 'todo.archived', detail: null }))).toBe('Archiviert');
     expect(cmp.icon(entry({ itemKind: 'meeting' }))).toBe(KIND_ICON.meeting);
   });
@@ -149,7 +225,11 @@ describe('ActivityComponent', () => {
 
   /** Spec 001273: the choice of "Von" stays in this browser. */
   it('shows the own actions on request and keeps the choice', async () => {
-    const { cmp, fixture, queries, api } = await setup([() => of(page([])), () => of(page([])), () => of(page([]))]);
+    const { cmp, fixture, queries, api } = await setup([
+      () => of(page([])),
+      () => of(page([])),
+      () => of(page([])),
+    ]);
     expect(queries[0].own).toBe(false);
     cmp.setWho('own');
     fixture.detectChanges();
@@ -198,7 +278,10 @@ describe('ActivityComponent', () => {
   });
 
   it('shows a load error and loads again on retry', async () => {
-    const { fixture } = await setup([() => throwError(() => new Error('down')), () => of(page([entry()]))]);
+    const { fixture } = await setup([
+      () => throwError(() => new Error('down')),
+      () => of(page([entry()])),
+    ]);
     expect(fixture.componentInstance.error()).toBe(true);
     retryLoadError();
     fixture.detectChanges();
@@ -208,11 +291,18 @@ describe('ActivityComponent', () => {
   it('works when the browser blocks the storage', async () => {
     const realGet = Storage.prototype.getItem;
     const realSet = Storage.prototype.setItem;
-    const get = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key: string) {
+    const get = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
       if (key === ActivityComponent.OWN_KEY) throw new Error('blocked');
       return realGet.call(this, key);
     });
-    const set = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+    const set = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
       if (key === ActivityComponent.OWN_KEY) throw new Error('blocked');
       realSet.call(this, key, value);
     });
@@ -235,19 +325,14 @@ describe('splitUrl', () => {
   });
 });
 
-describe('groupByDay', () => {
+describe('dayLabel', () => {
   const t = (key: TranslationKey): string => key;
   const now = new Date(2026, 10, 18, 12, 0);
 
-  it('labels today, yesterday and older days and keeps the order', () => {
-    const rows = [
-      entry({ id: 'a', at: new Date(2026, 10, 18, 9).toISOString() }),
-      entry({ id: 'b', at: new Date(2026, 10, 18, 8).toISOString() }),
-      entry({ id: 'c', at: new Date(2026, 10, 17, 9).toISOString() }),
-      entry({ id: 'd', at: new Date(2026, 10, 16, 9).toISOString() }),
-    ];
-    const days = groupByDay(rows, 'de', t, now);
-    expect(days.map((d) => d.label)).toEqual(['activity.today', 'activity.yesterday', 'Mo, 16.11.2026']);
-    expect(days[0].entries.map((e) => e.id)).toEqual(['a', 'b']);
+  it('labels today, yesterday and older days', () => {
+    const label = (d: Date): string => dayLabel(d.toISOString(), 'de', t, now);
+    expect(label(new Date(2026, 10, 18, 9))).toBe('activity.today');
+    expect(label(new Date(2026, 10, 17, 9))).toBe('activity.yesterday');
+    expect(label(new Date(2026, 10, 16, 9))).toBe('Mo, 16.11.2026');
   });
 });

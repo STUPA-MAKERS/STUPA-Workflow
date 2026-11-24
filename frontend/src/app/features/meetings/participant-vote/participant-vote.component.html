@@ -1,5 +1,7 @@
 @if (state.vote(); as v) {
-  <app-vote-panel
+  <app-vote-panel-view
+    [meetingLink]="meetingLink"
+    [applicationLink]="applicationLink"
     [layout]="layout()"
     [context]="context()"
     [vote]="v"

@@ -131,7 +131,7 @@
             <app-load-more [label]="'admin.translations.more' | t" (more)="more()" />
           }
         } @else {
-          <app-empty-state icon="searchOff" rows="3" [heading]="'admin.translations.noMatch' | t" />
+          <app-empty-state fill icon="searchOff" rows="3" [heading]="'admin.translations.noMatch' | t" />
         }
       </app-section>
     </ng-template>
@@ -154,39 +154,54 @@
 
 <app-dialog
   [open]="!!dialog()"
-  [title]="(dialog()?.code ? 'admin.translations.renameTitle' : 'admin.translations.createTitle') | t"
+  [heading]="
+    (dialog()?.code ? 'admin.translations.renameTitle' : 'admin.translations.createTitle') | t
+  "
   [closeLabel]="'action.close' | t"
   (closed)="dialog.set(null)"
+  [actions]="[
+    { key: 'dialog', label: ('action.cancel' | t) },
+    {
+      key: 'submitDialog',
+      label: ((dialog()?.code ? 'action.save' : 'admin.common.create') | t),
+      kind: 'main',
+      disabled: !dialogValid(),
+      busy: dialogBusy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'dialog'
+      ? dialog.set(null)
+      : $event.key === 'submitDialog'
+        ? submitDialog()
+        : null
+  "
 >
-  @if (dialog(); as d) {
-    <form class="tr__form" (submit)="$event.preventDefault(); submitDialog()">
-      @if (d.code === null) {
+  <ng-template dialogBody>
+    @if (dialog(); as d) {
+      <form class="tr__form" (submit)="$event.preventDefault(); submitDialog()">
+        @if (d.code === null) {
+          <app-input
+            [label]="'admin.translations.code' | t"
+            name="code"
+            [required]="true"
+            [error]="codeError()"
+            [ngModel]="d.newCode"
+            (ngModelChange)="patchDialog({ newCode: $event.trim() })"
+          />
+        }
         <app-input
-          [label]="'admin.translations.code' | t"
-          name="code"
+          [label]="'admin.translations.name' | t"
+          name="name"
           [required]="true"
-          [error]="codeError()"
-          [ngModel]="d.newCode"
-          (ngModelChange)="patchDialog({ newCode: $event.trim() })"
+          [ngModel]="d.name"
+          (ngModelChange)="patchDialog({ name: $event })"
         />
-      }
-      <app-input
-        [label]="'admin.translations.name' | t"
-        name="name"
-        [required]="true"
-        [ngModel]="d.name"
-        (ngModelChange)="patchDialog({ name: $event })"
-      />
-      @if (dialogError(); as err) {
-        <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
-      }
-      <button type="submit" hidden></button>
-    </form>
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="dialog.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!dialogValid()" [loading]="dialogBusy()" (click)="submitDialog()">
-      {{ (dialog()?.code ? 'action.save' : 'admin.common.create') | t }}
-    </app-button>
-  </div>
+        @if (dialogError(); as err) {
+          <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
+        }
+        <button type="submit" hidden></button>
+      </form>
+    }
+  </ng-template>
 </app-dialog>

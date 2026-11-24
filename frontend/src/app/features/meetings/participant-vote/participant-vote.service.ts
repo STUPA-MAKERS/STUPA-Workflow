@@ -6,7 +6,7 @@ import type { Meeting, MeetingVote, MyBallot, Vote } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../../layout/rail-status.service';
-import type { BallotCaster, BallotFailure } from '../../voting/ballot/ballot.component';
+import type { BallotCaster, BallotFailure } from '@stupa-makers/ui-kit/views/voting';
 
 const NOT_CAST: MyBallot = { cast: false, choice: null };
 
@@ -88,7 +88,9 @@ export class ParticipantVoteService {
     if (this.vote()?.status !== 'open') return null;
     const d = this.delegation();
     if (d?.blocked) {
-      return this.i18n.translate('voting.cast.delegation.blocked', { name: d.delegatedToName || '?' });
+      return this.i18n.translate('voting.cast.delegation.blocked', {
+        name: d.delegatedToName || '?',
+      });
     }
     if (this.own() === null && this.proxyName() === null) {
       return this.i18n.translate('voting.live.notEligible');
@@ -137,21 +139,30 @@ export class ParticipantVoteService {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
+      this.toast.show(
+        this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'),
+        'error',
+      );
       this.reload(true);
       return;
     }
     if (error.status === 409) {
-      this.toast.error(
+      this.toast.show(
         this.i18n.translate(
           castRefusalText(failure) ??
-            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
+            (failure.alreadyVoted
+              ? 'voting.cast.toast.alreadyVoted'
+              : 'voting.cast.toast.conflict'),
         ),
+        'error',
       );
       this.reload();
       return;
     }
-    this.toast.error(error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
+    this.toast.show(
+      error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'),
+      'error',
+    );
   }
 
   /** A read can arrive after the read of a newer vote, so only the vote of the row is kept. */

@@ -23,6 +23,7 @@ import {
   SelectFieldComponent,
   type SelectOption,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** A failed request: its status and the problem body of the server. */
@@ -58,7 +59,14 @@ function previewErrorKey(err: FailedRequest): TranslationKey {
   selector: 'app-type-change-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, SelectFieldComponent],
+  imports: [
+    DialogBodyDirective,
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    DialogComponent,
+    SelectFieldComponent,
+  ],
   templateUrl: './type-change-dialog.component.html',
   styleUrl: './type-change-dialog.component.scss',
 })
@@ -190,7 +198,7 @@ export class TypeChangeDialogComponent {
         next: () => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.success(this.i18n.translate('applications.typeChange.success'));
+          this.toast.show(this.i18n.translate('applications.typeChange.success'), 'success');
           this.done.emit();
         },
         error: (err: { status?: number }) => {
@@ -201,7 +209,7 @@ export class TypeChangeDialogComponent {
               : err.status === 409
                 ? 'applications.actions.conflict'
                 : 'applications.typeChange.error.save';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show(this.i18n.translate(key), 'error');
         },
       });
   }

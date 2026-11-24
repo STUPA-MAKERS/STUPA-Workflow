@@ -7,6 +7,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { loadCatalog } from '@core/i18n/translations';
 import { AdminTranslationsComponent, LANGUAGE_CODE, PAGE_SIZE, areaOf } from './translations.component';
 import { type AdminUiLanguage, TranslationsApiService } from './translations-api.service';
+import { toastMock } from '../../../../testing/toast';
 
 const FR: AdminUiLanguage = { code: 'fr', name: 'Français', active: false };
 
@@ -37,7 +38,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 }
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(api = makeApi(), toast = makeToast()) {
@@ -79,7 +80,7 @@ describe('AdminTranslationsComponent', () => {
     expect(inst.reference('action.save')).toBe('Save');
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
   it('names a failed read in a toast with a retry', async () => {
     const api = makeApi({ languages: jest.fn(() => throwError(() => new Error('x'))) });
     const { container } = await setup(api);

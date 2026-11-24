@@ -10,20 +10,26 @@ import {
   ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   filterChipText,
+  type ListRow,
+  type LoadState,
   NoteComponent,
-  SkeletonComponent,
+  SearchPillComponent,
   ToastService,
-  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenListFootDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { personLabel } from '@shared/person-label.util';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { debounced } from '@shared/debounced';
 
 /**
  * The most scope tags per row. A token usually carries every scope, and all of them would
@@ -56,19 +62,20 @@ const PAGE_SIZE = 25;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadStateComponent,
     ConfirmDialogComponent,
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
     ButtonComponent,
     ButtonGroupComponent,
-    EmptyStateComponent,
     FilterSelectComponent,
     NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
-    SkeletonComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenListFootDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
   ],
   templateUrl: './oauth-grants.component.html',
   styleUrl: './oauth-grants.component.scss',
@@ -84,7 +91,51 @@ export class AdminOAuthGrantsComponent {
   readonly offset = signal(0);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The rows of the records screen (§ui-kit:002257); a load error keeps what showed before. */
+  readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    const rows = this.grants().map((g) => ({ id: g.id, title: g.clientId }));
+    if (this.loading()) return rows.length ? { state: 'loading', previous: rows } : { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.oauthGrants.error'),
+        retry: () => this.load(),
+      };
+    if (rows.length) return { state: 'ready', data: rows };
+    return this.query()
+      ? { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('admin.list.noHits') }
+      : { state: 'empty', icon: 'key', heading: this.i18n.translate('admin.oauthGrants.empty') };
+  });
+
+  /** The text in the search pill (§002690). The server searches it as `q` (§002691). */
+  readonly searchText = signal('');
+  /** The search of the last load. */
+  private readonly query = signal('');
+  /** The hits for the pill: the total of the server while a search is set. */
+  readonly hits = computed(() => (this.query() && !this.loading() ? this.total() : null));
+  /** A typed search loads page one after a short pause. */
+  private readonly searchLater = debounced(() => this.runSearch());
+
+  /** The pill changed: load again after the pause. */
+  setSearch(text: string): void {
+    this.searchText.set(text);
+    this.searchLater();
+  }
+
+  /** Enter in the pill: load now. */
+  runSearch(): void {
+    this.searchLater.cancel();
+    const q = this.searchText().trim();
+    if (q === this.query()) return;
+    this.query.set(q);
+    this.offset.set(0);
+    this.load();
+  }
+
+  /** The grant of a row of the records screen. */
+  protected grantOf(id: string): OAuthGrantAdmin {
+    return this.grants().find((g) => g.id === id)!;
+  }
 
   /** Owner filter. An empty string means "every principal". */
   readonly principalId = signal<Uuid | ''>('');
@@ -149,6 +200,7 @@ export class AdminOAuthGrantsComponent {
         limit: PAGE_SIZE,
         offset: this.offset(),
         principalId: this.principalId() || null,
+        q: this.query() || null,
       })
       .subscribe({
         next: (page) => {
@@ -239,7 +291,7 @@ export class AdminOAuthGrantsComponent {
           return;
         }
         this.revoking.set(false);
-        this.toast.error(this.i18n.translate('admin.oauthGrants.revokeFailed'));
+        this.toast.show(this.i18n.translate('admin.oauthGrants.revokeFailed'), 'error');
       },
     });
   }
@@ -247,7 +299,7 @@ export class AdminOAuthGrantsComponent {
   private afterRevoke(message: 'admin.oauthGrants.revoked' | 'admin.oauthGrants.alreadyGone'): void {
     this.revoking.set(false);
     this.confirmRevoke.set(null);
-    this.toast.success(this.i18n.translate(message));
+    this.toast.show(this.i18n.translate(message), 'success');
     this.load();
   }
 }

@@ -4,7 +4,13 @@ import { TodosApiService, type TodoBoard, type TodoBoardEntry, type TodoEntryRol
 import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, DialogComponent, InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  InputComponent,
+  ToastService,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 import type { PickerHit } from '../../../features/gremien/gremium-person-picker/gremium-person-picker.component';
 import { TodoBoardEntriesComponent, entryOf } from '../board-entries/todo-board-entries.component';
 
@@ -18,7 +24,15 @@ import { TodoBoardEntriesComponent, entryOf } from '../board-entries/todo-board-
   selector: 'app-todo-new-board-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, ButtonComponent, DialogComponent, InputComponent, TodoBoardEntriesComponent, TranslatePipe],
+  imports: [
+    DialogBodyDirective,
+    FormsModule,
+    ButtonComponent,
+    DialogComponent,
+    InputComponent,
+    TodoBoardEntriesComponent,
+    TranslatePipe,
+  ],
   templateUrl: './todo-new-board-dialog.component.html',
   styleUrl: './todo-new-board-dialog.component.scss',
 })
@@ -69,15 +83,18 @@ export class TodoNewBoardDialogComponent {
       next: (board) => {
         this.saving.set(false);
         this.open.set(false);
-        this.toast.success(this.i18n.translate('todos.newBoard.created'));
+        this.toast.show(this.i18n.translate('todos.newBoard.created'), 'success');
         this.created.emit(board);
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        this.toast.error(
+        this.toast.show(
           this.i18n.translate(
-            problemCode(err) === 'board_create_required' ? 'todos.newBoard.forbidden' : 'todos.newBoard.failed',
+            problemCode(err) === 'board_create_required'
+              ? 'todos.newBoard.forbidden'
+              : 'todos.newBoard.failed',
           ),
+          'error',
         );
       },
     });

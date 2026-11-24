@@ -11,8 +11,8 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import type { Subscription } from 'rxjs';
 import {
   GRAPH_DEPTH_MAX,
@@ -24,6 +24,7 @@ import {
   type GraphNode,
   type GraphRelations,
 } from '@core/api/graph.service';
+import { PaperlessService } from '@core/api/paperless.service';
 import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -44,9 +45,11 @@ import {
   SearchPillComponent,
   SideSheetComponent,
   mediaQuery,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { LINK_ICON, LINK_KIND_LABEL, linkSub, splitUrl } from '../../features/todos/todos.util';
-import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
+import { LINK_ICON, LINK_KIND_LABEL, linkSub } from '../../features/todos/todos.util';
+import { LinkToDirective, isExternalUrl } from '../../shared/link-to.directive';
+import { type CanvasNode, GraphCanvasViewComponent } from '@stupa-makers/ui-kit/views/graph';
 import {
   AUTO_NODES,
   EMPTY_GRAPH,
@@ -76,7 +79,9 @@ export interface GraphRow {
   readonly title: string;
   readonly date: string | null;
   /** The target of "Öffnen"; null for an element without a page for this person. */
-  readonly route: ReturnType<typeof splitUrl> | null;
+  readonly route: string | null;
+  /** "Öffnen" leaves the app: a Paperless document opens in a new tab. */
+  readonly external: boolean;
 }
 
 /**
@@ -86,8 +91,8 @@ export interface GraphRow {
  * The server applies the read rules and every filter. The page loads 60 nodes per step and
  * adds each step to the drawing, by itself until 300 nodes show; then "Mehr laden" loads
  * the next 300. The filters are in the query of the URL. The drawing fills the page, and the
- * filters float over it. The field "Schritte" beside the search sets how far the neighbours of
- * the hits show (spec 001434). A press on a node chooses it: the panel shows its facts and
+ * filters float over it. The field "Schritte" at the start corner of the foot, opposite the
+ * zoom buttons, sets how far the neighbours of the hits show (spec 001434). A press on a node chooses it: the panel shows its facts and
  * "Öffnen", on a phone in a sheet. For a screen reader each node names its neighbours.
  */
 @Component({
@@ -95,17 +100,18 @@ export interface GraphRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     ButtonComponent,
     ButtonGroupComponent,
     ButtonLinkComponent,
     EmptyStateComponent,
     FilterSelectComponent,
-    GraphCanvasComponent,
+    GraphCanvasViewComponent,
     IconComponent,
     LoadErrorComponent,
     NgTemplateOutlet,
     RangeChipComponent,
-    RouterLink,
+    LinkToDirective,
     SearchPillComponent,
       SideSheetComponent,
     TranslatePipe,
@@ -131,6 +137,8 @@ export class GraphComponent {
   private readonly renderer = inject(Renderer2);
   private readonly i18n = inject(I18nService);
   private readonly features = inject(FeatureService);
+  /** The links to Paperless are on for this person (§F/integrations/paperless/002768). */
+  private readonly paperlessOn = toSignal(inject(PaperlessService).linksOn(), { initialValue: false });
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
@@ -159,7 +167,8 @@ export class GraphComponent {
   readonly kinds = computed<readonly GraphKind[]>(() =>
     GRAPH_KINDS.filter((k) => {
       const feature = KIND_FEATURE[k];
-      return feature === undefined || this.features.isOn(feature);
+      const shown = k !== 'paperless' || this.paperlessOn();
+      return shown && (feature === undefined || this.features.isOn(feature));
     }),
   );
 
@@ -351,7 +360,8 @@ export class GraphComponent {
         ? node.title || this.i18n.translate('graph.untitled')
         : this.i18n.translate('todos.link.noAccess', { kind }),
       date: node.date ? dayMonthYear(node.date, locale) : null,
-      route: node.url ? splitUrl(node.url) : null,
+      route: node.url || null,
+      external: isExternalUrl(node.url),
     };
   }
 

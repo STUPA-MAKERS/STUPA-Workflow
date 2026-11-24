@@ -6,12 +6,13 @@ import { TestBed } from '@angular/core/testing';
 import { of, Subject, throwError, type Observable } from 'rxjs';
 import type { PublicProtocolPage, PublicSemester } from './public-protocols.models';
 import { PublicProtocolsComponent } from './public-protocols.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { PublicProtocolsService } from './public-protocols.service';
 import { pageFixture, summaryFixture } from './public-protocols.fixtures';
 
 const GREMIEN = [
-  { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa', protocolCount: 8 },
-  { id: 'g-2', name: 'AStA', slug: 'asta', protocolCount: 7 },
+  { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa', protocolCount: 8, latestDate: '2026-09-29' },
+  { id: 'g-2', name: 'AStA', slug: 'asta', protocolCount: 7, latestDate: '2026-07-14' },
 ];
 
 function makeApi(over: Record<string, jest.Mock> = {}) {
@@ -24,14 +25,32 @@ function makeApi(over: Record<string, jest.Mock> = {}) {
   };
 }
 
-async function setup(api = makeApi(), query: Record<string, string | string[]> = {}) {
+/** A stand-in of the toasts: the kit public screen shows a failed first read as a toast. */
+function makeToasts(): Record<string, jest.Mock> {
+  const fns: Record<string, jest.Mock> = {};
+  return new Proxy(fns, { get: (t, k: string) => (t[k] ??= jest.fn(() => 1)) });
+}
+let toasts = makeToasts();
+
+/** The row cards; the kit public screen is an `article` too. */
+const allCards = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('article.pp__card')];
+const oneCard = (): HTMLElement => {
+  const all = allCards();
+  if (all.length !== 1) throw new Error(`expected one card, found ${all.length}`);
+  return all[0];
+};
+
+async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicProtocolsComponent, {
     providers: [
       provideRouter([]),
       { provide: PublicProtocolsService, useValue: api },
+      { provide: ToastService, useValue: toasts },
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { queryParamMap: convertToParamMap(query) } },
+        useValue: {
+          snapshot: { paramMap: convertToParamMap({ committee }), queryParamMap: convertToParamMap({}) },
+        },
       },
     ],
   });
@@ -39,17 +58,23 @@ async function setup(api = makeApi(), query: Record<string, string | string[]> =
 }
 
 describe('PublicProtocolsComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    toasts = makeToasts();
+  });
   afterEach(() => localStorage.clear());
 
   /** The page shows no raw ids. */
   it('lists the protocols by semester with the agenda, the results and the PDF', async () => {
     const { api } = await setup();
-    expect(api.list).toHaveBeenCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
-    expect(screen.getByRole('heading', { level: 1, name: 'Öffentliche Protokolle' })).toBeInTheDocument();
+    expect(api.list).toHaveBeenCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
+    expect(screen.getByRole('heading', { level: 1, name: 'Studierendenparlament' })).toBeInTheDocument();
+    const crumbs = screen.getByRole('navigation', { name: 'Pfad' });
+    expect(within(crumbs).getByRole('link', { name: 'Öffentliche Protokolle' })).toHaveAttribute('href', '/protocols');
+    expect(within(crumbs).getByText('Studierendenparlament')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('heading', { level: 2, name: 'Sommersemester 2026' })).toBeInTheDocument();
-    const card = screen.getByRole('article');
-    expect(within(card).getByText('Studierendenparlament · Di, 29.09.2026')).toBeInTheDocument();
+    const card = oneCard();
+    expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
     expect(
       within(card).getByRole('link', { name: '34. Sitzung des Studierendenparlaments' }),
     ).toHaveAttribute('href', '/protocols/p-1');
@@ -64,7 +89,7 @@ describe('PublicProtocolsComponent', () => {
     );
     expect(within(card).getByText('PDF · 212 KB · finalisiert 02.10.2026')).toBeInTheDocument();
     expect(screen.getByText('1 Protokoll')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions');
+    expect(screen.getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions/stupa');
     expect(document.body.textContent).not.toContain('g-1');
     expect(TestBed.inject(Meta).getTag('name="robots"')?.content).toBe('noindex');
   });
@@ -87,7 +112,7 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getByText('2 nicht-öffentliche TOPs ausgelassen')).toBeInTheDocument();
     expect(screen.getByText('Ohne Beschluss')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Wintersemester 2025/26' })).toBeInTheDocument();
-    const first = screen.getAllByRole('article')[0];
+    const first = allCards()[0];
     expect(within(first).queryByRole('link', { name: /PDF/ })).toBeNull();
     expect(within(first).getByText('PDF')).toBeInTheDocument();
   });
@@ -110,35 +135,38 @@ describe('PublicProtocolsComponent', () => {
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'Haushalt' }));
   });
 
-  /** The semester counts do not depend on the semester filter. */
-  it('filters by several gremien and a semester', async () => {
+  /** The semester counts do not depend on the semester filter. The page has no Gremium chip. */
+  it('filters by a semester and has no gremium filter', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium' }));
-    await userEvent.click(screen.getByRole('option', { name: 'Studierendenparlament' }));
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
-    expect(screen.getByRole('button', { name: 'Gremium: Studierendenparlament' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('option', { name: 'AStA' }));
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ gremium: ['g-1', 'g-2'] }));
-    expect(screen.getByRole('button', { name: 'Gremium: 2 Gremien' })).toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
-
+    expect(screen.queryByRole('button', { name: /^Gremium/ })).toBeNull();
     const semesterCalls = api.semesters.mock.calls.length;
     await userEvent.click(screen.getByRole('button', { name: 'Semester: Alle' }));
     await userEvent.click(screen.getByRole('option', { name: 'Sommersemester 2026' }));
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ semester: 'ss-2026' }));
+    expect(api.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ gremium: ['g-1'], semester: 'ss-2026' }),
+    );
     expect(api.semesters.mock.calls.length).toBe(semesterCalls);
     expect(screen.getByRole('button', { name: 'Semester: Sommersemester 2026' })).toBeInTheDocument();
   });
 
-  it('takes the gremium from the link of a detail page', async () => {
-    const { api } = await setup(makeApi(), { committee: 'g-1' });
-    expect(api.list).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
-    expect(screen.getByRole('button', { name: 'Gremium: Studierendenparlament' })).toBeInTheDocument();
+  /** Spec 002403: a slug of no public Gremium reads no page. */
+  it('shows the empty state for a slug of no public gremium', async () => {
+    const { api } = await setup(makeApi(), 'nope');
+    expect(api.list).not.toHaveBeenCalled();
+    expect(screen.getByText('Keine öffentlichen Protokolle')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Alle Gremien/ })).toHaveAttribute('href', '/protocols');
+    expect(screen.getByRole('heading', { level: 1, name: 'Öffentliche Protokolle' })).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
-  it('counts a gremium of an old link that publishes no more', async () => {
-    await setup(makeApi(), { committee: 'g-x' });
-    expect(screen.getByRole('button', { name: 'Gremium: 1 Gremien' })).toBeInTheDocument();
+  it('reports a failed read of the gremien', async () => {
+    const { api } = await setup(makeApi({ gremien: jest.fn(() => throwError(() => new Error('down'))) }));
+    expect(api.list).not.toHaveBeenCalled();
+    expect(toasts['show']).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Die Protokolle konnten nicht geladen werden.'),
+      }),
+    );
   });
 
   it('loads the next page once while it runs', async () => {
@@ -162,7 +190,7 @@ describe('PublicProtocolsComponent', () => {
     const { api } = await setup(makeApi({ list }));
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Protokolle laden' }));
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(allCards()).toHaveLength(2);
     expect(screen.queryByRole('button', { name: 'Weitere Protokolle laden' })).toBeNull();
   });
 
@@ -174,7 +202,7 @@ describe('PublicProtocolsComponent', () => {
     await setup(makeApi({ list }));
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Protokolle laden' }));
     expect(screen.getByRole('alert')).toHaveTextContent('nicht geladen');
-    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(allCards()).toHaveLength(1);
   });
 
   /** A new filter starts while the next page still loads. */
@@ -205,10 +233,12 @@ describe('PublicProtocolsComponent', () => {
     const stale = new Subject<PublicProtocolPage>();
     const list = jest
       .fn()
+      .mockReturnValueOnce(of(pageFixture([summaryFixture()])))
       .mockReturnValueOnce(stale)
       .mockReturnValue(of(pageFixture([summaryFixture({ id: 'p-9', title: 'Neu' })])));
     const { fixture } = await setup(makeApi({ list }));
     await userEvent.type(screen.getByRole('searchbox'), 'x{enter}');
+    await userEvent.type(screen.getByRole('searchbox'), 'y{enter}');
     stale.next(pageFixture([summaryFixture({ id: 'p-old', title: 'Alt' })]));
     stale.error(new Error('late'));
     fixture.detectChanges();
@@ -230,13 +260,8 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.queryByText('99')).toBeNull();
   });
 
-  it('says that no gremium publishes yet and links back to the start', async () => {
-    await setup(
-      makeApi({
-        list: jest.fn(() => of(pageFixture([]))),
-        gremien: jest.fn(() => throwError(() => new Error('down'))),
-      }),
-    );
+  it('says that the gremium has no protocols yet and links back to the start', async () => {
+    await setup(makeApi({ list: jest.fn(() => of(pageFixture([]))) }));
     expect(screen.getByText('Noch keine öffentlichen Protokolle')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Zur Startseite/ })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('searchbox')).toBeNull();
@@ -252,13 +277,21 @@ describe('PublicProtocolsComponent', () => {
     await userEvent.type(screen.getByRole('searchbox'), 'Haushalt 2025{enter}');
     expect(screen.getByText('Keine Protokolle gefunden')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    expect(api.list).toHaveBeenLastCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
-    expect(screen.getByRole('article')).toBeInTheDocument();
+    expect(api.list).toHaveBeenLastCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
+    expect(oneCard()).toBeInTheDocument();
   });
 
   it('reports a failed list', async () => {
-    await setup(makeApi({ list: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Protokolle konnten nicht geladen werden.');
+    const list = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(pageFixture([summaryFixture()])));
+    const { api } = await setup(makeApi({ list }));
+    const toast = toasts['show'].mock.calls[0][0];
+    expect(toast.text).toContain('Die Protokolle konnten nicht geladen werden.');
+    toast.closed('action');
+    expect(api.list).toHaveBeenCalledTimes(2);
+    expect(await waitFor(() => oneCard())).toBeInTheDocument();
   });
 
   it('cancels a pending search when the page goes away', async () => {
@@ -273,7 +306,7 @@ describe('PublicProtocolsComponent', () => {
   it('localizes to English', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup();
-    expect(screen.getByRole('heading', { level: 1, name: 'Public minutes' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Public minutes' })).toHaveAttribute('href', '/protocols');
     expect(screen.getByRole('heading', { level: 2, name: /Summer semester 2026/ })).toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ import {
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
@@ -14,6 +14,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { PaperlessService } from '@core/api/paperless.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { provideFormly } from '@shared/formly/formly.providers';
 import type {
@@ -28,6 +29,7 @@ import type {
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
+import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -212,6 +214,35 @@ function flushTypes(http: HttpTestingController) {
 /** jsdom has no structuredClone, and startEdit relies on the browser global. */
 describe('ApplicationsDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  /** No filed document by default, so the page asks Paperless nothing. */
+  let paperless: jest.SpyInstance;
+  beforeEach(() => {
+    paperless = jest.spyOn(PaperlessService.prototype, 'documentUrl').mockReturnValue(of(null));
+  });
+  afterEach(() => paperless.mockRestore());
+
+  /** § F/integrations/paperless/002525 */
+  it('offers "In Paperless öffnen" only for a filed Antrag', async () => {
+    const ids = (c: { menuSections(): readonly { items: readonly { id: string }[] }[] }) =>
+      c.menuSections().flatMap((sec) => sec.items.map((i) => i.id));
+    const none = await setup(['application.read']);
+    none.http.expectOne(url('')).flush(appWire());
+    none.detectChanges();
+    expect(ids(none.cmp)).not.toContain('paperless');
+
+    TestBed.resetTestingModule();
+    paperless.mockReturnValue(of('https://paperless.example.org/documents/7/details'));
+    const view = await setup(['application.read']);
+    view.http.expectOne(url('')).flush(appWire());
+    view.detectChanges();
+    await view.fixture.whenStable();
+    expect(paperless).toHaveBeenLastCalledWith('application', 'app-1');
+    expect(ids(view.cmp)).toContain('paperless');
+    const open = jest.spyOn(window, 'open').mockReturnValue(null);
+    view.cmp.onMenu({ id: 'paperless', label: '' });
+    expect(open).toHaveBeenCalledWith('https://paperless.example.org/documents/7/details', '_blank', 'noopener');
+    open.mockRestore();
+  });
 
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
@@ -302,9 +333,16 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush([
       ...COMMENTS,
-      { ...COMMENTS[0], id: 'c2', body: 'Erledigt.', at: '2026-06-05T12:05:00Z', editedAt: '2026-06-05T12:30:00Z' },
+      {
+        ...COMMENTS[0],
+        id: 'c2',
+        body: 'Erledigt.',
+        at: '2026-06-05T12:05:00Z',
+        editedAt: '2026-06-05T12:30:00Z',
+      },
     ]);
-    for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+    for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets'))
+      req.flush([]);
     flushForm(http);
     cmp.commentsOpen.set(true);
     detectChanges();
@@ -327,7 +365,13 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush([
       VERSIONS[0],
-      { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: null, at: '2026-06-05T11:00:00Z' },
+      {
+        version: 2,
+        data: {},
+        diff: { added: {}, removed: {}, changed: {} },
+        changedBy: null,
+        at: '2026-06-05T11:00:00Z',
+      },
     ]);
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
@@ -768,14 +812,20 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne(url('/transitions')).flush([
-      { id: 'tr-1', fromStateId: 's1', toStateId: 's2', label: { de: 'Annehmen' }, color: '#0a0' },
+      {
+        id: 'tr-1',
+        fromStateId: 's1',
+        toStateId: 's2',
+        label: { de: 'Annehmen' },
+        color: '#0a0',
+      },
     ]);
     for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
       req.flush([]);
     }
     flushForm(http);
     detectChanges();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     const railRefresh = jest.spyOn(TestBed.inject(RailStatusService), 'refresh');
 
     await userEvent.click(screen.getByRole('button', { name: 'Annehmen' }));
@@ -838,7 +888,7 @@ describe('ApplicationsDetailComponent', () => {
     }
     flushForm(http);
     detectChanges();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     await userEvent.click(screen.getByRole('button', { name: 'Annehmen' }));
     http
@@ -1008,7 +1058,7 @@ describe('ApplicationsDetailComponent', () => {
     flushForm(http);
     flushAttachments(http);
     detectChanges();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
 
     cmp['openBudgetDialog']();
     expect(cmp['budgetDialogOpen']()).toBe(true);
@@ -1057,7 +1107,7 @@ describe('ApplicationsDetailComponent', () => {
     flushForm(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     cmp['budgetChoice'].set('b1');
     cmp.assignBudget();
@@ -1175,7 +1225,13 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush([]);
     http.expectOne(url('/timeline')).flush([
-      { fromStateId: null, toStateId: 's1', toState: SUBMITTED, actor: 'Clara Clerk', at: '2026-06-05T10:00:00Z' },
+      {
+        fromStateId: null,
+        toStateId: 's1',
+        toState: SUBMITTED,
+        actor: 'Clara Clerk',
+        at: '2026-06-05T10:00:00Z',
+      },
     ]);
     flushForm(http);
     detectChanges();
@@ -1424,7 +1480,13 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush([]);
     http.expectOne(url('/comments')).flush([]);
     http.expectOne(url('/timeline')).flush([
-      { fromStateId: null, toStateId: 's9', toState: null, actor: null, at: '2026-06-05T10:00:00Z' },
+      {
+        fromStateId: null,
+        toStateId: 's9',
+        toState: null,
+        actor: null,
+        at: '2026-06-05T10:00:00Z',
+      },
     ]);
     flushForm(http);
     detectChanges();
@@ -1626,7 +1688,7 @@ describe('ApplicationsDetailComponent', () => {
       { title: 'Förderung Fest' },
     );
     flushAttachments(http);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
 
     cmp.startEdit(cmp.app() as Application);
     expect(cmp.editing()).toBe(true);
@@ -1727,7 +1789,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     jest.useFakeTimers();
 
     jest.spyOn(cmp.editForm, 'invalid', 'get').mockReturnValue(true);
@@ -1754,7 +1816,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp['sendComment']({ body: 'Hallo', visibility: 'internal' });
     http
       .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
@@ -1933,7 +1995,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     cmp.editModel = { title: 'Neu' };
     cmp.saveEdit();
@@ -1960,7 +2022,7 @@ describe('ApplicationsDetailComponent', () => {
     ];
     const { http, detectChanges, cmp, toast } = await setupWithFields(fields, { title: 'Fest', kosten });
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.startEdit(cmp.app() as Application);
     detectChanges();
     await new Promise((r) => setTimeout(r));
@@ -2000,7 +2062,7 @@ describe('ApplicationsDetailComponent', () => {
       { title: 'Fest' },
     );
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.startEdit(cmp.app() as Application);
     detectChanges();
     cmp.saveEdit();
@@ -2171,7 +2233,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/transitions')).flush([]);
     detectChanges();
     flushAttachments(http);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     expect(cmp.canDelete()).toBe(true);
 
@@ -2213,7 +2275,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     cmp.doDelete();
     http
@@ -2232,7 +2294,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
 
     cmp.doRequestErasure();
     http
@@ -2252,7 +2314,7 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
 
     cmp.doRequestErasure();
     http

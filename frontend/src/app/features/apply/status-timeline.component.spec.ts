@@ -17,6 +17,7 @@ import type {
 import { provideFormly } from '@shared/formly/formly.providers';
 import { MY_APPLICATIONS_PAGE } from './my-applications-page';
 import { StatusTimelineComponent } from './status-timeline.component';
+import { toastMock } from '../../../testing/toast';
 
 const ID = '3f9a2c71-1111-2222-3333-444444444444';
 
@@ -186,8 +187,12 @@ interface RouteOpts {
   providers?: unknown[];
 }
 
-async function setup(api: Partial<ApiClient>, params: Record<string, string> = { app: ID }, opts: RouteOpts = {}) {
-  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+async function setup(
+  api: Partial<ApiClient>,
+  params: Record<string, string> = { app: ID },
+  opts: RouteOpts = {},
+) {
+  const toast = toastMock();
   const view = await render(StatusTimelineComponent, {
     providers: [
       provideRouter([]),

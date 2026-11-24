@@ -1,6 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -10,25 +10,27 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
   CapitalizePipe,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   liveSearch,
-  NoteComponent,
   RowMenuComponent,
   type IconName,
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
-  SkeletonComponent,
   StatusTextComponent,
-  StickyBarComponent,
   ToastService,
-  PageHeaderComponent,
+  type ListRow,
+  type LoadState,
   ButtonGroupComponent,
   FactsComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../admin.models';
 import { UserMergeComponent } from './user-merge/user-merge.component';
@@ -36,7 +38,6 @@ import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';
 import type { TranslationKey } from '@core/i18n/translations';
 import { toggled } from '@shared/util/immutable';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 /** The choices of the chip "Letzte Anmeldung": older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
@@ -93,21 +94,17 @@ function lastLoginFilters(lastLogin: LastLoginFilter, now: number): PrincipalFil
   imports: [
     FactsComponent,
     ButtonGroupComponent,
-    LoadStateComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
     ExpandRowComponent,
-    RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     StatusTextComponent,
     AvatarComponent,
-    EmptyStateComponent,
-    NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
     SearchPillComponent,
-    StickyBarComponent,
-    SkeletonComponent,
     FilterSelectComponent,
     UserMergeComponent,
     UserRevokeComponent,
@@ -156,8 +153,9 @@ export class UsersComponent {
   /** The global group mappings. Empty without `admin.group_mappings`. */
   private readonly groupMappings = signal<GroupMapping[]>([]);
 
-  /** The group-mappings page needs its own permission. The hint links to it only then. */
-  protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
+  /** Reading the group mappings needs its own permission. Without it the roles column shows
+   * the bootstrap roles only. */
+  protected readonly canReadMappings = computed(() => this.auth.can('admin.group_mappings'));
 
   /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
@@ -200,9 +198,30 @@ export class UsersComponent {
    * the list does not jump on every key press.
    */
   protected readonly loading = signal(true);
-  /** The last read of the list failed (§ 000576). */
+  /** The last read of the list failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+  /**
+   * The rows of the records screen (§ui-kit:002257). The first load shows skeleton rows; a later
+   * search keeps the rows and only turns the magnifier into a spinner.
+   */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.users.loadFailed'),
+        retry: () => this.retryLoad(),
+      };
+    const rows = this.principals().map((p) => ({ id: p.id, title: p.id }));
+    return rows.length
+      ? { state: 'ready', data: rows }
+      : { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('admin.users.noResults') };
+  });
+
+  /** The person of a row of the records screen. */
+  protected principalOf(id: string): AdminPrincipal {
+    return this.principals().find((p) => p.id === id)!;
+  }
 
   /** The retry of the load error: run the search again. */
   protected retryLoad(): void {
@@ -217,7 +236,7 @@ export class UsersComponent {
    */
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
-    if (this.canManageMappings()) {
+    if (this.canReadMappings()) {
       this.api.listGroupMappings().subscribe({
         next: (m) => this.groupMappings.set(m),
         error: () => this.groupMappings.set([]),
@@ -367,12 +386,13 @@ export class UsersComponent {
   protected setActive(principal: AdminPrincipal, active: boolean): void {
     this.api.setPrincipalActive(principal.id, active).subscribe({
       next: () => {
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate(active ? 'admin.users.activated' : 'admin.users.deactivated'),
+          'success',
         );
         this.search.refresh();
       },
-      error: () => this.toast.error(this.i18n.translate('admin.users.actionFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.users.actionFailed'), 'error'),
     });
   }
 }

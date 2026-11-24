@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 /**
- * § 000632: an admin template shows a load through `app-load-state`. It holds no
+ * §ui-kit:000632: an admin template shows a load through `app-load-state`. It holds no
  * `app-load-error`, and it holds `app-skeleton` only in a `#loading` template.
  *
  * A second test guards the trap of that template: the reference `#loading` hides a member

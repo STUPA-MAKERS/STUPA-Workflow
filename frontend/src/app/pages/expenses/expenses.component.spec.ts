@@ -21,6 +21,7 @@ import type {
   Invoice,
 } from '../budget/budget-tree.api';
 import { TodosApiService } from '@core/api/todos.service';
+import { kindSpies } from '../../../testing/toast';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
 const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), links: () => of({ canLink: false, links: [] }), boards: () => of([]) };
@@ -738,10 +739,7 @@ describe('ExpensesComponent (unit)', () => {
   /** Without a detail the toast shows a generic fallback. */
   it('create surfaces the problem+json detail on error, else a generic message', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     dlg(cmp).newDescription.set('x');
     dlg(cmp).newAmount.set('1');
     dlg(cmp).newApplicationId.set('app-1');
@@ -1013,10 +1011,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('saveEdit toasts a generic failure on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.openEdit(EXPENSE);
     cmp.saveEdit(new Event('submit'));
     http
@@ -1063,10 +1058,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('doDelete toasts a failure on error', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.confirmDelete.set(EXPENSE);
     cmp.doDelete();
     http
@@ -1229,10 +1221,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('createTransfer surfaces the problem detail on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn(
-      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
-      'error',
-    );
+    const toastSpy = jest.spyOn(kindSpies((cmp as unknown as { toast: object }).toast), 'error');
     cmp.tFromId.set('a');
     cmp.tToId.set('b');
     cmp.tFiscalYearId.set('fy-1');
@@ -1268,7 +1257,10 @@ function toastSpies(cmp: ExpensesComponent): {
   const toast = (
     cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }
   ).toast;
-  return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
+  return {
+    success: jest.spyOn(kindSpies(toast), 'success'),
+    error: jest.spyOn(kindSpies(toast), 'error'),
+  };
 }
 
 describe('ExpensesComponent (sub-bookings)', () => {
@@ -1528,7 +1520,7 @@ describe('ExpensesComponent (invoice detail)', () => {
     }
   });
 
-  /** §F/administration/files/001080: the receipt opens in the file viewer; a null fileName falls back to 'Beleg.pdf'. */
+  /** §ui-kit:F/administration/files/001080: the receipt opens in the file viewer; a null fileName falls back to 'Beleg.pdf'. */
   it('openInvoiceFile opens the receipt in the file viewer (fileName fallback)', () => {
     const { cmp } = build();
     const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
@@ -2151,8 +2143,9 @@ describe('ExpensesComponent (query-param adoption)', () => {
   /** A form on the open row stays while the URL keeps that row. */
   it('closes an open form when the URL opens another booking or transfer', () => {
     const { cmp } = buildWithQuery([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adopt = (q: Record<string, string>) => (cmp as any).applyQueryParams(convertToParamMap(q));
+    const adopt = (q: Record<string, string>) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (cmp as any).applyQueryParams(convertToParamMap(q));
     cmp.openEdit(EXPENSE);
     expect(cmp.formMode()).toBe('edit');
     adopt({ id: 'e-2' });
@@ -2342,7 +2335,7 @@ describe('ExpensesListState.refresh', () => {
     state.onExport();
     const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(reqs.length).toBe(1);
-    const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
+    const toast = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
     reqs[0].error(new ProgressEvent('err'));
     expect(state.exporting()).toBe(false);
     expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');

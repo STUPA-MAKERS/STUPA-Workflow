@@ -1,97 +1,100 @@
 <app-dialog
   [open]="open()"
-  [title]="'outsideDecision.title' | t"
+  [heading]="'outsideDecision.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
+  [actions]="[
+    { key: 'close', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ('outsideDecision.confirm' | t),
+      kind: 'main',
+      disabled: !ready(),
+      busy: saving(),
+    },
+  ]"
+  (action)="$event.key === 'close' ? close() : $event.key === 'submit' ? submit() : null"
 >
-  <form class="odd" (submit)="$event.preventDefault(); submit()">
-    <app-segmented
-      class="odd__result"
-      width="equal"
-      [ariaLabel]="'outsideDecision.result' | t"
-      [options]="resultOptions()"
-      [value]="result()"
-      (valueChange)="result.set($any($event))"
-    />
-    <div class="odd__pair">
-      <app-datepicker
-        name="oddDate"
-        [label]="'outsideDecision.date' | t"
-        [required]="true"
-        [max]="today()"
-        [error]="dateError()"
-        [ngModel]="date()"
-        (ngModelChange)="date.set($event ?? '')"
+  <ng-template dialogBody>
+    <form class="odd" (submit)="$event.preventDefault(); submit()">
+      <app-segmented
+        class="odd__result"
+        width="equal"
+        [ariaLabel]="'outsideDecision.result' | t"
+        [options]="resultOptions()"
+        [value]="result()"
+        (valueChange)="result.set($any($event))"
       />
-      <app-select
-        name="oddGremium"
-        [label]="'outsideDecision.gremium' | t"
-        [placeholder]="'outsideDecision.gremiumPick' | t"
-        [options]="gremiumOptions()"
-        [ngModel]="gremium()"
-        (ngModelChange)="pickGremium($event ?? '')"
-      />
-    </div>
-    @if (asksAmount()) {
-      <div class="odd__field">
-        <span class="odd__cap">{{ 'decision.section' | t }}</span>
-        <app-decision-editor
-          idPrefix="odd"
-          [requested]="requested()"
-          [currency]="currency()"
+      <div class="odd__pair">
+        <app-datepicker
+          name="oddDate"
+          [label]="'outsideDecision.date' | t"
           [required]="true"
-          [(draft)]="draft"
+          [max]="today()"
+          [error]="dateError()"
+          [ngModel]="date()"
+          (ngModelChange)="date.set($event ?? '')"
+        />
+        <app-select
+          name="oddGremium"
+          [label]="'outsideDecision.gremium' | t"
+          [placeholder]="'outsideDecision.gremiumPick' | t"
+          [options]="gremiumOptions()"
+          [ngModel]="gremium()"
+          (ngModelChange)="pickGremium($event ?? '')"
         />
       </div>
-    }
-    <div class="odd__field" role="group" aria-labelledby="odd-counts">
-      <span id="odd-counts" class="odd__cap">{{ 'outsideDecision.counts' | t }}</span>
-      <div class="odd__counts">
-        <app-input
-          name="oddYes"
-          [label]="'outsideDecision.yes' | t"
-          [ngModel]="yes()"
-          (ngModelChange)="yes.set($event)"
-        />
-        <app-input
-          name="oddNo"
-          [label]="'outsideDecision.no' | t"
-          [ngModel]="no()"
-          (ngModelChange)="no.set($event)"
-        />
-        <app-input
-          name="oddAbstain"
-          [label]="'outsideDecision.abstain' | t"
-          [ngModel]="abstain()"
-          (ngModelChange)="abstain.set($event)"
-        />
-      </div>
-      @if (countError(); as err) {
-        <app-error-text>{{ err }}</app-error-text>
+      @if (asksAmount()) {
+        <div class="odd__field">
+          <span class="odd__cap">{{ 'decision.section' | t }}</span>
+          <app-decision-editor
+            idPrefix="odd"
+            [requested]="requested()"
+            [currency]="currency()"
+            [required]="true"
+            [(draft)]="draft"
+          />
+        </div>
       }
-    </div>
-    <app-select
-      name="oddMeeting"
-      [label]="'outsideDecision.meeting' | t"
-      [placeholder]="'outsideDecision.noMeeting' | t"
-      [options]="meetingOptions()"
-      [disabled]="!gremium()"
-      [ngModel]="meeting()"
-      (ngModelChange)="meeting.set($event ?? '')"
-    />
-    @if (refusal()) {
-      <app-error-text>{{ refusal() }}</app-error-text>
-    }
-    <button type="submit" hidden></button>
-  </form>
-  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-  <app-button
-    dialog-footer
-    variant="fill"
-    [disabled]="!ready()"
-    [loading]="saving()"
-    (click)="submit()"
-  >
-    {{ 'outsideDecision.confirm' | t }}
-  </app-button>
+      <div class="odd__field" role="group" aria-labelledby="odd-counts">
+        <span id="odd-counts" class="odd__cap">{{ 'outsideDecision.counts' | t }}</span>
+        <div class="odd__counts">
+          <app-input
+            name="oddYes"
+            [label]="'outsideDecision.yes' | t"
+            [ngModel]="yes()"
+            (ngModelChange)="yes.set($event)"
+          />
+          <app-input
+            name="oddNo"
+            [label]="'outsideDecision.no' | t"
+            [ngModel]="no()"
+            (ngModelChange)="no.set($event)"
+          />
+          <app-input
+            name="oddAbstain"
+            [label]="'outsideDecision.abstain' | t"
+            [ngModel]="abstain()"
+            (ngModelChange)="abstain.set($event)"
+          />
+        </div>
+        @if (countError(); as err) {
+          <app-error-text>{{ err }}</app-error-text>
+        }
+      </div>
+      <app-select
+        name="oddMeeting"
+        [label]="'outsideDecision.meeting' | t"
+        [placeholder]="'outsideDecision.noMeeting' | t"
+        [options]="meetingOptions()"
+        [disabled]="!gremium()"
+        [ngModel]="meeting()"
+        (ngModelChange)="meeting.set($event ?? '')"
+      />
+      @if (refusal()) {
+        <app-error-text>{{ refusal() }}</app-error-text>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

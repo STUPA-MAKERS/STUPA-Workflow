@@ -30,7 +30,7 @@ async function setup(reach = reachMock(), show = true) {
 describe('LoadErrorComponent', () => {
   afterEach(() => jest.useRealTimers());
 
-  /** § 000576: a toast with the retry action, nothing in the page. */
+  /** §ui-kit:000576: a toast with the retry action, nothing in the page. */
   it('shows the error as a toast with "Erneut versuchen" and renders nothing', async () => {
     const { container, retry } = await setup();
     expect(loadErrorToast()).toBe('Anträge konnten nicht geladen werden.');
@@ -40,12 +40,24 @@ describe('LoadErrorComponent', () => {
     expect(loadErrorToast()).toBeNull();
   });
 
+  /** §ui-kit:002405: with `face`, the face shows the error text, and the retry stays in the toast. */
+  it('shows the face with the error text when asked to', async () => {
+    const view = await render(`<app-load-error face message="Konnte nicht geladen werden." />`, {
+      imports: [LoadErrorComponent],
+      providers: [{ provide: ServerReachabilityService, useValue: reachMock() }],
+    });
+    expect(view.container.querySelector('app-empty-state')?.textContent).toContain('Konnte nicht geladen werden.');
+    expect(view.container.querySelector('button')).toBeNull();
+    expect(loadErrorToast()).toBe('Konnte nicht geladen werden.');
+    expect(await runAxe(view.container)).toHaveNoViolations();
+  });
+
   it('adds nothing to the page that axe can flag', async () => {
     const { container } = await setup();
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  /** § 000577: the toast does not close by its time, and closes when the error goes. */
+  /** §ui-kit:000577: the toast does not close by its time, and closes when the error goes. */
   it('keeps the toast past its time and closes it when the content loads', async () => {
     jest.useFakeTimers();
     const view = await setup();
@@ -55,7 +67,7 @@ describe('LoadErrorComponent', () => {
     expect(loadErrorToast()).toBeNull();
   });
 
-  /** § 000579: no toast while the server is unreachable, and a new load once it is back. */
+  /** §ui-kit:000579: no toast while the server is unreachable, and a new load once it is back. */
   it('shows no toast while the server is unreachable and loads again when it is back', async () => {
     const reach = reachMock();
     reach.waiting.set(true);
@@ -70,7 +82,7 @@ describe('LoadErrorComponent', () => {
     expect(loadErrorToast()).toBeNull();
   });
 
-  /** § 000579: a check that finds the server there shows the toast after all. */
+  /** §ui-kit:000579: a check that finds the server there shows the toast after all. */
   it('shows the toast when the check finds the server there', async () => {
     const reach = reachMock();
     reach.waiting.set(true);

@@ -26,7 +26,7 @@ describe('AdminApiService — mock mode', () => {
     const s = svc();
     s.listWebhooks().subscribe((hooks) => {
       expect(hooks.length).toBeGreaterThan(0);
-      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', active: true };
+      const fresh: WebhookConfig = { id: '', name: 'X', url: 'https://x', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] };
       s.saveWebhook(fresh).subscribe((saved) => {
         expect(saved.id).toBeTruthy();
         s.listWebhooks().subscribe((after) => {
@@ -58,6 +58,13 @@ describe('AdminApiService — mock mode', () => {
     expect(after.some((h) => h.id === before[0].id)).toBe(false);
     const status = await firstValueFrom(s.listWebhookDeliveryStatus());
     expect(status.map((x) => x.lastState)).toEqual(['sent', 'dead', 'pending', 'never']);
+  });
+
+  it('serves the webhook catalog and a test delivery in mock mode', async () => {
+    const s = svc();
+    const catalog = await firstValueFrom(s.getWebhookCatalog());
+    expect(catalog.map((e) => e.name)).toContain('application.transition');
+    expect(await firstValueFrom(s.sendWebhookTest('wh-1'))).toEqual({ deliveryId: 'test-wh-1' });
   });
 
   it('serves a public preview in mock mode', async () => {
@@ -120,6 +127,32 @@ describe('AdminApiService — mock mode', () => {
       });
     });
   });
+  /** § F/integrations/paperless/002511: the page works in the mock mode. */
+  it('keeps the Paperless connection and the failed filings in mock mode', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.getPaperless());
+    expect(before.tokenSet).toBe(true);
+    const saved = await firstValueFrom(
+      s.putPaperless({
+        baseUrl: 'https://paperless.example.org',
+        publicUrl: null,
+        token: 'secret',
+        fileProtocols: true,
+        fileApplications: false,
+        filePlans: false,
+        insertEnabled: false,
+      linkEnabled: false,
+      }),
+    );
+    expect(saved).toEqual(expect.objectContaining({ tokenSet: true, fileProtocols: true }));
+    expect(saved).not.toHaveProperty('token');
+    expect(await firstValueFrom(s.testPaperless())).toEqual({ ok: true, error: null });
+    expect(await firstValueFrom(s.backfillPaperless())).toEqual({ started: 3 });
+    const failed = await firstValueFrom(s.listPaperlessFailed());
+    expect(failed.length).toBeGreaterThan(0);
+    await firstValueFrom(s.retryPaperlessFiling(failed[0].id));
+    expect(await firstValueFrom(s.listPaperlessFailed())).toHaveLength(failed.length - 1);
+  });
 });
 
 describe('AdminApiService — real mode (contract)', () => {
@@ -163,11 +196,18 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/config-schemas').flush({});
   });
 
+  it('GETs the webhook catalog and POSTs a test delivery', () => {
+    s.getWebhookCatalog().subscribe();
+    expect(http.expectOne('/api/admin/webhooks/catalog').request.method).toBe('GET');
+    s.sendWebhookTest('wh-9').subscribe();
+    expect(http.expectOne('/api/admin/webhooks/wh-9/test').request.method).toBe('POST');
+  });
+
   it('POSTs a new webhook and PATCHes an existing one', () => {
-    s.saveWebhook({ id: '', name: 'n', url: 'https://h', active: true }).subscribe();
+    s.saveWebhook({ id: '', name: 'n', url: 'https://h', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] }).subscribe();
     expect(http.expectOne('/api/admin/webhooks').request.method).toBe('POST');
 
-    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', active: true }).subscribe();
+    s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', active: true, subscriptions: [], gremiumIds: [], typeIds: [], stateKeys: [] }).subscribe();
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
   });
 
@@ -422,6 +462,35 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(saved).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
   });
 
+  /** § F/integrations/paperless/002511, 002526, 002530 */
+  it('wires the Paperless routes', () => {
+    s.getPaperless().subscribe();
+    const read = http.expectOne({ method: 'GET', url: '/api/admin/paperless' });
+    expect(read.request.context.get(SKIP_LOADING)).toBe(true);
+    read.flush({});
+    const body = {
+      baseUrl: 'https://paperless.example.org',
+      publicUrl: null,
+      fileProtocols: true,
+      fileApplications: false,
+      filePlans: false,
+      insertEnabled: false,
+      linkEnabled: false,
+    };
+    s.putPaperless(body).subscribe();
+    const put = http.expectOne({ method: 'PUT', url: '/api/admin/paperless' });
+    expect(put.request.body).toEqual(body);
+    put.flush({});
+    s.testPaperless().subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/test' }).flush({ ok: true, error: null });
+    s.listPaperlessFailed().subscribe();
+    http.expectOne({ method: 'GET', url: '/api/admin/paperless/failed-filings' }).flush([]);
+    s.retryPaperlessFiling('f1').subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/failed-filings/f1/retry' }).flush(null);
+    s.backfillPaperless().subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/paperless/backfill' }).flush({ started: 0 });
+  });
+
   it('GETs and PUTs the meeting settings', () => {
     let read: unknown;
     s.getMeetingSettings().subscribe((v) => (read = v));
@@ -470,7 +539,7 @@ describe('AdminApiService — real mode (contract)', () => {
   it('reads and replaces the help and ticket settings', () => {
     let read: unknown;
     s.getHelpTickets().subscribe((v) => (read = v));
-    const settings = { wikiUrl: 'https://w.example', publicEnabled: true, notifyNew: false, retentionMonths: null };
+    const settings = { wikiUrl: 'https://w.example', publicEnabled: true, retentionMonths: null };
     http.expectOne({ method: 'GET', url: '/api/admin/help-tickets' }).flush(settings);
     expect(read).toEqual(settings);
     s.putHelpTickets({ ...settings, retentionMonths: 6 }).subscribe();
@@ -480,7 +549,7 @@ describe('AdminApiService — real mode (contract)', () => {
   });
 
   it('reads and replaces the feature switches', () => {
-    const switches = { todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true };
+    const switches = { activity: true, todos: true, calendar: true, meetings: true, voting: true, budget: false, invoices: true, tickets: true, graph: true, public: true, push: true, paperless: true };
     let read: unknown;
     s.getFeatures().subscribe((v) => (read = v));
     http.expectOne({ method: 'GET', url: '/api/admin/features' }).flush(switches);
@@ -716,6 +785,23 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(all.request.params.get('since')).toBe('s');
     expect(all.request.params.get('until')).toBe('u');
     all.flush({ items: [], nextCursor: null, hasMore: false });
+
+    s.listAuditLog({ q: ' anna ', labelActions: ['login', 'logout'] }).subscribe();
+    const search = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(search.request.params.get('q')).toBe('anna');
+    expect(search.request.params.getAll('labelAction')).toEqual(['login', 'logout']);
+    search.flush({ items: [], nextCursor: null, hasMore: false });
+
+    s.listAuditLog({ q: '  ', labelActions: ['login'] }).subscribe();
+    const blank = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(blank.request.params.get('q')).toBeNull();
+    expect(blank.request.params.get('labelAction')).toBeNull();
+    blank.flush({ items: [], nextCursor: null, hasMore: false });
+
+    s.listAuditLog({ q: 'x' }).subscribe();
+    const noLabels = http.expectOne((r) => r.url === '/api/admin/audit');
+    expect(noLabels.request.params.get('labelAction')).toBeNull();
+    noLabels.flush({ items: [], nextCursor: null, hasMore: false });
 
     s.listAuditLog({ before: 0 }).subscribe();
     const zero = http.expectOne((r) => r.url === '/api/admin/audit');
@@ -1262,12 +1348,11 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     expect(await firstValueFrom(s.getHelpTickets())).toMatchObject({ publicEnabled: true, retentionMonths: 12 });
     await firstValueFrom(
-      s.putHelpTickets({ wikiUrl: 'https://x.example', publicEnabled: false, notifyNew: false, retentionMonths: null }),
+      s.putHelpTickets({ wikiUrl: 'https://x.example', publicEnabled: false, retentionMonths: null }),
     );
     expect(await firstValueFrom(s.getHelpTickets())).toEqual({
       wikiUrl: 'https://x.example',
       publicEnabled: false,
-      notifyNew: false,
       retentionMonths: null,
     });
   });
@@ -1381,6 +1466,12 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(byAction.items.map((e) => e.action)).toEqual(['role_change']);
     const byActor = await firstValueFrom(s.listAuditLog({ actor: 'kc|kim.kasse' }));
     expect(byActor.items.every((e) => e.actor === 'kc|kim.kasse')).toBe(true);
+    const byWord = await firstValueFrom(s.listAuditLog({ q: 'kim.kasse' }));
+    expect(byWord.items.length).toBeGreaterThan(0);
+    expect(byWord.items.every((e) => JSON.stringify(e).includes('kim.kasse'))).toBe(true);
+    const byLabel = await firstValueFrom(s.listAuditLog({ q: 'zzz-none', labelActions: ['role_change'] }));
+    expect(byLabel.items.map((e) => e.action)).toEqual(['role_change']);
+    expect((await firstValueFrom(s.listAuditLog({ q: 'zzz-none' }))).items).toEqual([]);
     expect((await firstValueFrom(s.listAuditActors())).length).toBeGreaterThan(0);
   });
 
@@ -1466,7 +1557,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const rejNull = await firstValueFrom(s.rejectErasure('e-x'));
     expect(rejNull.id).toBe('e-x');
 
-    expect(await firstValueFrom(s.erasePrincipal('p-1'))).toBeUndefined();
+    expect(await firstValueFrom(s.erasePrincipal('p-1'))).toEqual({ paperlessDocuments: [] });
 
     const settings = await firstValueFrom(s.getPrivacySettings());
     expect(settings.defaultRetentionMonths).toBe(24);

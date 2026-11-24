@@ -133,6 +133,34 @@ def test_build_workbook_renders_comment_and_attachment_sheets() -> None:
     assert "rechnung_2026.pdf" in attachment_values
 
 
+def test_build_workbook_names_the_paperless_documents() -> None:
+    """§F/administration/privacy/002533: the number and the date of each filed document."""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    app_id = uuid4()
+    blob = build_auskunft_workbook(
+        email="z@example.org",
+        applications=[],
+        versions=[],
+        principal=None,
+        paperless_documents=[
+            {"applicationId": app_id, "documentId": 4711, "title": "=Antrag", "filedAt": _AT}
+        ],
+    )
+    rows = list(load_workbook(BytesIO(blob))["Paperless-Dokumente"].iter_rows(values_only=True))
+    assert rows[0] == ("Antrag-ID", "Dokumentnummer", "Titel", "Abgelegt am")
+    assert rows[1][0] == str(app_id)
+    assert rows[1][1] == 4711
+    assert rows[1][2] == "'=Antrag"
+    assert str(_AT.year) in str(rows[1][3])
+    empty = build_auskunft_workbook(
+        email="z@example.org", applications=[], versions=[], principal=None
+    )
+    assert load_workbook(BytesIO(empty))["Paperless-Dokumente"].max_row == 1
+
+
 def test_build_workbook_backward_compatible_without_new_kwargs() -> None:
     """Build the workbook without the comments and attachments kwargs.
 

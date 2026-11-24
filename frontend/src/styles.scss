@@ -1,5 +1,6 @@
 @use 'fonts';
 @use 'tokens';
+@use 'material';
 @use 'base';
 @use 'surface';
 @use 'skeleton';
@@ -132,6 +133,11 @@ app-dialog {
   gap: var(--sheet-head-gap);
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
+}
+// A tab line right below the head has a hairline of its own at its foot, so the head has
+// none: two lines with only the tabs between them read as a frame (002010).
+.sheet-head:has(+ app-tab-pager, + app-tabs) {
+  border-bottom: none;
 }
 
 // The Markdown and the chat texts stay selectable on a touch screen;

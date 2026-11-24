@@ -65,6 +65,28 @@ async def test_render_protocol_success_finalizes() -> None:
     assert proto.sent_at is None
 
 
+async def test_a_final_protocol_asks_for_a_paperless_filing_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§F/integrations/paperless/002523: only a finalization asks for the run."""
+    asked: list[object | None] = []
+
+    async def _request(pool: object | None) -> None:
+        asked.append(pool)
+
+    monkeypatch.setattr("worker.protocol.request_filing", _request)
+    draft = _protocol()
+    broken = FakeSession(store={}, results=[result(draft), result(), result(), result(draft)])
+    typst = FakeTypst(error=TypstError("bad markup", status=400, retryable=False))
+    failed = _ctx(broken, typst=typst, storage=FakeStorage())
+    assert await render_protocol(failed, str(PID)) == "failed"
+    assert asked == []
+    session = FakeSession(store={}, results=[result(_protocol()), result()])
+    ctx = _ctx(session, typst=FakeTypst(), storage=FakeStorage())
+    assert await render_protocol(ctx, str(PID)) == "final"
+    assert asked == [None]
+
+
 async def test_render_protocol_transient_retries() -> None:
     """Keep the protocol in rendering after a transient error, because a retry follows."""
     proto = _protocol()

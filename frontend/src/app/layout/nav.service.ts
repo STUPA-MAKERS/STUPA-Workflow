@@ -37,6 +37,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'webhook.manage',
   'admin.calendars',
   'admin.features',
+  'admin.paperless',
   'ticket.manage',
   'audit.read',
   'backup.manage',
@@ -83,8 +84,11 @@ export interface NavItem {
   readonly reportedTickets?: boolean;
   /** Match the active route exactly. */
   readonly exact?: boolean;
-  /** The feature of the entry. The entry does not show while the feature is off. */
-  readonly feature?: FeatureKey;
+  /**
+   * The feature of the entry, or the features of a page that needs several: a public page
+   * needs `public` and the feature of its records. The entry does not show while one is off.
+   */
+  readonly feature?: FeatureKey | readonly FeatureKey[];
   /** `end` entries sit at the foot of the rail, after the spacer. */
   readonly place: 'main' | 'end';
   /** The collapsible group of the entry: `public` is "Öffentlich" (spec 001303). */
@@ -97,7 +101,7 @@ export interface NavItem {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   /** The start page: the events of the own items (specs 001270, 001300); every session has it. */
-  { key: 'activity', path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [], place: 'main' },
+  { key: 'activity', path: '/activity', labelKey: 'nav.activity', icon: 'history', permissions: [], feature: 'activity', place: 'main' },
   /** Without `application.read` these pages show only the applications and tasks of the user. */
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
@@ -154,18 +158,25 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
   { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
   /** The graph of the elements and their relations (specs 001420, 001421). */
-  { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], place: 'main' },
+  { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], feature: 'graph', place: 'main' },
   /**
    * The public pages, for a signed-in person (spec 001303): the public start page `/` holds
    * the only other links to them, and it leads a session to the activity page. They form
    * the group "Öffentlich" at the end of the main entries; a page shows only while its
    * feature is on.
    */
-  { key: 'protocols', path: '/protocols', labelKey: 'nav.public.protocols', icon: 'file', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
-  { key: 'decisions', path: '/decisions', labelKey: 'nav.public.decisions', icon: 'vote', permissions: [], feature: 'meetings', place: 'main', group: 'public' },
-  { key: 'publicCalendar', path: '/public-calendar', labelKey: 'nav.public.calendar', icon: 'cal', permissions: [], feature: 'calendar', place: 'main', group: 'public' },
+  { key: 'protocols', path: '/protocols', labelKey: 'nav.public.protocols', icon: 'file', permissions: [], feature: ['meetings', 'public'], place: 'main', group: 'public' },
+  { key: 'decisions', path: '/decisions', labelKey: 'nav.public.decisions', icon: 'vote', permissions: [], feature: ['meetings', 'public'], place: 'main', group: 'public' },
+  { key: 'publicCalendar', path: '/public-calendar', labelKey: 'nav.public.calendar', icon: 'cal', permissions: [], feature: ['calendar', 'public'], place: 'main', group: 'public' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
+
+/** The features of an entry: none, one or several. */
+export function featuresOf(item: Pick<NavItem, 'feature'>): readonly FeatureKey[] {
+  const { feature } = item;
+  if (feature === undefined) return [];
+  return typeof feature === 'string' ? [feature] : feature;
+}
 
 /** The entries of the phone bar. The other visible entries go into the "Mehr" sheet. */
 export const BOTTOM_BAR_KEYS: readonly NavKey[] = ['activity', 'applications', 'meetings', 'tasks'];
@@ -184,13 +195,13 @@ export class NavService {
   readonly visible = computed<NavItem[]>(() => {
     if (!this.auth.isAuthenticated()) return [];
     const inAnyCommittee = this.auth.gremien().length > 0;
-    return NAV_ITEMS.filter((item) => !item.feature || this.features.isOn(item.feature)).filter(
+    return NAV_ITEMS.filter((item) => this.features.isOn(...featuresOf(item))).filter(
       (item) =>
         this.globalAllows(item) ||
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
         (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()) ||
-        (!!item.reportedTickets && this.auth.hasReportedTickets()),
+        (!!item.reportedTickets && (this.auth.hasReportedTickets() || this.auth.worksOnTickets())),
     );
   });
 

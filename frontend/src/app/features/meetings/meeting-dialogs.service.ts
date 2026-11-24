@@ -113,7 +113,7 @@ export class MeetingDialogsService {
     this.api.patchMeeting(m.id, { protokollantId: principalId }).subscribe({
       next: (updated) => {
         this.applyUpdated(updated);
-        this.toast.success(this.i18n.translate('meetings.toast.protokollantSet'));
+        this.toast.show(this.i18n.translate('meetings.toast.protokollantSet'), 'success');
       },
       error: (err: unknown) => this.keeperChangeFailed(err),
     });
@@ -145,10 +145,11 @@ export class MeetingDialogsService {
         this.handoverSaving.set(false);
         this.closeHandover();
         this.applyUpdated(updated);
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate(
             mode === 'now' ? 'meetings.toast.handedOver' : 'meetings.toast.handoverPlanned',
           ),
+          'success',
         );
       },
       error: (err: unknown) => {
@@ -168,7 +169,7 @@ export class MeetingDialogsService {
     this.api.cancelProtokollantHandover(m.id).subscribe({
       next: (updated) => {
         this.applyUpdated(updated);
-        this.toast.success(this.i18n.translate('meetings.toast.handoverDiscarded'));
+        this.toast.show(this.i18n.translate('meetings.toast.handoverDiscarded'), 'success');
       },
       error: (err: unknown) => this.keeperChangeFailed(err),
     });
@@ -176,11 +177,11 @@ export class MeetingDialogsService {
 
   private keeperChangeFailed(err: unknown): void {
     if (problemCode(err) === 'protokollant_needs_protocol_write') {
-      this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
+      this.toast.show(this.i18n.translate('meetings.toast.needsProtocolWrite'), 'error');
       return;
     }
     const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
-    this.toast.error(detail ? `${base}: ${detail}` : base);
+    this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
   }
 }

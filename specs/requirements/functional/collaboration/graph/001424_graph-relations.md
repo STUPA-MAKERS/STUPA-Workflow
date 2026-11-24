@@ -41,7 +41,7 @@ show one solid line.
 Reason: Most relations of the platform are not links that a person made by hand. A meeting has
 its TOPs and a Buchung has its invoice. Without them the graph is nearly empty and hides how
 the work really connects. The line style tells the two sorts apart without colour
-(NF/accessibility/perception/000502).
+(ui-kit:NF/accessibility/perception/000502).
 
 Test: A backend unit test builds a meeting with a TOP of an Antrag and a vote, and reads the
 lines with each choice of the filter.

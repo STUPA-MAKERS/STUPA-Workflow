@@ -18,14 +18,17 @@ import type { TodoBoardKind, TodoBoardSummary } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { IconComponent, type IconName, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  type IconName,
+  MEDIA,
+  mediaQuery,
+  SideSheetComponent,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
+import { BOARD_ICON } from '@stupa-makers/ui-kit/views/board';
 
-export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
-  personal: 'user',
-  gremium: 'landmark',
-  free: 'kanban',
-  team: 'ticket',
-};
+export { BOARD_ICON } from '@stupa-makers/ui-kit/views/board';
 
 /** The icon of the meta-board "Alle". */
 export const ALL_ICON: IconName = 'grid';
@@ -50,7 +53,7 @@ interface PickerSection {
   selector: 'app-todo-board-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
+  imports: [SheetBodyDirective, NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
   templateUrl: './todo-board-picker.component.html',
   styleUrl: './todo-board-picker.component.scss',
 })

@@ -40,13 +40,14 @@ import {
 import { problemDetail } from '@core/api/problem';
 import type { Observable } from 'rxjs';
 import { RailStatusService } from '../../layout/rail-status.service';
-import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
-import { VotePanelComponent } from './vote-panel/vote-panel.component';
+import type { BallotCaster, BallotFailure } from '@stupa-makers/ui-kit/views/voting';
+import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { voteChangeText, voteSubject, type SeenVote } from './vote-announce.util';
 import { VotingPageService, visibleTicks } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
+import { applicationLink, meetingLink, provideVotingApi } from './voting-api.provider';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -81,7 +82,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
  * - A phone uses the detail bar of the list/detail layout like every other detail
- *   (§ 000674): the back arrow, the menu and, after a scroll, the title. The meeting line
+ *   (§ui-kit:000674): the back arrow, the menu and, after a scroll, the title. The meeting line
  *   stands in the status line below the title. The button bar of the ballot is pinned at
  *   the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
@@ -91,6 +92,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  */
 @Component({
   selector: 'app-vote-cast',
+  providers: [provideVotingApi()],
   host: { '[class.vc-host--split]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -105,12 +107,14 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     ScrollFadeDirective,
     TodoLinkedListComponent,
     TranslatePipe,
-    VotePanelComponent,
+    VotePanelViewComponent,
   ],
   templateUrl: './vote-cast.component.html',
   styleUrl: './vote-cast.component.scss',
 })
 export class VoteCastComponent implements OnDestroy {
+  protected readonly meetingLink = meetingLink;
+  protected readonly applicationLink = applicationLink;
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly delegations = inject(DelegationsApiService);
@@ -308,7 +312,7 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   /**
-   * The live connection is lost and the client tries again (§ 000678). Not while the
+   * The live connection is lost and the client tries again (§ui-kit:000678). Not while the
    * server or the network is away: then the bar "Server nicht erreichbar" says so.
    */
   readonly connectionLost = computed(
@@ -319,12 +323,14 @@ export class VoteCastComponent implements OnDestroy {
   /** The toast "Verbindung verloren" stays while the connection is lost and closes itself. */
   private showConnectionLost(lost: boolean): void {
     if (lost && this.lostToast === null) {
-      this.lostToast = this.toast.showNotice({
-        message: this.i18n.translate('voting.live.reconnecting'),
-        variant: 'warning',
+      this.lostToast = this.toast.show({
+        text: this.i18n.translate('voting.live.reconnecting'),
+        kind: 'warning',
         // On a phone the notice is the bar at the top of the frame, like "Server nicht
         // erreichbar": a card that stays would cover the back arrow of the detail.
-        phonePlacement: 'top',
+        placement: 'top',
+        sticky: true,
+        closable: false,
       });
     } else if (!lost && this.lostToast !== null) {
       this.toast.dismiss(this.lostToast);
@@ -354,7 +360,9 @@ export class VoteCastComponent implements OnDestroy {
         this.runPoll(id);
         return;
       case 'plan':
-        void this.router.navigate(['/budget/plan'], { queryParams: { planVersion: this.loaded()?.planVersionId } });
+        void this.router.navigate(['/budget/plan'], {
+          queryParams: { planVersion: this.loaded()?.planVersionId },
+        });
         return;
       default:
         return;
@@ -391,13 +399,16 @@ export class VoteCastComponent implements OnDestroy {
     call.subscribe({
       next: () => {
         this.pollBusy.set(false);
-        this.toast.success(this.i18n.translate(this.pollToast(action)));
+        this.toast.show(this.i18n.translate(this.pollToast(action)), 'success');
         this.page?.notify({ id: vote.id, kind: 'updated' });
         this.reload();
       },
       error: (err: unknown) => {
         this.pollBusy.set(false);
-        this.toast.error(pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)));
+        this.toast.show(
+          pollRefusalMessage(err, (key, params) => this.i18n.translate(key, params)),
+          'error',
+        );
         this.reload();
       },
     });
@@ -413,7 +424,7 @@ export class VoteCastComponent implements OnDestroy {
         this.objecting.set(false);
         this.confirmObject.set(false);
         this.loaded.set(cancelled);
-        this.toast.success(this.i18n.translate('circular.object.done'));
+        this.toast.show(this.i18n.translate('circular.object.done'), 'success');
         this.page?.notify({ id: vote.id, kind: 'updated' });
       },
       error: (err: unknown) => {
@@ -421,7 +432,7 @@ export class VoteCastComponent implements OnDestroy {
         this.confirmObject.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
         this.reload();
       },
     });
@@ -449,23 +460,32 @@ export class VoteCastComponent implements OnDestroy {
     if (error.status === 403) {
       if (failure.asDelegation) this.proxyRefused.set(true);
       else this.notEligible.set(true);
-      this.toast.error(this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'));
+      this.toast.show(
+        this.i18n.translate(castRefusalText(failure) ?? 'voting.cast.notEligible'),
+        'error',
+      );
       this.reload();
       const id = this.loaded()?.id;
       if (id) this.loadDelegation(id);
       return;
     }
     if (error.status === 409) {
-      this.toast.error(
+      this.toast.show(
         this.i18n.translate(
           castRefusalText(failure) ??
-            (failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict'),
+            (failure.alreadyVoted
+              ? 'voting.cast.toast.alreadyVoted'
+              : 'voting.cast.toast.conflict'),
         ),
+        'error',
       );
       this.reload();
       return;
     }
-    this.toast.error(error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
+    this.toast.show(
+      error.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'),
+      'error',
+    );
   }
 
   /**
@@ -485,7 +505,7 @@ export class VoteCastComponent implements OnDestroy {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(false);
-        this.toast.success(this.i18n.translate('voting.delete.done'));
+        this.toast.show(this.i18n.translate('voting.delete.done'), 'success');
         this.page?.notify({ id: vote.id, kind: 'deleted' });
         void this.router.navigate(['/voting'], { queryParamsHandling: 'preserve' });
       },
@@ -494,14 +514,15 @@ export class VoteCastComponent implements OnDestroy {
         this.confirmDelete.set(false);
         if (err.status === 409) {
           const key = DELETE_CONFLICT_KEYS[err.error?.code ?? ''] ?? 'voting.delete.conflict.other';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show(this.i18n.translate(key), 'error');
           this.reload();
           return;
         }
-        this.toast.error(
+        this.toast.show(
           this.i18n.translate(
             err.status === 403 ? 'voting.delete.forbidden' : 'voting.delete.failed',
           ),
+          'error',
         );
       },
     });
@@ -612,9 +633,10 @@ export class VoteCastComponent implements OnDestroy {
     if (!vote) return;
     const { meeting, position } = this.context();
     const t: Translate = (key, params) => this.i18n.translate(key, params);
-    this.announcer.announce(voteChangeText(t, before, vote, voteSubject(t, vote.question, meeting?.title, position)));
+    this.announcer.announce(
+      voteChangeText(t, before, vote, voteSubject(t, vote.question, meeting?.title, position)),
+    );
   }
-
 
   /**
    * Read the delegation status. It explains a handed-over voting right, or it unlocks

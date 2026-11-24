@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Subscription } from 'rxjs';
 import {
@@ -14,28 +23,24 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { clock, isoDay, localToday, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
-import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
-import { RouterLink, type Params } from '@angular/router';
-import { FabLinkDirective } from '@stupa-makers/ui-kit/shell';
+import { Router, type Params } from '@angular/router';
+import { PushDeviceService } from '@core/pwa/push-device.service';
+import {
+  ActivityViewComponent,
+  type ActivityEntry as ActivityViewEntry,
+} from '@stupa-makers/ui-kit/views/activity';
 import { LiveCardsComponent } from '../../features/meetings/live-cards/live-cards.component';
 import { injectPanePage } from '../admin/pane-page';
 import { RailStatusService } from '../../layout/rail-status.service';
 import {
   ButtonComponent,
-  ButtonGroupComponent,
-  ButtonLinkComponent,
-  EmptyStateComponent,
-  FabComponent,
   FilterSelectComponent,
   IconComponent,
   type IconName,
-  InfiniteScrollDirective,
-  ListGroupComponent,
-  ListItemComponent,
+  type LoadState,
   MEDIA,
   PageHeaderComponent,
   ScrollFadeDirective,
-  SkeletonComponent,
   StickyBarComponent,
   mediaQuery,
 } from '@stupa-makers/ui-kit';
@@ -55,13 +60,6 @@ const KIND_FEATURE: Partial<Record<ActivityItemKind, 'todos' | 'tickets' | 'meet
   meeting: 'meetings',
 };
 
-/** One day of the page: its label and its rows. */
-export interface ActivityDay {
-  readonly key: string;
-  readonly label: string;
-  readonly entries: readonly ActivityEntry[];
-}
-
 /**
  * The page "Aktivität" (`/activity`, specs 001270-001277): the events of the Anträge,
  * To-Dos, Tickets and Sitzungen that the person made, holds or touched, newest first and
@@ -74,8 +72,11 @@ export interface ActivityDay {
  * The page loads 50 rows per step and the next 50 at the end of the list.
  *
  * It is the start page of a signed-in person (spec 001300): above the list it shows the
- * live meetings (spec 001302), and "Antrag stellen" is the one action of the header, on a
- * phone the floating button (spec 001301).
+ * live meetings (spec 001302), and the bell is the one action of the header
+ * (§F/collaboration/notifications/002550).
+ *
+ * The list is the activity view of the kit (§ui-kit:002280): the page maps its entries to the
+ * view entries and keeps the head, the filters, the live meetings and the error toast.
  */
 @Component({
   selector: 'app-activity',
@@ -84,24 +85,14 @@ export interface ActivityDay {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
+    ActivityViewComponent,
     ButtonComponent,
-    ButtonGroupComponent,
-    ButtonLinkComponent,
-    EmptyStateComponent,
-    FabComponent,
-    FabLinkDirective,
     FilterSelectComponent,
     LiveCardsComponent,
-    RouterLink,
     IconComponent,
-    InfiniteScrollDirective,
-    ListGroupComponent,
-    ListItemComponent,
     LoadErrorComponent,
     PageHeaderComponent,
-    RowChevronComponent,
     ScrollFadeDirective,
-    SkeletonComponent,
     StickyBarComponent,
   ],
   templateUrl: './activity.component.html',
@@ -113,6 +104,8 @@ export class ActivityComponent {
   private readonly features = inject(FeatureService);
   private readonly rail = inject(RailStatusService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly push = inject(PushDeviceService);
 
   /** The key of the stored choice of "Von" (spec 001273). */
   static readonly OWN_KEY = 'ap.activity.own';
@@ -145,9 +138,34 @@ export class ActivityComponent {
 
   readonly filtered = computed(() => this.kinds().length > 0 || this.own());
 
-  readonly days = computed<readonly ActivityDay[]>(() =>
-    groupByDay(this.entries(), this.i18n.locale(), (key) => this.i18n.translate(key)),
-  );
+  /** The entries as the view takes them: the item, the actor, the change, the day and the time. */
+  readonly view = computed<LoadState<readonly ActivityViewEntry[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.error()) {
+      return {
+        state: 'error',
+        message: this.i18n.translate('activity.loadError'),
+        retry: () => this.retry(),
+      };
+    }
+    const entries = this.entries();
+    if (!entries.length) {
+      return this.filtered()
+        ? {
+            state: 'empty',
+            icon: 'searchOff',
+            heading: this.i18n.translate('activity.emptyFiltered'),
+          }
+        : { state: 'empty', icon: 'history', heading: this.i18n.translate('activity.empty') };
+    }
+    const locale = this.i18n.locale();
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    return {
+      state: 'ready',
+      more: this.cursor() !== null,
+      data: entries.map((e) => this.toView(e, dayLabel(e.at, locale, t))),
+    };
+  });
 
   constructor() {
     // Beside the rail the page fills the window and only the list scrolls, so the head and the
@@ -160,6 +178,22 @@ export class ActivityComponent {
       untracked(() => this.load(kinds, own));
     });
     this.destroyRef.onDestroy(() => this.request?.unsubscribe());
+  }
+
+  /**
+   * The bell of the phone head (§F/collaboration/notifications/002550): switch on push for this
+   * device when it can take push and has none yet (the browser asks), then open the settings.
+   * A refused permission still opens the settings.
+   */
+  async openNotifications(): Promise<void> {
+    if (
+      this.features.isOn('push') &&
+      this.push.support() === 'ready' &&
+      !(await this.push.endpoint())
+    ) {
+      await this.push.enable().catch(() => undefined);
+    }
+    await this.router.navigateByUrl('/account/notifications');
   }
 
   setKinds(values: readonly string[]): void {
@@ -194,28 +228,21 @@ export class ActivityComponent {
     return KIND_ICON[e.itemKind];
   }
 
-  /** The row link of each entry, split once, so a link keeps its query object. */
-  private readonly links = computed(
-    () => new Map(this.entries().map((e) => [e.id, splitUrl(e.url)] as const)),
-  );
-
-  /** The path of the entry's URL, for the row link. */
-  path(e: ActivityEntry): string {
-    return (this.links().get(e.id) ?? splitUrl(e.url)).path;
-  }
-
-  /** The query of the entry's URL (`/todos?card=<id>`), for the row link. */
-  query(e: ActivityEntry): Readonly<Params> | null {
-    return (this.links().get(e.id) ?? splitUrl(e.url)).query;
-  }
-
-  title(e: ActivityEntry): string {
-    return e.itemTitle || this.i18n.translate('activity.untitled');
-  }
-
-  /** "Bob · Kommentar: Danke" — the actor and the change, as the row's second line. */
-  sub(e: ActivityEntry): string {
-    return `${this.actor(e)} · ${this.change(e)}`;
+  private toView(e: ActivityEntry, day: string): ActivityViewEntry {
+    const { path, query } = splitUrl(e.url);
+    return {
+      id: e.id,
+      item: {
+        title: e.itemTitle || this.i18n.translate('activity.untitled'),
+        icon: this.icon(e),
+        link: { commands: [path], ...(query ? { query } : {}) },
+      },
+      actor: { name: this.actor(e) },
+      change: this.change(e),
+      day,
+      time: clock(e.at, this.i18n.locale()),
+      new: e.isNew,
+    };
   }
 
   actor(e: ActivityEntry): string {
@@ -233,16 +260,15 @@ export class ActivityComponent {
   }
 
   change(e: ActivityEntry): string {
-    return this.i18n.translate(`activity.change.${e.change}` as TranslationKey, { detail: this.detail(e) });
-  }
-
-  time(e: ActivityEntry): string {
-    return clock(e.at, this.i18n.locale());
+    return this.i18n.translate(`activity.change.${e.change}` as TranslationKey, {
+      detail: this.detail(e),
+    });
   }
 
   private detail(e: ActivityEntry): string {
     if (e.status) {
-      const key = e.itemKind === 'ticket' ? `tickets.status.${e.status}` : `meetings.status.${e.status}`;
+      const key =
+        e.itemKind === 'ticket' ? `tickets.status.${e.status}` : `meetings.status.${e.status}`;
       return this.i18n.translate(key as TranslationKey);
     }
     return e.detail ?? '';
@@ -281,30 +307,27 @@ export class ActivityComponent {
     if (this.marked) return;
     this.marked = true;
     this.rail.activitySeen();
-    this.api.markSeen(page.readAt).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => undefined });
+    this.api
+      .markSeen(page.readAt)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => undefined });
   }
 }
 
 /**
- * The rows by local day, newest first: "Heute", "Gestern", then the short weekday and date ("Mo, 16.11.2026").
+ * The label of the local day of a moment: "Heute", "Gestern", then the short weekday and date
+ * ("Mo, 16.11.2026"). The view groups the rows in a row with the same label.
  */
-export function groupByDay(
-  entries: readonly ActivityEntry[],
+export function dayLabel(
+  at: string,
   locale: string,
   t: (key: TranslationKey) => string,
   now: Date = new Date(),
-): readonly ActivityDay[] {
-  const today = localToday(now);
+): string {
+  const key = isoDay(new Date(at));
+  if (key === localToday(now)) return t('activity.today');
   const yesterday = localToday(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-  const label = (key: string): string =>
-    key === today ? t('activity.today') : key === yesterday ? t('activity.yesterday') : weekdayDate(key, locale);
-  return entries.reduce<readonly ActivityDay[]>((days, e) => {
-    const key = isoDay(new Date(e.at));
-    const last = days.at(-1);
-    return last?.key === key
-      ? [...days.slice(0, -1), { ...last, entries: [...last.entries, e] }]
-      : [...days, { key, label: label(key), entries: [e] }];
-  }, []);
+  return key === yesterday ? t('activity.yesterday') : weekdayDate(key, locale);
 }
 
 function readOwn(): boolean {
@@ -328,7 +351,10 @@ function writeOwn(own: boolean): void {
  * Split an app URL into its path and its query params. A router link takes a path only and
  * encodes a `?` in it, so `/todos?card=<id>` as one string opens the 404 page.
  */
-export function splitUrl(url: string): { readonly path: string; readonly query: Readonly<Params> | null } {
+export function splitUrl(url: string): {
+  readonly path: string;
+  readonly query: Readonly<Params> | null;
+} {
   const at = url.indexOf('?');
   return at < 0
     ? { path: url, query: null }

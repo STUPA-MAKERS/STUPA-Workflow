@@ -9,6 +9,7 @@ import { TodoLinkPickerComponent } from '../link-picker/todo-link-picker.compone
 import { TodoLinkedListComponent } from './todo-linked-list.component';
 import { TodoLinkedRefresh } from './todo-linked-refresh';
 import { By } from '@angular/platform-browser';
+import { kindSpies } from '../../../../testing/toast';
 
 function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   return {
@@ -71,6 +72,26 @@ describe('TodoLinkedListComponent', () => {
     expect(screen.getByRole('link', { name: 'RE-2026-17' })).toHaveAttribute('href', '/invoices?id=i-1');
     expect(screen.getByText('Buchung (kein Zugriff)')).toHaveClass('tl__muted');
     expect(document.querySelectorAll('[data-testid="tl-link-row"]')).toHaveLength(2);
+  });
+
+  it('opens a Paperless document in a new tab and hides it without the right (002764, 002765)', async () => {
+    const href = 'https://paperless.example.org/documents/41/details';
+    await setup(() =>
+      of(
+        linksOf(
+          [],
+          [
+            linkRow({ id: 'l-5', kind: 'paperless', title: 'Angebot Beamer', url: href, detail: { documentType: 'Angebot' } }),
+            linkRow({ id: 'l-6', kind: 'paperless', targetId: 'p-2', accessible: false, title: null, url: null }),
+          ],
+        ),
+      ),
+    );
+    const link = screen.getByRole('link', { name: 'Angebot Beamer' });
+    expect(link).toHaveAttribute('href', href);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Paperless-Dokument · Angebot')).toBeInTheDocument();
+    expect(screen.getByText('Paperless-Dokument (kein Zugriff)')).toHaveClass('tl__muted');
   });
 
   it('leaves out the heading on request and keeps the name of the section', async () => {
@@ -249,7 +270,7 @@ describe('TodoLinkedListComponent actions (specs 000547, 001404, 001408)', () =>
     const fail = () => throwError(() => new Error('403'));
     const { cmp } = await withActions(true, linksOf([], [linkRow({ removable: true })]), { link: jest.fn(fail), unlink: jest.fn(fail) });
     const toast = TestBed.inject(ToastService);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.pick({ kind: 'ticket', targetId: 't-1', title: 'T-0001', detail: {} });
     expect(error).toHaveBeenLastCalledWith('Die Verknüpfung ist fehlgeschlagen.');
     cmp.remove(cmp.links()[0]);

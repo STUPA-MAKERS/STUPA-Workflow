@@ -24,6 +24,7 @@ from app.shared.schemas import FrozenStrictCamelModel
 class Feature(StrEnum):
     """A part of the platform that has a switch, in the order of the navigation."""
 
+    ACTIVITY = "activity"
     TODOS = "todos"
     CALENDAR = "calendar"
     MEETINGS = "meetings"
@@ -31,6 +32,10 @@ class Feature(StrEnum):
     BUDGET = "budget"
     INVOICES = "invoices"
     TICKETS = "tickets"
+    GRAPH = "graph"
+    PUBLIC = "public"
+    PUSH = "push"
+    PAPERLESS = "paperless"
 
 
 #: The features a feature needs (§F/administration/admin/000760). A feature is off while
@@ -50,6 +55,7 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     other feature goes on again.
     """
 
+    activity: bool = Field(default=True)
     todos: bool = Field(default=True)
     calendar: bool = Field(default=True)
     meetings: bool = Field(default=True)
@@ -57,6 +63,10 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     budget: bool = Field(default=True)
     invoices: bool = Field(default=True)
     tickets: bool = Field(default=True)
+    graph: bool = Field(default=True)
+    public: bool = Field(default=True)
+    push: bool = Field(default=True)
+    paperless: bool = Field(default=True)
 
     def is_set(self, feature: Feature) -> bool:
         """Return the stored switch of ``feature``."""

@@ -159,9 +159,10 @@ describe('NavService', () => {
   describe('with features off', () => {
     afterEach(() => localStorage.clear());
 
-    const ALL = { ...BASE, roles: ['admin'], permissions: ['budget.book', 'ticket.manage', 'vote.manage', 'session.manage'] };
+    const ALL = { ...BASE, roles: ['admin'], permissions: ['budget.book', 'ticket.manage', 'vote.manage', 'session.manage', 'graph.view'] };
 
     it.each([
+      ['activity', ['activity']],
       ['todos', ['todos']],
       ['calendar', ['calendar', 'publicCalendar']],
       ['meetings', ['meetings', 'protocols', 'decisions']],
@@ -169,11 +170,20 @@ describe('NavService', () => {
       ['budget', ['budget', 'expenses']],
       ['invoices', ['invoices']],
       ['tickets', ['tickets']],
+      ['graph', ['graph']],
+      ['public', ['protocols', 'decisions', 'publicCalendar']],
     ])('hides the entries of %s', (feature, hidden) => {
       localStorage.setItem('ap.features.off', JSON.stringify([feature]));
       const keys = keysFor(ALL as Principal);
       for (const key of hidden) expect(keys).not.toContain(key);
       expect(keys).toContain('applications');
+    });
+
+    /** Spec 000756: `Öffentliche Seiten` off keeps the internal Sitzungen and Kalender. */
+    it('keeps the internal pages while the public pages are off', () => {
+      localStorage.setItem('ap.features.off', JSON.stringify(['public']));
+      const keys = keysFor(ALL as Principal);
+      expect(keys).toEqual(expect.arrayContaining(['meetings', 'calendar']));
     });
 
     it('shows every entry of a feature while all are on', () => {

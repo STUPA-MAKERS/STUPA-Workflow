@@ -244,7 +244,7 @@ describe('HelpMenuComponent', () => {
     }
   });
 
-  /** §000593 the group "Darstellung" with its five switches, with and without a login. */
+  /** §ui-kit:000593 the group "Darstellung" with its five switches, with and without a login. */
   it('shows the display switches in the order of the spec, also for a visitor', async () => {
     await setup({ variant: 'sheet', menu: 'a11y', signedIn: false });
     const group = screen.getByRole('group', { name: 'Barrierefreiheit' });
@@ -261,7 +261,7 @@ describe('HelpMenuComponent', () => {
     ]);
   });
 
-  /** §000606 very high contrast turns the other switches on and disables them. */
+  /** §ui-kit:000606 very high contrast turns the other switches on and disables them. */
   it('locks the other switches on while very high contrast is on', async () => {
     const { fixture } = await setup({ variant: 'sheet', menu: 'a11y' });
     const display = fixture.debugElement.injector.get(DisplaySettingsService);
@@ -284,7 +284,7 @@ describe('HelpMenuComponent', () => {
     display.reset();
   });
 
-  /** §000594 a switch shows the state in effect and overrides the system; the reset clears all. */
+  /** §ui-kit:000594 a switch shows the state in effect and overrides the system; the reset clears all. */
   it('sets a display setting and the theme, and resets both to the system', async () => {
     const { fixture } = await setup({ variant: 'sheet', menu: 'a11y' });
     const display = fixture.debugElement.injector.get(DisplaySettingsService);

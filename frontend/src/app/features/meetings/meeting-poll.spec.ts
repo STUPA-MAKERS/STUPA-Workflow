@@ -7,8 +7,9 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { vote } from '../../../testing/meeting-fixtures';
 import { liveOpenedVote, voteMetaLine } from './meetings-display.util';
 import { pollSnippet, voteSnippet, voteSnippetQuestion } from './meetings.util';
-import { VoteCardComponent } from './vote-card/vote-card.component';
+import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { voteResultInfo, voteResultResolver } from './vote-result/vote-result';
+import { provideVotingApi } from '../voting/voting-api.provider';
 
 /** The German catalog with `{param}` filled in. */
 function t(key: TranslationKey, params: Record<string, string | number> = {}): string {
@@ -107,7 +108,13 @@ describe('poll snippet (same text as the backend build_poll_snippet)', () => {
   });
 
   it('one answer is "1 Antwort"', () => {
-    const one: PollResult = { counts: { o1: 1 }, abstentions: 0, ballots: 1, order: ['o1'], top: ['o1'] };
+    const one: PollResult = {
+      counts: { o1: 1 },
+      abstentions: 0,
+      ballots: 1,
+      order: ['o1'],
+      top: ['o1'],
+    };
     const text = pollSnippet(poll({ poll: SINGLE, pollResult: one }), SINGLE);
     expect(text.endsWith('> 1 Antwort')).toBe(true);
   });
@@ -125,7 +132,12 @@ describe('poll in the meeting', () => {
 
   it('the rules line of a poll names no rule and no secrecy', () => {
     const line = voteMetaLine(
-      poll({ majorityRule: 'simple', quorum: { type: 'count', value: 3 }, secret: true, closedAt: null }),
+      poll({
+        majorityRule: 'simple',
+        quorum: { type: 'count', value: 3 },
+        secret: true,
+        closedAt: null,
+      }),
       t,
       'de',
     );
@@ -143,14 +155,25 @@ describe('poll in the meeting', () => {
     });
     expect(v.kind).toBe('poll');
     expect(v.poll).toBe(SINGLE);
-    expect(liveOpenedVote({ type: 'vote_opened', voteId: 'p2', options: [], closesAt: null, kind: 'poll' }).poll).toBeNull();
+    expect(
+      liveOpenedVote({
+        type: 'vote_opened',
+        voteId: 'p2',
+        options: [],
+        closesAt: null,
+        kind: 'poll',
+      }).poll,
+    ).toBeNull();
   });
 
   describe('the vote card', () => {
     async function card(v: MeetingVote, canVote = false) {
-      return render(VoteCardComponent, {
+      return render(VoteCardViewComponent, {
         inputs: { vote: v, meetingStatus: 'live', canManage: true, canRun: true, canVote },
-        providers: [{ provide: ApiClient, useValue: { castBallot: () => of({ status: 'cast' }) } }],
+        providers: [
+          { provide: ApiClient, useValue: { castBallot: () => of({ status: 'cast' }) } },
+          provideVotingApi(),
+        ],
       });
     }
 
@@ -165,7 +188,15 @@ describe('poll in the meeting', () => {
 
     it('an open poll shows the poll ballot without a status caption', async () => {
       await card(
-        poll({ status: 'open', pollResult: null, counts: null, poll: DATE, guestsVote: true, presentMembers: 3, presentGuests: 1 }),
+        poll({
+          status: 'open',
+          pollResult: null,
+          counts: null,
+          poll: DATE,
+          guestsVote: true,
+          presentMembers: 3,
+          presentGuests: 1,
+        }),
         true,
       );
       expect(screen.queryByText('Umfrage offen')).toBeNull();

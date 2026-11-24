@@ -73,9 +73,26 @@ from app.modules.notifications.models import (
     NotificationSettings,
     TaskReminderLog,
 )
+from app.modules.notifications.push_models import (
+    PushPreference,
+    PushSubscription,
+    PushVapidKey,
+)
+from app.modules.paperless.models import (
+    PaperlessDocument,
+    PaperlessFiling,
+    PaperlessSettings,
+)
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
-from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
+from app.modules.tickets.models import (
+    Ticket,
+    TicketArea,
+    TicketCategory,
+    TicketEvent,
+    TicketNote,
+    TicketSenderBlock,
+)
 from app.modules.todos.models import (
     Link,
     TodoAssignee,
@@ -133,6 +150,9 @@ __all__ = [
     "MarkdownDocument",
     "MarkdownImage",
     "NotificationPreference",
+    "PushPreference",
+    "PushSubscription",
+    "PushVapidKey",
     "NotificationSettings",
     "TaskReminderLog",
     "Meeting",
@@ -144,6 +164,9 @@ __all__ = [
     "OAuthAuthorizationCode",
     "OAuthToken",
     "ErasureRequest",
+    "PaperlessDocument",
+    "PaperlessFiling",
+    "PaperlessSettings",
     "Principal",
     "Backup",
     "CalendarAnswer",
@@ -163,6 +186,8 @@ __all__ = [
     "StatusEvent",
     "SubmissionVersion",
     "Ticket",
+    "TicketArea",
+    "TicketCategory",
     "TicketEvent",
     "TicketNote",
     "TicketSenderBlock",

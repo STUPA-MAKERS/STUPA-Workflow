@@ -1,47 +1,32 @@
-<section class="ls admin-page">
-  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t">
-    <app-breadcrumbs crumbs />
-    @if (form.state() === 'ok' && dirty()) {
-      <app-button actions variant="text" [disabled]="form.saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
-    }
-  </app-page-header>
+<app-settings-screen
+  [head]="{ title: 'admin.loginSettings.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [save]="{ dirty: dirty(), busy: saving(), disabled: !body() }"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenGroup="sessions">
+    <form class="ls__grid" (submit)="$event.preventDefault(); save()">
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.web' | t"
+        [error]="webError()"
+        name="webSessionDays"
+        [ngModel]="draft().web"
+        (ngModelChange)="patch({ web: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
 
-  <app-load-state
-    [state]="form.state()"
-    [forbiddenText]="'admin.loginSettings.forbidden' | t"
-    [errorText]="'admin.loginSettings.loadError' | t"
-    (retry)="form.reload()"
-  >
-    <ng-template #content>
-      <form class="ls__grid" (submit)="$event.preventDefault(); save()">
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.web' | t"
-          [error]="webError()"
-          name="webSessionDays"
-          [ngModel]="draft().web"
-          (ngModelChange)="patch({ web: $event })"
-          [suffix]="'admin.loginSettings.daysUnit' | t"
-        />
-
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.pwa' | t"
-          [error]="pwaError()"
-          name="pwaSessionDays"
-          [ngModel]="draft().pwa"
-          (ngModelChange)="patch({ pwa: $event })"
-          [suffix]="'admin.loginSettings.daysUnit' | t"
-        />
-      </form>
-
-      @if (saved()?.updatedAt; as at) {
-        <p class="ls__meta">{{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}</p>
-      }
-
-      @if (dirty()) {
-        <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!body()" (activate)="save()" />
-      }
-    </ng-template>
-  </app-load-state>
-</section>
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.pwa' | t"
+        [error]="pwaError()"
+        name="pwaSessionDays"
+        [ngModel]="draft().pwa"
+        (ngModelChange)="patch({ pwa: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
+    </form>
+  </ng-template>
+</app-settings-screen>

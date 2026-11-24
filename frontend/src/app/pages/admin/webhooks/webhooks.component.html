@@ -1,139 +1,219 @@
-<section class="wh admin-page">
-  <app-page-header [flush]="true" [title]="'admin.webhook.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.webhook.error' | t" (retry)="load()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (hooks().length) {
-      <ul class="rowgroup wh__list" [attr.aria-label]="'admin.webhook.title' | t">
-        @for (h of hooks(); track h.id; let i = $index) {
-          @let s = statusOf(h.id);
-          <li>
-            <app-expand-row
-              [title]="h.name || h.url"
-              [toggle]="canManage() ? 'chevron' : 'row'"
-              [toggleLabel]="('admin.webhook.delivery.title' | t) + ': ' + (h.name || h.url)"
-              [open]="statusDetail()?.id === h.id"
-              (openChange)="toggleStatus(h)"
-              (activate)="openEdit(i)"
-            >
-              @if (!h.active) {
-                <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
-              }
-              @if (s) {
-                @let st = deliveryStatus(s.lastState);
-                <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
-              }
-              <span sub class="mono">{{ h.url }}</span>
-              <app-switch
-                trail
-                [checked]="h.active"
-                [disabled]="!canManage() || isToggling(h.id)"
-                (checkedChange)="setActive(h, $event)"
-                [ariaLabel]="('admin.webhook.active' | t) + ': ' + (h.name || h.url)"
-                >{{ 'admin.webhook.active' | t }}</app-switch
-              >
-              @if (canManage()) {
-                <app-button-group ngProjectAs="[trail]">
-                  <app-row-menu
-                    trail
-                    [sections]="rowMenu()"
-                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
-                    (selected)="askDelete(h)"
-                  />
-                </app-button-group>
-              }
-              @if (canManage()) {
-                <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">
-                  @if (s) {
-                    <dl appFacts class="wh__grid">
-                      <div>
-                        <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
-                        @let st = deliveryStatus(s.lastState);
-                        <dd>
-                          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{{ 'admin.webhook.delivery.responseCode' | t }}</dt>
-                        <dd class="mono">
-                          {{ s.responseCode ?? ('admin.webhook.delivery.noResponse' | t) }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{{ 'admin.webhook.delivery.attempts' | t }}</dt>
-                        <dd class="mono">{{ s.attempts }}</dd>
-                      </div>
-                      <div>
-                        <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
-                        <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
-                      </div>
-                      <div class="facts__wide">
-                        <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
-                        <dd>{{ reasonLabel(s.reasonClass) }}</dd>
-                      </div>
-                    </dl>
-                    @if (s.lastState === 'dead') {
-                      <app-error-text>{{ 'admin.webhook.delivery.deadHint' | t }}</app-error-text>
-                    }
-                  } @else {
-                    <app-empty-state icon="send" rows="1" [heading]="'admin.webhook.delivery.none' | t" />
-                  }
-                </app-section>
-              }
-            </app-expand-row>
-          </li>
+<app-records-screen
+  class="wh"
+  [head]="{ title: 'admin.webhook.title' | t }"
+  [rows]="rows()"
+  [actions]="actions()"
+  [keepOnError]="hooks().length > 0"
+  [skeleton]="3"
+  (action)="$event.key === 'add' && openAdd()"
+>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.webhook.search' | t"
+        [label]="'admin.webhook.search' | t"
+        [results]="hits()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+      />
+    </div>
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let h = hookOf(row.id);
+    @let i = indexOf(row.id);
+    @let s = statusOf(h.id);
+    <li>
+      <app-expand-row
+        [title]="h.name || h.url"
+        [toggle]="canManage() ? 'chevron' : 'row'"
+        [toggleLabel]="('admin.webhook.delivery.title' | t) + ': ' + (h.name || h.url)"
+        [open]="statusDetail()?.id === h.id"
+        (openChange)="toggleStatus(h)"
+        (activate)="openEdit(i)"
+      >
+        @if (!h.active) {
+          <app-status-text status kind="muted">{{ 'common.inactive' | t }}</app-status-text>
         }
-      </ul>
-    } @else {
-      <app-empty-state icon="webhook" [heading]="'admin.webhook.none' | t" />
-      }
-    </ng-template>
-  </app-load-state>
-
-  @if (canManage()) {
-    <app-fab [label]="'fab.webhook' | t" (activate)="openAdd()" />
-  }
-</section>
+        @if (s) {
+          @let st = deliveryStatus(s.lastState);
+          <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+        }
+        <span sub class="mono">{{ h.url }}</span>
+        <app-switch
+          trail
+          [checked]="h.active"
+          [disabled]="!canManage() || isToggling(h.id)"
+          (checkedChange)="setActive(h, $event)"
+          [ariaLabel]="('admin.webhook.active' | t) + ': ' + (h.name || h.url)"
+          >{{ 'admin.webhook.active' | t }}</app-switch
+        >
+        @if (canManage()) {
+          <app-button-group ngProjectAs="[trail]">
+            <app-row-menu
+              trail
+              [sections]="rowMenu()"
+              [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
+              (selected)="onMenu(h, $event)"
+            />
+          </app-button-group>
+        }
+        @if (canManage()) {
+          <app-section class="wh__status" [level]="2" [heading]="'admin.webhook.delivery.title' | t">
+            @if (s) {
+              <dl appFacts class="wh__grid">
+                <div>
+                  <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
+                  @let st = deliveryStatus(s.lastState);
+                  <dd>
+                    <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ 'admin.webhook.delivery.responseCode' | t }}</dt>
+                  <dd class="mono">
+                    {{ s.responseCode ?? ('admin.webhook.delivery.noResponse' | t) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ 'admin.webhook.delivery.attempts' | t }}</dt>
+                  <dd class="mono">{{ s.attempts }}</dd>
+                </div>
+                <div>
+                  <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
+                  <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
+                </div>
+                <div class="facts__wide">
+                  <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
+                  <dd>{{ reasonLabel(s.reasonClass) }}</dd>
+                </div>
+              </dl>
+              @if (s.lastState === 'dead') {
+                <app-error-text>{{ 'admin.webhook.delivery.deadHint' | t }}</app-error-text>
+              }
+            } @else {
+              <app-empty-state icon="send" rows="1" [heading]="'admin.webhook.delivery.none' | t" />
+            }
+          </app-section>
+        }
+      </app-expand-row>
+    </li>
+  </ng-template>
+</app-records-screen>
 
 <app-dialog
   [open]="draft() !== null"
-  [title]="(editingIndex() === null ? 'admin.webhook.create' : 'admin.webhook.edit') | t"
+  [heading]="(editingIndex() === null ? 'admin.webhook.create' : 'admin.webhook.edit') | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
+  [actions]="[
+    { key: 'close', label: ('action.cancel' | t) },
+    { key: 'save', label: ('action.save' | t), kind: 'main', disabled: !canSave() },
+  ]"
+  (action)="$event.key === 'close' ? close() : $event.key === 'save' ? save() : null"
 >
-  @if (draft(); as d) {
-    <form class="wh__form" (submit)="$event.preventDefault(); save()">
-      <app-input
-        [label]="'admin.webhook.name' | t"
-        [ngModel]="d.name"
-        (ngModelChange)="patch('name', $event)"
-        name="name"
-      />
-      <app-input
-        class="wh__urlField"
-        [label]="'admin.webhook.url' | t"
-        [error]="d.url && errors().length ? tr(errors()[0]) : ''"
-        [ngModel]="d.url"
-        (ngModelChange)="patch('url', $event)"
-        name="url"
-        placeholder="https://"
-      />
-      <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
-        'admin.webhook.active' | t
-      }}</app-switch>
-    </form>
-  }
-  <div dialog-footer class="wh__foot">
-    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="errors().length > 0" (click)="save()">{{
-      'action.save' | t
-    }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    @if (draft(); as d) {
+      <form class="wh__form" (submit)="$event.preventDefault(); save()">
+        <app-input
+          [label]="'admin.webhook.name' | t"
+          [required]="true"
+          [ngModel]="d.name"
+          (ngModelChange)="patch('name', $event)"
+          name="name"
+        />
+        <app-input
+          [label]="'admin.webhook.url' | t"
+          [error]="d.url && errors().length ? tr(errors()[0]) : ''"
+          [ngModel]="d.url"
+          (ngModelChange)="patch('url', $event)"
+          name="url"
+          placeholder="https://"
+        />
+        <div class="rowgroup rowgroup--settings">
+          <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{
+            'admin.webhook.active' | t
+          }}</app-switch>
+        </div>
+
+        @for (g of groups(); track g.group) {
+            <app-section [level]="3" [heading]="groupLabel(g.group)">
+              @for (ev of g.events; track ev.name) {
+                @let sub = subscriptionOf(ev.name);
+                <app-field-group role="group" [attr.aria-label]="eventLabel(ev.name)">
+                  <app-checkbox
+                    [name]="'wh-ev-' + ev.name"
+                    [ngModel]="sub !== null"
+                    (ngModelChange)="setEvent(ev, $event)"
+                    >{{ eventLabel(ev.name) }}</app-checkbox
+                  >
+                  @if (sub) {
+                    @for (f of ev.fields; track f.key) {
+                      <app-checkbox
+                        [name]="'wh-f-' + ev.name + '-' + f.key"
+                        [ngModel]="sub.fields.includes(f.key)"
+                        (ngModelChange)="setField(ev, f.key, $event)"
+                        >{{ fieldLabel(f.key) }}
+                        @if (f.personal) {
+                          <app-status-text kind="warn">{{ 'admin.webhook.personal' | t }}</app-status-text>
+                        }</app-checkbox
+                      >
+                    }
+                  }
+                </app-field-group>
+              }
+            </app-section>
+        }
+
+        <app-section [level]="3" [heading]="'admin.webhook.filters' | t">
+          <app-filter-select
+            size="md"
+            [multiple]="true"
+            [filled]="true"
+            [label]="'admin.webhook.filter.gremien' | t"
+            [text]="filterText('admin.webhook.filter.gremien', gremiumOptions(), d.gremiumIds)"
+            [options]="gremiumOptions()"
+            [values]="d.gremiumIds"
+            (valuesChange)="patch('gremiumIds', $event)"
+            [resetLabel]="'admin.webhook.filter.all' | t"
+          />
+          <app-filter-select
+            size="md"
+            [multiple]="true"
+            [filled]="true"
+            [label]="'admin.webhook.filter.types' | t"
+            [text]="filterText('admin.webhook.filter.types', typeOptions(), d.typeIds)"
+            [options]="typeOptions()"
+            [values]="d.typeIds"
+            (valuesChange)="patch('typeIds', $event)"
+            [resetLabel]="'admin.webhook.filter.all' | t"
+          />
+          @if (hasTransition()) {
+            <app-filter-select
+              size="md"
+              [multiple]="true"
+              [filled]="true"
+              [label]="'admin.webhook.filter.states' | t"
+              [text]="filterText('admin.webhook.filter.states', stateOptions(), d.stateKeys)"
+              [options]="stateOptions()"
+              [values]="d.stateKeys"
+              (valuesChange)="patch('stateKeys', $event)"
+              [resetLabel]="'admin.webhook.filter.all' | t"
+            />
+          }
+        </app-section>
+
+        @if (previews().length) {
+          <app-section [level]="3" [heading]="'admin.webhook.preview' | t">
+            @for (p of previews(); track p.name) {
+              <app-markdown-view [src]="p.markdown" />
+            }
+          </app-section>
+        }
+      </form>
+    }
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

@@ -19,6 +19,7 @@ import {
   IconComponent,
   NoteComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';
 
@@ -41,7 +42,14 @@ import { problemCode, problemDetail } from '@core/api/problem';
   selector: 'app-close-meeting-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DialogComponent, ButtonComponent, IconComponent, NoteComponent],
+  imports: [
+    DialogBodyDirective,
+    TranslatePipe,
+    DialogComponent,
+    ButtonComponent,
+    IconComponent,
+    NoteComponent,
+  ],
   templateUrl: './close-meeting-dialog.component.html',
   styleUrl: './close-meeting-dialog.component.scss',
 })
@@ -120,7 +128,7 @@ export class CloseMeetingDialogComponent {
     this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
       next: (updated) => {
         this.closing.set(false);
-        this.toast.success(this.i18n.translate('meetings.toast.closed'));
+        this.toast.show(this.i18n.translate('meetings.toast.closed'), 'success');
         this.meetingClosed.emit(updated);
       },
       error: (err: unknown) => {
@@ -135,7 +143,7 @@ export class CloseMeetingDialogComponent {
         }
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }

@@ -30,7 +30,7 @@ scope:
 The Markdown of a protocol must embed an uploaded PDF as
 `[<file name>](/api/media/documents/<uuid>)`. This must work in each Markdown text of a
 protocol: the TOP texts and the free protocol text. The editor must insert the reference on a
-paste, on a drop and from the insert button, the same way as an image (000506). Only a person
+paste, on a drop and from the insert button, the same way as an image (ui-kit:000506). Only a person
 who can write the text must be able to upload a PDF.
 
 Reason: A Sitzung often treats a document, for example a Haushaltsplan or an offer. The

@@ -132,7 +132,7 @@ class TransitionDef(WireModel, frozen=True):
         description="Actions: notify {recipients: [{kind, ref?}]} with kinds gremium/role/"
         "email (need ref), applicant, voteGremium (members of the Gremium that decides "
         "the vote) and budgetGremium (members of the deciding Gremium of the cost "
-        "center) — the last three without ref; webhook {webhookId}; "
+        "center) — the last three without ref; "
         "addToNextSession {gremiumId?} (target must be a vote state; without gremiumId "
         "the Gremium of the vote is used); assignBudget {budgetId}; "
         "assignBudgetFromField {field} (assigns the budget UUID stored in that form "
@@ -496,16 +496,35 @@ class UiLanguageUpdate(WireModel, frozen=True):
     active: bool | None = None
 
 
+class WebhookSubscription(WireModel, frozen=True):
+    event: str = Field(description="An event of get_webhook_catalog, e.g. application.transition")
+    fields: list[str] = Field(
+        default_factory=list,
+        description="The fields of the event for the data object; the IDs are always sent",
+    )
+
+
 class WebhookCreate(WireModel, frozen=True):
     name: str
     url: str
     active: bool = True
+    subscriptions: list[WebhookSubscription] = Field(default_factory=list)
+    gremiumIds: list[str] = Field(default_factory=list, description="Empty = every Gremium")
+    typeIds: list[str] = Field(default_factory=list, description="Empty = every Antragsart")
+    stateKeys: list[str] = Field(
+        default_factory=list,
+        description="Target status keys for application.transition; empty = every status",
+    )
 
 
 class WebhookUpdate(WireModel, frozen=True):
     name: str | None = None
     url: str | None = None
     active: bool | None = None
+    subscriptions: list[WebhookSubscription] | None = None
+    gremiumIds: list[str] | None = None
+    typeIds: list[str] | None = None
+    stateKeys: list[str] | None = None
 
 
 # Budget tree, bookings and transfers.
@@ -931,7 +950,7 @@ TodoLinkKind = Literal[
     "todo",
 ]
 TicketKind = Literal["bug", "question", "idea", "barrier"]
-TicketStatus = Literal["new", "in_progress", "done", "rejected"]
+TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 
 
 class TodoLinkIn(WireModel, frozen=True):
@@ -1002,13 +1021,82 @@ class TodoCardPatch(WireModel, frozen=True):
     dueDate: str | None = Field(default=None, description="ISO date; explicit null clears it")
 
 
+class TicketCategoryIn(WireModel, frozen=True):
+    id: str | None = Field(
+        default=None, description="The id of a stored Kategorie; leave out for a new one"
+    )
+    name: str
+
+
+class TicketAreaCreate(WireModel, frozen=True):
+    name: str
+    gremiumId: str | None = Field(
+        default=None, description="The Gremium whose roles grant ticket.work in the Bereich"
+    )
+    notifyNew: bool = Field(default=True, description="Mail each new ticket to the team")
+    inApp: bool = Field(
+        default=False,
+        description="A signed-in person can choose the Bereich in the ticket dialog",
+    )
+    categories: list[TicketCategoryIn] = Field(default_factory=list)
+
+
+class TicketAreaPatch(WireModel, frozen=True):
+    name: str | None = None
+    gremiumId: str | None = Field(
+        default=None, description="Explicit null leaves the Bereich without a Gremium"
+    )
+    notifyNew: bool | None = None
+    inApp: bool | None = Field(
+        default=None,
+        description="A signed-in person can choose the Bereich in the ticket dialog",
+    )
+    categories: list[TicketCategoryIn] | None = Field(
+        default=None,
+        description="The whole ordered list; a stored Kategorie that is left out is deleted",
+    )
+
+
+class TicketManualCreate(WireModel, frozen=True):
+    areaId: str = Field(description="A Bereich in which the caller works")
+    title: str = Field(description="1 to 200 characters")
+    body: str = Field(default="", description="The note of the team; the person does not read it")
+    kind: TicketKind | None = Field(
+        default=None, description="Required for the Bereich Plattform, not allowed elsewhere"
+    )
+    categoryId: str | None = Field(
+        default=None, description="A Kategorie of the Bereich; not for Plattform"
+    )
+    reporterId: str | None = Field(
+        default=None, description="The account of the person; or set email"
+    )
+    email: str | None = Field(
+        default=None,
+        description="The address of the person; the Bereich needs a Postfach (422 otherwise)",
+    )
+    message: str = Field(default="", description="The first public message to the person")
+
+
 class TicketPatch(WireModel, frozen=True):
     status: TicketStatus | None = None
     assigneeId: str | None = Field(
         default=None,
-        description="A holder of ticket.manage (see the ticket assignees); explicit null unassigns",
+        description="A person with the work right in the Bereich of the ticket (see the "
+        "ticket assignees with `area`); explicit null unassigns",
     )
-    kind: TicketKind | None = None
+    kind: TicketKind | None = Field(
+        default=None, description="The Kategorie of a ticket of the Bereich Plattform"
+    )
+    categoryId: str | None = Field(
+        default=None,
+        description="A Kategorie of the Bereich of the ticket (see the ticket areas); "
+        "explicit null clears it. Not for a ticket of Plattform",
+    )
+    areaId: str | None = Field(
+        default=None,
+        description="Move the ticket to this Bereich: clears the Kategorie, and the "
+        "assignee without the work right there",
+    )
     duplicateOfId: str | None = Field(
         default=None, description="Another ticket's id; only together with status `rejected`"
     )

@@ -18,4 +18,4 @@ scope:
 
 A holder of `application.create_on_behalf` must be able to capture an Antrag for an existing
 account or for a guest with name and e-mail. The Antrag must belong to the applicant. The
-capture dialog must follow the pattern of "Buchung anlegen" (000666).
+capture dialog must follow the pattern of "Buchung anlegen" (ui-kit:000666).

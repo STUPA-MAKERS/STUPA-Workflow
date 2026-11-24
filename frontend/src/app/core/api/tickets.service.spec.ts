@@ -140,6 +140,59 @@ describe('TicketsApiService', () => {
     lift.flush(null);
   });
 
+  it('works the Bereiche and the Postfach of a Bereich', () => {
+    api.areas().subscribe();
+    expect(http.expectOne('/api/tickets/areas').request.context.get(SKIP_LOADING)).toBe(true);
+    api.adminAreas().subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas').request.method).toBe('GET');
+    api.reportAreas().subscribe();
+    expect(http.expectOne('/api/tickets/report-areas').request.method).toBe('GET');
+    api.createArea({ name: 'Büro' } as never).subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas').request.body).toEqual({ name: 'Büro' });
+    api.updateArea('a-1', { name: 'Neu' }).subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1').request.method).toBe('PATCH');
+    api.deleteArea('a-1').subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1').request.method).toBe('DELETE');
+
+    api.adminMailboxes().subscribe();
+    expect(http.expectOne('/api/admin/ticket-mailboxes').request.context.get(SKIP_LOADING)).toBe(true);
+    api.createMailbox('a-1', { address: 'buero@example.org' } as never).subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1/mailbox').request.method).toBe('POST');
+    api.updateMailbox('a-1', { enabled: true }).subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1/mailbox').request.body).toEqual({ enabled: true });
+    api.deleteMailbox('a-1').subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1/mailbox').request.method).toBe('DELETE');
+    api.testMailbox('a-1').subscribe();
+    expect(http.expectOne('/api/admin/ticket-areas/a-1/mailbox/test').request.body).toEqual({});
+  });
+
+  it('creates a ticket by hand, sends a mail again and files a file in Paperless', () => {
+    api.createManual({ title: 't' } as never).subscribe();
+    expect(http.expectOne('/api/tickets/manual').request.body).toEqual({ title: 't' });
+    api.resendMail('t-1', 'm-1').subscribe();
+    expect(http.expectOne('/api/tickets/t-1/mails/m-1/resend').request.method).toBe('POST');
+    api.fileInPaperless('t-1', 'f-1').subscribe();
+    expect(http.expectOne('/api/tickets/t-1/files/f-1/paperless').request.body).toEqual({});
+    expect(api.mailSourceUrl('t-1', 'm-1')).toBe('/api/tickets/t-1/mails/m-1/source');
+  });
+
+  it('sends the receivers, the mentions and the visibility of a note only when it has them', () => {
+    api.addNote('t-1', 'Hallo').subscribe();
+    expect(http.expectOne('/api/tickets/t-1/notes').request.body).toEqual({ body: 'Hallo' });
+    api.addNote('t-1', 'Hallo', {}, 'public', ['p-1'], { to: ['a@example.org'], cc: [] }).subscribe();
+    expect(http.expectOne('/api/tickets/t-1/notes').request.body).toEqual({
+      body: 'Hallo',
+      to: ['a@example.org'],
+      cc: [],
+      mentions: ['p-1'],
+      visibility: 'public',
+    });
+    api.editNote('t-1', 'n-1', 'Neu', ['p-2']).subscribe();
+    expect(http.expectOne('/api/tickets/t-1/notes/n-1').request.body).toEqual({ body: 'Neu', mentions: ['p-2'] });
+    api.editNote('t-1', 'n-1', 'Neu').subscribe();
+    expect(http.expectOne('/api/tickets/t-1/notes/n-1').request.body).toEqual({ body: 'Neu' });
+  });
+
   it('builds the download url of an attachment', () => {
     expect(api.attachmentUrl('a-1')).toBe('/api/attachments/a-1/download');
   });

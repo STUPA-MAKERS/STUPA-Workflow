@@ -59,6 +59,7 @@ import {
   DetailNoneComponent,
   FabComponent,
   PageHeaderComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { invoiceStatus } from '@shared/ui';
@@ -113,7 +114,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  * a booking can reference one invoice, so one invoice can serve many bookings.
  *
  * The list: title with the import; the search and the chips (the status chip Alle /
- * Eingang / Verbucht / Bezahlt first, § 000667, then invoice date, due date, amount); the drop
+ * Eingang / Verbucht / Bezahlt first, §ui-kit:000667, then invoice date, due date, amount); the drop
  * zone; the rows by month. The detail: the open invoice (`?id=`, also the target of the
  * global search), or the form of a new, an imported or an edited invoice.
  *
@@ -134,6 +135,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     RowChevronComponent,
     PullRefreshDirective,
     InfiniteScrollDirective,
@@ -263,7 +265,7 @@ export class InvoicesComponent implements InvoiceFormHost {
    */
   readonly reloading = signal(false);
   readonly loadingMore = signal(false);
-  /** The search placeholder with the number of invoices (§ 000661). */
+  /** The search placeholder with the number of invoices (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,
@@ -702,7 +704,7 @@ export class InvoicesComponent implements InvoiceFormHost {
 
   /** The zone takes PDFs only. */
   onZoneRejected(): void {
-    this.toast.error(this.i18n.translate('invoices.toast.notPdf'));
+    this.toast.show(this.i18n.translate('invoices.toast.notPdf'), 'error');
   }
 
   onHeaderMenu(item: RowMenuItem): void {
@@ -728,7 +730,7 @@ export class InvoicesComponent implements InvoiceFormHost {
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
-          this.toast.error(this.failureText(err));
+          this.toast.show(this.failureText(err), 'error');
         }
       },
     });
@@ -769,7 +771,7 @@ export class InvoicesComponent implements InvoiceFormHost {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.failureText(err));
+        this.toast.show(this.failureText(err), 'error');
       },
     });
   }
@@ -844,13 +846,13 @@ export class InvoicesComponent implements InvoiceFormHost {
         next: (created) => {
           this.saving.set(false);
           this.createOpen.set(false);
-          this.toast.success(this.i18n.translate('invoices.toast.created'));
+          this.toast.show(this.i18n.translate('invoices.toast.created'), 'success');
           this.reload();
           if (created?.id) this.openInvoice(created.id);
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.failureText(err));
+          this.toast.show(this.failureText(err), 'error');
         },
       });
   }
@@ -891,12 +893,12 @@ export class InvoicesComponent implements InvoiceFormHost {
           this.saving.set(false);
           this.editing.set(null);
           this.replaceRow(updated);
-          this.toast.success(this.i18n.translate('invoices.toast.saved'));
+          this.toast.show(this.i18n.translate('invoices.toast.saved'), 'success');
           if (updated.status !== i.status) this.reload();
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.failureText(err));
+          this.toast.show(this.failureText(err), 'error');
         },
       });
   }
@@ -909,12 +911,12 @@ export class InvoicesComponent implements InvoiceFormHost {
       next: (updated) => {
         this.markingPaid.set(null);
         this.replaceRow(updated);
-        this.toast.success(this.i18n.translate('invoices.toast.paid'));
+        this.toast.show(this.i18n.translate('invoices.toast.paid'), 'success');
         this.reload();
       },
       error: (err) => {
         this.markingPaid.set(null);
-        this.toast.error(this.failureText(err));
+        this.toast.show(this.failureText(err), 'error');
       },
     });
   }
@@ -951,13 +953,13 @@ export class InvoicesComponent implements InvoiceFormHost {
         this.closeForms();
         this.items.update((list) => list.filter((x) => x.id !== i.id));
         this.total.update((t) => Math.max(0, t - 1));
-        this.toast.success(this.i18n.translate('invoices.toast.deleted'));
+        this.toast.show(this.i18n.translate('invoices.toast.deleted'), 'success');
         if (i.id === this.selectedId()) this.closeDetail();
         this.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('invoices.toast.failed'));
+        this.toast.show(this.i18n.translate('invoices.toast.failed'), 'error');
       },
     });
   }
@@ -1078,8 +1080,8 @@ export class InvoicesComponent implements InvoiceFormHost {
       this.bulkBusy.set(false);
       this.stopSelecting();
       this.reload();
-      if (failed) this.toast.error(this.i18n.translate('invoices.bulk.failed'));
-      else this.toast.success(this.i18n.translate(doneKey, { count: String(ids.length) }));
+      if (failed) this.toast.show(this.i18n.translate('invoices.bulk.failed'), 'error');
+      else this.toast.show(this.i18n.translate(doneKey, { count: String(ids.length) }), 'success');
     };
     from(ids)
       .pipe(concatMap((id) => call(id)))
@@ -1121,11 +1123,10 @@ export class InvoicesComponent implements InvoiceFormHost {
       next: (updated) => {
         this.replaceRow(updated);
         this.reload();
-        this.toast.showAction({
-          message: this.i18n.translate('invoices.toast.paid'),
-          action: this.i18n.translate('action.undo'),
-          actionIcon: 'undo',
-          variant: 'success',
+        this.toast.show({
+          text: this.i18n.translate('invoices.toast.paid'),
+          action: { key: 'action', label: this.i18n.translate('action.undo'), icon: 'undo' },
+          kind: 'success',
           closed: (how) => {
             if (how !== 'action') {
               this.setSwipedAway(i.id, false);
@@ -1135,7 +1136,7 @@ export class InvoicesComponent implements InvoiceFormHost {
               next: (back) => settle(back),
               error: (err) => {
                 settle(null);
-                this.toast.error(this.failureText(err));
+                this.toast.show(this.failureText(err), 'error');
               },
             });
           },
@@ -1143,7 +1144,7 @@ export class InvoicesComponent implements InvoiceFormHost {
       },
       error: (err) => {
         this.setSwipedAway(i.id, false);
-        this.toast.error(this.failureText(err));
+        this.toast.show(this.failureText(err), 'error');
       },
     });
   }

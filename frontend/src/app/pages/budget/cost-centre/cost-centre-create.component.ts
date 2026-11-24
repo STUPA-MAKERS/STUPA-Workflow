@@ -19,6 +19,7 @@ import {
   SelectFieldComponent,
   type SelectOption,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { problemCode } from '@core/api/problem';
 import { closeOnBack } from '@shared/util/close-on-back';
@@ -47,6 +48,7 @@ export interface CostCentreCreated {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -156,8 +158,7 @@ export class CostCentreCreateComponent {
     this.amountInvalid.set(!!this.amountField()?.validate());
   }
 
-  submit(event: Event): void {
-    event.preventDefault();
+  submit(): void {
     const top = this.top();
     const version = this.versionId();
     if (!top || !this.valid() || this.busy()) return;
@@ -169,12 +170,17 @@ export class CostCentreCreateComponent {
     this.busy.set(true);
     const done = (result: CostCentreCreated): void => {
       this.busy.set(false);
-      this.toast.success(this.i18n.translate(this.titled() ? 'budget.cc.toast.createdTitle' : 'budget.cc.toast.created'));
+      this.toast.show(
+        this.i18n.translate(
+          this.titled() ? 'budget.cc.toast.createdTitle' : 'budget.cc.toast.created',
+        ),
+        'success',
+      );
       this.created.emit(result);
     };
     const failed = (err: unknown): void => {
       this.busy.set(false);
-      this.toast.error(this.i18n.translate(costCentreError(problemCode(err))));
+      this.toast.show(this.i18n.translate(costCentreError(problemCode(err))), 'error');
     };
     if (version)
       this.planApi

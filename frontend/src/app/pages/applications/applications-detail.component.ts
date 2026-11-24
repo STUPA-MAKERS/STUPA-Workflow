@@ -106,6 +106,8 @@ import {
   TabsComponent,
   ToastService,
   scrollBehavior,
+  DialogBodyDirective,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -145,6 +147,7 @@ import { formatMoney } from '@shared/format-money';
 import { withoutKey } from '@shared/util/immutable';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -211,6 +214,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
+    DialogBodyDirective,
     ObserversDialogComponent,
     LoadErrorComponent,
     SectionComponent,
@@ -305,6 +310,8 @@ export class ApplicationsDetailComponent {
   readonly error = signal(false);
 
   readonly app = signal<Application | null>(null);
+  /** The filed document of the Antrag in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('application', computed(() => this.app()?.id));
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   /** The first read of the comments is out: the chat shows placeholder bubbles. */
@@ -346,7 +353,10 @@ export class ApplicationsDetailComponent {
         NO_FILES.add(this.id);
         this.filesRefusedHere.set(true);
       }
-      this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error')));
+      this.toast.show(
+        this.i18n.translate(sendErrorKey(err, 'applications.comments.error')),
+        'error',
+      );
     },
     draftDropper(this.api),
   );
@@ -612,7 +622,7 @@ export class ApplicationsDetailComponent {
       },
       error: () => {
         this.creatingVersion.set(false);
-        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+        this.toast.show(this.i18n.translate('status.newVersion.failed'), 'error');
       },
     });
   }
@@ -637,13 +647,14 @@ export class ApplicationsDetailComponent {
         this.app.set(keep ? { ...updated, applicant: current.applicant } : updated);
         this.archiving.set(false);
         this.page?.notify({ id: updated.id, kind: 'updated', source: 'detail' });
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          'success',
         );
       },
       error: () => {
         this.archiving.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.error'));
+        this.toast.show(this.i18n.translate('applications.detail.error'), 'error');
       },
     });
   }
@@ -1040,6 +1051,7 @@ export class ApplicationsDetailComponent {
         icon: 'history',
       }),
       pdf,
+      ...when(!!this.paperlessUrl(), { id: 'paperless', label: t('paperless.open'), icon: 'link' }),
     ];
     const danger = [
       ...when(this.canDelete(), {
@@ -1153,6 +1165,9 @@ export class ApplicationsDetailComponent {
         break;
       case 'pdf':
         this.openPdf(app.id, this.title());
+        break;
+      case 'paperless':
+        openInPaperless(this.paperlessUrl() ?? '');
         break;
     }
   }
@@ -1302,11 +1317,14 @@ export class ApplicationsDetailComponent {
         if (seq !== this.loadSeq) return;
         this.links.set(links);
         this.predecessorOpen.set(false);
-        this.toast.success(this.i18n.translate('applications.predecessor.linked'));
+        this.toast.show(this.i18n.translate('applications.predecessor.linked'), 'success');
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.linking.set(false);
-        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+        this.toast.show(
+          this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)),
+          'error',
+        );
       },
     });
   }
@@ -1326,11 +1344,14 @@ export class ApplicationsDetailComponent {
           },
           error: () => this.linking.set(false),
         });
-        this.toast.success(this.i18n.translate('applications.predecessor.removed'));
+        this.toast.show(this.i18n.translate('applications.predecessor.removed'), 'success');
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.linking.set(false);
-        this.toast.error(this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)));
+        this.toast.show(
+          this.i18n.translate(predecessorErrorKey(err.status, err.error?.code)),
+          'error',
+        );
       },
     });
   }
@@ -1443,7 +1464,7 @@ export class ApplicationsDetailComponent {
         next: () => {
           this.assigningBudget.set(false);
           this.budgetDialogOpen.set(false);
-          this.toast.success(this.i18n.translate('applications.actions.success'));
+          this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
           this.changed();
         },
         error: (err: { status?: number }) => {
@@ -1456,7 +1477,7 @@ export class ApplicationsDetailComponent {
                 : err.status === 403
                   ? 'applications.transitions.forbidden'
                   : 'applications.actions.error';
-          this.toast.error(this.i18n.translate(key));
+          this.toast.show(this.i18n.translate(key), 'error');
         },
       });
   }
@@ -1549,7 +1570,7 @@ export class ApplicationsDetailComponent {
     clearServerErrors(this.editFields());
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
-      this.toast.error(this.i18n.translate('applications.edit.invalid'));
+      this.toast.show(this.i18n.translate('applications.edit.invalid'), 'error');
       this.revealError();
       return;
     }
@@ -1558,8 +1579,9 @@ export class ApplicationsDetailComponent {
       next: (updated) => {
         this.savingEdit.set(false);
         this.editing.set(false);
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate('applications.edit.saved', { version: updated.version }),
+          'success',
         );
         this.changed();
       },
@@ -1570,14 +1592,14 @@ export class ApplicationsDetailComponent {
             this.i18n.translate(key),
           );
           if (placed) {
-            this.toast.error(this.i18n.translate('applications.edit.invalid'));
+            this.toast.show(this.i18n.translate('applications.edit.invalid'), 'error');
             this.revealError();
             return;
           }
         }
         const key =
           err.status === 409 ? 'applications.detail.locked' : 'applications.detail.saveFailed';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show(this.i18n.translate(key), 'error');
       },
     });
   }
@@ -1597,13 +1619,13 @@ export class ApplicationsDetailComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.deleted'));
+        this.toast.show(this.i18n.translate('applications.detail.deleted'), 'success');
         this.page?.notify({ id: this.id, kind: 'deleted', source: 'detail' });
         void this.router.navigate([...this.listPath()], { queryParamsHandling: 'preserve' });
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
+        this.toast.show(this.i18n.translate('applications.detail.deleteFailed'), 'error');
       },
     });
   }
@@ -1617,11 +1639,11 @@ export class ApplicationsDetailComponent {
       next: () => {
         this.requestingErasure.set(false);
         this.confirmErase.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.eraseRequested'));
+        this.toast.show(this.i18n.translate('applications.detail.eraseRequested'), 'success');
       },
       error: () => {
         this.requestingErasure.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
+        this.toast.show(this.i18n.translate('applications.detail.eraseRequestFailed'), 'error');
       },
     });
   }
@@ -1714,7 +1736,7 @@ export class ApplicationsDetailComponent {
       },
       error: (err: { status?: number }) => {
         change.restore?.();
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show(this.i18n.translate(this.commentErrorKey(err.status)), 'error');
       },
     });
   }
@@ -1725,7 +1747,7 @@ export class ApplicationsDetailComponent {
         this.comments.update((list) => list.filter((c) => c.id !== ref.id));
       },
       error: (err: { status?: number }) => {
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show(this.i18n.translate(this.commentErrorKey(err.status)), 'error');
       },
     });
   }
@@ -1749,7 +1771,7 @@ export class ApplicationsDetailComponent {
     this.api.fireTransition(this.id, { transitionId: t.id }).subscribe({
       next: () => {
         this.firing.set(null);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
         this.changed();
       },
       error: (err: { status?: number }) => {
@@ -1760,7 +1782,7 @@ export class ApplicationsDetailComponent {
             : err.status === 409
               ? 'applications.actions.conflict'
               : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show(this.i18n.translate(key), 'error');
         this.changed();
       },
     });

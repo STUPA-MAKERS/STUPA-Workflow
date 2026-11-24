@@ -1,6 +1,6 @@
 @if (info(); as i) {
   @if (empty()) {
-    <app-empty-state icon="alignLeft" [heading]="'gremien.info.empty' | t">
+    <app-empty-state icon="alignLeft" fill [heading]="'gremien.info.empty' | t">
       <app-button-group>
         <app-button variant="tonal" (click)="editOpen.set(true)">
           <app-icon name="edit" />
@@ -56,7 +56,7 @@
     />
   }
 } @else if (info() === null) {
-  <app-load-error [message]="'gremien.info.error' | t" (retry)="reload.emit()" />
+  <app-load-error face [message]="'gremien.info.error' | t" (retry)="reload.emit()" />
 } @else {
   <app-skeleton variant="lines" [count]="4" [label]="'gremien.info.loading' | t" />
 }

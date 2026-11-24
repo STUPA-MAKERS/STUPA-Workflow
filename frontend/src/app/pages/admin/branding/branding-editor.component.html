@@ -4,7 +4,7 @@
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
   >
     <app-breadcrumbs crumbs />
-    <!-- § 000672: the language of the texts stands at the end of the page head. -->
+    <!-- §ui-kit:000672: the language of the texts stands at the end of the page head. -->
     <div actions class="br__headTools">
       @if (draft() && dirty()) {
         <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
@@ -20,7 +20,7 @@
     [errorText]="(section === 'texts' ? 'admin.texts.loadFailed' : 'admin.brand.loadFailed') | t"
     (retry)="loadConfig()"
   >
-    <!-- The skeleton has the sections and fields of the loaded page (§ 000893). -->
+    <!-- The skeleton has the sections and fields of the loaded page (§ui-kit:000893). -->
     <ng-template #loading>
       <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
       <div class="br__cols skel-in" aria-hidden="true">
@@ -66,10 +66,11 @@
               </div>
             </app-section>
             <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
-              <span class="br__skSwitch">
-                <span class="br__skSwitchLabel">{{ 'admin.brand.avatars.gravatar' | t }}</span>
-                <span class="skel-box br__skToggle"></span>
-              </span>
+              <div class="rowgroup rowgroup--settings">
+                <span class="br__skSwitch"
+                  >{{ 'admin.brand.avatars.gravatar' | t }}<span class="skel-box br__skToggle"></span
+                ></span>
+              </div>
             </app-section>
           </div>
           <div class="br__col">
@@ -270,12 +271,14 @@
               </app-section>
 
               <app-section class="br__sec" [level]="2" [heading]="'admin.brand.avatars.group' | t">
-                <app-switch
-                  name="gravatarEnabled"
-                  [ngModel]="d.gravatarEnabled !== false"
-                  (ngModelChange)="setGravatar($event)"
-                  >{{ 'admin.brand.avatars.gravatar' | t }}</app-switch
-                >
+                <div class="rowgroup rowgroup--settings">
+                  <app-switch
+                    name="gravatarEnabled"
+                    [ngModel]="d.gravatarEnabled !== false"
+                    (ngModelChange)="setGravatar($event)"
+                    >{{ 'admin.brand.avatars.gravatar' | t }}</app-switch
+                  >
+                </div>
               </app-section>
             </div>
 

@@ -1,6 +1,7 @@
 /**
  * Mock of the public protocol routes (`/public/committees`, `/public/protocols…`, `/public/decisions`) for the
- * dev mock mode. Two fictional protocols of one public gremium. The interceptor loads
+ * dev mock mode. Two fictional protocols of one public gremium, and a second public gremium
+ * for the overview of `/protocols` (its page shows the same protocols). The interceptor loads
  * this file on first use.
  */
 import type {
@@ -15,7 +16,7 @@ const GREMIUM = { id: 'g-public-1', name: 'Studierendenparlament', slug: 'stupa'
 
 const PROTOCOLS: readonly PublicProtocolDetail[] = [
   {
-    id: 'pp-0001',
+    id: '00000000-0000-4000-8000-0000000000a1',
     title: '34. Sitzung des Studierendenparlaments',
     date: '2026-09-29',
     semester: 'ss-2026',
@@ -47,7 +48,7 @@ const PROTOCOLS: readonly PublicProtocolDetail[] = [
     ],
   },
   {
-    id: 'pp-0002',
+    id: '00000000-0000-4000-8000-0000000000a2',
     title: '33. Sitzung des Studierendenparlaments',
     date: '2026-07-14',
     semester: 'ss-2026',
@@ -68,7 +69,10 @@ export function mockPublicProtocols(
 ): { readonly body: unknown } | undefined {
   if (method !== 'GET') return undefined;
   if (path.endsWith('/public/committees')) {
-    const body: PublicGremium[] = [{ ...GREMIUM, protocolCount: PROTOCOLS.length }];
+    const body: PublicGremium[] = [
+      { id: 'g-public-2', name: 'AStA', slug: 'asta', protocolCount: 1, latestDate: '2026-06-30' },
+      { ...GREMIUM, protocolCount: PROTOCOLS.length, latestDate: PROTOCOLS[0]?.date ?? '2026-09-29' },
+    ];
     return { body };
   }
   if (path.endsWith('/public/protocols/semesters')) {

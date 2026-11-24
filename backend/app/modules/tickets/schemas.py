@@ -25,8 +25,11 @@ from app.shared.mentions import MAX_MENTIONS
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
 TicketKind = Literal["bug", "question", "idea", "barrier"]
-TicketStatus = Literal["new", "in_progress", "done", "rejected"]
-TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done"]
+TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
+TicketSource = Literal["help", "mail", "team"]
+TicketEventKind = Literal[
+    "created", "status", "assignee", "kind", "todo_done", "category", "area", "mail_auto"
+]
 NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
@@ -88,9 +91,16 @@ class TicketContext(FrozenStrictCamelModel, frozen=True):
 
 
 class TicketCreate(FrozenStrictCamelModel, frozen=True):
-    """A report. ``email`` and ``altcha`` are required without a session only."""
+    """A report. ``email`` and ``altcha`` are required without a session only.
 
-    kind: TicketKind
+    ``areaId`` names the Bereich; without it the report goes to ``Plattform``. A report
+    to ``Plattform`` needs a ``kind``. A report to another Bereich needs a session and
+    takes ``categoryId``, a Kategorie of that Bereich, in place of a kind.
+    """
+
+    kind: TicketKind | None = None
+    area_id: UUID | None = Field(default=None, alias="areaId")
+    category_id: UUID | None = Field(default=None, alias="categoryId")
     title: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=10000)
     email: EmailStr | None = None
@@ -103,7 +113,7 @@ class TicketCreate(FrozenStrictCamelModel, frozen=True):
 
 
 class TicketCreated(FrozenCamelModel, frozen=True):
-    """The only answer to a report: the ticket number (``T-0042``)."""
+    """The only answer to a report: the ticket number (``T-7K3QX9MD``)."""
 
     number: str
 
@@ -118,13 +128,21 @@ class TicketReporter(FrozenCamelModel, frozen=True):
 
 
 class TicketListItem(FrozenCamelModel, frozen=True):
-    """A ticket row of the work list."""
+    """A ticket row of the work list.
+
+    ``kind`` is the fixed Kategorie of a ticket of the Bereich ``Plattform`` and null
+    in every other Bereich. ``categoryId`` is the Kategorie of a ticket of another
+    Bereich, else null.
+    """
 
     id: UUID
     number: str
-    kind: TicketKind
+    area_id: UUID = Field(serialization_alias="areaId")
+    kind: TicketKind | None = None
+    category_id: UUID | None = Field(default=None, serialization_alias="categoryId")
     title: str
     status: TicketStatus
+    source: TicketSource = "help"
     reporter: TicketReporter
     assignee: PersonRef | None = None
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -146,6 +164,27 @@ class TicketAttachment(FrozenCamelModel, frozen=True):
         return cls(
             id=out.id, filename=out.filename, mime=out.mime, size=out.size, scanned=out.scanned
         )
+
+
+class TicketPaperlessFile(FrozenCamelModel, frozen=True):
+    """One clean file of a ticket with the state of its filing in Paperless.
+
+    Attributes:
+        state: ``none`` before the action, ``pending`` while the job runs, ``filed``
+            with a document, ``failed`` after the last try.
+        url: The address of the document in Paperless; null before ``filed``.
+    """
+
+    id: UUID
+    filename: str
+    state: Literal["none", "pending", "filed", "failed"]
+    url: str | None = None
+
+
+class TicketPaperless(FrozenCamelModel, frozen=True):
+    """The files of a ticket that a person can file in Paperless."""
+
+    files: tuple[TicketPaperlessFile, ...] = ()
 
 
 class TicketEventOut(FrozenCamelModel, frozen=True):
@@ -178,6 +217,70 @@ class TicketNoteOut(FrozenCamelModel, frozen=True):
     mentions: tuple[PersonRef, ...] = Field(default_factory=tuple)
 
 
+#: The most addresses in ``to`` and in ``cc`` of one sent mail.
+MAX_MAIL_RECIPIENTS = 20
+
+
+class TicketSkippedFile(FrozenCamelModel, frozen=True):
+    """A file of a mail that did not become a file of the message.
+
+    Attributes:
+        reason: ``size`` for a file above the size limit, ``type`` for a file of a type
+            that an upload refuses.
+    """
+
+    name: str
+    size: int
+    reason: Literal["size", "type"]
+
+
+class TicketMailOut(FrozenCamelModel, frozen=True):
+    """One mail of a ticket, for the team.
+
+    Attributes:
+        note_id: The message that the mail became; null for the first mail of the
+            ticket and for an automatic mail.
+        source: ``clean`` when the source can be downloaded, ``infected`` after a
+            finding, ``closed`` without a scan result, ``gone`` after the anonymization.
+        to: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; null for
+            an imported mail. A mail with ``failed`` takes ``POST …/resend``.
+        error: The short cause code of the newest failed send.
+        sender_checked: An imported mail answers a mail that the Postfach sent to its
+            ``From`` address; the team sees ``Absender nicht geprüft`` on each other one.
+    """
+
+    id: UUID
+    note_id: UUID | None = Field(default=None, serialization_alias="noteId")
+    direction: Literal["in", "out"] = "in"
+    from_name: str | None = Field(default=None, serialization_alias="fromName")
+    from_address: str | None = Field(default=None, serialization_alias="fromAddress")
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    subject: str | None = None
+    automatic: bool = False
+    sender_checked: bool = Field(default=False, serialization_alias="senderChecked")
+    source: Literal["clean", "infected", "closed", "gone"] = "gone"
+    source_size: int = Field(default=0, serialization_alias="sourceSize")
+    skipped: tuple[TicketSkippedFile, ...] = Field(default_factory=tuple)
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    state: Literal["sending", "sent", "failed"] | None = None
+    error: str | None = None
+    at: datetime
+
+
+class TicketMailAnswer(FrozenCamelModel, frozen=True):
+    """The recipients of the next public message on a mail ticket.
+
+    ``to`` holds the sender and ``cc`` each other address of the thread, without the
+    address of the Postfach. ``enabled`` is false while the Bereich has no Postfach or
+    its switch is off; a public message then answers 409 ``mailbox_off``.
+    """
+
+    to: tuple[str, ...] = Field(default_factory=tuple)
+    cc: tuple[str, ...] = Field(default_factory=tuple)
+    enabled: bool = False
+
+
 class TicketRef(FrozenCamelModel, frozen=True):
     """A reference to another ticket by id and number."""
 
@@ -202,21 +305,57 @@ class TicketDetail(TicketListItem, frozen=True):
     notes: tuple[TicketNoteOut, ...] = Field(default_factory=tuple)
     events: tuple[TicketEventOut, ...] = Field(default_factory=tuple)
     duplicate_of: TicketRef | None = Field(default=None, serialization_alias="duplicateOf")
+    follow_up_of: TicketRef | None = Field(default=None, serialization_alias="followUpOf")
     context_target: ContextTarget | None = Field(default=None, serialization_alias="contextTarget")
     open_todo_count: int = Field(default=0, serialization_alias="openTodoCount")
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     anonymized_at: datetime | None = Field(default=None, serialization_alias="anonymizedAt")
     sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
+    mails: tuple[TicketMailOut, ...] = Field(default_factory=tuple)
+    mail_answer: TicketMailAnswer | None = Field(default=None, serialization_alias="mailAnswer")
+    paperless: TicketPaperless | None = None
 
 
 class TicketPatch(FrozenStrictCamelModel, frozen=True):
-    """A change of status, assignee or kind. ``assigneeId: null`` unassigns."""
+    """A change of status, assignee, Kategorie or Bereich. ``assigneeId: null`` unassigns.
+
+    ``kind`` is the Kategorie of a ticket of ``Plattform``; ``categoryId`` is the
+    Kategorie of a ticket of another Bereich, and ``null`` clears it. ``areaId`` moves
+    the ticket to another Bereich.
+    """
 
     status: TicketStatus | None = None
     assignee_id: UUID | None = Field(default=None, alias="assigneeId")
     kind: TicketKind | None = None
+    category_id: UUID | None = Field(default=None, alias="categoryId")
+    area_id: UUID | None = Field(default=None, alias="areaId")
     duplicate_of_id: UUID | None = Field(default=None, alias="duplicateOfId")
     complete_todos: bool | None = Field(default=None, alias="completeTodos")
+
+
+class TicketManualCreate(FrozenStrictCamelModel, frozen=True):
+    """A ticket that a person of the team writes by hand for an account or an address.
+
+    Exactly one of ``reporterId`` (an account) and ``email`` names the person of the
+    ticket. ``body`` is the note of the team and stays with the team. ``message`` is the
+    first public message to the person. ``kind`` goes with ``Plattform`` and
+    ``categoryId`` with every other Bereich.
+    """
+
+    area_id: UUID = Field(alias="areaId")
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(default="", max_length=10000)
+    kind: TicketKind | None = None
+    category_id: UUID | None = Field(default=None, alias="categoryId")
+    reporter_id: UUID | None = Field(default=None, alias="reporterId")
+    email: EmailStr | None = None
+    message: str = Field(default="", max_length=10000)
+
+
+class TicketFollowUp(FrozenCamelModel, frozen=True):
+    """The answer to a message that became a new ticket: the new ticket."""
+
+    follow_up: TicketRef = Field(serialization_alias="followUp")
 
 
 class NoteBody(FrozenStrictCamelModel, frozen=True):
@@ -241,6 +380,10 @@ class NoteCreate(MessageFilesIn):
     ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
     ``mentions`` holds the principal ids of mentioned holders of ``ticket.manage`` (at
     most 50, duplicates drop); another id gives 422 ``mention_not_member``.
+
+    ``to`` and ``cc`` are the recipients of a public message on a mail ticket. A list
+    that the body leaves out takes the addresses of the thread (``mailAnswer`` of the
+    ticket).
     """
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
@@ -248,6 +391,8 @@ class NoteCreate(MessageFilesIn):
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
     mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
+    to: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
+    cc: list[EmailStr] | None = Field(default=None, max_length=MAX_MAIL_RECIPIENTS)
 
 
 class ReporterNoteCreate(MessageFilesIn):
@@ -259,11 +404,14 @@ class ReporterNoteCreate(MessageFilesIn):
 
 
 class ReporterTicketItem(FrozenCamelModel, frozen=True):
-    """A ticket in the list of its reporter: no reporter, no assignee."""
+    """A ticket in the list of its reporter: no reporter, no assignee.
+
+    ``kind`` is null for a ticket outside the Bereich ``Plattform``.
+    """
 
     id: UUID
     number: str
-    kind: TicketKind
+    kind: TicketKind | None = None
     title: str
     status: TicketStatus
     created_at: datetime = Field(serialization_alias="createdAt")
@@ -283,6 +431,9 @@ class ReporterTicketDetail(ReporterTicketItem, frozen=True):
     """The own ticket of a reporter: the report, the public notes and the status changes.
 
     ``canReply`` is false while a sender block holds back the reporter.
+    ``replyOpensNew`` is true when the ticket is closed for more than 14 days: a message
+    then becomes a new ticket. ``body`` is empty for a ticket that the team wrote by
+    hand, because that text is the note of the team.
     """
 
     body: str
@@ -291,6 +442,7 @@ class ReporterTicketDetail(ReporterTicketItem, frozen=True):
     events: tuple[ReporterTicketEvent, ...] = Field(default_factory=tuple)
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     can_reply: bool = Field(default=True, serialization_alias="canReply")
+    reply_opens_new: bool = Field(default=False, serialization_alias="replyOpensNew")
 
 
 class TicketBlockedSender(FrozenCamelModel, frozen=True):
@@ -312,5 +464,72 @@ class TicketCounts(FrozenCamelModel, frozen=True):
 
     new: int = 0
     in_progress: int = Field(default=0, serialization_alias="inProgress")
+    waiting: int = 0
     done: int = 0
     rejected: int = 0
+
+
+class TicketCategoryOut(FrozenCamelModel, frozen=True):
+    """One Kategorie of a Bereich."""
+
+    id: UUID
+    name: str
+
+
+class TicketAreaOut(FrozenCamelModel, frozen=True):
+    """A Bereich with its Kategorien in their order.
+
+    ``platform`` marks the built-in Bereich: it has no Gremium, its Kategorien are the
+    four kinds of a report, and nobody deletes it. ``mine`` tells if the caller works
+    in the Bereich. ``inApp`` tells if a signed-in person can choose the Bereich in the
+    ticket dialog of the help menu; it is always true for ``Plattform``.
+    """
+
+    id: UUID
+    name: str
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
+    platform: bool = False
+    notify_new: bool = Field(default=True, serialization_alias="notifyNew")
+    in_app: bool = Field(default=False, serialization_alias="inApp")
+    categories: tuple[TicketCategoryOut, ...] = Field(default_factory=tuple)
+    mine: bool = True
+
+
+class TicketAreaChoice(FrozenCamelModel, frozen=True):
+    """A Bereich that a signed-in person can choose in the ticket dialog."""
+
+    id: UUID
+    name: str
+    platform: bool = False
+    categories: tuple[TicketCategoryOut, ...] = Field(default_factory=tuple)
+
+
+class TicketCategoryIn(FrozenStrictCamelModel, frozen=True):
+    """A Kategorie in the save of a Bereich: ``id`` keeps a stored one, null adds one."""
+
+    id: UUID | None = None
+    name: str = Field(min_length=1, max_length=80)
+
+
+class TicketAreaCreate(FrozenStrictCamelModel, frozen=True):
+    """A new Bereich. It names at most one Gremium."""
+
+    name: str = Field(min_length=1, max_length=80)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    notify_new: bool = Field(default=True, alias="notifyNew")
+    in_app: bool = Field(default=False, alias="inApp")
+    categories: tuple[TicketCategoryIn, ...] = Field(default_factory=tuple, max_length=50)
+
+
+class TicketAreaPatch(FrozenStrictCamelModel, frozen=True):
+    """A change of a Bereich. A field that the body leaves out stays.
+
+    ``categories`` is the whole ordered list: a stored Kategorie that the list leaves
+    out is deleted, and its tickets lose their Kategorie.
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    notify_new: bool | None = Field(default=None, alias="notifyNew")
+    in_app: bool | None = Field(default=None, alias="inApp")
+    categories: tuple[TicketCategoryIn, ...] | None = Field(default=None, max_length=50)

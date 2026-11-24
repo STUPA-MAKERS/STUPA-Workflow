@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { localToday } from '@shared/date-format';
 import { OutsideDecisionDialogComponent } from './outside-decision-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -109,7 +110,7 @@ describe('OutsideDecisionDialogComponent', () => {
   /** Spec 001610: a passed decision names the amount; it is prefilled with the request. */
   it('records a passed decision with the amount, the counts and the meeting', async () => {
     const { http, host, cmp, toast, openIt, fill } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     openIt();
     fill();
     expect(cmp.asksAmount()).toBe(true);
@@ -164,7 +165,7 @@ describe('OutsideDecisionDialogComponent', () => {
     [500, false, null],
   ])('reports a %s answer', async (status, closes, body) => {
     const { http, host, cmp, toast, openIt, fill } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     fill();
     cmp.submit();

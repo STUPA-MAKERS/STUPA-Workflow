@@ -9,6 +9,9 @@ import { AdminApiService } from '../admin-api.service';
 import type { ApplicationTypeFull, FormDraft } from '../admin.models';
 import { FIELD_TYPES, groupsFromFields, groupsToFields } from '../form-field.util';
 import { FormEditorComponent } from './form-editor.component';
+import { FormEditorViewComponent } from '@stupa-makers/ui-kit/views/form-editor';
+import { By } from '@angular/platform-browser';
+import type { ComponentFixture } from '@angular/core/testing';
 
 const TYPE: ApplicationTypeFull = {
   id: 'f1',
@@ -24,6 +27,12 @@ function draft(fields: FormFieldDef[], description?: I18nMap): FormDraft {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Api = Record<string, any>;
+
+/** The kit view of the editor body: the edits and the selection live there (kit spec 002278). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function editorOf(fixture: ComponentFixture<FormEditorComponent>): any {
+  return fixture.debugElement.query(By.directive(FormEditorViewComponent)).componentInstance;
+}
 
 async function setup(
   d: FormDraft,
@@ -63,7 +72,8 @@ async function setup(
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c = view.fixture.componentInstance as any;
-  return { ...view, c, api, createFormVersion, updateApplicationType, setFormActive, toast };
+  const v = editorOf(view.fixture);
+  return { ...view, c, v, api, createFormVersion, updateApplicationType, setFormActive, toast };
 }
 
 /**
@@ -127,10 +137,11 @@ describe('FormEditorComponent', () => {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.addGroup();
+    const v = editorOf(fixture);
+    v.addGroup();
     expect(c.groups()).toHaveLength(2);
-    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Schritt 2' });
-    c.moveGroup(1, -1);
+    v.setGroupTitle(1, { ...c.groups()[1].title, de: 'Schritt 2' });
+    v.moveGroup(1, -1);
     expect(c.groups()[0].title['de']).toBe('Schritt 2');
   });
 
@@ -138,12 +149,12 @@ describe('FormEditorComponent', () => {
    * With nothing changed the page shows no "Speichern", but the save itself still works. A
    * markerless single group serializes back to exactly the original flat fields.
    */
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" reads the stored form again and hides with "Speichern"', async () => {
-    const { c, fixture, createFormVersion } = await setup(
+    const { c, v, fixture, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
     );
-    c.setDescription('de', 'Neu');
+    v.setDescription('de', 'Neu');
     fixture.detectChanges();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
@@ -173,9 +184,10 @@ describe('FormEditorComponent', () => {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.addGroup();
-    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Budget' });
-    c.addQuestion(1, 'currency');
+    const v = editorOf(fixture);
+    v.addGroup();
+    v.setGroupTitle(1, { ...c.groups()[1].title, de: 'Budget' });
+    v.addQuestion(1, 'currency');
     c.groups()[1].fields[0].key = 'amount';
     c.groups()[1].fields[0].label.de = 'Betrag';
     fixture.detectChanges();
@@ -192,10 +204,11 @@ describe('FormEditorComponent', () => {
     const { fixture } = await setup(draft([{ key: 'sum', type: 'text', label: { de: '', en: '' } }]));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.errorsFor(0, 0)).toContain('label (de) is required');
+    const v = editorOf(fixture);
+    expect(v.errorsFor(0, 0)).toContain('label (de) is required');
     await userEvent.type(screen.getByLabelText('Bezeichnung (DE)'), 'Summe');
     expect(c.groups()[0].fields[0].label.de).toBe('Summe');
-    expect(c.errorsFor(0, 0)).not.toContain('label (de) is required');
+    expect(v.errorsFor(0, 0)).not.toContain('label (de) is required');
   });
 
   /** Spec 000761: an Antragsart cannot get a budget while Budget is off. */
@@ -230,7 +243,7 @@ describe('FormEditorComponent', () => {
   });
 
   it('sets question fields and one option label without touching the others', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([
         {
           key: 'pick',
@@ -245,9 +258,9 @@ describe('FormEditorComponent', () => {
       ]),
     );
     const before = c.groups()[0].fields[1];
-    c.setQuestion({ gi: 0, qi: 0 }, { help: { de: 'Hilfe', en: '' } });
-    c.setOptionLabel({ gi: 0, qi: 0 }, 1, { de: 'Bé', en: 'B' });
-    c.setOptionLabel({ gi: 0, qi: 1 }, 0, { de: 'X', en: '' });
+    v.setQuestion({ gi: 0, qi: 0 }, { help: { de: 'Hilfe', en: '' } });
+    v.setOptionLabel({ gi: 0, qi: 0 }, 1, { de: 'Bé', en: 'B' });
+    v.setOptionLabel({ gi: 0, qi: 1 }, 0, { de: 'X', en: '' });
     const [pick, note] = c.groups()[0].fields;
     expect(pick.help).toEqual({ de: 'Hilfe', en: '' });
     expect(pick.options.map((o: { label: I18nMap }) => o.label['de'])).toEqual(['A', 'Bé']);
@@ -261,9 +274,26 @@ describe('FormEditorComponent', () => {
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.onPromotedToggle({ gi: 0, qi: 0 }, true);
+    const v = editorOf(fixture);
+    v.onPromotedToggle({ gi: 0, qi: 0 }, true);
     expect(c.groups()[0].fields[0].promoteTarget).toBe('amount');
-    c.onPromotedToggle({ gi: 0, qi: 0 }, false);
+    v.onPromotedToggle({ gi: 0, qi: 0 }, false);
+    expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
+  });
+
+  it('makes a computed field the amount with its own switch (spec 002843)', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'summe', type: 'computed', label: { de: 'Summe', en: '' }, compute: { var: 'km' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const v = editorOf(fixture);
+    expect(v.isAmount(c.groups()[0].fields[0])).toBe(false);
+    v.onAmountToggle({ gi: 0, qi: 0 }, true);
+    expect(c.groups()[0].fields[0]).toMatchObject({ isPromoted: true, promoteTarget: 'amount' });
+    expect(v.isAmount(c.groups()[0].fields[0])).toBe(true);
+    v.onAmountToggle({ gi: 0, qi: 0 }, false);
+    expect(c.groups()[0].fields[0].isPromoted).toBeUndefined();
     expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
@@ -430,11 +460,11 @@ describe('FormEditorComponent — title/description/label helpers', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('sets title and description per language', async () => {
-    const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
+    const { c, v } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
     c.title.set({ ...c.title(), en: 'English' });
     expect(c.title()).toEqual({ de: 'Förderantrag', en: 'English' });
-    c.setDescription('de', 'Hallo');
-    c.setDescription('en', 'Hi');
+    v.setDescription('de', 'Hallo');
+    v.setDescription('en', 'Hi');
     expect(c.description()).toEqual({ de: 'Hallo', en: 'Hi' });
   });
 
@@ -445,9 +475,9 @@ describe('FormEditorComponent — title/description/label helpers', () => {
   });
 
   it('returns the localized type label', async () => {
-    const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
-    expect(typeof c.typeLabel('text')).toBe('string');
-    expect(c.typeLabel('text').length).toBeGreaterThan(0);
+    const { v } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
+    expect(typeof v.typeLabel('text')).toBe('string');
+    expect(v.typeLabel('text').length).toBeGreaterThan(0);
   });
 });
 
@@ -474,10 +504,10 @@ describe('FormEditorComponent — group & question mutations', () => {
   }
 
   it('removes a group', async () => {
-    const { c } = await base();
-    c.addGroup();
+    const { c, v } = await base();
+    v.addGroup();
     expect(c.groups()).toHaveLength(2);
-    c.removeGroup(1);
+    v.removeGroup(1);
     expect(c.groups()).toHaveLength(1);
   });
 
@@ -486,46 +516,46 @@ describe('FormEditorComponent — group & question mutations', () => {
    * cover the guard.
    */
   it('reorder is a no-op at the edges and when from===to', async () => {
-    const { c } = await base();
-    c.addGroup();
-    c.setGroupTitle(0, { ...c.groups()[0].title, de: 'First' });
-    c.moveGroup(0, -1);
+    const { c, v } = await base();
+    v.addGroup();
+    v.setGroupTitle(0, { ...c.groups()[0].title, de: 'First' });
+    v.moveGroup(0, -1);
     expect(c.groups()).toHaveLength(2);
     expect(c.groups()[0].title['de']).toBe('First');
-    c.moveGroup(1, 1);
+    v.moveGroup(1, 1);
     expect(c.groups()).toHaveLength(2);
-    c.reorderGroup(0, 0);
+    v.reorderGroup(0, 0);
     expect(c.groups()[0].title['de']).toBe('First');
   });
 
   it('removes a question from a group', async () => {
-    const { c } = await base();
-    c.removeQuestion({ gi: 0, qi: 0 });
+    const { c, v } = await base();
+    v.removeQuestion({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields).toHaveLength(1);
     expect(c.groups()[0].fields[0].key).toBe('q2');
   });
 
   /** An empty key stays empty. */
   it('duplicates a question, suffixing _copy (and handling an empty key)', async () => {
-    const { c } = await base();
-    c.duplicateQuestion({ gi: 0, qi: 0 });
+    const { c, v } = await base();
+    v.duplicateQuestion({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields).toHaveLength(3);
     expect(c.groups()[0].fields[1].key).toBe('q1_copy');
     c.groups()[0].fields[0].key = '';
-    c.touch();
-    c.duplicateQuestion({ gi: 0, qi: 0 });
+    v.touch();
+    v.duplicateQuestion({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields[1].key).toBe('');
   });
 
   it('moves a question within its group', async () => {
-    const { c } = await base();
-    c.moveQuestion({ gi: 0, qi: 0 }, 1);
+    const { c, v } = await base();
+    v.moveQuestion({ gi: 0, qi: 0 }, 1);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q2', 'q1']);
   });
 
   it('moveQuestion is a no-op for a non-existent group', async () => {
-    const { c } = await base();
-    c.moveQuestion({ gi: 5, qi: 0 }, 1);
+    const { c, v } = await base();
+    v.moveQuestion({ gi: 5, qi: 0 }, 1);
     expect(c.groups()[0].fields).toHaveLength(2);
   });
 
@@ -533,12 +563,12 @@ describe('FormEditorComponent — group & question mutations', () => {
    * The last question of group 0 goes forward into group 1, and back again onto the end of group 0.
    */
   it('passes a boundary question into the next/previous group', async () => {
-    const { c } = await base();
-    c.addGroup();
-    c.moveQuestion({ gi: 0, qi: 1 }, 1);
+    const { c, v } = await base();
+    v.addGroup();
+    v.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.groups()[0].fields).toHaveLength(1);
     expect(c.groups()[1].fields[0].key).toBe('q2');
-    c.moveQuestion({ gi: 1, qi: 0 }, -1);
+    v.moveQuestion({ gi: 1, qi: 0 }, -1);
     expect(c.groups()[1].fields).toHaveLength(0);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
   });
@@ -548,10 +578,10 @@ describe('FormEditorComponent — group & question mutations', () => {
    * group.
    */
   it('moveQuestion at a boundary with no neighbour group does nothing', async () => {
-    const { c } = await base();
-    c.moveQuestion({ gi: 0, qi: 0 }, -1);
+    const { c, v } = await base();
+    v.moveQuestion({ gi: 0, qi: 0 }, -1);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
-    c.moveQuestion({ gi: 0, qi: 1 }, 1);
+    v.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.groups()[0].fields.map((f: FormFieldDef) => f.key)).toEqual(['q1', 'q2']);
   });
 });
@@ -560,14 +590,14 @@ describe('FormEditorComponent — type adaptation & options', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('adds options when switching to a choice type', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.onTypeChange({ gi: 0, qi: 0 }, 'select');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.onTypeChange({ gi: 0, qi: 0 }, 'select');
     expect(c.groups()[0].fields[0].type).toBe('select');
     expect(c.groups()[0].fields[0].options).toHaveLength(1);
   });
 
   it('keeps existing options when switching to multiselect', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([
         {
           key: 'q',
@@ -577,18 +607,18 @@ describe('FormEditorComponent — type adaptation & options', () => {
         },
       ]),
     );
-    c.onTypeChange({ gi: 0, qi: 0 }, 'multiselect');
+    v.onTypeChange({ gi: 0, qi: 0 }, 'multiselect');
     expect(c.groups()[0].fields[0].options).toHaveLength(1);
   });
 
   it('seeds a compute object for the computed type', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.onTypeChange({ gi: 0, qi: 0 }, 'computed');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.onTypeChange({ gi: 0, qi: 0 }, 'computed');
     expect(c.groups()[0].fields[0].compute).toEqual({ var: '' });
   });
 
   it('strips promotion metadata for non-numeric types', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([
         {
           key: 'q',
@@ -599,13 +629,13 @@ describe('FormEditorComponent — type adaptation & options', () => {
         },
       ]),
     );
-    c.onTypeChange({ gi: 0, qi: 0 }, 'text');
+    v.onTypeChange({ gi: 0, qi: 0 }, 'text');
     expect(c.groups()[0].fields[0].isPromoted).toBeUndefined();
     expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
   it('adds and removes options', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([
         {
           key: 'q',
@@ -615,21 +645,21 @@ describe('FormEditorComponent — type adaptation & options', () => {
         },
       ]),
     );
-    c.addOption({ gi: 0, qi: 0 });
+    v.addOption({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields[0].options).toHaveLength(2);
-    c.removeOption({ gi: 0, qi: 0 }, 0);
+    v.removeOption({ gi: 0, qi: 0 }, 0);
     expect(c.groups()[0].fields[0].options).toHaveLength(1);
   });
 
   it('addOption falls back to an empty list when options is undefined', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.addOption({ gi: 0, qi: 0 });
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.addOption({ gi: 0, qi: 0 });
     expect(c.groups()[0].fields[0].options).toHaveLength(1);
   });
 
   it('removeOption falls back gracefully when options is undefined', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.removeOption({ gi: 0, qi: 0 }, 0);
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.removeOption({ gi: 0, qi: 0 }, 0);
     expect(c.groups()[0].fields[0].options).toEqual([]);
   });
 });
@@ -638,27 +668,27 @@ describe('FormEditorComponent — expansion, type predicates', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('toggles and reports the expanded state per question', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
-    c.toggleExpanded({ gi: 0, qi: 0 });
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
-    c.toggleExpanded({ gi: 0, qi: 0 });
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    const { v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    v.toggleExpanded({ gi: 0, qi: 0 });
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+    v.toggleExpanded({ gi: 0, qi: 0 });
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(false);
   });
 
   it('classifies field types via the predicates', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    expect(c.isChoice('select')).toBe(true);
-    expect(c.isChoice('multiselect')).toBe(true);
-    expect(c.isChoice('text')).toBe(false);
-    expect(c.isPositions('positions')).toBe(true);
-    expect(c.isPositions('text')).toBe(false);
-    expect(c.isNumeric('number')).toBe(true);
-    expect(c.isNumeric('currency')).toBe(true);
-    expect(c.isNumeric('text')).toBe(false);
-    expect(c.isText('text')).toBe(true);
-    expect(c.isText('textarea')).toBe(true);
-    expect(c.isText('number')).toBe(false);
+    const { v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    expect(v.isChoice('select')).toBe(true);
+    expect(v.isChoice('multiselect')).toBe(true);
+    expect(v.isChoice('text')).toBe(false);
+    expect(v.isPositions('positions')).toBe(true);
+    expect(v.isPositions('text')).toBe(false);
+    expect(v.isNumeric('number')).toBe(true);
+    expect(v.isNumeric('currency')).toBe(true);
+    expect(v.isNumeric('text')).toBe(false);
+    expect(v.isText('text')).toBe(true);
+    expect(v.isText('textarea')).toBe(true);
+    expect(v.isText('number')).toBe(false);
   });
 });
 
@@ -666,29 +696,29 @@ describe('FormEditorComponent — drag reorder', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('reorders groups by drag start + drop', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.addGroup();
-    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
-    c.onDragStart(1);
-    c.onDrop(0);
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.addGroup();
+    v.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
+    v.onDragStart(1);
+    v.onDrop(0);
     expect(c.groups()[0].title['de']).toBe('Second');
   });
 
   it('onDragOver prevents default', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    const { v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     const ev = { preventDefault: jest.fn() } as unknown as DragEvent;
-    c.onDragOver(ev);
+    v.onDragOver(ev);
     expect(ev.preventDefault).toHaveBeenCalled();
   });
 
   it('onDrop is a no-op when dropping onto the same group or with no active drag', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.addGroup();
-    c.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
-    c.onDrop(0);
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.addGroup();
+    v.setGroupTitle(1, { ...c.groups()[1].title, de: 'Second' });
+    v.onDrop(0);
     expect(c.groups()[1].title['de']).toBe('Second');
-    c.onDragStart(1);
-    c.onDrop(1);
+    v.onDragStart(1);
+    v.onDrop(1);
     expect(c.groups()[1].title['de']).toBe('Second');
   });
 });
@@ -697,58 +727,58 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('sets and clears numeric validation values', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'number', label: { de: 'A', en: '' } }]));
-    c.setVal({ gi: 0, qi: 0 }, 'min', '5');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'number', label: { de: 'A', en: '' } }]));
+    v.setVal({ gi: 0, qi: 0 }, 'min', '5');
     expect(c.groups()[0].fields[0].validation).toEqual({ min: 5 });
-    c.setVal({ gi: 0, qi: 0 }, 'min', '');
+    v.setVal({ gi: 0, qi: 0 }, 'min', '');
     expect(c.groups()[0].fields[0].validation).toEqual({});
   });
 
   it('sets a string pattern (non-numeric key)', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.setVal({ gi: 0, qi: 0 }, 'pattern', '^a+$');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.setVal({ gi: 0, qi: 0 }, 'pattern', '^a+$');
     expect(c.groups()[0].fields[0].validation).toEqual({ pattern: '^a+$' });
   });
 
   /** Allowed is the default, so the key is removed instead of storing true. */
   it('setAllowNoOffers stores only the false value and clears on allow', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([{ key: 'q', type: 'positions', label: { de: 'A', en: '' } }]),
     );
-    c.setAllowNoOffers({ gi: 0, qi: 0 }, false);
+    v.setAllowNoOffers({ gi: 0, qi: 0 }, false);
     expect(c.groups()[0].fields[0].validation).toEqual({ allowNoOffers: false });
-    c.setAllowNoOffers({ gi: 0, qi: 0 }, true);
+    v.setAllowNoOffers({ gi: 0, qi: 0 }, true);
     expect(c.groups()[0].fields[0].validation).toEqual({});
   });
 
   it('parses valid JsonLogic into the field and reflects the raw input', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"var":"x"}');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"var":"x"}');
     expect(c.groups()[0].fields[0].visibleIf).toEqual({ var: 'x' });
-    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('{"var":"x"}');
+    expect(v.logicRaw(0, 0, 'visibleIf')).toBe('{"var":"x"}');
   });
 
   it('keeps the field unchanged on invalid JSON but stores the raw text', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    c.onLogicInput({ gi: 0, qi: 0 }, 'compute', '{ not json');
+    const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    v.onLogicInput({ gi: 0, qi: 0 }, 'compute', '{ not json');
     expect(c.groups()[0].fields[0].compute).toBeUndefined();
-    expect(c.logicRaw(0, 0, 'compute')).toBe('{ not json');
+    expect(v.logicRaw(0, 0, 'compute')).toBe('{ not json');
   });
 
   /** The field key is dropped (trimmed empty), but the raw text is kept verbatim. */
   it('removes the logic key when cleared to empty', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' }, visibleIf: { var: 'x' } }]),
     );
-    c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '   ');
+    v.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '   ');
     expect(c.groups()[0].fields[0].visibleIf).toBeUndefined();
-    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('   ');
+    expect(v.logicRaw(0, 0, 'visibleIf')).toBe('   ');
   });
 
   it('logicRaw stringifies the current value when no raw edit exists', async () => {
-    const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
-    expect(c.logicRaw(0, 0, 'compute', { var: 'y' })).toBe('{"var":"y"}');
-    expect(c.logicRaw(0, 0, 'compute')).toBe('');
+    const { v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
+    expect(v.logicRaw(0, 0, 'compute', { var: 'y' })).toBe('{"var":"y"}');
+    expect(v.logicRaw(0, 0, 'compute')).toBe('');
   });
 });
 
@@ -849,27 +879,27 @@ describe('FormEditorComponent — nullish/branch edges', () => {
   });
 
   it('sets the EN group title (else-branch of the de/en ternary)', async () => {
-    const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
-    c.setGroupTitle(0, { ...c.groups()[0].title, en: 'Step EN' });
+    const { c, v } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
+    v.setGroupTitle(0, { ...c.groups()[0].title, en: 'Step EN' });
     expect(c.groups()[0].title['en']).toBe('Step EN');
     expect(c.groups()[0].title['de']).toBe('');
   });
 
   it('only mutates the addressed question, leaving siblings untouched', async () => {
-    const { c } = await setup(
+    const { c, v } = await setup(
       draft([
         { key: 'a', type: 'text', label: { de: 'A', en: '' } },
         { key: 'b', type: 'text', label: { de: 'B', en: '' } },
       ]),
     );
-    c.addOption({ gi: 0, qi: 1 });
+    v.addOption({ gi: 0, qi: 1 });
     expect(c.groups()[0].fields[0].options).toBeUndefined();
     expect(c.groups()[0].fields[1].options).toHaveLength(1);
   });
 
   it('errorsFor returns an empty array for an unknown position', async () => {
-    const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
-    expect(c.errorsFor(9, 9)).toEqual([]);
+    const { v } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
+    expect(v.errorsFor(9, 9)).toEqual([]);
   });
 });
 
@@ -900,17 +930,17 @@ describe('FormEditorComponent — layout of the redesign', () => {
 
   /** Every type becomes a question of the group whose menu is open. */
   it('offers every question type in the type menu (the section marker is no question)', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
+    const { c, v } = await setup(draft(TWO_GROUPS));
     await userEvent.click(screen.getAllByRole('button', { name: 'Frage hinzufügen' })[1]);
     const items = screen.getAllByRole('menuitem').map((m) => m.textContent?.trim());
     expect(items).toHaveLength(FIELD_TYPES.length - 1);
     for (const type of FIELD_TYPES.filter((t) => t !== 'section')) {
-      expect(items).toContain(c.typeLabel(type));
+      expect(items).toContain(v.typeLabel(type));
     }
     expect(items).not.toContain('Abschnitt (neuer Schritt)');
     await userEvent.click(screen.getByRole('menuitem', { name: 'Kostenpositionen' }));
     expect(c.groups()[1].fields.at(-1).type).toBe('positions');
-    expect(c.typeMenuGroup()).toBeNull();
+    expect(v.typeMenuGroup()).toBeNull();
   });
 
   it('lists every group with its questions in the outline: label, required mark, key and type', async () => {
@@ -925,26 +955,26 @@ describe('FormEditorComponent — layout of the redesign', () => {
   });
 
   it('selects the first question on load and shows the cards of its group', async () => {
-    const { c, container } = await setup(draft(TWO_GROUPS));
+    const { c, v, container } = await setup(draft(TWO_GROUPS));
     expect(c.selected()).toEqual({ gi: 0, qi: 0 });
-    expect(c.groupIndex()).toBe(0);
+    expect(v.groupIndex()).toBe(0);
     expect(container.querySelectorAll('article.fe__card')).toHaveLength(2);
     expect(container.querySelector('.fe__card--sel')?.getAttribute('data-q')).toBe('0:0');
   });
 
   /** A click into a card selects its question without moving the page. */
   it('a click in the outline selects a question and shows its group; a click on a group heading shows the group', async () => {
-    const { c, fixture, container } = await setup(draft(TWO_GROUPS));
+    const { c, v, fixture, container } = await setup(draft(TWO_GROUPS));
     await userEvent.click(screen.getByRole('button', { name: /^Summe/ }));
     expect(c.selected()).toEqual({ gi: 1, qi: 2 });
-    expect(c.groupIndex()).toBe(1);
+    expect(v.groupIndex()).toBe(1);
     fixture.detectChanges();
     expect(container.querySelector('.fe__card--sel')?.getAttribute('data-q')).toBe('1:2');
     expect(container.querySelector('.fe__row--on')?.textContent).toContain('Summe');
     await userEvent.click(screen.getByRole('button', { name: 'Abschnitt 1 · Vorhaben' }));
-    expect(c.groupIndex()).toBe(0);
+    expect(v.groupIndex()).toBe(0);
     expect(c.selected()).toBeNull();
-    c.focusCard({ gi: 0, qi: 1 });
+    v.focusCard({ gi: 0, qi: 1 });
     expect(c.selected()).toEqual({ gi: 0, qi: 1 });
   });
 
@@ -953,10 +983,10 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * computed field shows without the advanced options.
    */
   it('shows the options of each type: choice options, cost positions and the computed expression', async () => {
-    const { c, fixture } = await setup(draft(TWO_GROUPS));
+    const { v, fixture } = await setup(draft(TWO_GROUPS));
     expect(screen.getByText('Auswahloptionen')).toBeInTheDocument();
     expect(await screen.findByDisplayValue('Kultur')).toBeInTheDocument();
-    c.selectGroup(1);
+    v.selectGroup(1);
     fixture.detectChanges();
     expect(screen.getByText('Kostenpositionen', { selector: 'legend' })).toBeInTheDocument();
     expect(screen.getByLabelText('Min. Vergleichsangebote')).toBeInTheDocument();
@@ -968,8 +998,8 @@ describe('FormEditorComponent — layout of the redesign', () => {
   });
 
   it('opens the advanced options per question: PII, metric, validation and visibleIf', async () => {
-    const { c, fixture } = await setup(draft(TWO_GROUPS));
-    c.selectGroup(1);
+    const { v, fixture } = await setup(draft(TWO_GROUPS));
+    v.selectGroup(1);
     fixture.detectChanges();
     expect(screen.queryByText('Personenbezogen (PII)')).not.toBeInTheDocument();
     const toggles = screen.getAllByRole('button', { name: 'Erweiterte Optionen' });
@@ -996,13 +1026,13 @@ describe('FormEditorComponent — layout of the redesign', () => {
 
   /** A move and its way back leave the form as it was. */
   it('save creates a form version with every group and question', async () => {
-    const { c, fixture, createFormVersion } = await setup(draft(TWO_GROUPS));
+    const { c, v, fixture, createFormVersion } = await setup(draft(TWO_GROUPS));
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-    c.moveQuestion({ gi: 0, qi: 0 }, 1);
-    c.moveQuestion({ gi: 0, qi: 1 }, -1);
+    v.moveQuestion({ gi: 0, qi: 0 }, 1);
+    v.moveQuestion({ gi: 0, qi: 1 }, -1);
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-    c.setGroupTitle(0, { ...c.groups()[0].title, de: 'Neu' });
+    v.setGroupTitle(0, { ...c.groups()[0].title, de: 'Neu' });
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(createFormVersion).toHaveBeenCalledTimes(1);
@@ -1016,24 +1046,24 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * question leaves the selection alone.
    */
   it('the selection follows a question that moves, is duplicated, added or removed', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
-    c.moveQuestion({ gi: 0, qi: 0 }, 1);
+    const { c, v } = await setup(draft(TWO_GROUPS));
+    v.moveQuestion({ gi: 0, qi: 0 }, 1);
     expect(c.selected()).toEqual({ gi: 0, qi: 1 });
-    c.moveQuestion({ gi: 0, qi: 1 }, 1);
+    v.moveQuestion({ gi: 0, qi: 1 }, 1);
     expect(c.selected()).toEqual({ gi: 1, qi: 0 });
-    expect(c.groupIndex()).toBe(1);
-    c.moveQuestion({ gi: 1, qi: 0 }, -1);
+    expect(v.groupIndex()).toBe(1);
+    v.moveQuestion({ gi: 1, qi: 0 }, -1);
     expect(c.selected()).toEqual({ gi: 0, qi: 1 });
-    c.duplicateQuestion({ gi: 0, qi: 1 });
+    v.duplicateQuestion({ gi: 0, qi: 1 });
     expect(c.selected()).toEqual({ gi: 0, qi: 2 });
-    c.addQuestion(1, 'email');
+    v.addQuestion(1, 'email');
     expect(c.selected()).toEqual({ gi: 1, qi: 3 });
-    c.removeQuestion({ gi: 1, qi: 0 });
+    v.removeQuestion({ gi: 1, qi: 0 });
     expect(c.selected()).toEqual({ gi: 1, qi: 2 });
-    c.removeQuestion({ gi: 1, qi: 2 });
+    v.removeQuestion({ gi: 1, qi: 2 });
     expect(c.selected()).toBeNull();
-    c.selectQuestion({ gi: 0, qi: 0 }, false);
-    c.moveQuestion({ gi: 1, qi: 0 }, 1);
+    v.selectQuestion({ gi: 0, qi: 0 }, false);
+    v.moveQuestion({ gi: 1, qi: 0 }, 1);
     expect(c.selected()).toEqual({ gi: 0, qi: 0 });
   });
 
@@ -1043,50 +1073,50 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * changes nothing.
    */
   it('moves a question by drag and drop in the outline, also into another group', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
+    const { c, v } = await setup(draft(TWO_GROUPS));
     const ev = () =>
       ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
-    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
-    c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
+    v.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    v.onQuestionDrop(ev(), { gi: 1, qi: 1 });
     expect(c.groups()[1].fields.map((f: FormFieldDef) => f.key)).toEqual(['kosten', 'title', 'eintritt', 'summe']);
     expect(c.selected()).toEqual({ gi: 1, qi: 1 });
-    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
-    c.onDrop(1);
+    v.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    v.onDrop(1);
     expect(c.groups()[1].fields.at(-1).key).toBe('cat');
     expect(c.selected()).toEqual({ gi: 1, qi: 1 });
     const before = JSON.stringify(c.groups());
-    c.onQuestionDrop(ev(), { gi: 1, qi: 0 });
-    c.onQuestionDragStart(ev(), { gi: 1, qi: 0 });
-    c.onQuestionDrop(ev(), { gi: 1, qi: 0 });
+    v.onQuestionDrop(ev(), { gi: 1, qi: 0 });
+    v.onQuestionDragStart(ev(), { gi: 1, qi: 0 });
+    v.onQuestionDrop(ev(), { gi: 1, qi: 0 });
     expect(JSON.stringify(c.groups())).toBe(before);
   });
 
   it('the ⋮ menu of a group moves it within the edges and deletes it; the shown group follows', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
-    const ids = (gi: number) => c.groupMenu(gi).flatMap((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id));
+    const { c, v } = await setup(draft(TWO_GROUPS));
+    const ids = (gi: number) => v.groupMenu(gi).flatMap((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id));
     expect(ids(0)).toEqual(['down', 'delete']);
     expect(ids(1)).toEqual(['up', 'delete']);
-    c.selectGroup(1);
-    c.onGroupMenu(1, { id: 'up', label: '' });
+    v.selectGroup(1);
+    v.onGroupMenu(1, { id: 'up', label: '' });
     expect(c.groups()[0].title['de']).toBe('Kosten');
-    expect(c.groupIndex()).toBe(0);
-    c.onGroupMenu(0, { id: 'down', label: '' });
+    expect(v.groupIndex()).toBe(0);
+    v.onGroupMenu(0, { id: 'down', label: '' });
     expect(c.groups()[1].title['de']).toBe('Kosten');
-    expect(c.groupIndex()).toBe(1);
-    c.onGroupMenu(1, { id: 'unknown', label: '' });
+    expect(v.groupIndex()).toBe(1);
+    v.onGroupMenu(1, { id: 'unknown', label: '' });
     expect(c.groups()).toHaveLength(2);
-    c.selectQuestion({ gi: 1, qi: 0 }, false);
-    c.onGroupMenu(0, { id: 'delete', label: '' });
+    v.selectQuestion({ gi: 1, qi: 0 }, false);
+    v.onGroupMenu(0, { id: 'delete', label: '' });
     expect(c.groups()).toHaveLength(1);
     expect(c.selected()).toEqual({ gi: 0, qi: 0 });
-    expect(c.groupIndex()).toBe(0);
+    expect(v.groupIndex()).toBe(0);
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('the phone header menu holds "Verwerfen" while the form has changes', async () => {
-    const { c, api } = await setup(draft(TWO_GROUPS, { de: 'Hallo', en: '' }));
+    const { c, v, api } = await setup(draft(TWO_GROUPS, { de: 'Hallo', en: '' }));
     const getFormDraft = api['getFormDraft'] as jest.Mock;
-    c.setDescription('de', 'Neu');
+    v.setDescription('de', 'Neu');
     expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['toggleActive', 'preview', 'discard']);
     const reads = getFormDraft.mock.calls.length;
     c.onHeaderMenu({ id: 'discard', label: '' });
@@ -1121,35 +1151,35 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * too.
    */
   it('opens the type menu below its button, or above it near the bottom, and closes it on a press outside', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
+    const { v } = await setup(draft(TWO_GROUPS));
     const button = (top: number) =>
       ({ currentTarget: { getBoundingClientRect: () => ({ left: 20, top, bottom: top + 32 }) } }) as unknown as Event;
-    c.toggleTypeMenu(0, button(100));
-    expect(c.typeMenuGroup()).toBe(0);
-    expect(c.menuPos()).toEqual({ left: 20, top: 136, bottom: null });
-    c.toggleTypeMenu(0, button(100));
-    expect(c.typeMenuGroup()).toBeNull();
-    c.toggleTypeMenu(1, button(window.innerHeight - 40));
-    expect(c.menuPos().top).toBeNull();
-    expect(c.menuPos().bottom).toBe(44);
+    v.toggleTypeMenu(0, button(100));
+    expect(v.typeMenuGroup()).toBe(0);
+    expect(v.menuPos()).toEqual({ left: 20, top: 136, bottom: null });
+    v.toggleTypeMenu(0, button(100));
+    expect(v.typeMenuGroup()).toBeNull();
+    v.toggleTypeMenu(1, button(window.innerHeight - 40));
+    expect(v.menuPos().top).toBeNull();
+    expect(v.menuPos().bottom).toBe(44);
     const inside = document.createElement('div');
     inside.className = 'fe__menu';
-    c.onDocumentPointerDown({ target: inside } as unknown as PointerEvent);
-    expect(c.typeMenuGroup()).toBe(1);
-    c.onDocumentPointerDown({ target: document.body } as unknown as PointerEvent);
-    expect(c.typeMenuGroup()).toBeNull();
-    c.toggleTypeMenu(0, button(100));
+    v.onDocumentPointerDown({ target: inside } as unknown as PointerEvent);
+    expect(v.typeMenuGroup()).toBe(1);
+    v.onDocumentPointerDown({ target: document.body } as unknown as PointerEvent);
+    expect(v.typeMenuGroup()).toBeNull();
+    v.toggleTypeMenu(0, button(100));
     window.dispatchEvent(new Event('scroll'));
-    expect(c.typeMenuGroup()).toBeNull();
+    expect(v.typeMenuGroup()).toBeNull();
   });
 
   it('a scroll does not close the type menu on a phone, where it is a bottom sheet', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
-    c.phone = () => true;
+    const { v } = await setup(draft(TWO_GROUPS));
+    v.phone = () => true;
     const button = { currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 100, bottom: 132 }) } } as unknown as Event;
-    c.toggleTypeMenu(0, button);
+    v.toggleTypeMenu(0, button);
     window.dispatchEvent(new Event('scroll'));
-    expect(c.typeMenuGroup()).toBe(0);
+    expect(v.typeMenuGroup()).toBe(0);
   });
 
   /** Tab leaves the menu the same way: it closes, and the button has the focus. */
@@ -1189,12 +1219,12 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * delete clears the selection.
    */
   it('the move buttons of a card: the moved question keeps the selection, also into the next group', async () => {
-    const { c, fixture } = await setup(draft(TWO_GROUPS));
-    c.selectQuestion({ gi: 0, qi: 1 }, false);
+    const { c, v, fixture } = await setup(draft(TWO_GROUPS));
+    v.selectQuestion({ gi: 0, qi: 1 }, false);
     fixture.detectChanges();
     const card = document.querySelector<HTMLElement>('[data-q="0:1"]')!;
     await userEvent.click(within(card).getByRole('button', { name: 'Nach unten' }));
-    expect(c.groupIndex()).toBe(1);
+    expect(v.groupIndex()).toBe(1);
     expect(c.selected()).toEqual({ gi: 1, qi: 0 });
     expect(c.groups()[1].fields[0].key).toBe('cat');
     fixture.detectChanges();
@@ -1218,32 +1248,32 @@ describe('FormEditorComponent — layout of the redesign', () => {
    * same way.
    */
   it('the raw JsonLogic text and the open advanced options move with their question', async () => {
-    const { c } = await setup(draft(TWO_GROUPS));
+    const { v } = await setup(draft(TWO_GROUPS));
     const ev = () =>
       ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
-    c.toggleExpanded({ gi: 0, qi: 0 });
-    c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"==": [');
-    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
-    c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
-    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('{"==": [');
-    expect(c.isExpanded({ gi: 1, qi: 1 })).toBe(true);
-    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
-    c.moveQuestion({ gi: 1, qi: 1 }, -1);
-    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
-    c.duplicateQuestion({ gi: 1, qi: 0 });
-    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('');
-    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
-    c.removeQuestion({ gi: 1, qi: 1 });
-    c.moveGroup(1, -1);
-    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('{"==": [');
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
-    c.removeQuestion({ gi: 0, qi: 0 });
-    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
-    c.toggleExpanded({ gi: 1, qi: 0 });
-    c.removeGroup(0);
-    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+    v.toggleExpanded({ gi: 0, qi: 0 });
+    v.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"==": [');
+    v.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    v.onQuestionDrop(ev(), { gi: 1, qi: 1 });
+    expect(v.logicRaw(1, 1, 'visibleIf')).toBe('{"==": [');
+    expect(v.isExpanded({ gi: 1, qi: 1 })).toBe(true);
+    expect(v.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    v.moveQuestion({ gi: 1, qi: 1 }, -1);
+    expect(v.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    v.duplicateQuestion({ gi: 1, qi: 0 });
+    expect(v.logicRaw(1, 1, 'visibleIf')).toBe('');
+    expect(v.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    v.removeQuestion({ gi: 1, qi: 1 });
+    v.moveGroup(1, -1);
+    expect(v.logicRaw(0, 0, 'visibleIf')).toBe('{"==": [');
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+    v.removeQuestion({ gi: 0, qi: 0 });
+    expect(v.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    v.toggleExpanded({ gi: 1, qi: 0 });
+    v.removeGroup(0);
+    expect(v.isExpanded({ gi: 0, qi: 0 })).toBe(true);
   });
 });
 
@@ -1284,25 +1314,25 @@ describe('group serialize/deserialize round-trip', () => {
 
     it('loads, changes, orders and saves the rules', async () => {
       const d = { ...draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]), rules: [rule] };
-      const { c, fixture, createFormVersion } = await setup(d);
+      const { c, v, fixture, createFormVersion } = await setup(d);
       expect(screen.getByText('Regel 1')).toBeInTheDocument();
       expect(c.rules()[0].logic).toBe(JSON.stringify(rule.logic));
-      c.addRule();
+      v.addRule();
       fixture.detectChanges();
-      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      expect(v.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
       expect(c.formValid()).toBe(false);
-      c.setRule(1, { logic: '{"var":"costTotal"}' });
-      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.messageMissing');
-      c.setRule(1, { message: { de: 'Kosten', en: 'Cost' }, severity: 'warn' });
-      expect(c.ruleErrors()).toEqual([null, null]);
-      c.setRule(1, { logic: '{"eval":["x"]}' });
-      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
-      c.setRule(1, { logic: '[1]' });
-      expect(c.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
-      c.setRule(1, { logic: '{"var":"costTotal"}' });
-      c.moveRule(1, -1);
-      c.moveRule(0, -1);
-      c.moveRule(1, 1);
+      v.setRule(1, { logic: '{"var":"costTotal"}' });
+      expect(v.ruleErrors()[1]).toBe('admin.forms.rules.messageMissing');
+      v.setRule(1, { message: { de: 'Kosten', en: 'Cost' }, severity: 'warn' });
+      expect(v.ruleErrors()).toEqual([null, null]);
+      v.setRule(1, { logic: '{"eval":["x"]}' });
+      expect(v.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      v.setRule(1, { logic: '[1]' });
+      expect(v.ruleErrors()[1]).toBe('admin.forms.rules.logicInvalid');
+      v.setRule(1, { logic: '{"var":"costTotal"}' });
+      v.moveRule(1, -1);
+      v.moveRule(0, -1);
+      v.moveRule(1, 1);
       expect(c.rules().map((r: { severity: string }) => r.severity)).toEqual(['warn', 'block']);
       fixture.detectChanges();
       expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
@@ -1311,33 +1341,33 @@ describe('group serialize/deserialize round-trip', () => {
         { logic: { var: 'costTotal' }, message: { de: 'Kosten', en: 'Cost' }, severity: 'warn' },
         rule,
       ]);
-      c.removeRule(0);
+      v.removeRule(0);
       expect(c.rules()).toHaveLength(1);
     });
 
     it('lets one number field be the number of participants', async () => {
-      const { c } = await setup(
+      const { c, v } = await setup(
         draft([
           { key: 'n', type: 'number', label: { de: 'N', en: '' } },
           { key: 'm', type: 'number', label: { de: 'M', en: '' } },
         ]),
       );
-      expect(c.participantsTaken(c.groups()[0].fields[1])).toBe(false);
-      c.setParticipants({ gi: 0, qi: 0 }, true);
+      expect(v.participantsTaken(c.groups()[0].fields[1])).toBe(false);
+      v.setParticipants({ gi: 0, qi: 0 }, true);
       expect(c.groups()[0].fields[0].validation).toEqual({ participants: true });
-      expect(c.participantsTaken(c.groups()[0].fields[1])).toBe(true);
-      expect(c.participantsTaken(c.groups()[0].fields[0])).toBe(false);
-      c.setParticipants({ gi: 0, qi: 1 }, true);
-      expect(c.fundingIssue()).toBe('admin.form.participantsTwice');
-      c.setParticipants({ gi: 0, qi: 1 }, false);
-      expect(c.fundingIssue()).toBeNull();
+      expect(v.participantsTaken(c.groups()[0].fields[1])).toBe(true);
+      expect(v.participantsTaken(c.groups()[0].fields[0])).toBe(false);
+      v.setParticipants({ gi: 0, qi: 1 }, true);
+      expect(v.fundingIssue()).toBe('admin.form.participantsTwice');
+      v.setParticipants({ gi: 0, qi: 1 }, false);
+      expect(v.fundingIssue()).toBeNull();
     });
 
     it('sets and clears the root of a cost-centre picker', async () => {
-      const { c } = await setup(draft([{ key: 'ks', type: 'budget_select', label: { de: 'KS', en: '' } }]));
-      c.setRootPath({ gi: 0, qi: 0 }, 'QSM');
+      const { c, v } = await setup(draft([{ key: 'ks', type: 'budget_select', label: { de: 'KS', en: '' } }]));
+      v.setRootPath({ gi: 0, qi: 0 }, 'QSM');
       expect(c.groups()[0].fields[0].validation).toEqual({ rootPath: 'QSM' });
-      c.setRootPath({ gi: 0, qi: 0 }, ' ');
+      v.setRootPath({ gi: 0, qi: 0 }, ' ');
       expect(c.groups()[0].fields[0].validation).toEqual({});
     });
 

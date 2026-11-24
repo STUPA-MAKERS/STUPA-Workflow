@@ -20,7 +20,7 @@ description: Global search behind the command palette. One GET /api/search?q= fa
 - `invoice`, `expense` — one of `budget.view`/`budget.structure`/`budget.book` (`budget.access.has_budget_read`, the gate of `GET /api/invoices` and `/api/expenses`). Subtitle: the amount and the supplier or correspondent.
 - `budget` — own query on `Budget.name`/`path_key`, only active nodes (`Budget.active`). Without a budget read permission only the nodes whose `view_gremium_id` is a Gremium of the caller (as `GET /api/budgets`). Subtitle: `path_key`.
 - `gremium` — own query on `Gremium.name`/`slug`, only with `admin.gremien` or `admin.users` (the hit links to the members page, which only an admin can open). Subtitle: the kind only, "Gremium" / "Committee"; the slug is an internal key.
-- `ticket` — `TicketService.list` (be-tickets), with `ticket.manage`. Title `T-0040 · <title>`; subtitle: the status in the reader's language (`TICKET_STATUS`).
+- `ticket` — `TicketService.list` (be-tickets), with `ticket.manage`. Title `T-7K3QX9MD · <title>`; subtitle: the status in the reader's language (`TICKET_STATUS`).
 - `todo` — `TodoService.search` (be-todos), live cards on the boards that the reader reads. Title: the card title; subtitle `<board> · <column>`; url `/todos?card={id}` (`card_url`, the card id only; the page opens the board the card is on now).
 - `principal` — `ConfigService.search_principals`, with `admin.users` or `admin.gremien`. Title: the name, else the e-mail, else "Ohne Namen" / "No name" (`UNNAMED`; never the `sub`); subtitle: the e-mail when a name exists.
 

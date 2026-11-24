@@ -154,7 +154,6 @@ export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'
 
 
 export type ActionType =
-  | 'webhook'
   | 'notify'
   | 'addToNextSession'
   | 'assignBudget'
@@ -162,7 +161,6 @@ export type ActionType =
   | 'assignBudgetFromApplicantGremium'
   | 'assignBudgetFromMap';
 export const ACTION_TYPES: readonly ActionType[] = [
-  'webhook',
   'notify',
   'addToNextSession',
   'assignBudget',
@@ -835,11 +833,49 @@ export const EVENT_NAMES: readonly EventName[] = [
 
 export type RecipientKind = 'group' | 'role' | 'applicant';
 
+/** One subscribed event of a webhook and the fields of its `data` object (§F/integrations/webhooks/002412). */
+export interface WebhookSubscription {
+  readonly event: string;
+  readonly fields: readonly string[];
+}
+
 export interface WebhookConfig {
   readonly id: Uuid;
   readonly name: string;
   readonly url: string;
   readonly active: boolean;
+  /** The subscribed events (§F/integrations/webhooks/002410). */
+  readonly subscriptions: readonly WebhookSubscription[];
+  /** Filters; an empty list lets every value pass (§F/integrations/webhooks/002414). */
+  readonly gremiumIds: readonly Uuid[];
+  readonly typeIds: readonly Uuid[];
+  /** Target status keys of `application.transition`. */
+  readonly stateKeys: readonly string[];
+}
+
+/** The groups of the webhook event catalog, in the order of the dialog. */
+export type WebhookEventGroup =
+  | 'applications'
+  | 'votes'
+  | 'meetings'
+  | 'protocols'
+  | 'budget'
+  | 'tickets';
+
+/** One field of a catalog event (`GET /admin/webhooks/catalog`). */
+export interface WebhookCatalogField {
+  readonly key: string;
+  /** Personal data: marked and off by default (§F/integrations/webhooks/002413). */
+  readonly personal: boolean;
+  readonly example: unknown;
+}
+
+/** One event of the webhook catalog (§F/integrations/webhooks/002411). */
+export interface WebhookCatalogEvent {
+  readonly name: string;
+  readonly group: WebhookEventGroup;
+  readonly idKeys: readonly string[];
+  readonly fields: readonly WebhookCatalogField[];
 }
 
 /** Coarse state of the most recent delivery of one webhook. */
@@ -890,6 +926,7 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.finalize',
   'info.write',
   'members.notify',
+  'ticket.work',
 ] as const;
 
 /**
@@ -946,6 +983,8 @@ export interface OAuthGrantQuery {
   readonly limit?: number;
   readonly offset?: number;
   readonly principalId?: Uuid | null;
+  /** The search over name, e-mail, client and scope (§002691). */
+  readonly q?: string | null;
 }
 
 /**
@@ -1246,6 +1285,34 @@ export interface ErasureRequest {
   readonly handledBy?: string | null;
   readonly handledAt?: string | null;
   readonly reason?: string | null;
+  /** The Paperless documents of the data of the request. They stay after the erasure. */
+  readonly paperlessDocuments?: readonly PaperlessDocument[];
+  /** The mails of the address per Postfach, in the answer of the execution only. */
+  readonly ticketMails?: readonly TicketMailCount[];
+}
+
+/**
+ * The mails of an erased address in one Postfach (§F/administration/privacy/002747). They
+ * stay on the mail server. `mailbox` is null for a Postfach that is removed.
+ */
+export interface TicketMailCount {
+  readonly mailbox: string | null;
+  readonly count: number;
+}
+
+/** A document that the platform filed in Paperless (§F/administration/privacy/002532). */
+export interface PaperlessDocument {
+  readonly documentId: number;
+  readonly title: string;
+  /** The address of the document in Paperless; `null` without a connection. */
+  readonly url?: string | null;
+  readonly filedAt?: string | null;
+}
+
+/** The answer of the erasure of an account: what stays in Paperless and on the mail servers. */
+export interface PrincipalErasure {
+  readonly paperlessDocuments: readonly PaperlessDocument[];
+  readonly ticketMails?: readonly TicketMailCount[];
 }
 
 /** Platform-wide DSGVO config (global retention default, P privacy.manage). */
@@ -1365,10 +1432,65 @@ export interface HelpTicketsSettings {
   readonly wikiUrl: string;
   /** Visitors without an account may send a ticket. */
   readonly publicEnabled: boolean;
-  /** A new ticket mails the holders of `ticket.manage`. */
-  readonly notifyNew: boolean;
   /** Months after the close until the reporter is anonymized (1 to 120); null = never. */
   readonly retentionMonths: number | null;
+}
+
+/**
+ * The page "Paperless" (`GET`/`PUT /admin/paperless`, permission `admin.paperless`): the
+ * connection to one Paperless-ngx instance and the switch of each part. The server never
+ * returns the token; `tokenSet` tells only whether one is stored.
+ */
+export interface PaperlessConnection {
+  readonly baseUrl: string | null;
+  /** The address for links; `null`: the links use `baseUrl` (§F/integrations/paperless/002844). */
+  readonly publicUrl: string | null;
+  readonly tokenSet: boolean;
+  readonly fileProtocols: boolean;
+  readonly fileApplications: boolean;
+  readonly filePlans: boolean;
+  readonly insertEnabled: boolean;
+  readonly linkEnabled: boolean;
+  /** The hosts of the deploy setting `PAPERLESS_HOST_ALLOWLIST`. */
+  readonly allowedHosts: readonly string[];
+}
+
+/** The body of `PUT /admin/paperless`. Without `token` the stored token stays. */
+export interface PaperlessConnectionIn {
+  readonly baseUrl: string | null;
+  readonly publicUrl: string | null;
+  readonly token?: string;
+  readonly fileProtocols: boolean;
+  readonly fileApplications: boolean;
+  readonly filePlans: boolean;
+  readonly insertEnabled: boolean;
+  readonly linkEnabled: boolean;
+}
+
+/** The result of `POST /admin/paperless/test`. `error` is the cause code of a failure. */
+export interface PaperlessTestResult {
+  readonly ok: boolean;
+  readonly error: string | null;
+}
+
+/** The kind of a filed file. */
+export type PaperlessFilingKind =
+  | 'protocol'
+  | 'protocol_public'
+  | 'application'
+  | 'attachment'
+  | 'plan'
+  | 'ticket_file';
+
+/** A filing whose job failed for the last time (`GET /admin/paperless/failed-filings`). */
+export interface PaperlessFailedFiling {
+  readonly id: string;
+  readonly kind: PaperlessFilingKind;
+  readonly elementId: string;
+  readonly title: string;
+  readonly failedAt: string | null;
+  /** The cause code of the newest failure. */
+  readonly error: string | null;
 }
 
 /** Versioned site config: active version + editable draft. */

@@ -12,9 +12,9 @@ tests:
   - "frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.spec.ts:reopenProtocol"
 implementation:
   - backend/app/modules/protocol/approval.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/drafts.py
   - backend/app/modules/protocol/router.py
-  - frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.ts
+  - frontend/vendor/ui-kit/views/protocol/src/protocol-bar-view.component.ts
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

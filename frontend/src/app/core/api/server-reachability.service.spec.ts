@@ -29,7 +29,7 @@ describe('ServerReachabilityService', () => {
     expect([200, 401, 403, 404, 500].some(isUnreachableStatus)).toBe(false);
   });
 
-  /** § 000578: a 502 shows the bar after a failed health check, a 200 of the check removes it. */
+  /** §ui-kit:000578: a 502 shows the bar after a failed health check, a 200 of the check removes it. */
   it('shows "Server nicht erreichbar" after a 502 and a failed check, and removes it after a 200', () => {
     jest.useFakeTimers();
     const { http, ctrl, reach, toast } = setup();
@@ -52,7 +52,7 @@ describe('ServerReachabilityService', () => {
     ctrl.verify();
   });
 
-  /** § 000578: one route that answers 503 for its own reason shows no bar. */
+  /** §ui-kit:000578: one route that answers 503 for its own reason shows no bar. */
   it('shows no bar when the health check answers', () => {
     const { http, ctrl, reach, toast } = setup();
     http.get('/api/admin/backups').subscribe({ error: () => undefined });

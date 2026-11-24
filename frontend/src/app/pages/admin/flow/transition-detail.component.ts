@@ -24,7 +24,7 @@ import {
   type TransitionDef,
 } from '../admin.models';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
-import { GuardEditorComponent } from './guard-editor.component';
+import { GuardEditorViewComponent } from '@stupa-makers/ui-kit/views/flow-editor';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 
 /**
@@ -45,7 +45,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
     IconComponent,
     InputComponent,
     SelectFieldComponent,
-    GuardEditorComponent,
+    GuardEditorViewComponent,
     CostCentreSelectComponent,
   ],
   templateUrl: './transition-detail.component.html',
@@ -58,7 +58,6 @@ export class TransitionDetailComponent {
   readonly transition = input.required<TransitionDef>();
   readonly roleOptions = input.required<SelectOption[]>();
   readonly gremiumOptions = input.required<SelectOption[]>();
-  readonly webhookOptions = input.required<SelectOption[]>();
   /** The cost-center tree for the cost-center pickers of the budget actions. */
   readonly budgetTree = input<BudgetTreeNode[]>([]);
   /** The target is a vote state that takes its gremium from the cost center. The

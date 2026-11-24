@@ -253,7 +253,7 @@ async def test_ticket_mentions_skip_missing_deleted_or_orphan_notes() -> None:
     session.objs[(TicketNote, MSG)] = _note()
     assert await _ticket_send(session, []) == 0
     assert await _ticket_send(session, [ADA]) == 0
-    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number=42, title="Drucker")
+    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number="AAAA0042", title="Drucker")
     assert await _ticket_send(session, [EVE]) == 0
     assert _Mail.sent == []
 
@@ -261,14 +261,14 @@ async def test_ticket_mentions_skip_missing_deleted_or_orphan_notes() -> None:
 async def test_ticket_mentions_mail_the_mentioned_holders() -> None:
     session = _Session(execute=[[(ADA, "ada@example.org")]])
     session.objs[(TicketNote, MSG)] = _note()
-    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number=42, title="Drucker")
+    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number="AAAA0042", title="Drucker")
     session.objs[(PrincipalRow, ME)] = _person(ME, None, "moritz@example.org")
     assert await _ticket_send(session, [ADA, BOB]) == 1
     (mail,) = _Mail.sent
     assert mail["template_key"] == "ticket_mentioned"
     assert mail["context"] == {
         "actor": "moritz@example.org",
-        "number": ticket_mails.format_number(42),
+        "number": ticket_mails.format_number("AAAA0042"),
         "title": "Drucker",
         "message": "Schau mal",
         "author": "moritz@example.org",
@@ -280,7 +280,7 @@ async def test_ticket_mentions_mail_the_mentioned_holders() -> None:
 async def test_ticket_mentions_of_a_files_only_note_name_the_files() -> None:
     session = _Session(execute=[[(ADA, "ada@example.org")]])
     session.objs[(TicketNote, MSG)] = _note(body="  ", author_id=None)
-    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number=7, title="Licht")
+    session.objs[(Ticket, TICKET)] = SimpleNamespace(id=TICKET, number="AAAA0007", title="Licht")
     _Files.names[MSG] = ["foto.jpg"]
     assert await _ticket_send(session, [ADA]) == 1
     context = _Mail.sent[0]["context"]

@@ -44,11 +44,14 @@ describe('featureMatch', () => {
     expect(routeFeatures({})).toEqual([]);
   });
 
-  it.each(FEATURES)('guards at least one route of %s', (key) => {
+  /** Push has no page of its own: it gates the push groups of the account page. */
+  it.each(FEATURES.filter((key) => key !== 'push'))('guards at least one route of %s', (key) => {
     expect(flat(routes).some((route) => routeFeatures(route).includes(key))).toBe(true);
   });
 
   it.each([
+    ['activity', ['activity']],
+    ['graph', ['graph']],
     ['todos', ['todos']],
     ['calendar', ['calendar']],
     ['meetings', ['meetings']],
@@ -57,8 +60,9 @@ describe('featureMatch', () => {
     ['expenses', ['budget']],
     ['invoices', ['invoices']],
     ['tickets', ['tickets']],
-    ['protocols', ['meetings']],
-    ['public-calendar', ['calendar']],
+    ['protocols', ['meetings', 'public']],
+    ['decisions', ['meetings', 'public']],
+    ['public-calendar', ['calendar', 'public']],
   ] as const)('guards /%s', (path, keys) => {
     const found = flat(routes).filter(
       (route) => route.path === path && route.redirectTo === undefined,

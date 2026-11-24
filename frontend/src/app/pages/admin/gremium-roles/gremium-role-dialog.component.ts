@@ -19,7 +19,11 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   CheckboxComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
+  DialogBodyDirective,
   DialogComponent,
+  I18nInputComponent,
   InputComponent,
   NoteComponent,
   SectionComponent,
@@ -27,9 +31,6 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
 
 /** The form state of the dialog. */
 interface RoleDraft {
@@ -56,6 +57,7 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
+    DialogBodyDirective,
     SectionComponent,
     ContentLangSwitchComponent,
     I18nInputComponent,
@@ -197,7 +199,7 @@ export class GremiumRoleDialogComponent {
           );
         } else {
           this.serverKeyError.set('');
-          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         }
       },
     });

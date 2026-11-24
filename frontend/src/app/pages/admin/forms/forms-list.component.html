@@ -8,7 +8,7 @@
     }
   </app-page-header>
 
-  <app-load-state [state]="loadError() ? 'error' : 'ok'" [keepContent]="true" [errorText]="'admin.forms.overviewError' | t" (retry)="retryLoad()">
+  <app-load-state [state]="loadError() ? 'error' : 'ok'" [keepContent]="true" [hasContent]="types().length > 0 || groups().length > 0" [errorText]="'admin.forms.overviewError' | t" (retry)="retryLoad()">
     <ng-template #content>
       @if (loading() || types().length || groups().length) {
         <div class="fl__blocks">
@@ -52,7 +52,7 @@
           }
         </div>
       } @else {
-        <app-empty-state icon="form" shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
+        <app-empty-state fill icon="form" shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
       }
     </ng-template>
   </app-load-state>
@@ -117,110 +117,142 @@
 
 <app-dialog
   [open]="dialogOpen()"
-  [title]="'admin.forms.create' | t"
+  [heading]="'admin.forms.create' | t"
   [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
+  [actions]="[
+    { key: 'closeDialog', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ('admin.common.create' | t),
+      kind: 'main',
+      disabled: !form().nameDe.trim(),
+      busy: saving(),
+    },
+  ]"
+  (action)="
+    $event.key === 'closeDialog' ? closeDialog() : $event.key === 'submit' ? submit() : null
+  "
 >
-  <form id="fl-form" class="fl__form" (submit)="submit($event)">
-    <app-input
-      [id]="'fl-name-de'"
-      [label]="'admin.forms.nameDe' | t"
-      [required]="true"
-      [hint]="('admin.common.key' | t) + ': ' + keyPreview()"
-      name="nameDe"
-      [ngModel]="form().nameDe"
-      (ngModelChange)="patch('nameDe', $event)"
-    />
-    <app-input
-      [id]="'fl-name-en'"
-      [label]="'admin.forms.nameEn' | t"
-      name="nameEn"
-      [ngModel]="form().nameEn"
-      (ngModelChange)="patch('nameEn', $event)"
-    />
-    @if (budgetOn) {
-      <app-checkbox
-        [ngModel]="form().hasBudget"
-        (ngModelChange)="patch('hasBudget', $event)"
-        name="hasBudget"
-      >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
-    }
-  </form>
-  <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
-      {{ 'admin.common.create' | t }}
-    </app-button>
-  </div>
+  <ng-template dialogBody>
+    <form id="fl-form" class="fl__form" (submit)="$event.preventDefault(); submit()">
+      <app-input
+        [id]="'fl-name-de'"
+        [label]="'admin.forms.nameDe' | t"
+        [required]="true"
+        [hint]="('admin.common.key' | t) + ': ' + keyPreview()"
+        name="nameDe"
+        [ngModel]="form().nameDe"
+        (ngModelChange)="patch('nameDe', $event)"
+      />
+      <app-input
+        [id]="'fl-name-en'"
+        [label]="'admin.forms.nameEn' | t"
+        name="nameEn"
+        [ngModel]="form().nameEn"
+        (ngModelChange)="patch('nameEn', $event)"
+      />
+      @if (budgetOn) {
+        <app-checkbox
+          [ngModel]="form().hasBudget"
+          (ngModelChange)="patch('hasBudget', $event)"
+          name="hasBudget"
+          >{{ 'admin.forms.hasBudget' | t }}</app-checkbox
+        >
+      }
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-dialog
   [open]="groupDialog() !== null"
-  [title]="(groupDialog() === 'new' ? 'admin.forms.groupCreate' : 'admin.forms.groupEdit') | t"
+  [heading]="(groupDialog() === 'new' ? 'admin.forms.groupCreate' : 'admin.forms.groupEdit') | t"
   [closeLabel]="'action.close' | t"
   (closed)="groupDialog.set(null)"
+  [actions]="[
+    { key: 'groupDialog', label: ('action.cancel' | t) },
+    {
+      key: 'saveGroup',
+      label: ((groupDialog() === 'new' ? 'admin.common.create' : 'action.save') | t),
+      kind: 'main',
+      disabled: !groupForm().nameDe.trim(),
+      busy: saving(),
+    },
+  ]"
+  (action)="
+    $event.key === 'groupDialog'
+      ? groupDialog.set(null)
+      : $event.key === 'saveGroup'
+        ? saveGroup()
+        : null
+  "
 >
-  <form id="fl-group-form" class="fl__form" (submit)="saveGroup($event)">
-    <app-input
-      [id]="'fl-group-name-de'"
-      [label]="'admin.forms.groupNameDe' | t"
-      [required]="true"
-      name="groupNameDe"
-      [ngModel]="groupForm().nameDe"
-      (ngModelChange)="patchGroup('nameDe', $event)"
-    />
-    <app-input
-      [id]="'fl-group-name-en'"
-      [label]="'admin.forms.groupNameEn' | t"
-      name="groupNameEn"
-      [ngModel]="groupForm().nameEn"
-      (ngModelChange)="patchGroup('nameEn', $event)"
-    />
-    <app-textarea [label]="'admin.forms.groupTextDe' | t">
-      <textarea
-        name="groupTextDe"
-        rows="5"
-        [ngModel]="groupForm().textDe"
-        (ngModelChange)="patchGroup('textDe', $event)"
-      ></textarea>
-    </app-textarea>
-    <app-textarea [label]="'admin.forms.groupTextEn' | t">
-      <textarea
-        name="groupTextEn"
-        rows="5"
-        [ngModel]="groupForm().textEn"
-        (ngModelChange)="patchGroup('textEn', $event)"
-      ></textarea>
-    </app-textarea>
-  </form>
-  <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="groupDialog.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!groupForm().nameDe.trim()" [loading]="saving()" (click)="saveGroup($event)">
-      {{ (groupDialog() === 'new' ? 'admin.common.create' : 'action.save') | t }}
-    </app-button>
-  </div>
+  <ng-template dialogBody>
+    <form id="fl-group-form" class="fl__form" (submit)="$event.preventDefault(); saveGroup()">
+      <app-input
+        [id]="'fl-group-name-de'"
+        [label]="'admin.forms.groupNameDe' | t"
+        [required]="true"
+        name="groupNameDe"
+        [ngModel]="groupForm().nameDe"
+        (ngModelChange)="patchGroup('nameDe', $event)"
+      />
+      <app-input
+        [id]="'fl-group-name-en'"
+        [label]="'admin.forms.groupNameEn' | t"
+        name="groupNameEn"
+        [ngModel]="groupForm().nameEn"
+        (ngModelChange)="patchGroup('nameEn', $event)"
+      />
+      <app-textarea [label]="'admin.forms.groupTextDe' | t">
+        <textarea
+          name="groupTextDe"
+          rows="5"
+          [ngModel]="groupForm().textDe"
+          (ngModelChange)="patchGroup('textDe', $event)"
+        ></textarea>
+      </app-textarea>
+      <app-textarea [label]="'admin.forms.groupTextEn' | t">
+        <textarea
+          name="groupTextEn"
+          rows="5"
+          [ngModel]="groupForm().textEn"
+          (ngModelChange)="patchGroup('textEn', $event)"
+        ></textarea>
+      </app-textarea>
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-dialog
   [open]="regroup() !== null"
-  [title]="'admin.forms.groupChange' | t"
+  [heading]="'admin.forms.groupChange' | t"
   [closeLabel]="'action.close' | t"
   (closed)="regroup.set(null)"
+  [actions]="[
+    { key: 'regroup', label: ('action.cancel' | t) },
+    { key: 'saveRegroup', label: ('action.save' | t), kind: 'main', busy: saving() },
+  ]"
+  (action)="
+    $event.key === 'regroup'
+      ? regroup.set(null)
+      : $event.key === 'saveRegroup'
+        ? saveRegroup()
+        : null
+  "
 >
-  <form class="fl__form" (submit)="$event.preventDefault(); saveRegroup()">
-    <app-select
-      [label]="'admin.forms.group' | t"
-      [options]="groupOptions()"
-      [clearable]="false"
-      name="regroup"
-      [ngModel]="regroupTo()"
-      (ngModelChange)="regroupTo.set($event)"
-    />
-  </form>
-  <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="regroup.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" [loading]="saving()" (click)="saveRegroup()">{{ 'action.save' | t }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    <form class="fl__form" (submit)="$event.preventDefault(); saveRegroup()">
+      <app-select
+        [label]="'admin.forms.group' | t"
+        [options]="groupOptions()"
+        [clearable]="false"
+        name="regroup"
+        [ngModel]="regroupTo()"
+        (ngModelChange)="regroupTo.set($event)"
+      />
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog

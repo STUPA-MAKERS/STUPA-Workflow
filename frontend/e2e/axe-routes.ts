@@ -1,5 +1,5 @@
 /**
- * Every route of the app for the axe sweep (§ NF/accessibility/conformance/000491).
+ * Every route of the app for the axe sweep (§ui-kit:NF/accessibility/conformance/000491).
  *
  * `path` is the route path as `app.routes.ts` writes it, so the jest contract
  * `src/app/axe-routes.contract.spec.ts` can prove that each route is here. A `:param` takes
@@ -40,6 +40,8 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('decisions', { public: true }),
   fixed('public-calendar', { public: true }),
   { path: 'protocols/:id', url: () => `/protocols/${MISSING}`, public: true },
+  { path: 'protocols/:committee', url: () => '/protocols/no-such-committee', public: true },
+  { path: 'decisions/:committee', url: () => '/decisions/no-such-committee', public: true },
   { path: 'j/:code', url: () => '/j/ZZZZZZ', public: true },
   fixed('accessibility', { public: true }),
   fixed('applications'),
@@ -81,6 +83,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/committees'),
   { path: 'admin/committees/:id/members', url: (ids) => `/admin/committees/${ids.gremium}/members` },
   { path: 'admin/committees/:id/roles', url: (ids) => `/admin/committees/${ids.gremium}/roles` },
+  { path: 'admin/committees/:id/substitutes', url: (ids) => `/admin/committees/${ids.gremium}/substitutes` },
   fixed('admin/branding'),
   fixed('admin/texts'),
   fixed('admin/translations'),
@@ -88,6 +91,7 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/calendars'),
   fixed('admin/webhooks'),
   fixed('admin/help-tickets'),
+  fixed('admin/paperless'),
   fixed('admin/features'),
   fixed('admin/oauth-grants'),
   fixed('admin/audit'),

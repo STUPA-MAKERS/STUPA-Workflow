@@ -27,6 +27,7 @@ import type {
   InvoiceParseResult,
 } from '../budget/budget-tree.api';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { kindSpies } from '../../../testing/toast';
 
 function inv(over: Partial<Invoice> = {}): Invoice {
   return {
@@ -555,7 +556,7 @@ describe('InvoicesComponent', () => {
 
   it('successful parse prefills the review dialog and says so in it, not in a toast', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'success');
+    const spy = jest.spyOn(kindSpies(toast), 'success');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
@@ -665,7 +666,7 @@ describe('InvoicesComponent', () => {
 
   it('other parse errors surface a problem-detail error toast', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
@@ -677,7 +678,7 @@ describe('InvoicesComponent', () => {
 
   it('parse error without detail falls back to the generic message', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
@@ -733,7 +734,7 @@ describe('InvoicesComponent', () => {
 
   it('attachFile error toasts the problem detail', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     const file = new File(['x'], 'm.pdf', { type: 'application/pdf' });
     c.onCreateFilePicked({
       target: { files: [file], value: '' },
@@ -796,7 +797,7 @@ describe('InvoicesComponent', () => {
   /** The reload fires a fresh GET. */
   it('create() submits trimmed fields, includes the file handle, toasts and reloads', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'success');
+    const spy = jest.spyOn(kindSpies(toast), 'success');
     c.openCreate();
     c.newNumber.set('  R-9 ');
     c.newSupplier.set(' Sup ');
@@ -901,7 +902,7 @@ describe('InvoicesComponent', () => {
 
   it('create() error toasts the problem detail and keeps the dialog open', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     c.openCreate();
     c.newNumber.set('R-1');
     c.newSupplier.set('Sup');
@@ -977,7 +978,7 @@ describe('InvoicesComponent', () => {
 
   it('saveEdit patches the invoice and replaces it in the list', async () => {
     const { c, http, toast } = await setup({ initial: [inv({ id: 'e1', supplier: 'old' })] });
-    const spy = jest.spyOn(toast, 'success');
+    const spy = jest.spyOn(kindSpies(toast), 'success');
     c.openEdit(c.items()[0]);
     c.editSupplier.set('  New Sup  ');
     c.editNote.set('   ');
@@ -1084,7 +1085,7 @@ describe('InvoicesComponent', () => {
 
   it('saveEdit error toasts the problem detail and keeps editing open', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     c.openEdit(inv({ id: 'e1' }));
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
     http
@@ -1107,7 +1108,7 @@ describe('InvoicesComponent', () => {
       initial: [inv({ id: 'd1' }), inv({ id: 'd2' })],
       total: 2,
     });
-    const spy = jest.spyOn(toast, 'success');
+    const spy = jest.spyOn(kindSpies(toast), 'success');
     c.askDelete(c.items()[0]);
     c.doDelete();
     expect(c.saving()).toBe(true);
@@ -1145,7 +1146,7 @@ describe('InvoicesComponent', () => {
 
   it('doDelete error toasts the generic failure', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
+    const spy = jest.spyOn(kindSpies(toast), 'error');
     c.askDelete(inv({ id: 'd1' }));
     c.doDelete();
     http
@@ -1364,7 +1365,7 @@ describe('InvoicesComponent (list/detail)', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Buchung anlegen' })[0]);
     expect(navigate).toHaveBeenCalledWith(['/expenses'], { queryParams: { new: 'booking', invoice: 'i-1' } });
 
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     await userEvent.click(screen.getByRole('button', { name: 'Als bezahlt markieren' }));
     expect(c.markingPaid()).toBe('i-1');
     c.markPaid(c.items()[0]);
@@ -1380,7 +1381,7 @@ describe('InvoicesComponent (list/detail)', () => {
 
   it('reports a failed "mark paid"', async () => {
     const { c, http, toast } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     c.markPaid(c.items()[0]);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/i-1'))
@@ -1622,7 +1623,7 @@ describe('InvoicesComponent (row swipe)', () => {
 
   it('marks paid at once, and the undo sets the invoice open again', async () => {
     const { c, http, toast } = await setup({ queryParams: { seg: 'inbox' } });
-    const action = jest.spyOn(toast, 'showAction');
+    const action = jest.spyOn(toast, 'show');
     c.onRowSwiped({ id: 'paid', label: 'x', icon: 'check', leaves: true }, c.items()[0]);
     expect(c.groups()).toEqual([]);
     const paid = http.expectOne(PATCH);
@@ -1630,7 +1631,10 @@ describe('InvoicesComponent (row swipe)', () => {
     paid.flush(inv({ status: 'paid' }));
     lastInvoicesReq(http).flush(page([]));
     expect(action).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Rechnung als bezahlt markiert.', action: 'Rückgängig' }),
+      expect.objectContaining({
+        text: 'Rechnung als bezahlt markiert.',
+        action: expect.objectContaining({ label: 'Rückgängig' }),
+      }),
     );
     lastClosed(action)('action');
     const open = http.expectOne(PATCH);
@@ -1643,8 +1647,8 @@ describe('InvoicesComponent (row swipe)', () => {
 
   it('keeps the paid state when the toast goes, and reports a failed swipe or undo', async () => {
     const { c, http, toast } = await setup();
-    const action = jest.spyOn(toast, 'showAction');
-    const error = jest.spyOn(toast, 'error');
+    const action = jest.spyOn(toast, 'show');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     c.onRowSwiped({ id: 'paid', label: 'x', icon: 'check' }, c.items()[0]);
     http.expectOne(PATCH).flush({ detail: 'Nein' }, { status: 409, statusText: 'x' });
     expect(error).toHaveBeenCalledWith('Nein');
@@ -1734,7 +1738,7 @@ describe('InvoicesComponent (multi-select)', () => {
 
   it('marks the selected open invoices paid, one after the other', async () => {
     const { c, http, toast } = await setup({ initial: [...two(), inv({ id: 'i-3' })] });
-    const ok = jest.spyOn(toast, 'success');
+    const ok = jest.spyOn(kindSpies(toast), 'success');
     c.startSelecting();
     c.toggleSelect('i-1', true);
     c.toggleSelect('i-2', true);
@@ -1754,7 +1758,7 @@ describe('InvoicesComponent (multi-select)', () => {
 
   it('deletes after the confirmation, within the cap, and stops at the first failure', async () => {
     const { c, http, toast } = await setup({ initial: [...two(), inv({ id: 'i-3' })] });
-    const err = jest.spyOn(toast, 'error');
+    const err = jest.spyOn(kindSpies(toast), 'error');
     c.askBulkDelete();
     expect(c.bulkConfirm()).toBe(false);
     c.startSelecting();

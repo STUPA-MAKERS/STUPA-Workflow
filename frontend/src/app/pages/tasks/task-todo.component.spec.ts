@@ -12,6 +12,7 @@ import { MEMBERS, detail } from '../../../testing/todo-fixtures';
 import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { TaskTodoComponent } from './task-todo.component';
 import { TasksComponent } from './tasks.component';
+import { toastMock } from '../../../testing/toast';
 
 @Component({ changeDetection: ChangeDetectionStrategy.Eager, standalone: true, template: '' })
 class ListStub {}
@@ -28,7 +29,7 @@ async function start(withPage: boolean, split = true, titles = false) {
       ]),
       { provide: TodosApiService, useValue: { card: jest.fn(() => of(detail())), members: jest.fn(() => of(MEMBERS)), boards: jest.fn(() => of([])) } },
       provideFakeTodoLive(),
-      { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+      { provide: ToastService, useValue: toastMock() },
       ...(withPage ? [{ provide: TasksComponent, useValue: page }] : []),
       ...(titles ? [{ provide: TitleStrategy, useExisting: PageTitleService }] : []),
     ],

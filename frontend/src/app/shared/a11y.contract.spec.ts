@@ -1,5 +1,5 @@
 /**
- * § NF/accessibility/conformance/000493: every shared component has a jest-axe test.
+ * §ui-kit:NF/accessibility/conformance/000493: every shared component has a jest-axe test.
  *
  * A shared component appears on many pages, so one axe error repeats on each of them. This
  * spec reads the sources of `src/app/shared/` and of the ui-kit and finds each component

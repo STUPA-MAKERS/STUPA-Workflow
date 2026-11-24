@@ -15,6 +15,8 @@ sets `SESSION_TTL_HOURS`, `MAGIC_LINK_EDIT_TTL_DAYS` or `MAGIC_LINK_ACTION_TTL_M
 keeps starting, because `extra="ignore"` drops the keys.
 """
 
+import base64
+import binascii
 import json
 import logging
 from functools import lru_cache
@@ -42,6 +44,26 @@ def _split_csv(value: object) -> object:
         except json.JSONDecodeError:
             pass
     return [part.strip() for part in text.split(",") if part.strip()]
+
+
+#: The bytes of the sealing key (AES-256, §NF/security/integrity/002810).
+SECRETS_KEY_BYTES = 32
+
+
+def decode_secrets_key(text: str) -> bytes:
+    """Decode a sealing key from base64 (standard or URL-safe, padding optional).
+
+    Raises:
+        ValueError: The text is not base64 of exactly 32 bytes.
+    """
+    clean = text.strip().replace("+", "-").replace("/", "_")
+    try:
+        raw = base64.urlsafe_b64decode(clean + "=" * (-len(clean) % 4))
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("SECRETS_KEY is not base64.") from exc
+    if len(raw) != SECRETS_KEY_BYTES:
+        raise ValueError(f"SECRETS_KEY must be {SECRETS_KEY_BYTES} bytes, got {len(raw)}.")
+    return raw
 
 
 class SettingsError(RuntimeError):
@@ -159,6 +181,25 @@ class Settings(BaseSettings):
         `extra="ignore"` dropped that name silently, so a deployment that copied the
         example ran with an empty allowlist. `WEBHOOK_HOST_ALLOWLIST` wins when both
         are set. The per-webhook `secret` never reaches the log.
+
+    Paperless:
+        `paperless_host_allowlist` names the hosts that the address of the Paperless
+        connection can have (§NF/security/network/002514). Paperless often runs in the
+        internal network, so the SSRF guard does not apply and this list is the whole
+        guard: an empty list allows no address.
+
+    Ticket mail:
+        `ticket_mail_host_allowlist` names the hosts that the IMAP host and the SMTP host
+        of a Postfach can have (§NF/security/network/002744). An admin sets the hosts of
+        a Postfach freely, so this list is the whole guard against a connection to an
+        internal host: an empty list allows no host.
+
+    Sealed secrets:
+        `secrets_key` (base64 of 32 bytes) seals the secrets of the integrations in the
+        database (§NF/security/integrity/002810), and `secrets_key_old` holds earlier keys
+        that only open (002811). The key comes from the deploy and never from the database
+        or a backup. Strict security refuses to start without it; outside strict security
+        the key comes from `session_secret`.
 
     Delegation:
         The gremium flag `allow_vote_delegation` alone switches vote delegation; no
@@ -362,7 +403,20 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("webhook_host_allowlist", "webhook_allowlist"),
     )
 
-    @field_validator("cors_allow_origins", "webhook_host_allowlist", mode="before")
+    paperless_host_allowlist: CsvList = []
+    ticket_mail_host_allowlist: CsvList = []
+
+    secrets_key: str | None = None
+    secrets_key_old: CsvList = []
+
+    @field_validator(
+        "cors_allow_origins",
+        "secrets_key_old",
+        "webhook_host_allowlist",
+        "paperless_host_allowlist",
+        "ticket_mail_host_allowlist",
+        mode="before",
+    )
     @classmethod
     def _accept_csv_lists(cls, value: object) -> object:
         """Accept a comma-separated list, as `deploy/.env.example` documents it."""
@@ -447,6 +501,23 @@ class Settings(BaseSettings):
         """
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
             raise ValueError('FORWARDED_ALLOW_IPS must not be "*" in production.')
+        return self
+
+    @model_validator(mode="after")
+    def _secrets_key_valid(self) -> "Settings":
+        """Refuse a malformed sealing key, and a missing one under strict security (002811).
+
+        Raises:
+            ValueError: A key is not base64 of 32 bytes, or strict security has no key.
+        """
+        for key in (self.secrets_key, *self.secrets_key_old):
+            if key:
+                decode_secrets_key(key)
+        if self.strict_security_enabled and not self.secrets_key:
+            raise ValueError(
+                "SECRETS_KEY is required under strict security "
+                "(base64 of 32 bytes, e.g. `openssl rand -base64 32`)."
+            )
         return self
 
     @property

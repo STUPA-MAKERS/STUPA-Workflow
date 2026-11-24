@@ -18,15 +18,17 @@ from app.modules.auth.people import DELETED_PERSON, PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 from app.modules.meetings.models import Meeting
-from app.modules.tickets import service as svc_mod
+from app.modules.tickets.access import PLATFORM_ONLY, area_workers
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
-from app.modules.tickets.schemas import NoteCreate, TicketCreate, TicketPatch
-from app.modules.tickets.service import (
-    TicketService,
-    format_number,
-    principal_id_of,
-    ticket_managers,
+from app.modules.tickets.numbers import (
+    NUMBER_ALPHABET,
+    NUMBER_LENGTH,
+    draw_number,
+    number_part,
+    parse_number,
 )
+from app.modules.tickets.schemas import NoteCreate, TicketCreate, TicketPatch
+from app.modules.tickets.service import TicketService, format_number, principal_id_of
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.tickets.fakes import FakeFiles, ScriptedSession
 
@@ -44,7 +46,7 @@ def _svc(session: ScriptedSession, **kw: Any) -> TicketService:
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 7,
+        "number": "AAAA0007",
         "kind": "bug",
         "title": "Fehler",
         "body": "Text",
@@ -86,9 +88,44 @@ class _Todos:
         return wanted & self.readable
 
 
-def test_format_number_pads_to_four_digits_and_grows() -> None:
-    assert format_number(42) == "T-0042"
-    assert format_number(12345) == "T-12345"
+def test_format_number_puts_the_prefix_before_the_characters() -> None:
+    assert format_number("7K3QX9MD") == "T-7K3QX9MD"
+
+
+def test_a_drawn_number_has_eight_characters_of_the_alphabet() -> None:
+    drawn = [draw_number() for _ in range(1000)]
+    assert all(len(n) == NUMBER_LENGTH and set(n) <= set(NUMBER_ALPHABET) for n in drawn)
+    assert not set("01ILO") & set(NUMBER_ALPHABET)
+    assert len(set(drawn)) > 990
+
+
+def test_a_number_parses_with_and_without_the_prefix() -> None:
+    assert parse_number(" t-7k3qx9md ") == "7K3QX9MD"
+    assert parse_number("T7K3QX9MD") == "7K3QX9MD"
+    assert parse_number("7K3QX9MD") == "7K3QX9MD"
+    assert parse_number("T-7K3QX9M") is None
+    assert parse_number("T-0K3QX9MD") is None
+    assert number_part("t-7k3") == "7K3"
+    assert number_part("7k3q") == "7K3Q"
+    assert number_part("T-7K3QX9MDD") is None
+    assert number_part("login") is None
+    assert number_part("") is None
+
+
+async def test_a_used_number_is_drawn_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    draws = iter(["AAAAAAAA", "BBBBBBBB"])
+    monkeypatch.setattr("app.modules.tickets.service.base.draw_number", lambda: next(draws))
+    session = ScriptedSession(scalar=[uuid.uuid4(), None])
+    assert await _svc(session).free_number() == "BBBBBBBB"
+    assert "ticket.number = 'AAAAAAAA'" in str(
+        session.statements[0].compile(compile_kwargs={"literal_binds": True})
+    )
+
+
+async def test_no_free_number_after_every_draw_is_an_error() -> None:
+    session = ScriptedSession(scalar=[uuid.uuid4(), uuid.uuid4()])
+    with pytest.raises(RuntimeError):
+        await _svc(session).free_number(2)
 
 
 async def test_principal_id_of_reads_the_row_id() -> None:
@@ -96,13 +133,14 @@ async def test_principal_id_of_reads_the_row_id() -> None:
     assert await principal_id_of(session, "s") == ME  # type: ignore[arg-type]
 
 
-async def test_ticket_managers_with_and_without_groups() -> None:
+async def test_the_workers_of_plattform_with_and_without_groups() -> None:
     session = ScriptedSession(scalars=[["grp"]], execute=[[(ME, "Ada", "a@x")]])
-    assert await ticket_managers(session, principal_id=ME) == [(ME, "Ada", "a@x")]  # type: ignore[arg-type]
+    found = await area_workers(session, PLATFORM_ONLY, principal_id=ME)  # type: ignore[arg-type]
+    assert found == [(ME, "Ada", "a@x")]
     sql = str(session.statements[-1])
     assert "oidc_groups" in sql
     session = ScriptedSession(scalars=[[]], execute=[[]])
-    assert await ticket_managers(session) == []  # type: ignore[arg-type]
+    assert await area_workers(session, PLATFORM_ONLY) == []  # type: ignore[arg-type]
     assert "oidc_groups" not in str(session.statements[-1])
 
 
@@ -152,8 +190,8 @@ async def test_create_checks_and_binds_the_drafts(monkeypatch: pytest.MonkeyPatc
     async def _bind(_s: object, **kw: Any) -> None:
         calls.append(("bind", kw))
 
-    monkeypatch.setattr(svc_mod, "check_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.create.check_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.create.bind_drafts", _bind)
     draft = uuid.uuid4()
     ticket = await _svc(ScriptedSession()).create(
         _create(attachmentIds=[str(draft)], draftToken="tok"),
@@ -199,7 +237,7 @@ async def test_list_without_filters_maps_reporters_and_assignees() -> None:
 async def test_list_with_every_filter_builds_the_where_clause() -> None:
     session = ScriptedSession(scalar=[None], scalars=[[]])
     page = await _svc(session).list(
-        statuses=["new"], kinds=["bug"], assignee="none", q="T-0040", limit=5, offset=10
+        statuses=["new"], kinds=["bug"], assignee="none", q="T-7K3QX9MD", limit=5, offset=10
     )
     assert page.total == 0
     assert (page.limit, page.offset) == (5, 10)
@@ -241,7 +279,7 @@ async def test_detail_of_an_unknown_ticket_is_404() -> None:
 
 
 async def test_detail_maps_notes_events_attachments_and_duplicate() -> None:
-    dup = _ticket(number=3)
+    dup = _ticket(number="AAAA0003")
     ticket = _ticket(duplicate_of_id=dup.id, context={"url": "u"}, status="rejected")
     note = TicketNote(id=uuid.uuid4(), ticket_id=ticket.id, author_id=ME, body="n", created_at=NOW)
     events = [
@@ -277,7 +315,7 @@ async def test_detail_maps_notes_events_attachments_and_duplicate() -> None:
     )
     detail = await _svc(session, files=FakeFiles([att]), todos=_Todos(2)).detail(ticket.id, VIEWER)
     assert detail.duplicate_of is not None
-    assert detail.duplicate_of.number == "T-0003"
+    assert detail.duplicate_of.number == "T-AAAA0003"
     assert detail.notes[0].is_own is True
     assert detail.attachments[0].filename == "a.png"
     assert detail.open_todo_count == 2
@@ -386,7 +424,7 @@ async def test_the_application_target_needs_a_confirmed_readable_application(
         if not allowed["ok"]:
             raise ForbiddenError("no")
 
-    monkeypatch.setattr(svc_mod, "resolve_app_read", _read)
+    monkeypatch.setattr("app.modules.tickets.service.reads.resolve_app_read", _read)
     session = ScriptedSession()
     session.put(Application(id=app_id, data={"title": "Antrag"}, email_confirmed_at=NOW))
     assert await _detail_with_route(route, session) is None
@@ -485,15 +523,15 @@ async def test_patch_without_a_change_writes_no_event(no_detail: list[uuid.UUID]
 
 
 async def test_patch_as_a_duplicate(no_detail: list[uuid.UUID]) -> None:
-    original = _ticket(number=1)
-    ticket = _ticket(number=2, status="rejected")
+    original = _ticket(number="AAAA0001")
+    ticket = _ticket(number="AAAA0002", status="rejected")
     session = ScriptedSession(scalar=[ME])
     session.put(original, ticket)
     payload = TicketPatch.model_validate({"status": "rejected", "duplicateOfId": str(original.id)})
     await _svc(session).patch(ticket.id, payload, VIEWER)
     assert ticket.duplicate_of_id == original.id
     assert _events(session) == [
-        ("status", {"from": "rejected", "to": "rejected", "duplicateOf": "T-0001"})
+        ("status", {"from": "rejected", "to": "rejected", "duplicateOf": "T-AAAA0001"})
     ]
 
 
@@ -601,8 +639,8 @@ async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPat
     async def _bind(_s: object, **kw: Any) -> None:
         calls.append(("bind", kw))
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.notes.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.notes.bind_drafts", _bind)
     ticket = _ticket()
     draft = uuid.uuid4()
     session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])
@@ -718,7 +756,9 @@ async def test_anonymize_clears_the_reporter_the_context_and_the_files() -> None
     session = ScriptedSession()
     await _svc(session, files=files).anonymize(ticket, actor="sys")
     assert files.deleted == [(ticket.id, "sys")]
-    notes, clear = session.statements
+    notes, clear, _sources, mails = session.statements
+    assert str(mails).startswith("UPDATE ticket_mail SET")
+    assert files.removed_keys == []
     sql = str(notes.compile(compile_kwargs={"literal_binds": True}))
     assert sql.startswith("UPDATE ticket_note SET author_id")
     assert ME.hex in sql or str(ME) in sql
@@ -736,8 +776,9 @@ async def test_anonymize_of_a_report_without_an_account_touches_no_note() -> Non
     ticket = _ticket(reporter_principal_id=None, reporter_email="x@example.org")
     session = ScriptedSession()
     await _svc(session, files=FakeFiles()).anonymize(ticket, actor="sys")
-    (clear,) = session.statements
+    clear, _sources, mails = session.statements
     assert str(clear).startswith("UPDATE ticket_event")
+    assert str(mails).startswith("UPDATE ticket_mail SET")
 
 
 def test_the_service_builds_its_own_files_service() -> None:

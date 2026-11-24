@@ -9,7 +9,6 @@ import { catchError, finalize, tap } from 'rxjs/operators';
 import {
   ButtonComponent,
   ButtonGroupComponent,
-  CellDirective,
   type ColumnDef,
   ConfirmDialogComponent,
   downloadBlob,
@@ -44,7 +43,11 @@ import {
   SwitchComponent,
   TextareaComponent,
   ToastService,
+  DialogBodyDirective,
+  type Action,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
+import { PlanFiguresViewComponent, PlanTableViewComponent, PlanTreeRowViewComponent } from '@stupa-makers/ui-kit/views/plan-table';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { errorStatus, problemCode } from '@core/api/problem';
@@ -63,6 +66,7 @@ import { CostCentreSettingsComponent } from '../cost-centre/cost-centre-settings
 import { CostCentreSelectComponent } from '../cost-centre-select/cost-centre-select.component';
 import { costCentreError, createKey, findNode, levelKey, withDescendants } from '../cost-centre/cost-centre.util';
 import { defaultFiscalYearId } from '../fiscal-year.util';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
 import {
   BudgetPlanApi,
   type BudgetPlan,
@@ -134,6 +138,7 @@ const ACTIONS = [
   'setState',
   'exportPdf',
   'exportXlsx',
+  'paperless',
 ] as const;
 type ActionId = (typeof ACTIONS)[number];
 
@@ -198,6 +203,11 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PlanFiguresViewComponent,
+    PlanTableViewComponent,
+    PlanTreeRowViewComponent,
+    SheetBodyDirective,
+    DialogBodyDirective,
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,
@@ -205,7 +215,6 @@ type YearBeforeField = 'prevAmount' | 'prevActual';
     LoadErrorComponent,
     ButtonComponent,
     ButtonGroupComponent,
-    CellDirective,
     ConfirmDialogComponent,
     CostCentreCreateComponent,
     CostCentreSelectComponent,
@@ -328,6 +337,8 @@ export class BudgetPlanComponent {
     return load.kind === 'plan' ? load.plan : null;
   });
   readonly versions = computed(() => this.plan()?.versions ?? []);
+  /** The filed document of the plan in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('plan', computed(() => this.plan()?.id));
   readonly version = computed<PlanVersion | null>(
     () => this.versions().find((v) => v.id === this.versionId()) ?? currentVersion(this.versions()),
   );
@@ -547,7 +558,6 @@ export class BudgetPlanComponent {
       ...(tight || !this.compared() ? [] : [money('change', this.i18n.translate('budget.plan.col.change'))]),
     ];
   });
-  readonly rowId = (row: unknown): string => (row as PlanRow).id;
   /** The plan has an Ansatz to compare against: the version before a Nachtrag, or a plan of the year before. */
   readonly compared = computed(() => this.nachtrag() || this.showsYearBefore());
 
@@ -667,6 +677,7 @@ export class BudgetPlanComponent {
     const files: RowMenuItem[] = [
       ...item('exportPdf', 'budget.plan.action.openPdf', 'file', !!this.version()),
       ...item('exportXlsx', 'budget.plan.action.exportXlsx', 'download', !!this.version()),
+      ...item('paperless', 'paperless.open', 'link', !!this.paperlessUrl()),
     ];
     const draft: RowMenuItem[] =
       this.editable() && this.versions().length > 0
@@ -677,6 +688,18 @@ export class BudgetPlanComponent {
 
   /** The ⋮ menu of the bottom sheet: the actions on its Kostenstelle. */
   readonly sheetMenu = computed<readonly RowMenuSection[]>(() => this.rowMenu(this.sheetRow()));
+  /** The same actions in the three-dot menu of the sheet head. */
+  readonly sheetActions = computed<readonly Action[]>(() =>
+    this.sheetMenu().flatMap((section) =>
+      section.items.map((i) => ({
+        key: i.id,
+        label: i.label,
+        icon: i.icon,
+        kind: i.danger ? ('danger' as const) : undefined,
+        priority: 'menu' as const,
+      })),
+    ),
+  );
 
   /** The actions on one Kostenstelle: take its line out of the draft, or delete it. */
   private rowMenu(row: PlanRow | null): readonly RowMenuSection[] {
@@ -1202,6 +1225,9 @@ export class BudgetPlanComponent {
       case 'exportXlsx':
         this.exportFile('xlsx');
         return;
+      case 'paperless':
+        openInPaperless(this.paperlessUrl() ?? '');
+        return;
     }
   }
 
@@ -1231,14 +1257,13 @@ export class BudgetPlanComponent {
       },
       error: () => {
         this.busy.set(false);
-        this.toast.error(this.i18n.translate('budget.dash.exportError'));
+        this.toast.show(this.i18n.translate('budget.dash.exportError'), 'error');
       },
     });
   }
 
   /** Save the state of the dialog "Zustand setzen". A version in force sets the allocations, so the tree is read again. */
-  setStateByHand(event: Event): void {
-    event.preventDefault();
+  setStateByHand(): void {
     const version = this.version();
     const target = this.stateTarget();
     const reason = this.stateReason().trim();
@@ -1288,7 +1313,7 @@ export class BudgetPlanComponent {
     this.api.deleteVersion(version.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('budget.plan.toast.draftDeleted'));
+        this.toast.show(this.i18n.translate('budget.plan.toast.draftDeleted'), 'success');
         this.versionId.set('');
         this.selId.set('');
         this.pickYear(this.fyId());
@@ -1338,21 +1363,23 @@ export class BudgetPlanComponent {
     this.treeApi.deleteNode(row.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.toast.show(this.i18n.translate('budget.tree.toast.deleted'), 'success');
         this.selectId(this.wide() ? (row.parentId ?? '') : '');
         this.reloadTree();
         this.reloadPlan();
       },
       error: (err: unknown) => {
         this.busy.set(false);
-        this.toast.error(this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')));
+        this.toast.show(
+          this.i18n.translate(costCentreError(problemCode(err), 'budget.tree.toast.deleteFailed')),
+          'error',
+        );
       },
     });
   }
 
   /** Take the chosen Kostenstelle into the draft with an Ansatz of 0 €. */
-  addLine(event: Event): void {
-    event.preventDefault();
+  addLine(): void {
     const version = this.version();
     const id = this.addId();
     if (!version || !id || this.busy()) return;
@@ -1504,7 +1531,7 @@ export class BudgetPlanComponent {
     const saved = (field === 'prevAmount' ? line?.prevAmount : line?.prevActual) ?? null;
     if (!this.editable() || !line || wanted === saved) return;
     if (wanted !== null && amountProblem(wanted) === 'negative') {
-      this.toast.error(this.i18n.translate('budget.plan.error.amountNegative'));
+      this.toast.show(this.i18n.translate('budget.plan.error.amountNegative'), 'error');
       return;
     }
     const body = { prevAmount: line.prevAmount ?? null, prevActual: line.prevActual ?? null, [field]: wanted };
@@ -1562,6 +1589,9 @@ export class BudgetPlanComponent {
   /** The version in which the person typed an amount that needs the wide form. */
   private readonly wideFor = signal<string | null>(null);
 
+  /** The amount field of a table row shows the typed or the saved Ansatz. */
+  readonly amountValue = (row: PlanRow): string | number => this.fieldValue(row, 'amount');
+
   /** The amount a field shows: the text a person types, else the amount of the save that runs, else the saved amount. */
   fieldValue(row: PlanRow, field: 'amount' | 'blocked'): string | number {
     return this.edits()[`${row.id}:${field}`] ?? this.lineSent()[`${this.version()?.id}:${row.id}`]?.[field] ?? row[field];
@@ -1585,10 +1615,10 @@ export class BudgetPlanComponent {
     if (value === '') return;
     switch (amountProblem(value)) {
       case 'negative':
-        this.toast.error(this.i18n.translate('budget.plan.error.amountNegative'));
+        this.toast.show(this.i18n.translate('budget.plan.error.amountNegative'), 'error');
         return;
       case 'tooLarge':
-        this.toast.error(this.i18n.translate('budget.plan.error.amountTooLarge'));
+        this.toast.show(this.i18n.translate('budget.plan.error.amountTooLarge'), 'error');
         return;
       case null:
         this.saveLine(row, { [field]: value });
@@ -1663,7 +1693,7 @@ export class BudgetPlanComponent {
         if (this.place() !== place) return;
         if (this.versionId() === shown) this.versionId.set('');
         if (this.newest(sent)) this.load.set({ kind: 'plan', plan });
-        if (toast) this.toast.success(this.i18n.translate(toast));
+        if (toast) this.toast.show(this.i18n.translate(toast), 'success');
         after?.();
         this.syncUrl();
       },
@@ -1678,7 +1708,10 @@ export class BudgetPlanComponent {
    */
   private fail(err: unknown, quiet = false): void {
     this.busy.set(false);
-    this.toast.error(this.i18n.translate(WRITE_ERRORS[problemCode(err)] ?? 'budget.plan.error.failed'));
+    this.toast.show(
+      this.i18n.translate(WRITE_ERRORS[problemCode(err)] ?? 'budget.plan.error.failed'),
+      'error',
+    );
     if (quiet) this.refreshPlan();
     else this.reloadPlan();
   }

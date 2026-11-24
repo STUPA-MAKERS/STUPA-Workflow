@@ -51,7 +51,7 @@
   </div>
 } @else if (error()) {
   <div class="cd cd--state">
-    <app-load-error [message]="'todos.card.error' | t" (retry)="reload()" />
+    <app-load-error face [message]="'todos.card.error' | t" (retry)="reload()" />
   </div>
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">
@@ -139,9 +139,11 @@
         side="bottom"
         [contentScrolls]="true"
       >
-        @if (activitySheet.shown()) {
-          <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
-        }
+        <ng-template sheetBody>
+          @if (activitySheet.shown()) {
+            <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
+          }
+        </ng-template>
       </app-side-sheet>
     } @else {
       <div class="cd__cols">
@@ -183,7 +185,7 @@
     />
   }
 
-  <app-todo-move-sheet
+  <app-todo-move-sheet-view
     [(open)]="moveOpen"
     [columns]="moveColumns()"
     [current]="card.columnId"
@@ -273,7 +275,7 @@
       <div class="cd__field">
         <dt>{{ 'todos.card.due' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="card.dueDate" [disabled]="!canWrite()" (changed)="setDue($event)" />
+          <app-todo-due-chip-view [value]="card.dueDate" [disabled]="!canWrite()" (changed)="setDue($event)" />
           @if (dueRelative()) {
             <span class="cd__muted">{{ dueRelative() }}</span>
           }
@@ -316,7 +318,7 @@
       <div class="cd__field" data-testid="cd-event-start">
         <dt>{{ 'todos.eventCard.starts' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
+          <app-todo-due-chip-view [value]="event.startsOn" [disabled]="!canWrite()" (changed)="setEvent({ startsOn: $event })" />
           @if (event.startsOn) {
             @if (eventEdit() === 'startTime') {
               <app-time-input
@@ -349,7 +351,7 @@
       <div class="cd__field">
         <dt>{{ 'todos.eventCard.ends' | t }}</dt>
         <dd class="cd__chips">
-          <app-todo-due-chip [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
+          <app-todo-due-chip-view [value]="event.endsOn" [disabled]="!canWrite()" (changed)="setEvent({ endsOn: $event })" />
           @if (event.endsOn) {
             @if (eventEdit() === 'endTime') {
               <app-time-input
@@ -540,7 +542,7 @@
               <app-icon class="cd__linkIcon" [name]="linkIcon(link)" [size]="18" />
               <span class="cd__linkText">
                 @if (link.url) {
-                  <a class="cd__linkTitle" [routerLink]="route(link.url).path" [queryParams]="route(link.url).query">{{ linkTitle(link) }}</a>
+                  <a class="cd__linkTitle" [appLinkTo]="link.url">{{ linkTitle(link) }}</a>
                 } @else if (link.granted) {
                   <button type="button" class="cd__linkTitle cd__linkOpen" data-testid="cd-link-view" (click)="viewLink(link)">{{ linkTitle(link) }}</button>
                 } @else {

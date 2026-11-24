@@ -42,6 +42,7 @@ from app.modules.forms.validation import (
     AnswerValidationError,
     validate_answers,
     value_is_valid,
+    with_computed,
 )
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -216,16 +217,19 @@ class TypeChangeOps(ApplicationsServiceBase):
         new_fields = tuple(f for s in new_form.sections for f in s.fields)
         old_fields = tuple(f for s in old_form.sections for f in s.fields)
         data = app.data or {}
-        carried = carry_values(old_fields, new_fields, data)
+        context = {"has_budget": new_type.has_budget}
+        carried = with_computed(new_fields, carry_values(old_fields, new_fields, data), context)
         return _Plan(
             app=app,
             new_type=new_type,
             new_form_version_id=new_form.form_version_id,
             new_fields=new_fields,
             carried=carried,
-            missing=missing_fields(new_fields, carried, {"has_budget": new_type.has_budget}),
+            missing=missing_fields(new_fields, carried, context),
             dropped=dropped_fields(old_fields, data, carried),
-            carried_fields=tuple(f for f in new_fields if f.key in carried),
+            carried_fields=tuple(
+                f for f in new_fields if f.key in carried and f.type not in _NO_VALUE
+            ),
         )
 
     async def _edit_transitions(

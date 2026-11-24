@@ -27,6 +27,14 @@ describe('answer-format', () => {
     expect(formatAnswer(f('currency'), true, env)).toBe('true');
   });
 
+  it('formats a computed amount as euro and another computed value as is (spec 002842)', () => {
+    const amount = f('computed', { isPromoted: true, promoteTarget: 'amount' });
+    expect(formatAnswer(amount, 29.4, env).replace(/\s/g, ' ')).toBe('29,40 €');
+    expect(formatAnswer(amount, 29.4, { ...env, lang: 'en' })).toBe('€29.40');
+    expect(formatAnswer(amount, 'abc', env)).toBe('abc');
+    expect(formatAnswer(f('computed'), 29.4, env)).toBe('29.4');
+  });
+
   it('formats the requested funding in euro like a currency field', () => {
     expect(formatAnswer(f('funding'), 600, env)).toBe(formatAnswer(f('currency'), 600, env));
   });

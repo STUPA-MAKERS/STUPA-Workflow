@@ -276,28 +276,30 @@
       [side]="phone() ? 'bottom' : 'end'"
       [contentScrolls]="true"
     >
-      @if (commentsSheet.shown()) {
-        <app-chat
-          class="ad__chat"
-          [class.ad__chat--sheet]="phone()"
-          [loading]="commentsLoading()"
-          [draftKey]="'application.' + application.id"
-          [messages]="chatMessages()"
-          [visibilityOptions]="chatVisibilities()"
-          [visibilityGuard]="chatVisibilityGuard"
-          [canAttach]="canAttach()"
-          [canPost]="!observer()"
-          [mentionables]="mentionables()"
-          [publicMentions]="false"
-          placeholder="applications.comments.placeholder"
-          (send)="sendComment($event)"
-          (retry)="retryComment($event)"
-          (discard)="discardComment($event)"
-          (edit)="editComment($event)"
-          (delete)="deleteComment($event)"
-          (refresh)="refreshComments()"
-        />
-      }
+      <ng-template sheetBody>
+        @if (commentsSheet.shown()) {
+          <app-chat
+            class="ad__chat"
+            [class.ad__chat--sheet]="phone()"
+            [loading]="commentsLoading()"
+            [draftKey]="'application.' + application.id"
+            [messages]="chatMessages()"
+            [visibilityOptions]="chatVisibilities()"
+            [visibilityGuard]="chatVisibilityGuard"
+            [canAttach]="canAttach()"
+            [canPost]="!observer()"
+            [mentionables]="mentionables()"
+            [publicMentions]="false"
+            placeholder="applications.comments.placeholder"
+            (send)="sendComment($event)"
+            (retry)="retryComment($event)"
+            (discard)="discardComment($event)"
+            (edit)="editComment($event)"
+            (delete)="deleteComment($event)"
+            (refresh)="refreshComments()"
+          />
+        }
+      </ng-template>
     </app-side-sheet>
   }
 }
@@ -444,6 +446,7 @@
     [canUpload]="canUploadFiles()"
     [canDelete]="canDeleteFiles()"
     [dropTarget]="false"
+    [fill]="!split()"
   />
 </ng-template>
 
@@ -458,7 +461,7 @@
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
-      <app-empty-state icon="history" rows="1" [heading]="'applications.history.empty' | t" />
+      <app-empty-state icon="history" rows="1" [fill]="!split()" [heading]="'applications.history.empty' | t" />
     }
   </app-section>
 </ng-template>
@@ -494,61 +497,83 @@
 
 <app-dialog
   [open]="budgetDialogOpen()"
-  [title]="'applications.budget.title' | t"
+  [heading]="'applications.budget.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="budgetDialogOpen.set(false)"
+  [actions]="[
+    { key: 'budgetDialogOpen', label: ('action.cancel' | t) },
+    {
+      key: 'assignBudget',
+      label: ('applications.budget.save' | t),
+      kind: 'main',
+      disabled:
+        budgetChoice() === (app()?.budgetId ?? '') &&
+        fiscalChoice() === (app()?.fiscalYearId ?? ''),
+      busy: assigningBudget(),
+    },
+  ]"
+  (action)="
+    $event.key === 'budgetDialogOpen'
+      ? budgetDialogOpen.set(false)
+      : $event.key === 'assignBudget'
+        ? assignBudget()
+        : null
+  "
 >
-  @if (budgetDialogOpen()) {
-    <app-budget-year-select
-      [fiscalYearId]="fiscalChoice()"
-      [preferBudgetId]="assignPreferTop()"
-      (picked)="onAssignPair($event)"
-    />
-    @if (assignTopId()) {
-      <app-cost-centre-select
-        leavesOnly
-        class="ad__ccFy"
-        [label]="'applications.budget.field' | t"
-        [allLabel]="'applications.budget.none' | t"
-        [nodes]="assignTree()"
-        [value]="budgetChoice()"
+  <ng-template dialogBody>
+    @if (budgetDialogOpen()) {
+      <app-budget-year-select
         [fiscalYearId]="fiscalChoice()"
-        expenseOnly
-        (picked)="budgetChoice.set($event)"
+        [preferBudgetId]="assignPreferTop()"
+        (picked)="onAssignPair($event)"
       />
+      @if (assignTopId()) {
+        <app-cost-centre-select
+          leavesOnly
+          class="ad__ccFy"
+          [label]="'applications.budget.field' | t"
+          [allLabel]="'applications.budget.none' | t"
+          [nodes]="assignTree()"
+          [value]="budgetChoice()"
+          [fiscalYearId]="fiscalChoice()"
+          expenseOnly
+          (picked)="budgetChoice.set($event)"
+        />
+      }
     }
-  }
-  <div dialog-footer>
-    <app-button variant="text" (click)="budgetDialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button
-      variant="fill"
-      [loading]="assigningBudget()"
-      [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
-      (click)="assignBudget()"
-    >{{ 'applications.budget.save' | t }}</app-button>
-  </div>
+  </ng-template>
 </app-dialog>
 
 <app-dialog
   [open]="predecessorOpen()"
-  [title]="'applications.predecessor.dialogTitle' | t"
+  [heading]="'applications.predecessor.dialogTitle' | t"
   [closeLabel]="'action.close' | t"
   (closed)="predecessorOpen.set(false)"
+  [actions]="
+    links()?.predecessor
+      ? [
+          {
+            key: 'remove',
+            label: ('applications.predecessor.remove' | t),
+            kind: 'danger',
+            busy: linking(),
+          },
+          { key: 'cancel', label: ('action.cancel' | t) },
+        ]
+      : [{ key: 'cancel', label: ('action.cancel' | t) }]
+  "
+  (action)="$event.key === 'remove' ? removePredecessor() : predecessorOpen.set(false)"
 >
-  @if (app(); as a) {
-    <app-predecessor-field
-      inputId="ad-predecessor-search"
-      [typeId]="a.typeId"
-      [excludeId]="a.id"
-      (choose)="setPredecessor($event)"
-    />
-  }
-  <div dialog-footer>
-    @if (links()?.predecessor) {
-      <app-button variant="danger" [loading]="linking()" (click)="removePredecessor()">{{ 'applications.predecessor.remove' | t }}</app-button>
+  <ng-template dialogBody>
+    @if (app(); as a) {
+      <app-predecessor-field
+        inputId="ad-predecessor-search"
+        [typeId]="a.typeId"
+        [excludeId]="a.id"
+        (choose)="setPredecessor($event)"
+      />
     }
-    <app-button variant="text" (click)="predecessorOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-  </div>
+  </ng-template>
 </app-dialog>
 
 <app-force-status-dialog

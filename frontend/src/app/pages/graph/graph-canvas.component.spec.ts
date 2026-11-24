@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { render, screen } from '@testing-library/angular';
-import { type CanvasNode, GraphCanvasComponent, LABEL_ZOOM, NUDGE } from './graph-canvas.component';
-import { type Body, SETTLE_STEPS } from './graph-layout';
+import { type CanvasNode, GraphCanvasViewComponent as GraphCanvasComponent, LABEL_ZOOM, NUDGE } from '@stupa-makers/ui-kit/views/graph';
+import { type Body, SETTLE_STEPS } from '@stupa-makers/ui-kit/views/graph';
 import type { GraphLine } from './graph.util';
 
 const node = (key: string, over: Partial<CanvasNode> = {}): CanvasNode => ({
@@ -26,15 +26,23 @@ const line = (a: string, b: string, source: GraphLine['source'] = 'link'): Graph
 const NODES = [node('a'), node('b'), node('c', { muted: true, kind: 'invoice', icon: 'receipt' })];
 const LINES = [line('a', 'b'), line('b', 'c', 'builtin'), line('a', 'gone')];
 
-/** The frames that the component asked for; `run` plays them until none is left. */
+/**
+ * The frames and the pauses that the component asked for; `run` plays the frames until none
+ * is left, `pause` plays the next pause (one node joins), `joinAll` plays every pause.
+ */
 function frames() {
   const queue: FrameRequestCallback[] = [];
+  const pauses: { readonly next: () => void; readonly ms: number }[] = [];
   const door = GraphCanvasComponent.prototype as unknown as {
     nextFrame: (cb: FrameRequestCallback) => number;
     dropFrame: (frame: number) => void;
+    later: (next: () => void, ms: number) => number;
+    dropLater: (timer: number) => void;
   };
   const request = jest.spyOn(door, 'nextFrame').mockImplementation((cb) => queue.push(cb));
   const cancel = jest.spyOn(door, 'dropFrame').mockImplementation(() => undefined);
+  const wait = jest.spyOn(door, 'later').mockImplementation((next, ms) => pauses.push({ next, ms }));
+  const unwait = jest.spyOn(door, 'dropLater').mockImplementation(() => pauses.splice(0));
   const run = (): number => {
     let played = 0;
     while (queue.length > 0) {
@@ -43,7 +51,15 @@ function frames() {
     }
     return played;
   };
-  return { queue, request, cancel, run };
+  const pause = (): number => {
+    const next = pauses.shift();
+    next?.next();
+    return next?.ms ?? 0;
+  };
+  const joinAll = (): void => {
+    while (pauses.length > 0) pause();
+  };
+  return { queue, pauses, request, cancel, wait, unwait, run, pause, joinAll };
 }
 
 function pointer(target: Element, id: number, x: number, y: number, type = 'pointerdown'): PointerEvent {
@@ -87,7 +103,7 @@ describe('GraphCanvasComponent', () => {
     localStorage.clear();
   });
 
-  /** § F/collaboration/graph/001427: with reduced motion the layout runs to its end before the paint. */
+  /** §ui-kit:F/collaboration/graph/001427: with reduced motion the layout runs to its end before the paint. */
   it('shows the final layout at once with reduced motion', async () => {
     const f = frames();
     const { cmp, container, surface } = await setup();
@@ -98,30 +114,67 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelectorAll('.gc__node')).toHaveLength(3);
   });
 
-  /** § F/collaboration/graph/001426: the layout settles frame by frame, and the nodes keep their place. */
-  it('settles over frames and keeps the nodes that show when new nodes arrive', async () => {
+  /** §ui-kit:F/collaboration/graph/001426: the nodes join one at a time, and the nodes that show keep their place. */
+  it('adds one node per pause and keeps the nodes that show when new nodes arrive', async () => {
     const f = frames();
-    const { cmp, fixture, surface, button } = await setup({ reduce: false, nodes: [node('a'), node('b')], lines: [line('a', 'b')] });
+    const { cmp, fixture, surface, button, container } = await setup({
+      reduce: false,
+      nodes: [node('a'), node('b')],
+      lines: [line('a', 'b')],
+    });
     expect(surface).not.toHaveClass('gc--still');
+    // The first node shows at once, the second waits for its pause.
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a']);
+    expect(container.querySelectorAll('.gc__node')).toHaveLength(1);
+    expect(container.querySelectorAll('.gc__line')).toHaveLength(0);
+    expect(container.querySelector('.gc__world')).toHaveAttribute('aria-busy', 'true');
     expect(f.queue).toHaveLength(1);
-    expect(f.run()).toBe(SETTLE_STEPS);
+    expect(f.pause()).toBe(120);
+    fixture.detectChanges();
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a', 'b']);
+    // The line shows together with its second node.
+    expect(container.querySelectorAll('.gc__line')).toHaveLength(1);
+    expect(container.querySelector('.gc__world')).toHaveAttribute('aria-busy', 'false');
+    expect(f.pauses).toHaveLength(0);
+    f.run();
     expect(f.queue).toHaveLength(0);
 
     const before = cmp.bodies();
     const elementA = button('a');
-    fixture.componentRef.setInput('nodes', [node('a'), node('b'), node('n1'), node('n2')]);
-    fixture.componentRef.setInput('lines', [line('a', 'b'), line('a', 'n1')]);
+    // n1 waits before n2 in the page, but n2 has a neighbour that shows and joins first.
+    fixture.componentRef.setInput('nodes', [node('a'), node('b'), node('n1'), node('n2'), node('n3')]);
+    fixture.componentRef.setInput('lines', [line('a', 'b'), line('n2', 'b'), line('n1', 'n3')]);
     fixture.detectChanges();
-    // Before the next frame the old nodes are where they were.
     expect(cmp.bodies().slice(0, 2)).toEqual(before);
     expect(button('a')).toBe(elementA);
-    expect(cmp.order().get('n1')).toBe(0);
-    expect(cmp.order().get('n2')).toBe(1);
-    expect(cmp.delay('n2')).toBe('14ms');
-    expect(cmp.delay('a')).toBe('0ms');
-    expect(f.queue).toHaveLength(1);
-    f.run();
-    expect(cmp.bodies()).toHaveLength(4);
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a', 'b', 'n2']);
+    f.pause();
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a', 'b', 'n2', 'n1']);
+    // A page that arrives while nodes wait goes to the end of the queue.
+    fixture.componentRef.setInput('nodes', [node('a'), node('b'), node('n1'), node('n2'), node('n3'), node('n4')]);
+    fixture.detectChanges();
+    f.joinAll();
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a', 'b', 'n2', 'n1', 'n3', 'n4']);
+    expect(f.run()).toBeGreaterThan(0);
+    expect(f.run()).toBe(0);
+  });
+
+  it('drops the waiting nodes that leave and stops the pause when none waits', async () => {
+    const f = frames();
+    const { cmp, fixture } = await setup({ reduce: false, nodes: [node('a'), node('b'), node('c')], lines: [] });
+    expect(cmp.shown()).toEqual(new Set(['a']));
+    fixture.componentRef.setInput('nodes', [node('a')]);
+    fixture.detectChanges();
+    expect(f.unwait).toHaveBeenCalled();
+    expect(f.pauses).toHaveLength(0);
+    expect(cmp.busy()).toBe(false);
+    expect(cmp.bodies().map((b) => b.id)).toEqual(['a']);
+  });
+
+  it('settles a lone node over frames', async () => {
+    const f = frames();
+    await setup({ reduce: false, nodes: [node('a')], lines: [] });
+    expect(f.run()).toBe(SETTLE_STEPS);
   });
 
   it('asks for one frame at a time and cancels it when it ends', async () => {
@@ -144,7 +197,7 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelector('.gc__lines')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  /** § F/collaboration/graph/001428: one group with a label; § 001430: the icon and the kind. */
+  /** §ui-kit:F/collaboration/graph/001428: one group with a label; §ui-kit:001430: the icon and the kind. */
   it('names the drawing and each node, and marks an element without access', async () => {
     const { container, button } = await setup();
     expect(screen.getByRole('group', { name: 'Graph mit 3 Elementen' })).toBeInTheDocument();
@@ -157,7 +210,7 @@ describe('GraphCanvasComponent', () => {
     expect(container.querySelector('.gc')).toHaveClass('gc--labels');
   });
 
-  /** § F/collaboration/graph/001429: a press chooses, the other nodes dim. */
+  /** §ui-kit:F/collaboration/graph/001429: a press chooses, the other nodes dim. */
   it('emits the pressed node and dims the nodes that are no neighbours', async () => {
     const { chosen, button, fixture, container } = await setup({ nodes: [...NODES, node('d')] });
     button('a').click();
@@ -178,7 +231,7 @@ describe('GraphCanvasComponent', () => {
     expect(lines[1]).toHaveClass('gc__line--dim');
   });
 
-  /** § F/collaboration/graph/001428: Tab reaches one node, the arrow keys move to the nearest one. */
+  /** §ui-kit:F/collaboration/graph/001428: Tab reaches one node, the arrow keys move to the nearest one. */
   it('has one tab stop and moves the focus with the arrow keys', async () => {
     const { cmp, button, fixture } = await setup({ nodes: [node('a'), node('b'), node('c')], lines: [] });
     expect(button('a')).toHaveAttribute('tabindex', '0');
@@ -227,7 +280,7 @@ describe('GraphCanvasComponent', () => {
     expect(cmp.tabStop()).toBeNull();
   });
 
-  /** § F/collaboration/graph/001429: a press on the empty drawing ends the choice, a drag moves the view. */
+  /** §ui-kit:F/collaboration/graph/001429: a press on the empty drawing ends the choice, a drag moves the view. */
   it('ends the choice with a press on the empty drawing and moves the view with a drag', async () => {
     const { cmp, chosen, surface, button } = await setup();
     cmp.onDown(pointer(surface, 1, 100, 100));
@@ -253,7 +306,7 @@ describe('GraphCanvasComponent', () => {
     expect(cmp.view()).toEqual({ x: start.x + 60, y: start.y + 30, zoom: start.zoom });
   });
 
-  /** § F/collaboration/graph/001433: a drag on a node moves the node, and it stays there. */
+  /** §ui-kit:F/collaboration/graph/001433: a drag on a node moves the node, and it stays there. */
   it('moves a node with a drag and holds it where the person lets go', async () => {
     const { cmp, chosen, surface, button, fixture } = await setup();
     const capture = jest.fn();
@@ -294,6 +347,7 @@ describe('GraphCanvasComponent', () => {
   it('lets the neighbours follow a moved node unless nothing may move', async () => {
     const f = frames();
     const { cmp, surface, button } = await setup({ reduce: false, nodes: [node('a'), node('b')], lines: [line('a', 'b')] });
+    f.joinAll();
     f.run();
     cmp.onDown(pointer(button('a'), 1, 0, 0));
     cmp.onMove(pointer(surface, 1, 300, 300, 'pointermove'));
@@ -306,7 +360,7 @@ describe('GraphCanvasComponent', () => {
     cmp.onUp(pointer(surface, 1, 300, 300, 'pointerup'));
   });
 
-  /** § F/collaboration/graph/001433: Alt and an arrow key move the node without a pointer. */
+  /** §ui-kit:F/collaboration/graph/001433: Alt and an arrow key move the node without a pointer. */
   it('moves a node with Alt and an arrow key', async () => {
     const { cmp, button } = await setup();
     const at = cmp.bodies().find((b) => b.id === 'a') as Body;
@@ -369,7 +423,7 @@ describe('GraphCanvasComponent', () => {
     screen.getByRole('button', { name: 'Verkleinern' }).click();
     fixture.detectChanges();
     expect(cmp.view().zoom).toBeLessThan(LABEL_ZOOM);
-    // § 001430: the titles hide when they are too small to read.
+    // §ui-kit:001430: the titles hide when they are too small to read.
     expect(container.querySelector('.gc')).not.toHaveClass('gc--labels');
     expect(screen.getByRole('group', { name: 'Ansicht der Zeichnung' })).toBeInTheDocument();
   });

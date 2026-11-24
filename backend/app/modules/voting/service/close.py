@@ -36,6 +36,7 @@ from app.modules.voting.service.base import (
 )
 from app.modules.voting.service.delete import VoteDeleteOps
 from app.modules.voting.service.plan import VotePlanOps
+from app.modules.voting.webhook_fields import emit_vote_event
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, NotFoundError
 
@@ -328,6 +329,7 @@ class VoteCloseOps(VotePlanOps, VoteDeleteOps, VoteAccessOps):
                 "quorumMet": outcome.quorum_met,
             },
         )
+        await emit_vote_event(self.session, "vote.closed", vote, counts=counts)
 
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
@@ -507,6 +509,7 @@ class VoteCloseOps(VotePlanOps, VoteDeleteOps, VoteAccessOps):
                 "quorumMet": outcome.quorum_met,
             },
         )
+        await emit_vote_event(self.session, "vote.closed", vote, counts=outcome.display_counts())
         await self.session.commit()
         tally_out = TallyOut(
             counts=outcome.display_counts(),
@@ -560,6 +563,7 @@ class VoteCloseOps(VotePlanOps, VoteDeleteOps, VoteAccessOps):
                 "ballots": outcome.ballots,
             },
         )
+        await emit_vote_event(self.session, "vote.closed", vote, counts=outcome.display_counts())
         await self.session.commit()
         tally_out = TallyOut(
             counts=outcome.display_counts(),

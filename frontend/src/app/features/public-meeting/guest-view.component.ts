@@ -31,10 +31,11 @@ import {
   TabPageDirective,
   TabPagerComponent,
 } from '@stupa-makers/ui-kit';
-import type { BallotCaster } from '../voting/ballot/ballot.component';
-import { VotePanelComponent } from '../voting/vote-panel/vote-panel.component';
+import type { BallotCaster } from '@stupa-makers/ui-kit/views/voting';
+import { VotePanelViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { guestVoteToVote } from './guest-vote.util';
-import { TopBadgeComponent } from '../meetings/top-badge/top-badge.component';
+import { TopBadgeViewComponent } from '@stupa-makers/ui-kit/views/meeting';
+import { applicationLink, meetingLink, provideVotingApi } from '../voting/voting-api.provider';
 
 /** One agenda row of the guest view. */
 interface AgendaRow {
@@ -57,10 +58,11 @@ interface AgendaRow {
  */
 @Component({
   selector: 'app-guest-view',
+  providers: [provideVotingApi()],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    TopBadgeComponent,
+    TopBadgeViewComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
@@ -71,12 +73,14 @@ interface AgendaRow {
     StatusTextComponent,
     TabPageDirective,
     TabPagerComponent,
-    VotePanelComponent,
+    VotePanelViewComponent,
   ],
   templateUrl: './guest-view.component.html',
   styleUrl: './guest-view.component.scss',
 })
 export class GuestViewComponent {
+  protected readonly meetingLink = meetingLink;
+  protected readonly applicationLink = applicationLink;
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
 
@@ -171,20 +175,25 @@ export class GuestViewComponent {
     return v.canCast || v.myBallot.cast ? v.myBallot : null;
   });
   /** The note above a vote: watch mode, members only, or admitted during the vote. */
-  protected readonly voteNote = computed<{ key: TranslationKey; icon: 'eye' | 'info' } | null>(() => {
-    const v = this.pageVote();
-    if (!v || v.status !== 'open') return null;
-    if (this.watch()) return { key: 'guests.vote.noteWatch', icon: 'eye' };
-    if (!v.guestsVote) return { key: 'guests.vote.noteMembersOnly', icon: 'info' };
-    if (this.admittedDuringVote() && !v.myBallot.cast) return { key: 'guests.vote.noteLate', icon: 'info' };
-    return null;
-  });
+  protected readonly voteNote = computed<{ key: TranslationKey; icon: 'eye' | 'info' } | null>(
+    () => {
+      const v = this.pageVote();
+      if (!v || v.status !== 'open') return null;
+      if (this.watch()) return { key: 'guests.vote.noteWatch', icon: 'eye' };
+      if (!v.guestsVote) return { key: 'guests.vote.noteMembersOnly', icon: 'info' };
+      if (this.admittedDuringVote() && !v.myBallot.cast)
+        return { key: 'guests.vote.noteLate', icon: 'info' };
+      return null;
+    },
+  );
   /** "TOP 3 · 7. Sitzung der Fachschaft Informatik". */
   protected readonly voteWhere = computed(() => {
     const v = this.pageVote();
     const item = this.ordered().find((i) => i.id === v?.agendaItemId);
     const title = this.me().meeting.title;
-    return item ? `${this.i18n.translate('meetings.agenda.top', { n: item.position })} · ${title}` : title;
+    return item
+      ? `${this.i18n.translate('meetings.agenda.top', { n: item.position })} · ${title}`
+      : title;
   });
 
   /** The ballot goes to the public route with the device cookie. */
@@ -217,9 +226,12 @@ export class GuestViewComponent {
   }
 
   protected progressOf(v: GuestVote): string {
-    return this.i18n.translate(v.guestsVote ? 'meetings.vote.progress' : 'guests.vote.progressMembers', {
-      voted: v.tally.voted,
-      present: v.tally.present,
-    });
+    return this.i18n.translate(
+      v.guestsVote ? 'meetings.vote.progress' : 'guests.vote.progressMembers',
+      {
+        voted: v.tally.voted,
+        present: v.tally.present,
+      },
+    );
   }
 }

@@ -33,9 +33,11 @@ from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.meetings.models import Meeting, MeetingAttendance
+from app.modules.notifications.push_models import PushSubscription
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket, TicketNote
+from app.modules.tickets.privacy import mail_ticket_ids_of, public_messages_of
 from app.modules.tickets.service import (
     TicketService,
     erase_sender_blocks,
@@ -152,6 +154,9 @@ class PrincipalService:
         await erase_appointments(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
+        )
+        await self.session.execute(
+            delete(PushSubscription).where(PushSubscription.principal_id == principal_id)
         )
         await audit_record(
             self.session,
@@ -525,7 +530,10 @@ class AuskunftService:
         email. The live account comes first: not merged, then active, then the newest
         login. The result also holds its attendance with excuse reasons, the tickets
         that the address reported (without a session or through the account) with
-        their attachment metadata, and the own ticket messages with file names.
+        their attachment metadata, and the own ticket messages with file names. A ticket
+        from a mail whose sender or ``Cc`` address is the address is part of the export
+        with its public messages and never with an internal message
+        (§F/administration/privacy/002748).
         Deleted messages keep their text until the anonymization, so they are part of
         the export.
 
@@ -562,8 +570,13 @@ class AuskunftService:
                 else ()
             ),
         )
+        mail_tickets = await mail_ticket_ids_of(self.session, email)
         trows = (
-            await self.session.scalars(select(Ticket).where(or_(*reporter)).order_by(Ticket.number))
+            await self.session.scalars(
+                select(Ticket)
+                .where(or_(*reporter, Ticket.id.in_(mail_tickets)))
+                .order_by(Ticket.number)
+            )
         ).all()
         tickets = [
             {
@@ -577,7 +590,13 @@ class AuskunftService:
             for t in trows
         ]
         ticket_files = await self._ticket_attachments(trows) if trows else []
-        ticket_notes = await self._ticket_notes(principal_row) if principal_row is not None else []
+        own_notes = await self._ticket_notes(principal_row) if principal_row is not None else []
+        ticket_notes = [
+            *(row for _note_id, row in own_notes),
+            *await public_messages_of(
+                self.session, mail_tickets, skip=[note_id for note_id, _row in own_notes]
+            ),
+        ]
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
@@ -798,8 +817,8 @@ class AuskunftService:
             for at in tarows
         ]
 
-    async def _ticket_notes(self, principal_row: Principal) -> list[dict[str, Any]]:
-        """Return the own ticket notes of the principal, with the names of their files."""
+    async def _ticket_notes(self, principal_row: Principal) -> list[tuple[UUID, dict[str, Any]]]:
+        """Return the own ticket notes of the principal by id, with the names of their files."""
         nrows = (
             await self.session.execute(
                 select(TicketNote, Ticket.number)
@@ -822,14 +841,17 @@ class AuskunftService:
             else {}
         )
         return [
-            {
-                "ticketNumber": format_number(number),
-                "visibility": note.visibility,
-                "createdAt": note.created_at,
-                "deletedAt": note.deleted_at,
-                "body": note.body,
-                "attachments": note_files.get(note.id, []),
-            }
+            (
+                note.id,
+                {
+                    "ticketNumber": format_number(number),
+                    "visibility": note.visibility,
+                    "createdAt": note.created_at,
+                    "deletedAt": note.deleted_at,
+                    "body": note.body,
+                    "attachments": note_files.get(note.id, []),
+                },
+            )
             for note, number in nrows
         ]
 
@@ -850,18 +872,21 @@ def build_auskunft_workbook(
     sender_blocks: Sequence[Mapping[str, Any]] = (),
     appointments: Sequence[Mapping[str, Any]] = (),
     appointment_answers: Sequence[Mapping[str, Any]] = (),
+    paperless_documents: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    ten sheets: the comments that the subject can see (with the names of their
+    eleven sheets: the comments that the subject can see (with the names of their
     files), the attachment metadata of the applications and the reported tickets, the
     meeting attendance with the reason of an excuse, the reported tickets with their
     text and technical context, the own ticket messages (with the names of their
     files), the to-dos that the subject created or is assigned to
     (with the description of the own cards), the own to-do comments (with the names of
     their files), the sender blocks of the account or the address, the Termine that the
-    subject created and the answers of the subject to Termine.
+    subject created and the answers of the subject to Termine. An eleventh sheet names
+    the Paperless documents that the platform filed for the Anträge of the subject, with
+    the number and the date of the filing (§F/administration/privacy/002533).
     """
     from io import BytesIO
 
@@ -1039,6 +1064,19 @@ def build_auskunft_workbook(
                 _fmt_dt(a.get("answeredAt")),
             ]
             for a in appointment_answers
+        ],
+    )
+    _add_sheet(
+        "Paperless-Dokumente",
+        ["Antrag-ID", "Dokumentnummer", "Titel", "Abgelegt am"],
+        [
+            [
+                str(d.get("applicationId") or ""),
+                d.get("documentId"),
+                d.get("title") or "",
+                _fmt_dt(d.get("filedAt")),
+            ]
+            for d in paperless_documents
         ],
     )
 

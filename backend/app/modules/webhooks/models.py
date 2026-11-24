@@ -13,7 +13,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    LargeBinary,
     Text,
     UniqueConstraint,
 )
@@ -21,31 +20,43 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.shared.sealed import SealedBytes
 
 
 class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
     """Outbound webhook config (`webhook.manage`).
 
     The server generates ``secret`` and never exposes it through the API. The
-    worker signs the deliveries with it (HMAC). A webhook has no event list: it
-    sends only when a flow transition runs its ``webhook`` action
-    (§F/integrations/webhooks/000402).
+    worker signs the deliveries with it (HMAC).
+
+    ``subscriptions`` is a list of ``{"event": <name>, "fields": [<key>, ...]}``: the
+    events of the catalog that the webhook gets and, per event, the fields of its
+    ``data`` object (§F/integrations/webhooks/002410, 002412). ``gremium_ids`` and
+    ``type_ids`` (UUID strings) and ``state_keys`` (status keys of the target state of
+    ``application.transition``) are the filters; an empty list lets every value pass
+    (§F/integrations/webhooks/002414).
     """
 
     __tablename__ = "webhook"
 
     name: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)
-    secret: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    secret: Mapped[bytes | None] = mapped_column(SealedBytes("webhook.secret"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    subscriptions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")
+    gremium_ids: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    type_ids: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    state_keys: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
 
 
-class WebhookDelivery(UUIDPkMixin, Base):
+class WebhookDelivery(UUIDPkMixin, CreatedAtMixin, Base):
     """Delivery attempt of a webhook.
 
-    No query picks the rows up. Each delivery has its own arq job
-    ``deliver_webhook`` with the job key ``webhook:<id>``, and a retry is the
-    same job, deferred by ``arq.Retry`` with an exponential backoff.
+    The body in ``payload`` is built when the event occurs and never changes after
+    (§F/integrations/webhooks/002417). The worker cron ``enqueue_pending_webhooks``
+    hands each new ``pending`` row without an attempt to its own arq job
+    ``deliver_webhook`` with the job key ``webhook:<id>``, and a retry is the same
+    job, deferred by ``arq.Retry`` with an exponential backoff.
     ``idempotency_key`` decouples the event instance from the dispatch. A flow
     retry of the same status event creates no second delivery, because
     ``(webhook_id, idempotency_key)`` is unique. A ``NULL`` key means no

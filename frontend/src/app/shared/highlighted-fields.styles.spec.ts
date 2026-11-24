@@ -10,11 +10,11 @@ const APP = join(__dirname, '..');
 
 const FIELDS: readonly (readonly [string, string])[] = [
   ['shared/formly/types/formly-positions.type.scss', '.pf'],
-  ['shared/ui/chat/chat.component.scss', '.chat__editInput'],
+  ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__editInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__itemInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__evInput'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts__titleInput'],
-  ['features/meetings/agenda-pane/agenda-pane.component.scss', '.ap__input'],
+  ['../../vendor/ui-kit/views/protocol/src/top-sheet-view.component.scss', '.ts__titleInput'],
+  ['../../vendor/ui-kit/views/meeting/src/agenda-pane-view.component.scss', '.ap__input'],
   ['pages/admin/privacy/privacy.component.scss', '.pv__textarea'],
   ['pages/todos/board-settings/todo-board-settings.component.scss', '.bs__input'],
   ['pages/budget/cost-centre-select/cost-centre-select.component.scss', '.ccs__search'],
@@ -31,23 +31,23 @@ function rule(css: string, selector: string): string {
 }
 
 const SURFACES: readonly (readonly [string, string])[] = [
-  ['shared/ui/chat/chat.component.scss', '.chat__box'],
+  ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__box'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__area'],
   ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__search'],
-  ['pages/todos/board-view/todo-board-view.component.scss', '.bv__quick'],
+  ['../../vendor/ui-kit/views/board/src/todo-board-view.component.scss', '.bv__quick'],
   ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__note'],
   ['pages/admin/committees/gremium-dialog/gremium-dialog.component.scss', '.gd__mail'],
-  ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__note'],
-  ['pages/admin/forms/form-editor.component.scss', '.fe__pv-control'],
+  ['../../vendor/ui-kit/views/meeting/src/attendance-sheet-view.component.scss', '.as__note'],
+  ['../../vendor/ui-kit/views/form-editor/src/form-editor-view.component.scss', '.fe__pv-control'],
   ['features/meetings/live-cards/live-cards.component.scss', '.lc__join'],
   ['pages/todos/board-picker/todo-board-picker.component.scss', '.bp__chip'],
   ['features/help/help-menu/help-menu.component.scss', '.hm__head'],
-  ['features/meetings/top-sheet/top-sheet.component.scss', '.ts'],
+  ['../../vendor/ui-kit/views/protocol/src/top-sheet-view.component.scss', '.ts'],
   ['pages/home.component.scss', '.home__latestItem'],
   ['features/apply/altcha.component.scss', '.altcha__btn'],
 ];
 
-describe('highlightedFields (§000598)', () => {
+describe('highlightedFields (§ui-kit:000598)', () => {
   it.each(SURFACES)('%s %s includes the highlight surface', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
     expect(body).toMatch(/@include f\.highlight-surface;/);
@@ -66,7 +66,7 @@ describe('highlightedFields (§000598)', () => {
       'pages/budget/cost-centre-select/cost-centre-select.component.scss',
       ".ccs__opt[aria-selected='true']",
     ],
-    ['features/todos/move-sheet/todo-move-sheet.component.scss', '.ms__row--on'],
+    ['../../vendor/ui-kit/views/board/src/todo-move-sheet-view.component.scss', '.ms__row--on'],
     ['features/todos/link-picker/todo-link-picker.component.scss', '.lp__hit--on'],
     ['features/todos/pick-dialog/todo-pick-dialog.component.scss', '.pd__row--on'],
     [
@@ -76,12 +76,12 @@ describe('highlightedFields (§000598)', () => {
     ['features/meetings/delegation-dialog/delegation-dialog.component.scss', '.dd__row--on'],
     ['features/meetings/agenda-item-dialog/agenda-item-dialog.component.scss', '.aid__row--on'],
     ['pages/budget/budget-dashboard.component.scss', '.tn--on'],
-    ['pages/admin/forms/form-editor.component.scss', '.fe__row--on'],
+    ['../../vendor/ui-kit/views/form-editor/src/form-editor-view.component.scss', '.fe__row--on'],
     ['pages/applications/agenda-dialog/agenda-dialog.component.scss', '.agd__row--on'],
-    ['features/meetings/attendance-sheet/attendance-sheet.component.scss', '.as__opt--on'],
+    ['../../vendor/ui-kit/views/meeting/src/attendance-sheet-view.component.scss', '.as__opt--on'],
     ['features/apply/apply-wizard.component.scss', '.wz__type.is-selected'],
-    ['features/voting/ballot/ballot.component.scss', '.choice--on'],
-    ['features/voting/ballot/ballot.component.scss', '.pchoice--on'],
+    ['../../vendor/ui-kit/views/voting/src/ballot-view.component.scss', '.choice--on'],
+    ['../../vendor/ui-kit/views/voting/src/ballot-view.component.scss', '.pchoice--on'],
     ['features/public-meeting/guest-view.component.scss', '.gv__item--now'],
   ])('%s %s paints the chosen row black on yellow', (file, selector) => {
     const body = rule(readFileSync(join(APP, file), 'utf8'), selector);
@@ -118,19 +118,31 @@ describe('highlightedFields (§000598)', () => {
   });
 
   it('the TOP badge in a chosen row is a black ring, the current one black with a yellow number', () => {
-    const css = readFileSync(join(APP, 'features/meetings/top-badge/top-badge.component.scss'), 'utf8');
+    const css = readFileSync(
+      join(APP, '../../vendor/ui-kit/views/meeting/src/top-badge-view.component.scss'),
+      'utf8',
+    );
     expect(css).toMatch(
       /:host-context\(:root\[data-fields='highlight'\] \.li--on\) \{[^}]*border: 2px solid var\(--field-text\);/,
     );
-    expect(css).toMatch(/\.tb--now \{\s*background: var\(--field-text\);\s*color: var\(--field-bg\);/);
+    expect(css).toMatch(
+      /\.tb--now \{\s*background: var\(--field-text\);\s*color: var\(--field-bg\);/,
+    );
   });
 
   it.each([
-    ['features/meetings/session-dock/session-dock.component.scss', '.sd__chip:not(.sd__chip--static)'],
+    [
+      '../../vendor/ui-kit/views/meeting/src/session-dock-view.component.scss',
+      '.sd__chip:not(.sd__chip--static)',
+    ],
     ['features/meetings/meeting-page/meeting-page.component.scss', '.mp__chip'],
   ])('%s %s is a black on yellow pill button', (file, selector) => {
     const css = readFileSync(join(APP, file), 'utf8');
     const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    expect(css).toMatch(new RegExp(`${esc} \\{[^}]*background: var\\(--field-bg\\);[^}]*box-shadow: inset 0 0 0 1px var\\(--field-text\\);`));
+    expect(css).toMatch(
+      new RegExp(
+        `${esc} \\{[^}]*background: var\\(--field-bg\\);[^}]*box-shadow: inset 0 0 0 1px var\\(--field-text\\);`,
+      ),
+    );
   });
 });

@@ -23,6 +23,8 @@ import type {
   MeetingSettings,
   FeatureSwitches,
   HelpTicketsSettings,
+  PaperlessConnection,
+  PaperlessFailedFiling,
   LoginSettings,
   MailTemplate,
   FormOverviewItem,
@@ -36,6 +38,7 @@ import type {
   MergeConflict,
   MergePreview,
   Role,
+  WebhookCatalogEvent,
   WebhookConfig,
   WebhookDeliveryStatus,
 } from './admin.models';
@@ -373,21 +376,461 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
   },
 };
 
+const NO_FILTER = { gremiumIds: [], typeIds: [], stateKeys: [] } as const;
+
 export const MOCK_WEBHOOKS: readonly WebhookConfig[] = [
   {
     id: 'wh-1',
     name: 'Matrix-Bridge',
     url: 'https://hooks.example.org/matrix',
     active: true,
+    subscriptions: [
+      { event: 'application.created', fields: ['title', 'type', 'gremium', 'amount', 'url'] },
+      { event: 'application.transition', fields: ['title', 'toStatus', 'url'] },
+    ],
+    ...NO_FILTER,
   },
   {
     id: 'wh-2',
     name: 'Archiv-Export',
     url: 'https://archive.example.org/api/hooks/protocols/receive-and-store-every-final-protocol',
     active: true,
+    subscriptions: [
+      { event: 'protocol.finalized', fields: ['meetingTitle', 'gremium', 'publicUrl'] },
+    ],
+    ...NO_FILTER,
   },
-  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', active: true },
-  { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', active: false },
+  {
+    id: 'wh-3',
+    name: 'Kalender',
+    url: 'https://calendar.example.org/hook',
+    active: true,
+    subscriptions: [
+      { event: 'meeting.created', fields: ['title', 'date', 'startTime', 'location'] },
+    ],
+    ...NO_FILTER,
+  },
+  {
+    id: 'wh-4',
+    name: 'Test-Endpunkt',
+    url: 'https://test.example.org/hook',
+    active: false,
+    subscriptions: [],
+    ...NO_FILTER,
+  },
+];
+/** The webhook event catalog of the backend (`app/modules/webhooks/catalog.py`). */
+export const MOCK_WEBHOOK_CATALOG: readonly WebhookCatalogEvent[] = [
+  {
+    name: 'application.created',
+    group: 'applications',
+    idKeys: ['applicationId'],
+    fields: [
+      { key: 'title', personal: false, example: 'Zuschuss Sommerfest' },
+      {
+        key: 'type',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Finanzantrag' },
+      },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      {
+        key: 'status',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Eingereicht' },
+      },
+      { key: 'amount', personal: false, example: '125.00' },
+      { key: 'currency', personal: false, example: 'EUR' },
+      { key: 'approvedAmount', personal: false, example: null },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/applications/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'applicantName', personal: true, example: 'Erika Mustermann' },
+      { key: 'applicantEmail', personal: true, example: 'erika@example.org' },
+      { key: 'answers', personal: true, example: { title: 'Zuschuss Sommerfest' } },
+    ],
+  },
+  {
+    name: 'application.updated',
+    group: 'applications',
+    idKeys: ['applicationId'],
+    fields: [
+      { key: 'title', personal: false, example: 'Zuschuss Sommerfest' },
+      {
+        key: 'type',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Finanzantrag' },
+      },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      {
+        key: 'status',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Eingereicht' },
+      },
+      { key: 'amount', personal: false, example: '125.00' },
+      { key: 'currency', personal: false, example: 'EUR' },
+      { key: 'approvedAmount', personal: false, example: null },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/applications/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'applicantName', personal: true, example: 'Erika Mustermann' },
+      { key: 'applicantEmail', personal: true, example: 'erika@example.org' },
+      { key: 'answers', personal: true, example: { title: 'Zuschuss Sommerfest' } },
+    ],
+  },
+  {
+    name: 'application.transition',
+    group: 'applications',
+    idKeys: ['applicationId', 'transitionId', 'statusEventId'],
+    fields: [
+      { key: 'title', personal: false, example: 'Zuschuss Sommerfest' },
+      {
+        key: 'type',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Finanzantrag' },
+      },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      {
+        key: 'status',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Eingereicht' },
+      },
+      { key: 'amount', personal: false, example: '125.00' },
+      { key: 'currency', personal: false, example: 'EUR' },
+      { key: 'approvedAmount', personal: false, example: null },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/applications/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'applicantName', personal: true, example: 'Erika Mustermann' },
+      { key: 'applicantEmail', personal: true, example: 'erika@example.org' },
+      { key: 'answers', personal: true, example: { title: 'Zuschuss Sommerfest' } },
+      {
+        key: 'fromStatus',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Eingereicht' },
+      },
+      {
+        key: 'toStatus',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Genehmigt' },
+      },
+      { key: 'note', personal: true, example: 'Einstimmig' },
+    ],
+  },
+  {
+    name: 'application.archived',
+    group: 'applications',
+    idKeys: ['applicationId'],
+    fields: [
+      { key: 'title', personal: false, example: 'Zuschuss Sommerfest' },
+      {
+        key: 'type',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Finanzantrag' },
+      },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      {
+        key: 'status',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Eingereicht' },
+      },
+      { key: 'amount', personal: false, example: '125.00' },
+      { key: 'currency', personal: false, example: 'EUR' },
+      { key: 'approvedAmount', personal: false, example: null },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/applications/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'applicantName', personal: true, example: 'Erika Mustermann' },
+      { key: 'applicantEmail', personal: true, example: 'erika@example.org' },
+      { key: 'answers', personal: true, example: { title: 'Zuschuss Sommerfest' } },
+    ],
+  },
+  {
+    name: 'comment.created',
+    group: 'applications',
+    idKeys: ['commentId', 'applicationId'],
+    fields: [
+      { key: 'visibility', personal: false, example: 'internal' },
+      { key: 'applicationTitle', personal: false, example: 'Zuschuss Sommerfest' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/applications/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'body', personal: true, example: 'Bitte Angebot nachreichen.' },
+      { key: 'authorName', personal: true, example: 'Max Mustermann' },
+    ],
+  },
+  {
+    name: 'vote.opened',
+    group: 'votes',
+    idKeys: ['voteId'],
+    fields: [
+      { key: 'question', personal: false, example: 'Zuschuss Sommerfest bewilligen?' },
+      { key: 'kind', personal: false, example: 'vote' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'meetingId', personal: false, example: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f' },
+      { key: 'applicationId', personal: false, example: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f' },
+      { key: 'closesAt', personal: false, example: '2026-11-23T20:00:00+00:00' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/voting/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'vote.closed',
+    group: 'votes',
+    idKeys: ['voteId'],
+    fields: [
+      { key: 'question', personal: false, example: 'Zuschuss Sommerfest bewilligen?' },
+      { key: 'kind', personal: false, example: 'vote' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'meetingId', personal: false, example: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f' },
+      { key: 'applicationId', personal: false, example: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f' },
+      { key: 'closesAt', personal: false, example: '2026-11-23T20:00:00+00:00' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/voting/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'result', personal: false, example: 'passed' },
+      { key: 'counts', personal: false, example: { yes: 9, no: 2, abstain: 1 } },
+    ],
+  },
+  {
+    name: 'meeting.created',
+    group: 'meetings',
+    idKeys: ['meetingId'],
+    fields: [
+      { key: 'title', personal: false, example: '3. ordentliche Sitzung' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'date', personal: false, example: '2026-11-23' },
+      { key: 'startTime', personal: false, example: '18:00:00' },
+      { key: 'endTime', personal: false, example: '20:00:00' },
+      { key: 'location', personal: false, example: 'Raum 9-012' },
+      { key: 'status', personal: false, example: 'planned' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/meetings/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'meeting.started',
+    group: 'meetings',
+    idKeys: ['meetingId'],
+    fields: [
+      { key: 'title', personal: false, example: '3. ordentliche Sitzung' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'date', personal: false, example: '2026-11-23' },
+      { key: 'startTime', personal: false, example: '18:00:00' },
+      { key: 'endTime', personal: false, example: '20:00:00' },
+      { key: 'location', personal: false, example: 'Raum 9-012' },
+      { key: 'status', personal: false, example: 'planned' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/meetings/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'meeting.closed',
+    group: 'meetings',
+    idKeys: ['meetingId'],
+    fields: [
+      { key: 'title', personal: false, example: '3. ordentliche Sitzung' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'date', personal: false, example: '2026-11-23' },
+      { key: 'startTime', personal: false, example: '18:00:00' },
+      { key: 'endTime', personal: false, example: '20:00:00' },
+      { key: 'location', personal: false, example: 'Raum 9-012' },
+      { key: 'status', personal: false, example: 'planned' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/meetings/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'protocol.finalized',
+    group: 'protocols',
+    idKeys: ['protocolId', 'meetingId'],
+    fields: [
+      { key: 'meetingTitle', personal: false, example: '3. ordentliche Sitzung' },
+      {
+        key: 'gremium',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'StuPa' },
+      },
+      { key: 'finalizedAt', personal: false, example: '2026-11-24T09:00:00+00:00' },
+      {
+        key: 'publicUrl',
+        personal: false,
+        example: 'https://example.org/public/protocols/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'booking.created',
+    group: 'budget',
+    idKeys: ['bookingId'],
+    fields: [
+      { key: 'kind', personal: false, example: 'expense' },
+      { key: 'amount', personal: false, example: '125.00' },
+      {
+        key: 'costCentre',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Kultur' },
+      },
+      {
+        key: 'fiscalYear',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: '2026' },
+      },
+      { key: 'description', personal: false, example: 'Sommerfest Technik' },
+      { key: 'applicationId', personal: false, example: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f' },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/expenses?id=3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'invoice.created',
+    group: 'budget',
+    idKeys: ['invoiceId'],
+    fields: [
+      { key: 'number', personal: false, example: 'RE-2026-0042' },
+      { key: 'supplier', personal: false, example: 'Veranstaltungstechnik GmbH' },
+      { key: 'grossAmount', personal: false, example: '119.00' },
+      { key: 'currency', personal: false, example: 'EUR' },
+      { key: 'issueDate', personal: false, example: '2026-11-20' },
+      { key: 'dueDate', personal: false, example: '2026-12-04' },
+      {
+        key: 'costCentre',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Kultur' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/invoices?id=3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+    ],
+  },
+  {
+    name: 'ticket.created',
+    group: 'tickets',
+    idKeys: ['ticketId'],
+    fields: [
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
+      { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'kind', personal: false, example: 'problem' },
+      { key: 'source', personal: false, example: 'mail' },
+      { key: 'body', personal: true, example: 'Beim Hochladen passiert nichts.' },
+      { key: 'reporterEmail', personal: true, example: 'erika@example.org' },
+    ],
+  },
+  {
+    name: 'ticket.message',
+    group: 'tickets',
+    idKeys: ['ticketId'],
+    fields: [
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
+      { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'body', personal: true, example: 'Es geht wieder nicht.' },
+    ],
+  },
+  {
+    name: 'ticket.status',
+    group: 'tickets',
+    idKeys: ['ticketId'],
+    fields: [
+      { key: 'number', personal: false, example: 'T-7K3QX9MD' },
+      { key: 'title', personal: false, example: 'Upload hängt' },
+      {
+        key: 'area',
+        personal: false,
+        example: { id: '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f', name: 'Plattform' },
+      },
+      {
+        key: 'url',
+        personal: false,
+        example: 'https://example.org/tickets/3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f',
+      },
+      { key: 'fromStatus', personal: false, example: 'in_progress' },
+      { key: 'toStatus', personal: false, example: 'done' },
+    ],
+  },
 ];
 
 /** The delivery state of the mock webhooks: one of each state. */
@@ -423,12 +866,45 @@ export const MOCK_MEETING_PERIODS: MeetingPeriods = {
 export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
   wikiUrl: 'https://wiki.reutlingen.university/books/antragsplattform',
   publicEnabled: true,
-  notifyNew: true,
   retentionMonths: 12,
 };
 
+/** The Paperless connection of the mock: connected, with the protocols filed. */
+export const MOCK_PAPERLESS: PaperlessConnection = {
+  baseUrl: 'https://paperless.example.org',
+  publicUrl: null,
+  tokenSet: true,
+  fileProtocols: true,
+  fileApplications: false,
+  filePlans: false,
+  insertEnabled: false,
+  linkEnabled: false,
+  allowedHosts: ['paperless.example.org'],
+};
+
+/** The failed filings of the mock. */
+export const MOCK_PAPERLESS_FAILED: readonly PaperlessFailedFiling[] = [
+  {
+    id: 'pf-1',
+    kind: 'protocol',
+    elementId: 'm-1',
+    title: '3. ordentliche Sitzung',
+    failedAt: '2026-11-20T09:12:00Z',
+    error: 'unreachable',
+  },
+  {
+    id: 'pf-2',
+    kind: 'attachment',
+    elementId: 'a-1',
+    title: 'Erstsemesterfahrt – Angebot.pdf',
+    failedAt: '2026-11-19T16:40:00Z',
+    error: 'rejected',
+  },
+];
+
 /** The feature switches of the mock: every feature on, as the backend defaults them. */
 export const MOCK_FEATURES: FeatureSwitches = {
+  activity: true,
   todos: true,
   calendar: true,
   meetings: true,
@@ -436,6 +912,10 @@ export const MOCK_FEATURES: FeatureSwitches = {
   budget: true,
   invoices: true,
   tickets: true,
+  graph: true,
+  public: true,
+  push: true,
+  paperless: true,
 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */
@@ -582,6 +1062,20 @@ export const MOCK_ERASURES: readonly ErasureRequest[] = [
     applicationId: 'a1000000-0000-0000-0000-000000000001',
     email: 'antrag@example.org',
     status: 'open',
+    paperlessDocuments: [
+      {
+        documentId: 412,
+        title: 'Erstsemesterfahrt',
+        url: 'https://paperless.example.org/documents/412/details',
+        filedAt: '2026-05-12T10:04:00+00:00',
+      },
+      {
+        documentId: 413,
+        title: 'Erstsemesterfahrt – Angebot.pdf',
+        url: 'https://paperless.example.org/documents/413/details',
+        filedAt: '2026-05-12T10:05:00+00:00',
+      },
+    ],
   },
   {
     id: 'e-2',
@@ -598,6 +1092,20 @@ export const MOCK_ERASURES: readonly ErasureRequest[] = [
     email: null,
     status: 'executed',
     handledAt: '2026-05-21T08:00:00+00:00',
+    paperlessDocuments: [
+      {
+        documentId: 412,
+        title: 'Erstsemesterfahrt',
+        url: 'https://paperless.example.org/documents/412/details',
+        filedAt: '2026-05-12T10:04:00+00:00',
+      },
+      {
+        documentId: 413,
+        title: 'Erstsemesterfahrt – Angebot.pdf',
+        url: 'https://paperless.example.org/documents/413/details',
+        filedAt: '2026-05-12T10:05:00+00:00',
+      },
+    ],
   },
   {
     id: 'e-4',

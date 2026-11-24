@@ -16,8 +16,8 @@ Actor gates apply to manual transitions only: `roleIs` (a global role),
 of the Gremium that decides the current vote). `validate_guard(..., allow_actor_ops=False)`
 forbids them on automatic transitions.
 
-An action has one whitelisted type: `webhook`, `notify`, `addToNextSession`,
-`assignBudget`, `assignBudgetFromField`, `assignBudgetFromApplicantGremium` or
+An action has one whitelisted type: `notify`, `addToNextSession`, `assignBudget`,
+`assignBudgetFromField`, `assignBudgetFromApplicantGremium` or
 `assignBudgetFromMap`. The engine dispatches the action. This module
 only validates it. An unknown operator or action type raises `GuardError` when the flow
 version is SAVED, not at runtime. See `validate_guard` and `validate_action`.
@@ -87,7 +87,6 @@ _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
 
 ACTION_TYPES: frozenset[str] = frozenset(
     {
-        "webhook",
         "notify",
         "addToNextSession",
         "assignBudget",
@@ -113,7 +112,6 @@ ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
 #: Required string field per action type. ``notify`` and ``assignBudgetFromMap`` have a
 #: separate check. ``assignBudgetFromField`` reads the cost center id from the named field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
-    "webhook": "webhookId",
     "assignBudget": "budgetId",
     "assignBudgetFromField": "field",
 }
@@ -483,7 +481,7 @@ def _validate_compare(spec: object) -> None:
 def validate_action(action: dict[str, Any]) -> None:
     """Check that `action.type` is whitelisted and that the required fields are present.
 
-    `webhook` needs `webhookId`. `notify` needs a recipient list with valid kinds.
+    `notify` needs a recipient list with valid kinds.
     `addToNextSession` takes an optional `gremiumId` (without it, the Gremium of the
     vote). `assignBudgetFromApplicantGremium` takes an optional `parentId`.
     `assignBudgetFromMap` needs `field` and a non-empty `map` of field value to budget

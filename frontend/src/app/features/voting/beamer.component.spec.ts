@@ -59,13 +59,25 @@ function vote(over: Partial<Vote> = {}): Vote {
     agendaItemId: 'ag-2',
     question: 'Wird der Haushalt beschlossen?',
     eligibleGroup: 'g1',
-    config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', quorum: { type: 'count', value: 12 } },
+    config: {
+      options: ['yes', 'no', 'abstain'],
+      majorityRule: 'simple',
+      quorum: { type: 'count', value: 12 },
+    },
     status: 'open',
     opensAt: null,
     closesAt: null,
     result: null,
     secret: false,
-    tally: { counts: {}, eligible: 19, voted: 4, present: 19, revealed: false, quorumMet: false, leading: null },
+    tally: {
+      counts: {},
+      eligible: 19,
+      voted: 4,
+      present: 19,
+      revealed: false,
+      quorumMet: false,
+      leading: null,
+    },
     ...over,
   };
 }
@@ -144,21 +156,37 @@ describe('BeamerComponent', () => {
     expect(screen.getByRole('heading', { name: 'TOP 2 · Haushalt' })).toBeInTheDocument();
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
     expect(screen.getByText('34. Sitzung')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/meetings/m1');
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute(
+      'href',
+      '/meetings/m1',
+    );
   });
 
   it('names an item without a title, and shows no item that is not on the agenda', async () => {
     const { push } = await setup();
-    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-3', status: 'live' });
+    push({
+      type: 'meeting_state',
+      activeApplicationId: null,
+      currentAgendaItemId: 'ag-3',
+      status: 'live',
+    });
     expect(screen.getByRole('heading', { name: 'TOP 3 · Unbenannter TOP' })).toBeInTheDocument();
-    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-x', status: 'live' });
+    push({
+      type: 'meeting_state',
+      activeApplicationId: null,
+      currentAgendaItemId: 'ag-x',
+      status: 'live',
+    });
     expect(screen.queryByText('Jetzt')).toBeNull();
   });
 
   it('goes back to the voting overview without a meeting', async () => {
     const { source } = await setup({ id: null });
     expect(source.lastMeetingId).toBe('demo');
-    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/voting');
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute(
+      'href',
+      '/voting',
+    );
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
 
@@ -166,7 +194,12 @@ describe('BeamerComponent', () => {
     const { push, api } = await setup();
     push({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
     expect(api.getMeeting).toHaveBeenCalledTimes(1);
-    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-1', status: 'live' });
+    push({
+      type: 'meeting_state',
+      activeApplicationId: null,
+      currentAgendaItemId: 'ag-1',
+      status: 'live',
+    });
     expect(api.getMeeting).toHaveBeenCalledTimes(2);
     expect(api.listAgenda).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('heading', { name: 'TOP 1 · Begrüßung' })).toBeInTheDocument();
@@ -180,27 +213,73 @@ describe('BeamerComponent', () => {
     const { push, api, container } = await setup();
     push(OPEN);
     expect(api.getVote).toHaveBeenCalledWith('v1', { quiet: true });
-    expect(screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' }),
+    ).toBeInTheDocument();
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
-    expect(container.querySelector('.bm__warn')?.textContent?.trim()).toBe('Quorum 12 · noch nicht erreicht');
-    push({ type: 'vote_tally', voteId: 'v1', counts: {}, eligible: 19, cast: 14, present: 19, revealed: false, quorumMet: true, leading: null });
+    expect(container.querySelector('.bm__warn')?.textContent?.trim()).toBe(
+      'Quorum 12 · noch nicht erreicht',
+    );
+    push({
+      type: 'vote_tally',
+      voteId: 'v1',
+      counts: {},
+      eligible: 19,
+      cast: 14,
+      present: 19,
+      revealed: false,
+      quorumMet: true,
+      leading: null,
+    });
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('14');
     expect(container.querySelector('.bm__warn')).toBeNull();
-    expect(container.querySelector('app-vote-bars')).toBeNull();
-    push({ type: 'vote_tally', voteId: 'other', counts: {}, eligible: 19, cast: 1, present: 19, revealed: false, quorumMet: true, leading: null });
+    expect(container.querySelector('app-vote-bars-view')).toBeNull();
+    push({
+      type: 'vote_tally',
+      voteId: 'other',
+      counts: {},
+      eligible: 19,
+      cast: 1,
+      present: 19,
+      revealed: false,
+      quorumMet: true,
+      leading: null,
+    });
     expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
   });
 
   it('shows the counts once every present member voted', async () => {
     const { push } = await setup();
     push(OPEN);
-    push({ type: 'vote_tally', voteId: 'v1', counts: { yes: 15, no: 2, abstain: 2 }, eligible: 19, cast: 19, present: 19, revealed: true, quorumMet: true, leading: 'yes' });
+    push({
+      type: 'vote_tally',
+      voteId: 'v1',
+      counts: { yes: 15, no: 2, abstain: 2 },
+      eligible: 19,
+      cast: 19,
+      present: 19,
+      revealed: true,
+      quorumMet: true,
+      leading: 'yes',
+    });
     expect(screen.getByRole('img', { name: 'Ja: 15 Stimmen, 79 %' })).toBeInTheDocument();
   });
 
   it('shows the counts of a read that revealed them', async () => {
     const { push } = await setup({
-      votes: [vote({ tally: { counts: { yes: 2, no: 1, abstain: 0 }, eligible: 3, voted: 3, present: 3, revealed: true, quorumMet: true, leading: 'yes' } })],
+      votes: [
+        vote({
+          tally: {
+            counts: { yes: 2, no: 1, abstain: 0 },
+            eligible: 3,
+            voted: 3,
+            present: 3,
+            revealed: true,
+            quorumMet: true,
+            leading: 'yes',
+          },
+        }),
+      ],
     });
     push(OPEN);
     expect(screen.getByRole('img', { name: 'Ja: 2 Stimmen, 67 %' })).toBeInTheDocument();
@@ -211,39 +290,90 @@ describe('BeamerComponent', () => {
     const closed = vote({
       status: 'closed',
       result: 'passed',
-      tally: { counts: { yes: 15, no: 3, abstain: 2 }, eligible: 20, voted: 21, present: 0, revealed: true, quorumMet: true, leading: 'yes' },
+      tally: {
+        counts: { yes: 15, no: 3, abstain: 2 },
+        eligible: 20,
+        voted: 21,
+        present: 0,
+        revealed: true,
+        quorumMet: true,
+        leading: 'yes',
+      },
     });
     const { push, api, container } = await setup({ votes: [vote(), vote(), closed] });
     push(OPEN);
-    push({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 15, no: 3, abstain: 2 } });
+    push({
+      type: 'vote_closed',
+      voteId: 'v1',
+      result: 'passed',
+      counts: { yes: 15, no: 3, abstain: 2 },
+    });
     expect(api.getVote).toHaveBeenCalledTimes(2);
     expect(container.querySelector('.bm__result')?.textContent).toContain('Angenommen');
-    expect(screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
+    expect(
+      screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen'),
+    ).toBeInTheDocument();
   });
 
   it('shows the read result after the close', async () => {
     const closed = vote({
       status: 'closed',
       result: 'tie',
-      tally: { counts: { yes: 9, no: 9, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: null },
+      tally: {
+        counts: { yes: 9, no: 9, abstain: 2 },
+        eligible: 20,
+        voted: 20,
+        present: 0,
+        revealed: true,
+        quorumMet: true,
+        leading: null,
+      },
     });
     const { push, container } = await setup({ votes: [vote(), closed] });
     push(OPEN);
-    push({ type: 'vote_closed', voteId: 'v1', result: 'tie', counts: { yes: 9, no: 9, abstain: 2 }, failedReason: null });
+    push({
+      type: 'vote_closed',
+      voteId: 'v1',
+      result: 'tie',
+      counts: { yes: 9, no: 9, abstain: 2 },
+      failedReason: null,
+    });
     expect(container.querySelector('.bm__result')?.textContent).toContain('Abgelehnt');
-    expect(screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
+    expect(
+      screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 20 Stimmen'),
+    ).toBeInTheDocument();
   });
 
   it('takes the reason of the close frame', async () => {
     const { push } = await setup();
     push(OPEN);
-    push({ type: 'vote_closed', voteId: 'v1', result: 'rejected', counts: { yes: 1 }, failedReason: 'quorum' });
-    expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
+    push({
+      type: 'vote_closed',
+      voteId: 'v1',
+      result: 'rejected',
+      counts: { yes: 1 },
+      failedReason: 'quorum',
+    });
+    expect(
+      screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme'),
+    ).toBeInTheDocument();
   });
 
   it('shows an election: the result of the close frame, then a runoff round from the read', async () => {
-    const election = { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }, { id: 'c2', name: 'Ben' }], secret: true };
-    const open = vote({ kind: 'election', election, config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple' }, secret: true });
+    const election = {
+      seats: 1,
+      candidates: [
+        { id: 'c1', name: 'Anna' },
+        { id: 'c2', name: 'Ben' },
+      ],
+      secret: true,
+    };
+    const open = vote({
+      kind: 'election',
+      election,
+      config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple' },
+      secret: true,
+    });
     const { push, fixture } = await setup({ votes: [open, open] });
     push({ ...OPEN, options: ['c1', 'c2', 'abstain'] });
     expect(screen.getByText(/^Wahl · 1 Posten/)).toBeInTheDocument();
@@ -255,9 +385,16 @@ describe('BeamerComponent', () => {
       electionResult: { counts: { c1: 3, c2: 1 }, abstentions: 0, ballots: 4, elected: ['c1'] },
     });
     expect(screen.getAllByText(/Gewählt: Anna/).length).toBeGreaterThan(0);
-    const cmp = fixture.componentInstance as unknown as { view(v: Vote, over: object): { round?: number; electionResult?: unknown } };
+    const cmp = fixture.componentInstance as unknown as {
+      view(v: Vote, over: object): { round?: number; electionResult?: unknown };
+    };
     const runoff = cmp.view(
-      vote({ kind: 'election', election, round: 2, electionResult: { counts: {}, abstentions: 0, ballots: 0, elected: [] } }),
+      vote({
+        kind: 'election',
+        election,
+        round: 2,
+        electionResult: { counts: {}, abstentions: 0, ballots: 0, elected: [] },
+      }),
       { status: 'closed', voted: 0 },
     );
     expect(runoff.round).toBe(2);
@@ -283,13 +420,17 @@ describe('BeamerComponent', () => {
     answer('v2', vote({ id: 'v2', question: 'Wird der Nachtrag beschlossen?' }));
     answer('v1', vote({ id: 'v1' }));
     fixture.detectChanges();
-    expect(screen.getByRole('heading', { name: 'Wird der Nachtrag beschlossen?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Wird der Nachtrag beschlossen?' }),
+    ).toBeInTheDocument();
   });
 
   it('goes idle when the vote is cancelled', async () => {
     const { push } = await setup();
     push(OPEN);
-    expect(screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' }),
+    ).toBeInTheDocument();
     push({ type: 'vote_cancelled', voteId: 'v1' });
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
@@ -304,13 +445,29 @@ describe('BeamerComponent', () => {
       status: 'closed',
       result: 'rejected',
       question: '',
-      tally: { counts: { yes: 1, no: 4, abstain: 0 }, eligible: 5, quorumMet: true, leading: 'no', failedReason: 'majority' },
+      tally: {
+        counts: { yes: 1, no: 4, abstain: 0 },
+        eligible: 5,
+        quorumMet: true,
+        leading: 'no',
+        failedReason: 'majority',
+      },
     });
-    const { container, push } = await setup({ meeting: meeting({ votes: [row] }), votes: [closed] });
+    const { container, push } = await setup({
+      meeting: meeting({ votes: [row] }),
+      votes: [closed],
+    });
     expect(container.querySelector('.bm__result')?.textContent).toContain('Abgelehnt');
     expect(screen.getByRole('heading', { level: 1, name: 'Beschlussfrage' })).toBeInTheDocument();
-    expect(screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 5 Stimmen')).toBeInTheDocument();
-    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-1', status: 'live' });
+    expect(
+      screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 5 Stimmen'),
+    ).toBeInTheDocument();
+    push({
+      type: 'meeting_state',
+      activeApplicationId: null,
+      currentAgendaItemId: 'ag-1',
+      status: 'live',
+    });
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
 
@@ -362,7 +519,9 @@ describe('BeamerComponent', () => {
       const exit = jest.fn(() => Promise.reject(new Error('not allowed')));
       setFullscreen(document.body, exit);
       const { fixture } = await setup();
-      jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
+      jest
+        .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(exit).toHaveBeenCalledTimes(1);
       await Promise.resolve();
@@ -373,7 +532,9 @@ describe('BeamerComponent', () => {
       const exit = jest.fn(() => Promise.resolve());
       setFullscreen(null, exit);
       const { fixture } = await setup();
-      jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
+      jest
+        .spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl')
+        .mockResolvedValue(true);
       fireEvent.click(exitLink());
       expect(exit).not.toHaveBeenCalled();
     });
@@ -401,7 +562,19 @@ describe('BeamerComponent', () => {
   describe('edge cases', () => {
     it('counts 0 for an open vote without turnout numbers and without a tally frame', async () => {
       const { push, fixture } = await setup({
-        votes: [vote({ tally: { counts: {}, eligible: 19, voted: null, present: null, revealed: false, quorumMet: false, leading: null } as unknown as Vote['tally'] })],
+        votes: [
+          vote({
+            tally: {
+              counts: {},
+              eligible: 19,
+              voted: null,
+              present: null,
+              revealed: false,
+              quorumMet: false,
+              leading: null,
+            } as unknown as Vote['tally'],
+          }),
+        ],
       });
       push(OPEN);
       await fixture.whenStable();
@@ -451,20 +624,56 @@ describe('BeamerComponent', () => {
     });
 
     it('shows no code when the link cannot load', async () => {
-      const second = await setup({ meeting: meeting({ publicJoin: true, status: 'live' }), votes: [] });
+      const second = await setup({
+        meeting: meeting({ publicJoin: true, status: 'live' }),
+        votes: [],
+      });
       second.api.getJoinLink.mockReturnValue(throwError(() => new Error('x')));
-      second.push({ type: 'guest_counts', publicJoin: true, joinCode: 'NEW123', admittedGuests: 1 });
+      second.push({
+        type: 'guest_counts',
+        publicJoin: true,
+        joinCode: 'NEW123',
+        admittedGuests: 1,
+      });
       expect(screen.queryByText('Mit dem Handy scannen')).toBeNull();
     });
 
     it('passes the room of a vote with guests to the screen', async () => {
       const { push } = await setup({
         meeting: meeting({ publicJoin: true, status: 'live' }),
-        votes: [vote({ guestsVote: true, config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', guestsVote: true }, tally: { counts: {}, eligible: 26, voted: 4, present: 26, revealed: false, quorumMet: true, leading: null, presentMembers: 19, presentGuests: 7 } })],
+        votes: [
+          vote({
+            guestsVote: true,
+            config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', guestsVote: true },
+            tally: {
+              counts: {},
+              eligible: 26,
+              voted: 4,
+              present: 26,
+              revealed: false,
+              quorumMet: true,
+              leading: null,
+              presentMembers: 19,
+              presentGuests: 7,
+            },
+          }),
+        ],
       });
       push(OPEN);
       expect(await screen.findByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
-      push({ type: 'vote_tally', voteId: 'v1', counts: {}, eligible: 27, quorumMet: true, leading: null, cast: 5, present: 27, revealed: false, presentMembers: 19, presentGuests: 8 });
+      push({
+        type: 'vote_tally',
+        voteId: 'v1',
+        counts: {},
+        eligible: 27,
+        quorumMet: true,
+        leading: null,
+        cast: 5,
+        present: 27,
+        revealed: false,
+        presentMembers: 19,
+        presentGuests: 8,
+      });
       expect(screen.getByText('19 Mitglieder + 8 Gäste anwesend')).toBeInTheDocument();
     });
   });

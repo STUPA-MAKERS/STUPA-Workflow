@@ -10,7 +10,7 @@
 # - pip-audit moved to its own workflow (deps-audit.yml): weekly plus main pushes.
 # - All backend jobs cache pip (setup-python). This saves about 45 s per job.
 # - e2e, restore-smoke and real-stack-smoke stay opt-in (label, dispatch or variable).
-# - axe runs the axe sweep of e2e on every frontend change; it is a gate (spec 000491).
+# - axe runs the axe sweep of e2e on every frontend change; it is a gate (spec ui-kit:000491).
 name: ci
 
 on:
@@ -81,8 +81,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/pyproject.toml
-      # Checks the format of every spec, the index and every § reference in the code.
+      # Checks the format of every spec, the index and every § reference in the code. The kit
+      # specs come from the submodule: one number space, `§ui-kit:` references (ui-kit:002211, 002212).
       - run: python3 scripts/check_specs.py
+        env:
+          PARTNER_SPECS: frontend/vendor/ui-kit/specs
       # The UML views in specs/uml are current and well formed (specs 000679-000684). The
       # script imports the backend models and reads its import graph.
       - run: pip install -e 'backend[dev]'
@@ -103,8 +106,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: python3 scripts/check_functional.py
-      # Service commits, fake sessions and import exceptions can only go down
-      # (specs 000640, 000642, 000651).
+      # Service commits, fake sessions, import exceptions and the own styles of the frontend
+      # can only go down (specs 000640, 000642, 000651, ui-kit 002213).
       - run: python3 scripts/check_ratchets.py
       # Images and actions are pinned, and a build download repeats (specs 000978, 000981).
       - run: python3 scripts/check_build_pins.py
@@ -235,6 +238,7 @@ jobs:
       DATABASE_URL: "postgresql+asyncpg://app:pw@localhost:5432/antrag_test"
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
+      SECRETS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -293,6 +297,7 @@ jobs:
       DATABASE_URL: "postgresql+asyncpg://app:pw@localhost:5432/antrag_test"
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
+      SECRETS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -425,9 +430,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # axe on every route in both themes (spec 000491), against the real stack. Unlike the
+  # axe on every route in both themes (spec ui-kit:000491), against the real stack. Unlike the
   # full e2e run it is not opt-in: an accessibility regression fails the PR. It runs only
-  # e2e/06-axe.spec.ts, so it stays a few minutes.
+  # e2e/06-axe.spec.ts and the opaque-head check e2e/07-opaque-heads.spec.ts (spec
+  # ui-kit:002420), so it stays a few minutes.
   axe:
     runs-on: ubuntu-latest
     env:
@@ -459,7 +465,7 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: axe sweep (vs echtem Stack)
-        run: scripts/e2e.sh e2e/06-axe.spec.ts
+        run: scripts/e2e.sh e2e/06-axe.spec.ts e2e/07-opaque-heads.spec.ts
       - name: Playwright-Report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -534,6 +540,7 @@ jobs:
             -e DATABASE_URL="postgresql+asyncpg://app:pw@localhost/antrag_test" \
             -e SESSION_SECRET="ci-session-secret" \
             -e MAGIC_LINK_SECRET="ci-magic-link-secret" \
+            -e SECRETS_KEY="MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" \
             -e FORWARDED_ALLOW_IPS="*" \
             antrag-backend:ci
           for i in $(seq 1 30); do

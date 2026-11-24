@@ -96,34 +96,15 @@
   }
 }
 
-// The frame that the lists "Protokolle" and "Beschlüsse" share: the page column, the head, the
-// toolbar with the chips, the empty state, the semester title, the card of one row with its date
-// block, and the pill buttons. A page adds only the parts of its own card.
+// The body that the lists "Protokolle" and "Beschlüsse" share inside the kit public screen
+// (ui-kit 002245, which draws the column, the crumbs and the head): the toolbar with the chips,
+// the semester title, the card of one row with its date block, and the pill buttons. A page adds
+// only the parts of its own card.
 @mixin list-page {
-  :host {
-    display: flex;
-    flex: 1 0 auto;
-    justify-content: center;
-  }
-
-  .pp {
+  .pp__body {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    width: min(67.5rem, 100%);
-    padding-block: var(--space-6);
-  }
-  .pp__head {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  @include crumbs('.pp__crumbs');
-  .pp__title {
-    margin: 0;
-    font-size: var(--fs-d2);
-    line-height: var(--lh-d2);
-    font-weight: var(--fw-semibold);
   }
 
   .pp__toolbar {
@@ -143,14 +124,6 @@
   .pp__count {
     color: var(--color-text-muted);
     font-size: var(--fs-sm);
-  }
-
-  .pp__none {
-    display: flex;
-    flex-direction: column;
-    padding: var(--space-4);
-    border-radius: var(--radius-2xl);
-    background: var(--color-surface-1);
   }
 
   // The section title of the design system (`app-section`): small accent type on the inset of
@@ -209,13 +182,8 @@
   }
 
   @include bp.phone {
-    .pp {
+    .pp__body {
       gap: var(--space-3);
-      padding-block: var(--space-4);
-    }
-    .pp__title {
-      font-size: var(--fs-h1);
-      line-height: var(--lh-h1);
     }
     .pp__card {
       flex-wrap: wrap;

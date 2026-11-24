@@ -8,6 +8,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, GroupMapping, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { principalFilters, UsersComponent } from './users.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ROLES: Role[] = [
   {
@@ -89,7 +90,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 }
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(
@@ -150,7 +151,7 @@ describe('UsersComponent', () => {
     expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
     expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem').filter((li) => li.parentElement?.classList.contains('au__list'))).toHaveLength(2);
+    expect(screen.getAllByRole('listitem').filter((li) => li.parentElement?.classList.contains('rcs__list'))).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
@@ -170,19 +171,15 @@ describe('UsersComponent', () => {
     expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
   });
 
-  it('shows a link to the group mappings when permitted', async () => {
+  it('has no link to the group mappings (spec 002620)', async () => {
     await setup();
-    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
-      'href',
-      '/admin/group-mappings',
-    );
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });
 
-  it('without admin.group_mappings: no link and no mapping request', async () => {
+  it('without admin.group_mappings: no mapping request', async () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null, false));
     expect(api.listGroupMappings).not.toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
   });
 
@@ -285,7 +282,7 @@ describe('UsersComponent', () => {
     });
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
   it('search error path shows a toast with a retry', async () => {
     const api = makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) });
     await setup(api);
@@ -502,5 +499,11 @@ describe('UsersComponent', () => {
         'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
       );
     });
+  });
+
+  it('gives the records screen loading rows while the first read is out', async () => {
+    const { inst } = await setup();
+    inst.loading.set(true);
+    expect(inst.rows()).toEqual({ state: 'loading' });
   });
 });

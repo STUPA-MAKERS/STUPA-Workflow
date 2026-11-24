@@ -126,7 +126,7 @@ export class ExpenseTransfersState {
           this.reloading.set(false);
           this.loadingMore.set(false);
           this.loaded.set(true);
-          this.toast.error(this.failureText(err));
+          this.toast.show(this.failureText(err), 'error');
         },
       });
   }
@@ -173,17 +173,17 @@ export class ExpenseTransfersState {
         this.items.update((rows) =>
           rows.map((x) => (x.transferId === updated.transferId ? updated : x)),
         );
-        this.toast.success(this.i18n.translate('expenses.transfers.saved'));
+        this.toast.show(this.i18n.translate('expenses.transfers.saved'), 'success');
         this.list.refresh();
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
         if (err.status === 409 && problemCode(err) !== FISCAL_YEAR_CLOSED) {
-          this.toast.error(this.i18n.translate('expenses.transfers.immutablePair'));
+          this.toast.show(this.i18n.translate('expenses.transfers.immutablePair'), 'error');
           this.reload();
           return;
         }
-        this.toast.error(this.failureText(err));
+        this.toast.show(this.failureText(err), 'error');
       },
     });
   }
@@ -207,14 +207,14 @@ export class ExpenseTransfersState {
         this.confirmDelete.set(null);
         this.items.update((rows) => rows.filter((x) => x.transferId !== t.transferId));
         this.total.update((n) => Math.max(0, n - 1));
-        this.toast.success(this.i18n.translate('expenses.transfers.deleted'));
+        this.toast.show(this.i18n.translate('expenses.transfers.deleted'), 'success');
         this.list.refresh();
         this.onDeleted?.(t);
       },
       error: (err) => {
         this.saving.set(false);
         this.confirmDelete.set(null);
-        this.toast.error(this.failureText(err));
+        this.toast.show(this.failureText(err), 'error');
       },
     });
   }

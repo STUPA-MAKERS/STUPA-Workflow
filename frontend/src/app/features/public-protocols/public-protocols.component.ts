@@ -5,6 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { PublicScreenComponent, ScreenBodyDirective, type PublicCrumb } from '@stupa-makers/ui-kit/screens';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -15,6 +16,9 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   formatBytes,
+  type Action,
+  type LoadState,
+  type ScreenHead,
   HighlightComponent,
   IconComponent,
   NoteComponent,
@@ -36,12 +40,15 @@ import {
 import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
 
 /**
- * "Öffentliche Protokolle" (`/protocols`, no login): the final protocols of the gremien
- * that publish them, in their public version, newest first and grouped by semester.
+ * The public protocols of one Gremium (`/protocols/<slug>`, no login, spec 002400): its final
+ * protocols in their public version, newest first and grouped by semester.
  *
- * The search (meeting title and the text of the public agenda items), the Gremium chip
- * (several gremien) and the Semester chip filter on the server. "Weitere Protokolle
- * laden" appends the next page. The page is `noindex`.
+ * The search (meeting title and the text of the public agenda items) and the Semester chip
+ * filter on the server. "Weitere Protokolle laden" appends the next page. The head links the
+ * decisions of the same Gremium (spec 002402). A slug of no public Gremium shows the empty
+ * state (spec 002403). The kit public screen (ui-kit 002245) draws the column, the crumbs, the
+ * head and the first load; the body keeps the list on the page while a search reads again, so
+ * the search field keeps its focus. The page is `noindex`.
  */
 @Component({
   selector: 'app-public-protocols',
@@ -60,6 +67,8 @@ import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
     NoteComponent,
     SearchPillComponent,
     SkeletonComponent,
+    PublicScreenComponent,
+    ScreenBodyDirective,
   ],
   templateUrl: './public-protocols.component.html',
   styleUrl: './public-protocols.component.scss',
@@ -73,11 +82,11 @@ export class PublicProtocolsComponent {
   private readonly list = publicList<PublicProtocolSummary>({
     load: (query) => this.api.list(query),
     semesterQuery: (filters) => filters,
-    checkCommittee: false,
   });
   protected readonly appliedQuery = this.list.appliedQuery;
   protected readonly search = this.list.search;
-  protected readonly gremiumFilter = this.list.gremiumFilter;
+  protected readonly gremium = this.list.gremium;
+  protected readonly unknown = this.list.unknown;
   protected readonly semesterFilter = this.list.semesterFilter;
   protected readonly items = this.list.items;
   protected readonly total = this.list.total;
@@ -86,15 +95,81 @@ export class PublicProtocolsComponent {
   protected readonly error = this.list.error;
   protected readonly hasFilters = this.list.hasFilters;
   protected readonly hasMore = this.list.hasMore;
-  protected readonly gremiumOptions = this.list.gremiumOptions;
-  protected readonly gremiumText = this.list.gremiumText;
   protected readonly semesterOptions = this.list.semesterOptions;
   protected readonly semesterText = this.list.semesterText;
   protected readonly groups = this.list.groups;
 
+  private readonly loaded = this.list.loaded;
+
   constructor() {
     useNoindex();
   }
+
+  protected readonly head = computed<ScreenHead>(() => ({
+    title: this.gremium()?.name ?? this.i18n.translate('publicProtocols.title'),
+    back: null,
+  }));
+
+  /** "Start › Öffentliche Protokolle › Studierendenparlament" (spec 002402). */
+  protected readonly crumbs = computed<readonly PublicCrumb[]>(() => {
+    const g = this.gremium();
+    return [
+      { label: this.i18n.translate('publicProtocols.crumbHome'), link: { commands: ['/'] } },
+      { label: this.i18n.translate('publicProtocols.title'), link: { commands: ['/protocols'] } },
+      ...(g ? [{ label: g.name }] : []),
+    ];
+  });
+
+  /** The decisions of the same Gremium (spec 002402). */
+  protected readonly actions = computed<readonly Action[]>(() => {
+    const g = this.gremium();
+    return g
+      ? [
+          {
+            key: 'decisions',
+            label: this.i18n.translate('publicDecisions.link'),
+            icon: 'vote',
+            route: { commands: ['/decisions', g.slug] },
+          },
+        ]
+      : [];
+  });
+
+  /**
+   * The state of the screen: the first load, an unknown slug (spec 002403), a Gremium without
+   * protocols, a failed first read. After the first page the screen stays `ready`.
+   */
+  protected readonly state = computed<LoadState<unknown>>(() => {
+    if (this.unknown()) {
+      return { state: 'empty', heading: this.i18n.translate('publicProtocols.gremium.unknown'), icon: 'file' };
+    }
+    if (!this.loaded()) {
+      return this.error()
+        ? { state: 'error', message: this.i18n.translate('publicProtocols.error'), retry: () => this.list.retry() }
+        : { state: 'loading' };
+    }
+    if (this.total() === 0 && !this.hasFilters() && !this.loading()) {
+      return { state: 'empty', heading: this.i18n.translate('publicProtocols.empty.none'), icon: 'file' };
+    }
+    return { state: 'ready', data: null };
+  });
+
+  /** The button of the empty state: the list of Gremien, or the start page. */
+  protected readonly emptyAction = computed<Action>(() =>
+    this.unknown()
+      ? {
+          key: 'all',
+          label: this.i18n.translate('publicProtocols.gremium.all'),
+          icon: 'back',
+          route: { commands: ['/protocols'] },
+        }
+      : {
+          key: 'home',
+          label: this.i18n.translate('publicProtocols.empty.home'),
+          icon: 'back',
+          route: { commands: ['/'] },
+        },
+  );
 
   protected readonly countText = computed(() =>
     this.i18n.translate(
@@ -108,10 +183,6 @@ export class PublicProtocolsComponent {
       { n: this.total() },
     ),
   );
-
-  protected onGremien(ids: readonly string[]): void {
-    this.list.onGremien(ids);
-  }
 
   protected onSemester(key: string): void {
     this.list.onSemester(key);

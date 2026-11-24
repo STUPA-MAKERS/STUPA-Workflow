@@ -25,6 +25,7 @@ from app.modules.budget.tree_models import (
     Invoice,
 )
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
+from app.modules.budget.webhook_fields import emit_booking_created
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
@@ -190,6 +191,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 ),
             },
         )
+        await emit_booking_created(self.session, expense, node, kind=payload.kind)
         if commit:
             await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())

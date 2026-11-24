@@ -30,6 +30,7 @@ import {
   SwitchComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type {
@@ -106,6 +107,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     SectionComponent,
     EmptyStateComponent,
@@ -401,26 +403,27 @@ export class UserRevokeComponent {
     if (!p || !this.canSubmit()) return;
     this.submitting.set(true);
     const ids = selectionIds(this.selected());
-    this.api
-      .revokePrincipal(p.principal.id, { ...ids, deactivate: this.deactivate() })
-      .subscribe({
-        next: (res) => {
-          this.submitting.set(false);
-          this.toast.success(this.i18n.translate('admin.users.revoke.done'));
-          this.revoked.emit(res);
-          this.close();
-        },
-        error: (err: { error?: { code?: string } }) => {
-          this.submitting.set(false);
-          const code = err?.error?.code;
-          if (code && RELOAD_CODES.has(code)) this.load(p.principal.id, this.selected());
-          this.toast.error(
-            this.i18n.translate(
-              isRevokeErrorCode(code) ? `admin.users.revoke.error.${code}` : 'admin.users.revoke.failed',
-            ),
-          );
-        },
-      });
+    this.api.revokePrincipal(p.principal.id, { ...ids, deactivate: this.deactivate() }).subscribe({
+      next: (res) => {
+        this.submitting.set(false);
+        this.toast.show(this.i18n.translate('admin.users.revoke.done'), 'success');
+        this.revoked.emit(res);
+        this.close();
+      },
+      error: (err: { error?: { code?: string } }) => {
+        this.submitting.set(false);
+        const code = err?.error?.code;
+        if (code && RELOAD_CODES.has(code)) this.load(p.principal.id, this.selected());
+        this.toast.show({
+          text: this.i18n.translate(
+            isRevokeErrorCode(code)
+              ? `admin.users.revoke.error.${code}`
+              : 'admin.users.revoke.failed',
+          ),
+          kind: 'error',
+        });
+      },
+    });
   }
 
   protected close(): void {

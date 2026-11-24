@@ -164,6 +164,8 @@ export interface Principal {
   readonly in_substitute_pool?: boolean;
   /** The principal reported a ticket that is not anonymized: the tab "Tickets" shows. */
   readonly has_reported_tickets?: boolean;
+  /** The principal works on tickets in at least one Bereich. */
+  readonly works_on_tickets?: boolean;
 }
 
 /** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */
@@ -2265,6 +2267,27 @@ export interface Protocol {
 export interface NotificationPreference {
   readonly kind: string;
   readonly enabled: boolean;
+}
+
+/** GET /push/key — the public VAPID key that a device subscribes with. */
+export interface PushKey {
+  readonly publicKey: string;
+}
+
+/** POST /push/devices — the subscription of this device, as the browser gives it. */
+export interface PushDeviceIn {
+  readonly endpoint: string;
+  readonly keys: { readonly p256dh: string; readonly auth: string };
+  readonly label: string;
+}
+
+/** One own device with push. */
+export interface PushDevice {
+  readonly id: string;
+  readonly label: string;
+  readonly endpoint: string;
+  readonly createdAt: string;
+  readonly lastSuccessAt: string | null;
 }
 
 /**

@@ -20,13 +20,26 @@
   @if (!phone()) {
     @switch (mainAction()) {
       @case ('open') {
-        <app-button variant="fill" [disabled]="!!openBlocked()" [title]="openBlocked() || ('meetings.control.open' | t)" (click)="startSession.emit()">
+        <app-button
+          variant="fill"
+          [disabled]="!!openBlocked()"
+          [title]="openBlocked() || ('meetings.control.open' | t)"
+          (click)="startSession.emit()"
+        >
           <app-icon name="play" />
           {{ opensAtText() || ('meetings.control.open' | t) }}
         </app-button>
       }
       @case ('close') {
-        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+        <app-button
+          variant="danger"
+          [loading]="finalizing()"
+          [disabled]="anyOpenVote()"
+          [title]="
+            (anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t
+          "
+          (click)="closeSession.emit()"
+        >
           {{ 'meetings.control.closeSession' | t }}
         </app-button>
       }
@@ -34,10 +47,27 @@
   }
 
   @if (proto && m.status === 'closed') {
-    <app-protocol-bar [meeting]="m" [protocol]="proto" [finalizing]="finalizing()" [compact]="phone()" (finalize)="finalize.emit()" />
+    <app-protocol-bar-view
+      [meeting]="m"
+      [protocol]="proto"
+      [finalizing]="finalizing()"
+      [compact]="phone()"
+      [hasSession]="hasSession"
+      (finalize)="finalize.emit()"
+      (sendDraft)="sendProtocolDraft()"
+      (reopen)="reopenProtocol()"
+      (approve)="approveProtocol($event)"
+      (publish)="publishProtocol($event)"
+      (approvalRequest)="approvalOpen.set(true)"
+      (pdfOpen)="openProtocolPdf($event)"
+    />
   }
 
-  <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
+  <app-row-menu
+    [sections]="menu()"
+    [label]="'meetings.page.menu' | t"
+    (selected)="onMenu($event)"
+  />
 </header>
 
 <div class="mp__body" appScrollFade="y" [class.mp__body--wide]="wide()">
@@ -60,7 +90,10 @@
         />
         @if (!showText()) {
           <div class="mp__inPlace">
-            <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: v }" />
+            <ng-container
+              [ngTemplateOutlet]="voteCardTpl"
+              [ngTemplateOutletContext]="{ $implicit: v }"
+            />
           </div>
         }
       </div>
@@ -91,8 +124,9 @@
   </div>
 </div>
 
-<app-session-dock
+<app-session-dock-view
   class="mp__dock"
+  [guestCounts]="dockGuests()"
   [class.mp__dock--quiet]="phone() && m.status === 'planned' && !top()"
   [meeting]="m"
   [agenda]="agenda()"
@@ -118,15 +152,23 @@
 />
 
 @if (!wide()) {
-  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
-    @if (canAddTop()) {
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
-        <app-icon name="plus" />
-      </app-button>
-    }
-    @if (agendaOpen()) {
-      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
-    }
+  <app-side-sheet
+    [side]="phone() ? 'bottom' : 'start'"
+    [heading]="'meetings.agenda.title' | t"
+    [(open)]="agendaOpen"
+    [actions]="
+      canAddTop() ? [{ key: 'add', label: ('meetings.agenda.dialogTitle' | t), icon: 'plus' }] : []
+    "
+    (action)="addTop.emit()"
+  >
+    <ng-template sheetBody>
+      @if (agendaOpen()) {
+        <ng-container
+          [ngTemplateOutlet]="agendaTpl"
+          [ngTemplateOutletContext]="{ inSheet: true }"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -144,7 +186,6 @@
   (conflictResolved)="attendanceConflictResolved.emit($event)"
   (showQr)="showQr()"
 />
-
 
 <ng-template #agendaTpl let-inSheet="inSheet">
   <app-agenda-pane
@@ -174,68 +215,78 @@
      that the dock opens, so the protocol text has the page to itself (spec 001460). -->
 <ng-template #votesTpl>
   @for (vote of votes(); track vote.id) {
-    <ng-container [ngTemplateOutlet]="voteCardTpl" [ngTemplateOutletContext]="{ $implicit: vote }" />
+    <ng-container
+      [ngTemplateOutlet]="voteCardTpl"
+      [ngTemplateOutletContext]="{ $implicit: vote }"
+    />
   } @empty {
-    <app-empty-state icon="vote" shape="row" rows="1" [heading]="'voting.list.empty' | t" />
+    <app-empty-state fill icon="vote" shape="row" rows="1" [heading]="'voting.list.empty' | t" />
   }
 </ng-template>
 
 <ng-template #voteCardTpl let-vote>
-    <app-vote-card
-      [vote]="vote"
-      [meetingStatus]="m.status"
-      [canManage]="m.canManageVotes"
-      [canRun]="m.canManageVotes && m.isProtokollant"
-      [canVote]="m.canVote"
-      [myChoice]="myChoice(vote.id)"
-      [casting]="casting()"
-      [deleting]="deletingVote()"
-      [locked]="locked()"
-      [canInsert]="pendingResult()?.id === vote.id && editable()"
-      [inProtocol]="inText(vote)"
-      [otherOpen]="anyOpenVote()"
-      [repeated]="repeatedIds().has(vote.id)"
-      [canRepeat]="repeatableIds().has(vote.id)"
-      [continued]="continuedIds().has(vote.id)"
-      (edit)="voteSource.emit({ mode: 'edit', vote: $event })"
-      (repeat)="voteSource.emit({ mode: 'repeat', vote: $event })"
-      (close)="voteClose.emit($event)"
-      (cancel)="voteCancel.emit($event)"
-      (open)="voteOpen.emit($event)"
-      (remove)="voteDelete.emit($event)"
-      (cast)="castVote.emit($event)"
-      (insertResult)="insertResult($event)"
-      (electionChanged)="electionChanged.emit()"
-    />
+  <app-vote-card-view
+    [vote]="vote"
+    [meetingStatus]="m.status"
+    [canManage]="m.canManageVotes"
+    [canRun]="m.canManageVotes && m.isProtokollant"
+    [canVote]="m.canVote"
+    [myChoice]="myChoice(vote.id)"
+    [casting]="casting()"
+    [deleting]="deletingVote()"
+    [locked]="locked()"
+    [canInsert]="pendingResult()?.id === vote.id && editable()"
+    [inProtocol]="inText(vote)"
+    [otherOpen]="anyOpenVote()"
+    [repeated]="repeatedIds().has(vote.id)"
+    [canRepeat]="repeatableIds().has(vote.id)"
+    [continued]="continuedIds().has(vote.id)"
+    (edit)="voteSource.emit({ mode: 'edit', vote: $event })"
+    (repeat)="voteSource.emit({ mode: 'repeat', vote: $event })"
+    (close)="voteClose.emit($event)"
+    (cancel)="voteCancel.emit($event)"
+    (open)="voteOpen.emit($event)"
+    (remove)="voteDelete.emit($event)"
+    (cast)="castVote.emit($event)"
+    (insertResult)="insertResult($event)"
+    (electionChanged)="electionChanged.emit()"
+  />
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.meeting.sheet' | t" [(open)]="todosOpen">
-  <!-- One projected group, so the buttons join the head group of the close button. -->
-  @if (todoList()?.canAct() || todoList()?.canLink()) {
-    <ng-container ngProjectAs="[sheet-actions]">
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="todoList()?.linkOpen?.set(true)">
-        <app-icon name="link" />
-      </app-button>
-      @if (todoList()?.canAct()) {
-        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="todoList()?.newOpen?.set(true)">
-          <app-icon name="plus" />
-        </app-button>
-      }
-    </ng-container>
-  }
-  @if (todosOpen()) {
-    <app-todo-linked-list
-      #todoList
-      kind="meeting"
-      headingId="mp-meeting-todos"
-      [showTitle]="false"
-      [targetId]="m.id"
-      [gremiumId]="m.gremiumId"
-      [linkLabel]="m.title"
-      [emptyHeading]="'todos.meeting.empty' | t"
-      [headActions]="true"
-    />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'todos.meeting.sheet' | t"
+  [(open)]="todosOpen"
+  [actions]="
+    todoList()?.canAct()
+      ? [
+          { key: 'link', label: ('todos.linked.link' | t), icon: 'link' },
+          { key: 'add', label: ('todos.linked.add' | t), icon: 'plus' },
+        ]
+      : todoList()?.canLink()
+        ? [{ key: 'link', label: ('todos.linked.link' | t), icon: 'link' }]
+        : []
+  "
+  (action)="
+    $event.key === 'link' ? todoList()?.linkOpen?.set(true) : todoList()?.newOpen?.set(true)
+  "
+>
+  <ng-template sheetBody>
+    @if (todosOpen()) {
+      <app-todo-linked-list
+        #todoList
+        kind="meeting"
+        headingId="mp-meeting-todos"
+        [showTitle]="false"
+        fill
+        [targetId]="m.id"
+        [gremiumId]="m.gremiumId"
+        [linkLabel]="m.title"
+        [emptyHeading]="'todos.meeting.empty' | t"
+        [headActions]="true"
+      />
+    }
+  </ng-template>
 </app-side-sheet>
 
 <!-- Above the phone width small tabs at the end edge open the sheets: the votes for everybody
@@ -288,48 +339,60 @@
 
 <!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
      (spec 001800). -->
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.linked.top' | t" [(open)]="linksOpen">
-  <!-- One projected group, so the buttons join the head group of the close button. -->
-  @if (topLinks()?.canAct() || topLinks()?.canLink()) {
-    <ng-container ngProjectAs="[sheet-actions]">
-      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.link' | t" (click)="topLinks()?.linkOpen?.set(true)">
-        <app-icon name="link" />
-      </app-button>
-      @if (topLinks()?.canAct()) {
-        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'todos.linked.add' | t" (click)="topLinks()?.newOpen?.set(true)">
-          <app-icon name="plus" />
-        </app-button>
-      }
-    </ng-container>
-  }
-  @if (linksOpen() && top(); as t) {
-    <app-todo-linked-list
-      #topLinks
-      kind="agenda_item"
-      headingId="mp-top-links"
-      [showTitle]="false"
-      [targetId]="t.id"
-      [gremiumId]="m.gremiumId"
-      [linkLabel]="t.title ?? ''"
-      [lead]="applicationLead()"
-      [emptyHeading]="'todos.linked.empty' | t"
-      [headActions]="true"
-    />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'todos.linked.top' | t"
+  [(open)]="linksOpen"
+  [actions]="
+    topLinks()?.canAct()
+      ? [
+          { key: 'link', label: ('todos.linked.link' | t), icon: 'link' },
+          { key: 'add', label: ('todos.linked.add' | t), icon: 'plus' },
+        ]
+      : topLinks()?.canLink()
+        ? [{ key: 'link', label: ('todos.linked.link' | t), icon: 'link' }]
+        : []
+  "
+  (action)="
+    $event.key === 'link' ? topLinks()?.linkOpen?.set(true) : topLinks()?.newOpen?.set(true)
+  "
+>
+  <ng-template sheetBody>
+    @if (linksOpen() && top(); as t) {
+      <app-todo-linked-list
+        #topLinks
+        kind="agenda_item"
+        headingId="mp-top-links"
+        [showTitle]="false"
+        fill
+        [targetId]="t.id"
+        [gremiumId]="m.gremiumId"
+        [linkLabel]="t.title ?? ''"
+        [lead]="applicationLead()"
+        [emptyHeading]="'todos.linked.empty' | t"
+        [headActions]="true"
+      />
+    }
+  </ng-template>
 </app-side-sheet>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'meetings.vote.count' | t" [(open)]="votesOpen">
-  <!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
-  @if (canAddVote() && top(); as t) {
-    <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="addVoteLabel() | t" (click)="voteDialog.emit(t)">
-      <app-icon name="plus" />
-    </app-button>
-  }
-  @if (votesOpen()) {
-    <div class="mp__votes mp__votes--sheet">
-      <ng-container [ngTemplateOutlet]="votesTpl" />
-    </div>
-  }
+<!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'meetings.vote.count' | t"
+  [(open)]="votesOpen"
+  [actions]="
+    canAddVote() && top() ? [{ key: 'add', label: (addVoteLabel() | t), icon: 'plus' }] : []
+  "
+  (action)="top() && voteDialog.emit(top()!)"
+>
+  <ng-template sheetBody>
+    @if (votesOpen()) {
+      <div class="mp__votes mp__votes--sheet">
+        <ng-container [ngTemplateOutlet]="votesTpl" />
+      </div>
+    }
+  </ng-template>
 </app-side-sheet>
 
 <!-- The format tools of the sheet for the dock ("Aa" on a phone). A press keeps the focus in
@@ -343,12 +406,13 @@
             variant="tonal"
             [iconOnly]="true"
             [ariaPressed]="ts.activeFormats().has(tool.format)"
-            [ariaLabel]="tool.label | t"
-            [title]="tool.label | t"
+            [ariaLabel]="tool.label | uiKitT"
+            [title]="tool.label | uiKitT"
             (pointerdown)="$event.preventDefault()"
             (mousedown)="$event.preventDefault()"
             (click)="ts.toggleFormat(tool.format)"
-          ><app-icon [name]="tool.icon" /></app-button>
+            ><app-icon [name]="tool.icon"
+          /></app-button>
         }
       </app-button-group>
     }
@@ -361,7 +425,8 @@
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
         (click)="ts.insertTable()"
-      ><app-icon name="table" /></app-button>
+        ><app-icon name="table"
+      /></app-button>
       <app-button
         variant="text"
         [iconOnly]="true"
@@ -370,7 +435,8 @@
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
         (click)="ts.insertImage()"
-      ><app-icon name="image" /></app-button>
+        ><app-icon name="image"
+      /></app-button>
       <app-button
         variant="text"
         [iconOnly]="true"
@@ -379,7 +445,8 @@
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
         (click)="ts.insertDocument()"
-      ><app-icon name="file" /></app-button>
+        ><app-icon name="file"
+      /></app-button>
       <app-button
         variant="text"
         [iconOnly]="true"
@@ -388,7 +455,20 @@
         (pointerdown)="$event.preventDefault()"
         (mousedown)="$event.preventDefault()"
         (click)="ts.insertTimeNote()"
-      ><app-icon name="clock" /></app-button>
+        ><app-icon name="clock"
+      /></app-button>
+      @if (ts.paperlessOn()) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'paperless.command' | t"
+          [title]="'paperless.command' | t"
+          (pointerdown)="$event.preventDefault()"
+          (mousedown)="$event.preventDefault()"
+          (click)="ts.insertFromPaperless()"
+          ><app-icon name="archive"
+        /></app-button>
+      }
     </app-button-group>
   }
 </ng-template>
@@ -429,9 +509,24 @@
       <app-join-qr [meeting]="meeting()" [iconOnly]="true" [(open)]="qrOpen" />
     }
     @if (wide() && meeting().status !== 'closed' && meeting().canManage) {
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.beamer.enter' | t" (click)="toggleBeamer.emit()">
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.beamer.enter' | t"
+        (click)="toggleBeamer.emit()"
+      >
         <app-icon name="monitor" />
       </app-button>
     }
   </ng-container>
 </ng-template>
+
+@if (approvalOpen()) {
+  <app-protocol-approval-dialog
+    [open]="true"
+    [meeting]="meeting()"
+    [saving]="approvalSaving()"
+    (closed)="approvalOpen.set(false)"
+    (picked)="approveProtocol($event)"
+  />
+}

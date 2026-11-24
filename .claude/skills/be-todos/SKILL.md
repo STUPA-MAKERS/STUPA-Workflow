@@ -27,7 +27,9 @@ done (`completed_at`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
   appointment (a Termin, `calendar_appointment`; read rule `calendar.appointments.readable`,
   a granted Termin gives title, start, end and place only), gremium, invoice, expense
-  (`budget_expense`), budget (the cost centre), ticket, todo.
+  (`budget_expense`), budget (the cost centre), ticket, todo, paperless (a Paperless
+  document, row `paperless_document`, migration `b9e2c47f1a36`; `LinkResolver.prepare`
+  stores the document before a new link, see be-paperless).
   Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
   `b3b70dda7d08` adds `budget_id`; `d85b3e6a1f47` adds `appointment_id`.
   `TodoCardEvent` has `start_time`/`end_time` (migration `c7d21f9a4e63`): a time needs its
@@ -39,8 +41,16 @@ done (`completed_at`).
   and mentionable people); `token_reads` (the token gate), `TODO_ALL`, `TODO_READ_ALL`.
   The gremium rights come from `auth.policy.gremium_ids_with` (admin bypass + own role,
   scope-capped).
-- `service.py` — `TodoService`: boards, columns, labels, cards, sub-resources, `mine`,
-  `linked`, `search`, `card_for_agenda`, `link_agenda_item`, `complete`. Mails go to
+- `service/` — package; `__init__.py` re-exports `TodoService`, `TodoMail`, `BERLIN` and
+  `berlin_today`. `service.py` is the `TodoService` facade over ops classes on
+  `base.TodoServiceBase` (access, locks, `_card`, `_event`, `_touch`, `_facts`, `_mail`):
+  `boards.py`, `columns.py` (columns and labels), `details.py` (card reads), `cards.py`
+  (create, patch, move, transfer, complete, archive, `card_for_agenda`,
+  `link_agenda_item`), `card_parts.py` (assignees, labels, checklist), `card_events.py`
+  (Event, follow-up, series), `comments.py`, `reads.py` (`mine`, board rows, linked,
+  search), `calendar_reads.py`; pure helpers in `common.py`, `ranks.py` (lexorank),
+  `rows.py` (serialization). A test that monkeypatches a name patches the submodule that
+  uses it (e.g. `service.comments.bind_drafts`). Mails go to
   `outbox` (`TodoMail`); the router sends them after the commit. `mine_boards`: the rows
   under "Meine To-Dos"; `all_boards`: the meta-board "Alle"; both through
   `_board_rows(mine=...)`.
@@ -168,7 +178,7 @@ answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 40
   ranks collide (`RankError` → `spread` over the column). Create, move, `complete` and
   column delete also re-rank the live cards of the column with `spread` when the new rank
   is longer than `MAX_LENGTH` (50): every append adds about one digit per six cards, and
-  the done column never empties (`_append`, `_rank` in `service.py`). Every write bumps
+  the done column never empties (`_append`, `_rank` in `service/ranks.py`). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
 - `transfer` moves a card into a column of another board: between `afterId` and
   `beforeId` (`_slot` and `_place`, the same code as the move), else to the end. It locks both boards in

@@ -133,6 +133,20 @@ class AuditAction(StrEnum):
             the actor. The ``GUEST_*`` entries NEVER carry the name of a guest. A
             guest ballot writes VOTE_CAST with the actor ``guest:<meeting_guest.id>``
             and no choice.
+        PAPERLESS_CONNECTION: A change of the Paperless connection or of its switches
+            (§F/integrations/paperless/002531). ``data`` holds the address, the
+            switches and whether the token changed, never the token.
+        PAPERLESS_FILED: The platform filed one document in Paperless. The target is the
+            element (``protocol``, ``application`` or ``budget_plan``). ``data`` holds
+            the kind of the file and the number of the Paperless document.
+        PAPERLESS_INSERTED: A person copied one Paperless document into a protocol text
+            (§F/integrations/paperless/002528). The target is the stored PDF
+            (``markdown_document``). ``data`` holds the Sitzung and the number of the
+            Paperless document.
+        TICKET_MAILBOX: A create, a change or a delete of the Postfach of a Bereich
+            (§F/integrations/ticket-mail/002743). The target is the Bereich
+            (``ticket_area``). ``data`` holds the operation and the names of the changed
+            fields, never a password.
         PII_EXPORT: GDPR export (Art. 15). ANONYMIZATION and the ``ERASURE_*`` entries
             cover erasure (Art. 17) and its request queue, RETENTION_ANONYMIZE covers
             retention (Art. 5(1)(e)).
@@ -275,6 +289,10 @@ class AuditAction(StrEnum):
     BACKUP_RESTORE = "backup_restore"
     GREMIUM_INFO_UPDATE = "gremium_info_update"
     GREMIUM_NOTIFY = "gremium_notify"
+    PAPERLESS_CONNECTION = "paperless_connection"
+    PAPERLESS_FILED = "paperless_filed"
+    PAPERLESS_INSERTED = "paperless_inserted"
+    TICKET_MAILBOX = "ticket_mailbox"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

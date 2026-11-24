@@ -1,8 +1,4 @@
-<section class="bk admin-page">
-  <app-page-header [flush]="true" [title]="'admin.backups.title' | t">
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
+<app-sections-screen class="bk" [head]="{ title: 'admin.backups.title' | t }">
   @if (!enabled()) {
     <app-note kind="warn" icon="alert">
       <strong>{{ 'admin.backups.offTitle' | t }}.</strong> {{ 'admin.backups.offHint' | t }}
@@ -53,103 +49,59 @@
     </app-section>
   </div>
 
-  <app-section class="bk__list" [level]="2" [heading]="'admin.backups.listTitle' | t">
-    @if (loading() || rows().length) {
-      <app-data-table
-        surface="rowgroup"
-        [columns]="columns()"
-        [rows]="rows()"
-        [loading]="loading()"
-        [loadingText]="'common.loading' | t"
-      >
-        <ng-template appCell="createdAt" let-r>
-          <span class="mono bk__nowrap bk__date">{{ $any(r).createdAt | ldate: 'medium' }}</span>
-        </ng-template>
-
-        <ng-template appCell="kind" let-r>
-          <span class="bk__kind">
-            {{ kindLabel($any(r).kind) }}
-            @if ($any(r).pinned) {
-              <app-icon class="bk__pinMark" name="pin" [size]="14" [title]="'admin.backups.pinnedHint' | t" />
-              <span class="sr-only">{{ 'admin.backups.pinned' | t }}</span>
-            }
-          </span>
-          @if ($any(r).note) {
-            <span class="bk__noteText ell" [title]="$any(r).note">{{ $any(r).note }}</span>
-          }
-        </ng-template>
-
-        <ng-template appCell="status" let-r>
-          @let st = backupStatus($any(r).status);
-          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-          @if ($any(r).status === 'failed' && $any(r).error) {
-            <span class="bk__error">{{ $any(r).error }}</span>
-          }
-        </ng-template>
-
-        <ng-template appCell="size" let-r>
-          <span class="mono bk__nowrap">{{ sizeLabel($any(r).sizeBytes) }}</span>
-        </ng-template>
-
-        <ng-template appCell="contents" let-r>
-          @if ($any(r).objectCount !== null && $any(r).objectCount !== undefined) {
-            {{ 'admin.backups.objectCount' | t: { count: $any(r).objectCount } }}
-          } @else {
-            —
-          }
-        </ng-template>
-
-        <ng-template appCell="actions" let-r>
-          @if ($any(r).status === 'done') {
-            <app-button-group>
-              <app-row-menu
-                [label]="('admin.common.actions' | t) + ': ' + ($any(r).createdAt | ldate: 'medium')"
-                [sections]="rowMenu($any(r))"
-                (selected)="onRowMenu($any(r), $event)"
-              />
-            </app-button-group>
-          }
-        </ng-template>
-      </app-data-table>
-    } @else {
-      <app-empty-state icon="db" shape="table" [heading]="'admin.backups.empty' | t" />
-    }
-  </app-section>
-</section>
+  <app-record-section
+    [heading]="'admin.backups.listTitle' | t"
+    [rows]="list()"
+    (rowAction)="onRowAction($event.id, $event.key)"
+  />
+</app-sections-screen>
 
 @if (confirmRestore(); as target) {
   <app-dialog
     [open]="true"
-    [title]="'admin.backups.restoreTitle' | t"
+    [heading]="'admin.backups.restoreTitle' | t"
     [subtitle]="restoreSubtitle(target)"
     [closeLabel]="'action.close' | t"
     (closed)="confirmRestore.set(null)"
+    [actions]="[
+      { key: 'confirmRestore', label: ('action.cancel' | t) },
+      {
+        key: 'doRestore',
+        label: ('admin.backups.restore' | t),
+        icon: 'history',
+        kind: 'danger',
+        disabled: !restoreArmed() || busy(),
+      },
+    ]"
+    (action)="
+      $event.key === 'confirmRestore'
+        ? confirmRestore.set(null)
+        : $event.key === 'doRestore'
+          ? doRestore()
+          : null
+    "
   >
-    <form class="bk__restore" (submit)="$event.preventDefault(); doRestore()">
-      <p class="bk__warn">{{ 'admin.backups.restoreWarning' | t }}</p>
-      <ul class="bk__points">
-        <li>{{ 'admin.backups.restorePoint1' | t }}</li>
-        <li>{{ 'admin.backups.restorePoint2' | t }}</li>
-        <li>{{ 'admin.backups.restorePoint3' | t }}</li>
-      </ul>
-      <p class="bk__target">
-        {{ 'admin.backups.restoreTarget' | t }}
-        <strong class="mono">{{ target.createdAt | ldate: 'medium' }}</strong>
-      </p>
-      <app-input
-        [label]="'admin.backups.restoreConfirmLabel' | t"
-        [ngModel]="restoreConfirmText()"
-        (ngModelChange)="restoreConfirmText.set($event)"
-        name="restoreConfirm"
-      />
-      <button type="submit" hidden></button>
-    </form>
-    <div dialog-footer>
-      <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
-      <app-button variant="danger" [disabled]="!restoreArmed() || busy()" (click)="doRestore()">
-        <app-icon name="history" /> {{ 'admin.backups.restore' | t }}
-      </app-button>
-    </div>
+    <ng-template dialogBody>
+      <form class="bk__restore" (submit)="$event.preventDefault(); doRestore()">
+        <p class="bk__warn">{{ 'admin.backups.restoreWarning' | t }}</p>
+        <ul class="bk__points">
+          <li>{{ 'admin.backups.restorePoint1' | t }}</li>
+          <li>{{ 'admin.backups.restorePoint2' | t }}</li>
+          <li>{{ 'admin.backups.restorePoint3' | t }}</li>
+        </ul>
+        <p class="bk__target">
+          {{ 'admin.backups.restoreTarget' | t }}
+          <strong class="mono">{{ target.createdAt | ldate: 'medium' }}</strong>
+        </p>
+        <app-input
+          [label]="'admin.backups.restoreConfirmLabel' | t"
+          [ngModel]="restoreConfirmText()"
+          (ngModelChange)="restoreConfirmText.set($event)"
+          name="restoreConfirm"
+        />
+        <button type="submit" hidden></button>
+      </form>
+    </ng-template>
   </app-dialog>
 }
 

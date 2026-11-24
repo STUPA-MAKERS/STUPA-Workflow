@@ -37,7 +37,7 @@ def _svc(session: ScriptedSession, files: FakeFiles | None = None) -> TicketServ
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 7,
+        "number": "AAAA0007",
         "kind": "bug",
         "title": "Fehler",
         "body": "Text",
@@ -97,14 +97,14 @@ async def test_the_list_holds_only_the_own_live_tickets() -> None:
     ticket = _ticket()
     session = ScriptedSession(scalar=[1], scalars=[[ticket]])
     page = await _svc(session).reporter_list(
-        ME, statuses=["new"], kinds=["bug"], q="T-0007", limit=10, offset=0
+        ME, statuses=["new"], kinds=["bug"], q="t-7k3qx9md", limit=10, offset=0
     )
     assert page.total == 1
-    assert page.items[0].number == "T-0007"
+    assert page.items[0].number == "T-AAAA0007"
     sql = str(session.statements[-1].compile(compile_kwargs={"literal_binds": True}))
     assert "ticket.reporter_principal_id" in sql
     assert "ticket.anonymized_at IS NULL" in sql
-    assert "ticket.number = 7" in sql
+    assert "ticket.number = '7K3QX9MD'" in sql
     assert "reporter_email" not in sql.split("WHERE", 1)[1]
 
 
@@ -138,7 +138,7 @@ async def test_the_detail_shows_public_notes_and_status_changes_only() -> None:
         ticket_id=ticket.id,
         actor_id=STAFF,
         kind="status",
-        payload={"from": "new", "to": "in_progress", "duplicateOf": "T-0001"},
+        payload={"from": "new", "to": "in_progress", "duplicateOf": "T-AAAA0001"},
         created_at=NOW,
     )
     report_file = AttachmentOut(
@@ -214,7 +214,6 @@ async def test_a_message_of_the_reporter_is_public() -> None:
 
 
 async def test_a_message_with_files_locks_the_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.tickets import service as svc_mod
 
     async def _check(_s: object, **_kw: Any) -> str:
         return "tok"
@@ -222,8 +221,8 @@ async def test_a_message_with_files_locks_the_ticket(monkeypatch: pytest.MonkeyP
     async def _bind(_s: object, **_kw: Any) -> None:
         return None
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.notes.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.notes.bind_drafts", _bind)
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME, None], execute=[[(ME, "Me", None)]])
     session.put(ticket)

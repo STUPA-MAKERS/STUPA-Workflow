@@ -7,14 +7,14 @@ owner: frederikbeimgraben
 updated: 2026-11-19
 implementation:
   - frontend/src/app/features/calendar/calendar.component.ts
-  - frontend/src/app/features/calendar/external-entry/external-entry.component.ts
+  - frontend/vendor/ui-kit/views/calendar/src/external-entry-view.component.ts
 scope:
   - frontend/src/app/features
 ---
 
 # An entry opens its own element
 
-The side column of the desktop must show each entry of the picked day as one row (001770)
+The side column of the desktop must show each entry of the picked day as one row (ui-kit:001770)
 that is pressable as a whole. A meeting entry must open the meeting and a card entry must open the card.
 A Termin and an entry of an external calendar must open in a dialog on the desktop and in a
 bottom sheet on the phone. The dialog of an external entry must be read-only and must show the

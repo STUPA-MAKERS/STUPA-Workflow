@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * § 000634: a record row of Verwaltung has the anatomy of the shared record row. The page
+ * §ui-kit:000634: a record row of Verwaltung has the anatomy of the shared record row. The page
  * sets no inset and no height for the row and no font for its title.
  */
 const LISTS = [
   { name: 'oauth-grants/oauth-grants.component', row: 'og__row', title: 'og__name' },
   { name: 'delegations/delegations.component', row: 'dl__row', title: 'dl__title' },
-  { name: 'delegations/substitute-pool.component', row: 'sp__row', title: 'sp__member' },
+  { name: 'committees/substitute-pool.component', row: 'sp__row', title: 'sp__member' },
   { name: 'committees/gremium-members.component', row: 'gmm__row', title: 'gmm__name' },
   { name: 'cd-variants/cd-variants.component', row: 'cdv__variant', title: 'cdv__name' },
   { name: 'help-tickets/help-tickets.component', row: 'ht__row', title: 'ht__name' },
@@ -26,7 +26,8 @@ function declarationsOf(scss: string, selector: string): string {
 describe('AdminRecordRows', () => {
   it.each(LISTS)('$name lists its records in the shared record row group', ({ name }) => {
     const html = read(`${name}.html`);
-    expect(html).toMatch(/class="rowgroup rowgroup--records\b/);
+    // On the kit records screen (§ui-kit:002257) `variant="records"` draws the record row group.
+    expect(html).toMatch(/class="rowgroup rowgroup--records\b|<app-records-screen[^>]*\svariant="records"/);
     expect(html).toMatch(/\browgroup__title\b/);
   });
 

@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { ImageAltService } from '@shared/markdown/image-alt.service';
 import { MediaApiService } from '@shared/markdown/media-api.service';
-import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
+import { ProtocolImageUploadDirective, TopSheetViewComponent } from '@stupa-makers/ui-kit/views/protocol';
 import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -13,9 +13,12 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
-import { type SaveState, TopSheetComponent, documentUploadErrorKey } from './top-sheet.component';
+import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { documentUploadErrorKey } from './protocol-api.provider';
 import { KnownNamesService } from './known-names.service';
+import { PaperlessService } from '@core/api/paperless.service';
 import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { kindSpies } from '../../../../testing/toast';
 
 interface Inputs {
   meeting: Meeting;
@@ -199,7 +202,7 @@ describe('TopSheetComponent', () => {
     const ask = jest.fn().mockResolvedValueOnce(null).mockResolvedValue('Die Sitzung im Saal');
     const view = await setup({}, [
       { provide: MediaApiService, useValue: { uploadImage: upload } },
-      { provide: ImageAltService, useValue: { ask } },
+      { provide: ImageAltService, useValue: Object.assign(Object.create(ImageAltService.prototype) as ImageAltService, { ask }) },
     ]);
     const uploader = editorOf(view).imageUpload();
     expect(uploader).not.toBeNull();
@@ -209,7 +212,7 @@ describe('TopSheetComponent', () => {
     expect(upload).not.toHaveBeenCalled();
     await expect(uploader!(png)).resolves.toEqual({ src: `/api/media/images/${ID}`, alt: 'Die Sitzung im Saal' });
     const toast = TestBed.inject(ToastService);
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     await expect(uploader!(png)).rejects.toEqual({ status: 413 });
     expect(error).toHaveBeenCalled();
   });
@@ -230,7 +233,7 @@ describe('TopSheetComponent', () => {
     const pdf = new File(['x'], 'Angebot.pdf', { type: 'application/pdf' });
     await expect(uploader!(pdf)).resolves.toEqual({ src: doc.url, name: 'Angebot.pdf' });
     expect(uploadDocument).toHaveBeenCalledWith(view.fixture.componentInstance.meeting().id, pdf);
-    const error = jest.spyOn(TestBed.inject(ToastService), 'error');
+    const error = jest.spyOn(kindSpies(TestBed.inject(ToastService)), 'error');
     await expect(uploader!(pdf)).rejects.toEqual({ status: 415 });
     expect(error).toHaveBeenCalledWith('Nur PDF-Dateien ohne Passwort.');
     await expect(editor.documentInfo()!(doc.url)).resolves.toBe(3);
@@ -371,7 +374,8 @@ describe('TopSheetComponent', () => {
 
     it('marks no name for a reader', async () => {
       const view = await setup({ editable: false, top: { ...AGENDA[0], body: '' } });
-      const cmp = view.fixture.componentInstance as unknown as { knownNames: () => readonly unknown[] };
+      const cmp = view.fixture.debugElement.query((d) => d.componentInstance instanceof TopSheetViewComponent)
+        .componentInstance as unknown as { knownNames: () => readonly unknown[] };
       expect(cmp.knownNames()).toEqual([]);
     });
 
@@ -395,8 +399,8 @@ describe('TopSheetComponent', () => {
       expect(area.value).toBe('Text\n\n|  |  |  |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n');
       expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
       const directive = view.fixture.debugElement
-        .query((d) => d.injector.get(MarkdownImageUploadDirective, null) !== null)
-        .injector.get(MarkdownImageUploadDirective);
+        .query((d) => d.injector.get(ProtocolImageUploadDirective, null) !== null)
+        .injector.get(ProtocolImageUploadDirective);
       const pick = jest.spyOn(directive, 'pick').mockImplementation(() => undefined);
       await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
       expect(pick).toHaveBeenCalled();
@@ -429,7 +433,7 @@ describe('TopSheetComponent', () => {
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
   });
 
-  /** § 001304: the protocol of a closed meeting sits in the meeting head, not on the sheet. */
+  /** §ui-kit:001304: the protocol of a closed meeting sits in the meeting head, not on the sheet. */
   it('shows no protocol state and no protocol action on the sheet of a closed meeting', async () => {
     const { container } = await setup({ meeting: meeting({ status: 'closed' }) });
     expect(container.querySelector('.ts__foot')).toBeNull();
@@ -651,6 +655,106 @@ describe('TopSheetComponent', () => {
       await setup(over);
       expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /TOP umbenennen/ })).toBeNull();
+    });
+  });
+
+  /**
+   * § ui-kit 002771: the inserts of the text as slash commands.
+   * § F/integrations/paperless/002527: the command `Paperless` opens the Paperless search.
+   */
+  describe('slash commands', () => {
+    const copy = { name: 'Angebot.pdf', url: `/api/media/documents/${ID}` };
+    const paperless = (on: boolean): Provider => ({
+      provide: PaperlessService,
+      useValue: {
+        insertOn: () => of(on),
+        linksOn: () => of(false),
+        search: () => of([{ documentId: 418, title: 'Angebot', documentType: null, created: null }]),
+        insert: jest.fn(() => of(copy)),
+      },
+    });
+    afterEach(() => document.querySelectorAll('.sw-layer').forEach((n) => n.remove()));
+
+    const labels = (view: Awaited<ReturnType<typeof setup>>): string[] =>
+      editorOf(view)
+        .slashCommands()
+        .map((command) => command.label);
+
+    it('offers the inserts of the format bar and runs each of them', async () => {
+      const view = await setup({}, [paperless(false)]);
+      const editor = editorOf(view);
+      expect(labels(view)).toEqual(['Tabelle', 'Bild', 'PDF', 'Anmerkung']);
+      const table = jest.spyOn(editor, 'insertTable').mockReturnValue(true);
+      const image = jest.spyOn(editor, 'pickImage').mockImplementation(() => {});
+      const pdf = jest.spyOn(editor, 'pickDocument').mockImplementation(() => {});
+      const note = jest.spyOn(editor, 'insertTimeNote').mockReturnValue(true);
+      for (const id of ['table', 'image', 'document', 'timeNote']) editor.slashCommand.emit(id);
+      expect([table, image, pdf, note].map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+      expect(view.container.querySelector('app-paperless-insert')).toBeNull();
+    });
+
+    it('adds Paperless as the last command with the permission and the part on, and inserts the pick', async () => {
+      const view = await setup({}, [
+        paperless(true),
+        { provide: MediaApiService, useValue: { documentInfo: () => of({ pages: 3 }) } },
+      ]);
+      const editor = editorOf(view);
+      expect(labels(view)).toEqual(['Tabelle', 'Bild', 'PDF', 'Anmerkung', 'Paperless']);
+      expect(document.querySelector('.sw')).toBeNull();
+
+      editor.slashCommand.emit('paperless');
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(document.querySelector('.sw')?.getAttribute('aria-label')).toBe('In Paperless suchen');
+
+      (document.querySelector('.sw__row') as HTMLElement).click();
+      view.fixture.detectChanges();
+      expect(TestBed.inject(PaperlessService).insert).toHaveBeenCalledWith(
+        view.fixture.componentInstance.meeting().id,
+        418,
+      );
+      expect(document.querySelector('.sw')).toBeNull();
+      expect(view.bodyChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: expect.stringContaining(`[Angebot.pdf](${copy.url})`) }),
+      );
+    });
+
+    it('has the tool Paperless in the format bar after Anmerkung, and none with the part off', async () => {
+      const view = await setup({}, [paperless(true)]);
+      const bar = screen.getByRole('toolbar');
+      const names = Array.from(bar.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'));
+      expect(names.slice(-2)).toEqual(['Anmerkung mit Uhrzeit einfügen', 'Paperless']);
+      await userEvent.click(screen.getByRole('button', { name: 'Paperless' }));
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(document.querySelector('.sw')?.getAttribute('aria-label')).toBe('In Paperless suchen');
+    });
+
+    it('has no tool Paperless with the part off', async () => {
+      await setup({}, [paperless(false)]);
+      expect(screen.queryByRole('button', { name: 'Paperless' })).toBeNull();
+    });
+
+    it('puts the pick at the caret of the Markdown source', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: 'Text' } }, [paperless(true)]);
+      view.fixture.componentInstance.mode.set('raw');
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.componentInstance.insertFromPaperless();
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      (document.querySelector('.sw__row') as HTMLElement).click();
+      view.fixture.detectChanges();
+      expect(view.bodyChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ body: expect.stringContaining(`[Angebot.pdf](${copy.url})`) }),
+      );
+    });
+
+    it('gives a reader no commands', async () => {
+      const view = await setup({ editable: false }, [paperless(true)]);
+      expect(labels(view)).toEqual([]);
     });
   });
 });

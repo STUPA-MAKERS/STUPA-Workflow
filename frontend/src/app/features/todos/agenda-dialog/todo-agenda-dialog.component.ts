@@ -78,14 +78,17 @@ export class TodoAgendaDialogComponent {
     this.api.addAgendaTodo(meetingId, this.cardId()).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('todos.agenda.done'));
+        this.toast.show(this.i18n.translate('todos.agenda.done'), 'success');
         this.added.emit(meetingId);
         this.open.set(false);
       },
       error: (err: { error?: { code?: string } }) => {
         this.busy.set(false);
         const taken = err?.error?.code === 'todo_already_on_agenda';
-        this.toast.error(this.i18n.translate(taken ? 'todos.agenda.taken' : 'todos.agenda.error'));
+        this.toast.show(
+          this.i18n.translate(taken ? 'todos.agenda.taken' : 'todos.agenda.error'),
+          'error',
+        );
       },
     });
   }

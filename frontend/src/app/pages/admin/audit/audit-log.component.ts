@@ -1,7 +1,6 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import { LoadMoreComponent } from '@shared/ui/load-more/load-more.component';
-import { ButtonGroupComponent, MetaLineComponent, PageHeaderComponent, StickyBarComponent as _Sb, FactsComponent } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { ButtonGroupComponent, MetaLineComponent, FactsComponent } from '@stupa-makers/ui-kit';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -19,16 +18,26 @@ import {
   ButtonComponent,
   ConfigDiffComponent,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   filterChipText,
   IconComponent,
+  type ListRow,
+  type LoadState as ScreenLoadState,
   RangeChipComponent,
   type RangeValue,
+  SearchPillComponent,
   SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import {
+  RecordsScreenComponent,
+  ScreenFiltersDirective,
+  ScreenIntroDirective,
+  ScreenListFootDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { checkedAt, formatCount, triggerLabel } from '../admin-health/admin-health.util';
 import type {
@@ -37,7 +46,10 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
+import { debounced } from '@shared/debounced';
 import { expandSet } from '@shared/expand-set';
+import type { Subscription } from 'rxjs';
+import { searchWords, textsMatch } from '../list-search';
 import type { LoadState } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
@@ -173,6 +185,10 @@ export const AUDIT_ACTIONS = [
   'backup_restore',
   'gremium_info_update',
   'gremium_notify',
+  'paperless_connection',
+  'paperless_filed',
+  'paperless_inserted',
+  'ticket_mailbox',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
@@ -263,8 +279,6 @@ type VerifyState =
     LoadStateComponent,
     ExpandRowComponent,
     LoadMoreComponent,
-    _Sb,
-    EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
@@ -274,10 +288,15 @@ type VerifyState =
     ConfirmDialogComponent,
     IconComponent,
     FilterSelectComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     SkeletonComponent,
     RangeChipComponent,
+    RecordsScreenComponent,
+    ScreenFiltersDirective,
+    ScreenIntroDirective,
+    ScreenListFootDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -294,9 +313,31 @@ export class AuditLogComponent {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
-  /** The first page loads: skeleton rows. A later page loads inside the list. */
-  protected readonly loadState = computed<LoadState>(() =>
-    this.loading() && !this.entries().length ? 'loading' : this.loadError() ? 'error' : 'ok',
+  /**
+   * The rows of the records screen (§ui-kit:002257). The first page loads as skeleton rows; a
+   * later page loads inside the list, so the rows stay ready. A failed later page keeps the rows
+   * (`keepOnError` while entries show); a failed first page shows the face (§ui-kit:002405).
+   */
+  protected readonly rows = computed<ScreenLoadState<readonly ListRow[]>>(() => {
+    const entries = this.entries();
+    if (this.loading() && !entries.length) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.audit.error'),
+        retry: () => this.retry(),
+      };
+    return entries.length
+      ? { state: 'ready', data: entries.map((e) => ({ id: String(e.id), title: e.action })) }
+      : {
+          state: 'empty',
+          icon: this.activeFilterCount() || this.query() ? 'searchOff' : 'clipcheck',
+          heading: this.i18n.translate(this.query() ? 'admin.list.noHits' : 'admin.audit.empty'),
+        };
+  });
+  /** The entries by the id of their row. */
+  private readonly byId = computed(
+    () => new Map(this.entries().map((e) => [String(e.id), e] as const)),
   );
   /** A further page loads, for "Mehr laden". */
   protected readonly loadingMore = computed(() => this.loading() && this.entries().length > 0);
@@ -323,6 +364,21 @@ export class AuditLogComponent {
   protected readonly verifying = signal(false);
 
   protected readonly action = signal('');
+  /** The text in the search pill (§002690). The server searches it as `q` (§002693). */
+  protected readonly searchText = signal('');
+  /** The search of the last load. */
+  private readonly query = signal('');
+  /**
+   * The hits for the pill while a search is set: the loaded entries once no page follows. The
+   * list pages by keyset and has no total, so a search with more pages shows no number.
+   */
+  protected readonly hits = computed(() =>
+    this.query() && !this.loading() && !this.hasMore() ? this.entries().length : null,
+  );
+  /** A typed search loads page one after a short pause. */
+  private readonly searchLater = debounced(() => this.runSearch());
+  /** The request in flight; a new search or filter cancels it. */
+  private pending?: Subscription;
   protected readonly actor = signal('');
   protected readonly since = signal('');
   protected readonly until = signal('');
@@ -392,6 +448,11 @@ export class AuditLogComponent {
 
   }
 
+  /** The entry of a row of the records screen. */
+  protected entryOf(id: string): AuditEntry {
+    return this.byId().get(id)!;
+  }
+
   private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {
     const hit = value ? options.find((o) => o.value === value) : undefined;
     return filterChipText(this.i18n.translate(label), hit?.label);
@@ -405,8 +466,11 @@ export class AuditLogComponent {
       next: (check) => {
         this.verifying.set(false);
         this.verify.set({ status: 'stored', check });
-        this.toast.success(
-          this.i18n.translate(check.valid ? 'admin.audit.verify.done' : 'admin.audit.verify.broken'),
+        this.toast.show(
+          this.i18n.translate(
+            check.valid ? 'admin.audit.verify.done' : 'admin.audit.verify.broken',
+          ),
+          'success',
         );
       },
       error: (err: { status?: number }) => {
@@ -417,9 +481,35 @@ export class AuditLogComponent {
             : err?.status === 429
               ? 'admin.audit.verify.cooldown'
               : 'admin.audit.verify.failed';
-        this.toast.error(this.i18n.translate(key));
+        this.toast.show(this.i18n.translate(key), 'error');
       },
     });
+  }
+
+  /** The pill changed: load again after the pause. */
+  protected setSearch(text: string): void {
+    this.searchText.set(text);
+    this.searchLater();
+  }
+
+  /** Enter in the pill: load now. */
+  protected runSearch(): void {
+    this.searchLater.cancel();
+    const q = this.searchText().trim();
+    if (q === this.query()) return;
+    this.query.set(q);
+    this.reload();
+  }
+
+  /**
+   * The action keys whose label holds every word of the search: the labels live in the
+   * frontend, so the page sends these keys with `q` (§002693).
+   */
+  private labelActions(q: string): string[] {
+    const words = searchWords(q);
+    return words.length
+      ? AUDIT_ACTIONS.filter((a) => textsMatch(words, [this.actionLabel(a)]))
+      : [];
   }
 
   protected setAction(v: string): void {
@@ -518,12 +608,12 @@ export class AuditLogComponent {
     this.api.revertAuditEntry(e.id).subscribe({
       next: () => {
         this.reverting.set(false);
-        this.toast.success(this.i18n.translate('admin.audit.revert.success'));
+        this.toast.show(this.i18n.translate('admin.audit.revert.success'), 'success');
         this.reload();
       },
       error: (err: { status?: number; error?: { code?: string } }) => {
         this.reverting.set(false);
-        this.toast.error(this.i18n.translate(this.revertErrorKey(err)));
+        this.toast.show(this.i18n.translate(this.revertErrorKey(err)), 'error');
       },
     });
   }
@@ -556,6 +646,8 @@ export class AuditLogComponent {
 
   /** After a filter change, drop the list and load again from the newest entry. */
   private reload(): void {
+    this.pending?.unsubscribe();
+    this.loading.set(false);
     this.entries.set([]);
     this.cursor.set(null);
     this.hasMore.set(false);
@@ -571,7 +663,7 @@ export class AuditLogComponent {
     if (this.loading()) return;
     this.loading.set(true);
     this.loadError.set(false);
-    this.api
+    this.pending = this.api
       .listAuditLog({
         limit: PAGE_SIZE,
         before: reset ? undefined : (this.cursor() ?? undefined),
@@ -579,6 +671,8 @@ export class AuditLogComponent {
         actor: this.actor() || undefined,
         since: this.since() ? localDayBound(this.since(), false) : undefined,
         until: this.until() ? localDayBound(this.until(), true) : undefined,
+        q: this.query() || undefined,
+        labelActions: this.labelActions(this.query()),
       })
       .subscribe({
         next: (page) => {

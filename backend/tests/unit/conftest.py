@@ -13,6 +13,8 @@ from app.modules.meetings import present as present_mod
 from app.modules.meetings.present import Present
 from app.modules.notifications import brand as brand_mod
 from app.modules.site_config.branding import Branding
+from app.modules.webhooks import events as events_mod
+from app.modules.webhooks.models import Webhook
 
 
 @dataclass(slots=True)
@@ -63,3 +65,45 @@ def mail_branding(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(brand_mod, "active_branding", _active)
     return holder
+
+
+@dataclass(slots=True)
+class ActiveWebhooks:
+    """The active webhooks that the event emit of one test reads."""
+
+    hooks: list[Webhook]
+
+
+@pytest.fixture(autouse=True)
+def active_webhooks(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> ActiveWebhooks:
+    """Stub the read of the active webhooks, so a session fake needs no row for them.
+
+    A domain event then finds no webhook and adds no delivery. A test sets
+    `active_webhooks.hooks` to let its event reach these webhooks. A test of the read itself
+    carries the marker `real_webhooks`.
+    """
+    holder = ActiveWebhooks(hooks=[])
+    if request.node.get_closest_marker("real_webhooks") is not None:
+        return holder
+
+    async def _active(_session: AsyncSession) -> list[Webhook]:
+        return list(holder.hooks)
+
+    monkeypatch.setattr(events_mod, "active_webhooks", _active)
+    return holder
+
+
+@pytest.fixture(autouse=True)
+def paperless_links_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the switch of the Paperless links as off, so a session fake needs no row for it.
+
+    The links to Paperless documents have their tests on a real Postgres
+    (`tests/integration/modules/todos/test_paperless_links.py`).
+    """
+
+    async def _off(_session: AsyncSession) -> bool:
+        return False
+
+    monkeypatch.setattr("app.modules.todos.links.links_part_on", _off)

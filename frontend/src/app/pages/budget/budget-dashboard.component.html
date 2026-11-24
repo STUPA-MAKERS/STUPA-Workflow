@@ -3,7 +3,7 @@
 }
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <app-load-error [message]="'budget.error' | t" (retry)="load()" />
+  <app-load-error face [message]="'budget.error' | t" (retry)="load()" />
 } @else if (showSkeleton()) {
   <!-- The skeleton uses the containers of the page, so nothing moves when the figures arrive. -->
   <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
@@ -388,6 +388,8 @@
           }
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="(canSeeBookings() ? 'budget.dash.itemsLoading' : 'budget.dash.appsLoading') | t" />
+          } @else if (!previewItems().length && appsError()) {
+            <app-empty-state icon="alert" [heading]="(canSeeBookings() ? 'budget.dash.itemsError' : 'budget.dash.appsError') | t" />
           } @else if (!previewItems().length) {
             <app-empty-state icon="swap" rows="1" [heading]="(canSeeBookings() ? 'budget.dash.itemsNone' : 'budget.dash.appsNone') | t" />
           } @else {
@@ -408,7 +410,9 @@
       [heading]="'budget.dash.tree' | t"
       [(open)]="navOpen"
     >
-      <ng-container *ngTemplateOutlet="treePane" />
+      <ng-template sheetBody>
+        <ng-container *ngTemplateOutlet="treePane" />
+      </ng-template>
     </app-side-sheet>
   }
 
@@ -522,34 +526,36 @@
 
   <app-dialog
     [open]="overviewOpen()"
-    [title]="'budget.overview.title' | t"
+    [heading]="'budget.overview.title' | t"
     [closeLabel]="'action.close' | t"
     size="lg"
     (closed)="overviewOpen.set(false)"
   >
-    @if (visibleOverviewMetrics().length > 1) {
-      <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
-        @for (m of visibleOverviewMetrics(); track m) {
-          <button
-            type="button"
-            role="tab"
-            class="chip"
-            [class.on]="activeOverviewMetric() === m"
-            [attr.aria-selected]="activeOverviewMetric() === m"
-            (click)="overviewMetric.set(m)"
-          >
-            <span class="chip__text">{{ metricLabel(m) }}</span>
-          </button>
-        }
-      </div>
-    }
-    <app-budget-sunburst
-      [root]="overviewRoot()"
-      [fyId]="selectedFyId()"
-      [metric]="activeOverviewMetric()"
-      [colors]="colors()"
-      (nodeClick)="onOverviewPick($event)"
-    />
+    <ng-template dialogBody>
+      @if (visibleOverviewMetrics().length > 1) {
+        <div class="bd__ovTabs" role="tablist" [attr.aria-label]="'budget.overview.title' | t">
+          @for (m of visibleOverviewMetrics(); track m) {
+            <button
+              type="button"
+              role="tab"
+              class="chip"
+              [class.on]="activeOverviewMetric() === m"
+              [attr.aria-selected]="activeOverviewMetric() === m"
+              (click)="overviewMetric.set(m)"
+            >
+              <span class="chip__text">{{ metricLabel(m) }}</span>
+            </button>
+          }
+        </div>
+      }
+      <app-budget-sunburst
+        [root]="overviewRoot()"
+        [fyId]="selectedFyId()"
+        [metric]="activeOverviewMetric()"
+        [colors]="colors()"
+        (nodeClick)="onOverviewPick($event)"
+      />
+    </ng-template>
   </app-dialog>
 }
 

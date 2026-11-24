@@ -263,6 +263,10 @@ def webhook_row(**kw: Any) -> Any:
         "name": "hook",
         "url": "https://x.example/hook",
         "active": True,
+        "subscriptions": [],
+        "gremium_ids": [],
+        "type_ids": [],
+        "state_keys": [],
     }
     base.update(kw)
     return Row(**base)
@@ -1348,6 +1352,102 @@ async def test_update_webhook_all_fields() -> None:
     assert row.url == "https://y.example/h"
     assert row.active is False
     assert out.active is False
+
+
+async def test_update_webhook_events_and_filters() -> None:
+    """A given list replaces the stored one. §F/integrations/webhooks/002410, 002414."""
+    row = webhook_row()
+    gid = uuid.uuid4()
+    s, _ = svc([*audit_results()], gets=[row])
+    out = await s.update_webhook(
+        row.id,
+        WebhookUpdate.model_validate(
+            {
+                "subscriptions": [{"event": "vote.closed", "fields": ["result"]}],
+                "gremiumIds": [str(gid), str(gid)],
+                "typeIds": [],
+                "stateKeys": ["approved", "approved"],
+            }
+        ),
+        "admin",
+    )
+    assert row.subscriptions == [{"event": "vote.closed", "fields": ["result"]}]
+    assert row.gremium_ids == [str(gid)]
+    assert row.type_ids == []
+    assert row.state_keys == ["approved"]
+    assert out.gremium_ids == [gid]
+
+
+def test_webhook_out_drops_an_unknown_event() -> None:
+    out = _webhook_out(
+        webhook_row(subscriptions=[{"event": "gone", "fields": []}, {"event": "vote.opened"}])
+    )
+    assert [sub.event for sub in out.subscriptions] == ["vote.opened"]
+
+
+def test_webhook_subscription_validation() -> None:
+    """Unknown or twice listed events and fields give 422. §F/integrations/webhooks/002412."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        WebhookCreate.model_validate(
+            {"name": "h", "url": "https://x", "subscriptions": [{"event": "nope"}]}
+        )
+    with pytest.raises(ValidationError, match="has no field"):
+        WebhookCreate.model_validate(
+            {
+                "name": "h",
+                "url": "https://x",
+                "subscriptions": [{"event": "vote.opened", "fields": ["result"]}],
+            }
+        )
+    with pytest.raises(ValidationError, match="twice"):
+        WebhookUpdate.model_validate(
+            {"subscriptions": [{"event": "vote.opened", "fields": ["kind", "kind"]}]}
+        )
+    with pytest.raises(ValidationError, match="subscribed twice"):
+        WebhookCreate.model_validate(
+            {
+                "name": "h",
+                "url": "https://x",
+                "subscriptions": [{"event": "vote.opened"}, {"event": "vote.opened"}],
+            }
+        )
+    with pytest.raises(ValidationError, match="http"):
+        WebhookUpdate.model_validate({"url": "ftp://x"})
+
+
+def test_webhook_catalog_out() -> None:
+    from app.modules.admin.service.webhooks import catalog_out
+
+    events = catalog_out()
+    assert len(events) == 16
+    ticket = next(e for e in events if e.name == "ticket.created")
+    assert {f.key for f in ticket.fields if f.personal} == {"body", "reporterEmail"}
+
+
+async def test_send_test_delivery() -> None:
+    """A test delivery is a pending row with example data. §F/integrations/webhooks/002416."""
+    row = webhook_row(subscriptions=[{"event": "vote.closed", "fields": ["result"]}])
+    s, session = svc(gets=[row])
+    out = await s.send_test_delivery(row.id)
+    delivery = session.added[0]
+    assert out.delivery_id == delivery.id
+    assert delivery.event == "webhook.test"
+    assert delivery.status == "pending"
+    assert delivery.payload["data"] == {"vote.closed": {"result": "passed"}}
+    assert session.committed == 0
+
+
+async def test_send_test_delivery_refuses_missing_and_inactive() -> None:
+    from app.shared.errors import ConflictError
+
+    s, _ = svc(gets=[None])
+    with pytest.raises(NotFoundError):
+        await s.send_test_delivery(uuid.uuid4())
+    s, _ = svc(gets=[webhook_row(active=False)])
+    with pytest.raises(ConflictError):
+        await s.send_test_delivery(uuid.uuid4())
 
 
 async def test_update_webhook_noop() -> None:

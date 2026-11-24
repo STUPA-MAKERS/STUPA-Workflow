@@ -4,8 +4,10 @@
 <ng-template #body>
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
+  } @else if (empty() && error()) {
+    <app-empty-state fill icon="alert" [heading]="'gremien.attendance.detailError' | t" />
   } @else if (empty()) {
-    <app-empty-state icon="users" rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
+    <app-empty-state fill icon="users" rows="1" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {
     @for (g of groups(); track g.month) {
       @if (g.meetings.length) {
@@ -44,14 +46,26 @@
 @if (request(); as r) {
   @if (phone()) {
     <div #layer class="gad__layer" popover="manual">
-      <app-side-sheet side="bottom" [heading]="r.heading" [open]="true" (openChange)="onSheetOpen($event)">
-        <div class="gad gad--sheet">
-          <div class="gad__who">
-            <app-avatar size="sm" [name]="r.name" [principalId]="r.principalId" [decorative]="true" />
-            <span class="gad__summary">{{ r.summary }}</span>
+      <app-side-sheet
+        side="bottom"
+        [heading]="r.heading"
+        [open]="true"
+        (openChange)="onSheetOpen($event)"
+      >
+        <ng-template sheetBody>
+          <div class="gad gad--sheet">
+            <div class="gad__who">
+              <app-avatar
+                size="sm"
+                [name]="r.name"
+                [principalId]="r.principalId"
+                [decorative]="true"
+              />
+              <span class="gad__summary">{{ r.summary }}</span>
+            </div>
+            <ng-container [ngTemplateOutlet]="body" />
           </div>
-          <ng-container [ngTemplateOutlet]="body" />
-        </div>
+        </ng-template>
       </app-side-sheet>
     </div>
   } @else {

@@ -1,85 +1,95 @@
 <app-dialog
   [open]="open()"
-  [title]="'poll.new.title' | t"
+  [heading]="'poll.new.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ('poll.new.saveDraft' | t),
+      disabled: !canSubmit(),
+      busy: submitting() && savingDraft(),
+    },
+    {
+      key: 'a2',
+      label: ('poll.new.start' | t),
+      icon: 'vote',
+      kind: 'main',
+      disabled: !canSubmit(),
+      busy: submitting() && !savingDraft(),
+    },
+  ]"
+  (action)="
+    $event.key === 'cancel'
+      ? cancel()
+      : $event.key === 'submit'
+        ? submit(true)
+        : $event.key === 'a2'
+          ? submit(false)
+          : null
+  "
 >
-  <form class="npd" (submit)="$event.preventDefault(); submit(false)">
-    <app-segmented
-      width="equal"
-      class="npd__seg"
-      [ariaLabel]="'meetings.vote.kind.label' | t"
-      [options]="kindOptions()"
-      [value]="kind()"
-      (valueChange)="setKind($event)"
-    />
-    <app-select
-      name="gremium"
-      [id]="'npd-gremium'"
-      [label]="'poll.new.gremium' | t"
-      [options]="gremiumOptions()"
-      [required]="true"
-      [ngModel]="gremium()"
-      (ngModelChange)="gremium.set($event)"
-    />
-    <app-textarea [label]="(circular() ? 'meetings.vote.question' : 'poll.dialog.question') | t">
-      <textarea
-        id="npd-question"
-        rows="3"
-        name="question"
-        [ngModel]="question()"
-        (ngModelChange)="question.set($event)"
-      ></textarea>
-    </app-textarea>
-
-    @if (circular()) {
-      <p class="npd__rule" role="note">
-        <app-icon name="info" [size]="16" />
-        <span>{{ (minDays() === 1 ? 'circular.new.rule1' : 'circular.new.rule') | t: { n: minDays() } }}</span>
-      </p>
-    } @else {
-      <app-poll-editor idPrefix="npd" [(draft)]="draft" />
-    }
-
-    <div class="npd__end">
-      <app-datepicker
-        class="npd__date"
-        name="endDate"
-        [id]="'npd-end-date'"
-        [label]="'poll.new.endDate' | t"
-        [required]="true"
-        [ngModel]="endDate()"
-        (ngModelChange)="endDate.set($event)"
+  <ng-template dialogBody>
+    <form class="npd" (submit)="$event.preventDefault(); submit(false)">
+      <app-segmented
+        width="equal"
+        class="npd__seg"
+        [ariaLabel]="'meetings.vote.kind.label' | t"
+        [options]="kindOptions()"
+        [value]="kind()"
+        (valueChange)="setKind($event)"
       />
-      <app-time-input
-        class="npd__time"
-        name="endTime"
-        [id]="'npd-end-time'"
-        [label]="'poll.new.endTime' | t"
+      <app-select
+        name="gremium"
+        [id]="'npd-gremium'"
+        [label]="'poll.new.gremium' | t"
+        [options]="gremiumOptions()"
         [required]="true"
-        [ngModel]="endTime()"
-        (ngModelChange)="endTime.set($event)"
+        [ngModel]="gremium()"
+        (ngModelChange)="gremium.set($event)"
       />
-    </div>
-  </form>
-  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  <app-button
-    dialog-footer
-    variant="tonal"
-    [loading]="submitting() && savingDraft()"
-    [disabled]="!canSubmit()"
-    (click)="submit(true)"
-  >
-    {{ 'poll.new.saveDraft' | t }}
-  </app-button>
-  <app-button
-    dialog-footer
-    variant="fill"
-    [loading]="submitting() && !savingDraft()"
-    [disabled]="!canSubmit()"
-    (click)="submit(false)"
-  >
-    <app-icon name="vote" [size]="16" />
-    {{ 'poll.new.start' | t }}
-  </app-button>
+      <app-textarea [label]="(circular() ? 'meetings.vote.question' : 'poll.dialog.question') | t">
+        <textarea
+          id="npd-question"
+          rows="3"
+          name="question"
+          [ngModel]="question()"
+          (ngModelChange)="question.set($event)"
+        ></textarea>
+      </app-textarea>
+
+      @if (circular()) {
+        <p class="npd__rule" role="note">
+          <app-icon name="info" [size]="16" />
+          <span>{{
+            (minDays() === 1 ? 'circular.new.rule1' : 'circular.new.rule') | t: { n: minDays() }
+          }}</span>
+        </p>
+      } @else {
+        <app-poll-editor idPrefix="npd" [(draft)]="draft" />
+      }
+
+      <div class="npd__end">
+        <app-datepicker
+          class="npd__date"
+          name="endDate"
+          [id]="'npd-end-date'"
+          [label]="'poll.new.endDate' | t"
+          [required]="true"
+          [ngModel]="endDate()"
+          (ngModelChange)="endDate.set($event)"
+        />
+        <app-time-input
+          class="npd__time"
+          name="endTime"
+          [id]="'npd-end-time'"
+          [label]="'poll.new.endTime' | t"
+          [required]="true"
+          [ngModel]="endTime()"
+          (ngModelChange)="endTime.set($event)"
+        />
+      </div>
+    </form>
+  </ng-template>
 </app-dialog>

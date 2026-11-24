@@ -37,6 +37,8 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 - Public protocols: the published protocols page with its Gremien, semesters,
   detail, PDF and images. The service shows public protocols only.
 - Calendar: the ICS feed authenticates by the secret token in the path.
+- Push actions: a push button acts by the signed token in the path, which names the
+  person, the action and the element; the service worker fetches it without a session.
 - Public calendar: the page of the public Termine and of the meetings of the Gremien
   with public protocols, with its Gremien, search, the two detail reads and the ICS
   feed without a token. The service shows public entries only.
@@ -146,6 +148,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/public/calendar/meetings/{meeting_id}"),
         ("GET", "/api/public/calendar.ics"),
         ("GET", "/api/calendar/{token}.ics"),
+        ("GET", "/api/push/actions/{token}"),
         ("GET", "/api/altcha/challenge"),
         ("GET", "/api/site-config"),
         ("GET", "/api/i18n"),

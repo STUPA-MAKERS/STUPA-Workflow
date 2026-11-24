@@ -29,6 +29,7 @@ import {
   SkeletonComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type {
@@ -99,6 +100,7 @@ import { RowChevronComponent } from '../../../../shared/ui/row-chevron/row-chevr
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     RowChevronComponent,
     LoadStateComponent,
     SectionComponent,
@@ -162,7 +164,7 @@ export class UserMergeComponent {
   protected readonly previewError = signal<TranslationKey>('admin.users.merge.previewFailed');
   /**
    * The load state of the preview. A refusal with a known code is a data state and shows as
-   * a note (§ 000633), so only a failed request is an error here.
+   * a note (§ui-kit:000633), so only a failed request is an error here.
    */
   protected readonly previewState = computed<LoadState>(() =>
     this.loadingPreview()
@@ -287,7 +289,7 @@ export class UserMergeComponent {
     this.understood.set(false);
   }
 
-  /** The retry of the failed account list (§ 000576). */
+  /** The retry of the failed account list (§ui-kit:000576). */
   protected retrySearch(): void {
     this.searched.set(false);
     this.searchFailed.set(false);
@@ -313,7 +315,7 @@ export class UserMergeComponent {
         this.merging.set(false);
         this.result.set(res);
         this.step.set('done');
-        this.toast.success(this.i18n.translate('admin.users.merge.done'));
+        this.toast.show(this.i18n.translate('admin.users.merge.done'), 'success');
         this.merged.emit(res);
       },
       error: (err: { status?: number; error?: ConflictProblem }) => {
@@ -328,17 +330,18 @@ export class UserMergeComponent {
             this.loadPreview(p.source.id, p.target.id);
           }
           this.understood.set(false);
-          this.toast.error(this.i18n.translate('admin.users.merge.conflictToast'));
+          this.toast.show(this.i18n.translate('admin.users.merge.conflictToast'), 'error');
           return;
         }
         const code = err?.error?.code;
         if (code === 'merge_privileges') {
           this.loadPreview(p.source.id, p.target.id);
         }
-        this.toast.error(
+        this.toast.show(
           this.i18n.translate(
             isMergeErrorCode(code) ? this.errorKey(code) : 'admin.users.merge.failed',
           ),
+          'error',
         );
       },
     });

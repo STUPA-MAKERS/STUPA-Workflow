@@ -33,11 +33,12 @@
           <span class="mono pv__date">{{ $any(r).createdAt | ldate: 'mediumDate' }}</span>
         </ng-template>
         <ng-template appCell="actions" let-r>
-          @if ($any(r).status === 'open') {
+          @let menu = rowMenu($any(r));
+          @if (menu.length) {
             <app-button-group>
               <app-row-menu
                 [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
-                [sections]="rowMenu()"
+                [sections]="menu"
                 (selected)="onRowMenu($any(r), $event)"
               />
             </app-button-group>
@@ -159,24 +160,29 @@
 
 <app-dialog
   [open]="rejecting() !== null"
-  [title]="'admin.privacy.rejectTitle' | t"
+  [heading]="'admin.privacy.rejectTitle' | t"
   [subtitle]="rejecting()?.email ?? ''"
   [closeLabel]="'action.close' | t"
   (closed)="rejecting.set(null)"
+  [actions]="[
+    { key: 'rejecting', label: ('action.cancel' | t) },
+    { key: 'doReject', label: ('admin.privacy.reject' | t), kind: 'main' },
+  ]"
+  (action)="
+    $event.key === 'rejecting' ? rejecting.set(null) : $event.key === 'doReject' ? doReject() : null
+  "
 >
-  <label class="pv__reason">
-    <span class="pv__reasonLabel">{{ 'admin.privacy.rejectReason' | t }}</span>
-    <textarea
-      class="pv__textarea"
-      rows="3"
-      [ngModel]="rejectReason()"
-      (ngModelChange)="rejectReason.set($event)"
-    ></textarea>
-  </label>
-  <div dialog-footer>
-    <app-button variant="text" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
-  </div>
+  <ng-template dialogBody>
+    <label class="pv__reason">
+      <span class="pv__reasonLabel">{{ 'admin.privacy.rejectReason' | t }}</span>
+      <textarea
+        class="pv__textarea"
+        rows="3"
+        [ngModel]="rejectReason()"
+        (ngModelChange)="rejectReason.set($event)"
+      ></textarea>
+    </label>
+  </ng-template>
 </app-dialog>
 
 <app-confirm-dialog
@@ -196,3 +202,44 @@
     </p>
   }
 </app-confirm-dialog>
+
+<app-dialog
+  [open]="paperlessDocuments() !== null"
+  [heading]="'admin.privacy.paperless.title' | t"
+  [subtitle]="'admin.privacy.paperless.text' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="paperlessDocuments.set(null)"
+  [actions]="[{ key: 'close', label: ('action.close' | t), kind: 'main' }]"
+  (action)="paperlessDocuments.set(null)"
+>
+  <ng-template dialogBody>
+    <app-data-table surface="rowgroup" [columns]="paperlessColumns()" [rows]="$any(paperlessDocuments() ?? [])">
+      <ng-template appCell="filedAt" let-d>{{ $any(d).filedAt | ldate: 'mediumDate' }}</ng-template>
+      <ng-template appCell="open" let-d>
+        @if ($any(d).url) {
+          <app-button-group>
+            <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="$any(d).url">{{
+              'admin.privacy.paperless.open' | t
+            }}</a>
+          </app-button-group>
+        }
+      </ng-template>
+    </app-data-table>
+  </ng-template>
+</app-dialog>
+
+<app-dialog
+  [open]="ticketMails() !== null && paperlessDocuments() === null"
+  [heading]="'admin.privacy.mails.title' | t"
+  [subtitle]="'admin.privacy.mails.text' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="ticketMails.set(null)"
+  [actions]="[{ key: 'close', label: ('action.close' | t), kind: 'main' }]"
+  (action)="ticketMails.set(null)"
+>
+  <ng-template dialogBody>
+    <app-data-table surface="rowgroup" [columns]="mailColumns()" [rows]="$any(ticketMails() ?? [])">
+      <ng-template appCell="mailbox" let-m>{{ $any(m).mailbox ?? ('admin.privacy.mails.removed' | t) }}</ng-template>
+    </app-data-table>
+  </ng-template>
+</app-dialog>

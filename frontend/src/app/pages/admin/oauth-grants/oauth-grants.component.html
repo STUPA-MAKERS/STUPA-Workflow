@@ -1,12 +1,27 @@
-<section class="og admin-page">
-  <app-page-header
-    [flush]="true"
-    [title]="'admin.oauthGrants.title' | t"
-  >
-    <app-breadcrumbs crumbs />
-  </app-page-header>
-
-  <div class="og__filters">
+<app-records-screen
+  class="og"
+  [head]="{ title: 'admin.oauthGrants.title' | t }"
+  [rows]="rows()"
+  variant="records"
+  [keepOnError]="true"
+  [skeleton]="4"
+>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.oauthGrants.search' | t"
+        [label]="'admin.oauthGrants.search' | t"
+        [busy]="loading() && grants().length > 0"
+        [results]="hits()"
+        [value]="searchText()"
+        (valueChange)="setSearch($event)"
+        (commit)="runSearch()"
+      />
+    </div>
+  </ng-template>
+  <ng-template screenFilters>
     <app-filter-select
       icon="user"
       [label]="'admin.oauthGrants.filter.principal' | t"
@@ -16,84 +31,87 @@
       [value]="principalId()"
       (valueChange)="setPrincipal($event)"
     />
-  </div>
-
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.oauthGrants.error' | t" (retry)="load()">
-    <ng-template #loading>
-      <app-skeleton variant="rows" [count]="4" [label]="'admin.oauthGrants.loading' | t" />
-    </ng-template>
-    <ng-template #content>
-      @if (grants().length) {
-        <ul class="rowgroup rowgroup--records og__list" [attr.aria-label]="'admin.oauthGrants.title' | t">
-          @for (g of grants(); track g.id) {
-            <li class="og__row">
-              <app-avatar class="og__avatar" size="sm" [name]="ownerName(g)" [principalId]="g.principalId" [decorative]="true" />
-              <div class="og__who">
-                <span class="og__name rowgroup__title ell" [title]="ownerEmail(g) ?? ownerName(g)"
-                  >{{ ownerName(g) }}@if (ownerEmail(g); as mail) {<span class="sr-only">, {{ mail }}</span>}</span
-                >
-                <span class="og__client mono">{{ g.clientId }}</span>
-              </div>
-              <div class="og__scopes" [title]="scopes(g).join(' ')">
-                <span class="sr-only">{{ 'admin.oauthGrants.col.scope' | t }}:</span>
-                @for (s of visibleScopes(g); track s) {
-                  <code class="code-tag">{{ s }}</code>
-                }
-                @if (hiddenScopeCount(g); as extra) {
-                  <span class="og__more" aria-hidden="true">{{
-                    'admin.oauthGrants.moreScopes' | t: { count: extra }
-                  }}</span>
-                  <span class="sr-only">{{ hiddenScopes(g).join(', ') }}</span>
-                }
-              </div>
-              <div class="og__field og__field--created">
-                <span class="og__lbl">{{ 'admin.oauthGrants.col.created' | t }}</span>
-                <span>{{ g.createdAt | ldate: 'medium' }}</span>
-              </div>
-              <div class="og__field og__field--access">
-                <span class="og__lbl">{{ 'admin.oauthGrants.col.accessExpires' | t }}</span>
-                <span>{{ g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : ('account.lifetime.never' | t) }}</span>
-              </div>
-              <div class="og__field og__field--refresh">
-                <span class="og__lbl">{{ 'admin.oauthGrants.col.refreshExpires' | t }}</span>
-                <span>{{ g.refreshExpiresAt ? (g.refreshExpiresAt | ldate: 'mediumDate') : ('account.lifetime.never' | t) }}</span>
-              </div>
-              @if (canRevoke()) {
-                <div class="og__act">
-                  <app-button-group>
-                    <app-button
-                      size="sm"
-                      variant="danger"
-                      [ariaLabel]="('admin.oauthGrants.revoke' | t) + ': ' + ownerName(g)"
-                      (click)="askRevoke(g)"
-                      >{{ 'admin.oauthGrants.revoke' | t }}</app-button
-                    >
-                  </app-button-group>
-                </div>
-              }
-            </li>
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let g = grantOf(row.id);
+    <li class="og__row">
+      <app-avatar
+        class="og__avatar"
+        size="sm"
+        [name]="ownerName(g)"
+        [principalId]="g.principalId"
+        [decorative]="true"
+      />
+      <div class="og__who">
+        <span class="og__name rowgroup__title ell" [title]="ownerEmail(g) ?? ownerName(g)"
+          >{{ ownerName(g) }}
+          @if (ownerEmail(g); as mail) {
+            <span class="sr-only">, {{ mail }}</span>
           }
-        </ul>
-      } @else {
-        <app-empty-state icon="key" [heading]="'admin.oauthGrants.empty' | t" />
-      }
-
-      @if (total() > 0) {
-        <nav class="og__pager" [attr.aria-label]="'admin.oauthGrants.pager' | t">
-          <span class="og__range">{{ rangeLabel() }}</span>
+        </span>
+        <span class="og__client mono">{{ g.clientId }}</span>
+      </div>
+      <div class="og__scopes" [title]="scopes(g).join(' ')">
+        <span class="sr-only">{{ 'admin.oauthGrants.col.scope' | t }}:</span>
+        @for (s of visibleScopes(g); track s) {
+          <code class="code-tag">{{ s }}</code>
+        }
+        @if (hiddenScopeCount(g); as extra) {
+          <span class="og__more" aria-hidden="true">{{
+            'admin.oauthGrants.moreScopes' | t: { count: extra }
+          }}</span>
+          <span class="sr-only">{{ hiddenScopes(g).join(', ') }}</span>
+        }
+      </div>
+      <div class="og__field og__field--created">
+        <span class="og__lbl">{{ 'admin.oauthGrants.col.created' | t }}</span>
+        <span>{{ g.createdAt | ldate: 'medium' }}</span>
+      </div>
+      <div class="og__field og__field--access">
+        <span class="og__lbl">{{ 'admin.oauthGrants.col.accessExpires' | t }}</span>
+        <span>{{
+          g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : ('account.lifetime.never' | t)
+        }}</span>
+      </div>
+      <div class="og__field og__field--refresh">
+        <span class="og__lbl">{{ 'admin.oauthGrants.col.refreshExpires' | t }}</span>
+        <span>{{
+          g.refreshExpiresAt
+            ? (g.refreshExpiresAt | ldate: 'mediumDate')
+            : ('account.lifetime.never' | t)
+        }}</span>
+      </div>
+      @if (canRevoke()) {
+        <div class="og__act">
           <app-button-group>
-            <app-button variant="outlined" size="sm" [disabled]="!hasPrev()" (click)="prevPage()">{{
-              'admin.oauthGrants.prevPage' | t
-            }}</app-button>
-            <app-button variant="outlined" size="sm" [disabled]="!hasNext()" (click)="nextPage()">{{
-              'admin.oauthGrants.nextPage' | t
-            }}</app-button>
+            <app-button
+              size="sm"
+              variant="danger"
+              [ariaLabel]="('admin.oauthGrants.revoke' | t) + ': ' + ownerName(g)"
+              (click)="askRevoke(g)"
+              >{{ 'admin.oauthGrants.revoke' | t }}</app-button
+            >
           </app-button-group>
-        </nav>
+        </div>
       }
-    </ng-template>
-  </app-load-state>
-</section>
+    </li>
+  </ng-template>
+  <ng-template screenListFoot>
+    @if (total() > 0) {
+      <nav class="og__pager" [attr.aria-label]="'admin.oauthGrants.pager' | t">
+        <span class="og__range">{{ rangeLabel() }}</span>
+        <app-button-group>
+          <app-button variant="outlined" size="sm" [disabled]="!hasPrev()" (click)="prevPage()">{{
+            'admin.oauthGrants.prevPage' | t
+          }}</app-button>
+          <app-button variant="outlined" size="sm" [disabled]="!hasNext()" (click)="nextPage()">{{
+            'admin.oauthGrants.nextPage' | t
+          }}</app-button>
+        </app-button-group>
+      </nav>
+    }
+  </ng-template>
+</app-records-screen>
 
 <app-confirm-dialog
   [open]="confirmRevoke() !== null"

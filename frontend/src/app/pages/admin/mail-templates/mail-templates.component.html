@@ -1,7 +1,7 @@
 <section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t">
     <app-breadcrumbs crumbs />
-    <!-- § 000672: the language of the template stands at the end of the page head. -->
+    <!-- §ui-kit:000672: the language of the template stands at the end of the page head. -->
     <div actions class="mt__headTools">
       @if (dirty()) {
         <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
@@ -10,7 +10,7 @@
     </div>
   </app-page-header>
 
-  <app-load-state [state]="loadState()" [keepContent]="true" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
+  <app-load-state [state]="loadState()" [keepContent]="true" [hasContent]="templates().length > 0" [errorText]="'admin.mailTemplates.loadFailed' | t" (retry)="load()">
     <ng-template #loading>
       <div class="mt__layout">
         @if (!phone()) {
@@ -49,7 +49,7 @@
                 }
               </app-list-item>
             } @empty {
-              <app-empty-state icon="mail" rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+              <app-empty-state fill icon="mail" rows="3" [heading]="'admin.mailTemplates.empty' | t" />
             }
           </nav>
         }

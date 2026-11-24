@@ -3,7 +3,7 @@
 The validation accepts the action, but the worker filter dropped it before this fix,
 so the extras dispatcher never saw it. The action now reaches the dispatcher. A retry
 with the same idempotency key changes nothing and writes no second audit entry.
-`build_worker_dispatcher` chains the notify, webhook and extras dispatchers.
+`build_worker_dispatcher` chains the notify, extras and Paperless dispatchers.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from app.modules.flow.dispatch import (
 )
 from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
 from app.modules.flow.mail_actions import NotificationActionDispatcher
-from app.modules.flow.webhook_actions import WebhookActionDispatcher
+from app.modules.flow.paperless_actions import PaperlessFilingDispatcher
 from app.settings import load_settings
 
 
@@ -117,19 +117,18 @@ async def test_assign_from_field_runs_once_per_idempotency_key(
 
 
 def test_build_worker_dispatcher_chains_all_handlers() -> None:
-    """Chain every handler; without an arq pool the mails and deliveries stay pending."""
+    """Chain every handler; without an arq pool the mails stay pending."""
     settings = load_settings()
     maker: Any = object()
     chain = build_worker_dispatcher(None, maker, settings)
     assert isinstance(chain, ChainActionDispatcher)
-    notify, webhook, extras = chain.dispatchers
+    notify, extras, paperless = chain.dispatchers
+    assert isinstance(paperless, PaperlessFilingDispatcher)
+    assert paperless.pool is None
     assert isinstance(notify, NotificationActionDispatcher)
-    assert isinstance(webhook, WebhookActionDispatcher)
     assert isinstance(extras, FlowExtrasActionDispatcher)
     assert notify.queue is None
-    assert webhook.queue is None
     assert notify.sessionmaker is maker
-    assert webhook.sessionmaker is maker
     assert extras.sessionmaker is maker
     assert notify.settings is settings
 
@@ -137,7 +136,7 @@ def test_build_worker_dispatcher_chains_all_handlers() -> None:
 def test_build_worker_dispatcher_wraps_the_pool() -> None:
     pool: Any = object()
     chain = build_worker_dispatcher(pool, object())  # type: ignore[arg-type]
-    notify, webhook, _extras = chain.dispatchers
+    notify, _extras, paperless = chain.dispatchers
+    assert paperless.pool is pool  # type: ignore[attr-defined]
     assert notify.queue is not None  # type: ignore[attr-defined]
-    assert webhook.queue is not None  # type: ignore[attr-defined]
     assert notify.settings is not None  # type: ignore[attr-defined]

@@ -2,6 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 
 /** The features that an admin switches on and off, in the order of the navigation. */
 export const FEATURES = [
+  'activity',
   'todos',
   'calendar',
   'meetings',
@@ -9,6 +10,10 @@ export const FEATURES = [
   'budget',
   'invoices',
   'tickets',
+  'graph',
+  'public',
+  'push',
+  'paperless',
 ] as const;
 
 /** The key of a feature with a switch. */
@@ -75,6 +80,12 @@ export class FeatureService {
       boolean
     >;
   });
+
+  /**
+   * The start page of a signed-in person: the activity, or the Anträge while `Aktivität`
+   * is off (spec 000758).
+   */
+  readonly home = computed(() => (this._off().has('activity') ? '/applications' : '/activity'));
 
   /** True while every one of `keys` is on. No key gives true. */
   isOn(...keys: readonly FeatureKey[]): boolean {

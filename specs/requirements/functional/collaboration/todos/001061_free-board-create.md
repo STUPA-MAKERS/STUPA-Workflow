@@ -10,7 +10,7 @@ tests:
   - "frontend/src/app/pages/todos/board-picker/todo-board-picker.component.spec.ts:TodoBoardPickerComponent"
   - "frontend/src/app/pages/todos/new-board-dialog/todo-new-board-dialog.component.spec.ts:TodoNewBoardDialogComponent"
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
   - backend/app/modules/todos/router.py
   - backend/migrations/versions/c6010961aa02_todo_free_boards.py
   - frontend/src/app/pages/todos/new-board-dialog/todo-new-board-dialog.component.ts

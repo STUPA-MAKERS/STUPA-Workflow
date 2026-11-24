@@ -76,6 +76,7 @@ import {
   TabPageDirective,
   TabPagerComponent,
   ToastService,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { formatMoney } from '@shared/format-money';
@@ -129,6 +130,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     ObserversDialogComponent,
     NgTemplateOutlet,
     AmountComponent,
@@ -254,7 +256,11 @@ export class StatusTimelineComponent {
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.application()?.id ?? '', req.body, 'public', req),
     (created) => this.comments.update((list) => appendOnce(list, created)),
-    (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed'))),
+    (err) =>
+      this.toast.show(
+        this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed')),
+        'error',
+      ),
     draftDropper(this.api),
   );
   /** The comments as chat messages, the pending ones last. */
@@ -618,7 +624,7 @@ export class StatusTimelineComponent {
       next: (res) => {
         this.creatingVersion.set(false);
         if (res.linkSent) {
-          this.toast.success(this.i18n.translate('status.newVersion.linkSent'));
+          this.toast.show(this.i18n.translate('status.newVersion.linkSent'), 'success');
           return;
         }
         this.page?.reload();
@@ -626,7 +632,7 @@ export class StatusTimelineComponent {
       },
       error: () => {
         this.creatingVersion.set(false);
-        this.toast.error(this.i18n.translate('status.newVersion.failed'));
+        this.toast.show(this.i18n.translate('status.newVersion.failed'), 'error');
       },
     });
   }
@@ -643,7 +649,7 @@ export class StatusTimelineComponent {
       },
       error: () => {
         this.firing.set(null);
-        this.toast.error(this.i18n.translate('status.actions.failed'));
+        this.toast.show(this.i18n.translate('status.actions.failed'), 'error');
       },
     });
   }
@@ -728,7 +734,7 @@ export class StatusTimelineComponent {
     clearServerErrors(this.editFields());
     if (this.editForm.invalid) {
       this.editForm.markAllAsTouched();
-      this.toast.error(this.i18n.translate('apply.error.invalid'));
+      this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
       setTimeout(() => revealFirstInvalid(document.querySelector('.sp__edit')));
       return;
     }
@@ -738,14 +744,14 @@ export class StatusTimelineComponent {
         this.application.set(updated);
         this.saving.set(false);
         this.leaveEdit();
-        this.toast.success(this.i18n.translate('status.toast.saved'));
+        this.toast.show(this.i18n.translate('status.toast.saved'), 'success');
         this.api.timeline(app.id, { quiet: true }).subscribe((t) => this.timeline.set(t));
         this.api.versions(app.id).subscribe({ next: (v) => this.versions.set(v), error: () => undefined });
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.saving.set(false);
         if (err.status === 409) {
-          this.toast.error(this.i18n.translate('status.toast.locked'));
+          this.toast.show(this.i18n.translate('status.toast.locked'), 'error');
           this.leaveEdit(true);
           this.api.getApplication(app.id, { quiet: true }).subscribe((a) => this.application.set(a));
           return;
@@ -755,11 +761,14 @@ export class StatusTimelineComponent {
             this.i18n.translate(key),
           );
           if (placed) {
-            this.toast.error(this.i18n.translate('apply.error.invalid'));
+            this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
             return;
           }
         }
-        this.toast.error(err.error?.detail ?? this.i18n.translate('status.toast.saveFailed'));
+        this.toast.show(
+          err.error?.detail ?? this.i18n.translate('status.toast.saveFailed'),
+          'error',
+        );
       },
     });
   }
@@ -773,11 +782,11 @@ export class StatusTimelineComponent {
       next: () => {
         this.requestingErasure.set(false);
         this.confirmErase.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.eraseRequested'));
+        this.toast.show(this.i18n.translate('applications.detail.eraseRequested'), 'success');
       },
       error: () => {
         this.requestingErasure.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.eraseRequestFailed'));
+        this.toast.show(this.i18n.translate('applications.detail.eraseRequestFailed'), 'error');
       },
     });
   }
@@ -811,7 +820,7 @@ export class StatusTimelineComponent {
       },
       error: (err: { status?: number }) => {
         change.restore?.();
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show(this.i18n.translate(this.commentErrorKey(err.status)), 'error');
       },
     });
   }
@@ -824,7 +833,7 @@ export class StatusTimelineComponent {
         this.comments.update((list) => list.filter((c) => c.id !== ref.id));
       },
       error: (err: { status?: number }) => {
-        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+        this.toast.show(this.i18n.translate(this.commentErrorKey(err.status)), 'error');
       },
     });
   }

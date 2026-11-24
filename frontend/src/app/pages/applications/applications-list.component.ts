@@ -30,7 +30,42 @@ import type {
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
-import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, CurrencyInputComponent, DatepickerComponent, EmptyStateComponent, FabComponent, FabGroupComponent, FilterSelectComponent, IconComponent, InfiniteScrollDirective, ListDetailLayoutComponent, ListGroupComponent, ListItemComponent, LongPressDirective, MEDIA, mediaQuery, MetaLineComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, type RowSwipeAction, ScrollFadeDirective, SearchPillComponent, SelectionBarComponent, SideSheetComponent, SkeletonComponent, type StatusKind, StatusTextComponent, StickyBarComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  CheckboxComponent,
+  ConfirmDialogComponent,
+  CurrencyInputComponent,
+  DatepickerComponent,
+  EmptyStateComponent,
+  FabComponent,
+  FabGroupComponent,
+  FilterSelectComponent,
+  IconComponent,
+  InfiniteScrollDirective,
+  ListDetailLayoutComponent,
+  ListGroupComponent,
+  ListItemComponent,
+  LongPressDirective,
+  MEDIA,
+  mediaQuery,
+  MetaLineComponent,
+  PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  type RowSwipeAction,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SelectionBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
+  StickyBarComponent,
+  ToastService,
+  SheetBodyDirective,
+} from '@stupa-makers/ui-kit';
 import { FabLinkDirective, injectListDetailPage } from '@stupa-makers/ui-kit/shell';
 import { flowColorKind } from '@shared/ui';
 import { exportDownload } from '@shared/download.util';
@@ -138,6 +173,7 @@ type FilterSheet = 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     RowChevronComponent,
     MetaLineComponent,
     PullRefreshDirective,
@@ -711,7 +747,7 @@ export class ApplicationsListComponent {
         return this.api.exportApplicationsXlsx(unpaged);
       },
       'applications.xlsx',
-      () => this.toast.error(this.i18n.translate('applications.list.exportError')),
+      () => this.toast.show(this.i18n.translate('applications.list.exportError'), 'error'),
     );
   }
 
@@ -755,12 +791,12 @@ export class ApplicationsListComponent {
     this.api.fireTransition(item.id, { transitionId }).subscribe({
       next: () => {
         this.busyRow.set(null);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
+        this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
         this.changed(item.id, 'updated');
       },
       error: (err: { status?: number }) => {
         this.busyRow.set(null);
-        this.toast.error(this.i18n.translate(actionErrorKey(err.status)));
+        this.toast.show(this.i18n.translate(actionErrorKey(err.status)), 'error');
         this.changed(item.id, 'updated');
       },
     });
@@ -838,11 +874,10 @@ export class ApplicationsListComponent {
     this.api.setApplicationArchived(item.id, next).subscribe({
       next: () => {
         this.changed(item.id, 'updated');
-        this.toast.showAction({
-          message: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
-          action: this.i18n.translate('action.undo'),
-          actionIcon: 'undo',
-          variant: 'success',
+        this.toast.show({
+          text: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          action: { key: 'action', label: this.i18n.translate('action.undo'), icon: 'undo' },
+          kind: 'success',
           closed: (how) => {
             if (how !== 'action') {
               this.setSwipedAway(item.id, false);
@@ -855,7 +890,7 @@ export class ApplicationsListComponent {
               },
               error: () => {
                 this.setSwipedAway(item.id, false);
-                this.toast.error(this.i18n.translate('applications.actions.error'));
+                this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
               },
             });
           },
@@ -863,7 +898,7 @@ export class ApplicationsListComponent {
       },
       error: () => {
         this.setSwipedAway(item.id, false);
-        this.toast.error(this.i18n.translate('applications.actions.error'));
+        this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
       },
     });
   }
@@ -881,14 +916,15 @@ export class ApplicationsListComponent {
     this.api.setApplicationArchived(item.id, next).subscribe({
       next: () => {
         this.busyRow.set(null);
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          'success',
         );
         this.changed(item.id, 'updated');
       },
       error: () => {
         this.busyRow.set(null);
-        this.toast.error(this.i18n.translate('applications.actions.error'));
+        this.toast.show(this.i18n.translate('applications.actions.error'), 'error');
       },
     });
   }
@@ -902,13 +938,13 @@ export class ApplicationsListComponent {
       next: () => {
         this.deleting.set(false);
         this.deleteFor.set(null);
-        this.toast.success(this.i18n.translate('applications.detail.deleted'));
+        this.toast.show(this.i18n.translate('applications.detail.deleted'), 'success');
         if (this.selectedId() === item.id) this.closeDetail();
         this.changed(item.id, 'deleted');
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
+        this.toast.show(this.i18n.translate('applications.detail.deleteFailed'), 'error');
       },
     });
   }

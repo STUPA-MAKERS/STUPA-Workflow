@@ -92,9 +92,8 @@
       <p class="sheet-line td__line">
         <span class="td__part"><app-status-text chip [kind]="statusKind()">{{ statusLabel() }}</app-status-text></span>
         <span class="td__part mono">{{ ticket.number }}</span>
-        <span class="td__part">{{ kindLabel() }}</span>
-        @if (manager) {
-          <span class="td__part">{{ assigneeName() }}</span>
+        @for (part of lineParts(); track $index) {
+          <span class="td__part">{{ part }}</span>
         }
       </p>
 
@@ -125,10 +124,12 @@
         </div>
       }
 
-      @if (ticket.duplicateOf; as dup) {
-        <app-note class="td__note" icon="copy">
-          {{ 'tickets.detail.duplicateOf' | t }}
-          <a class="td__link" [routerLink]="['/tickets', dup.id]" queryParamsHandling="preserve">{{ dup.number }}</a>
+      @for (hint of hints(); track hint.text) {
+        <app-note class="td__note" [icon]="hint.icon">
+          {{ hint.text }}
+          @if (hint.ref; as ref) {
+            <a class="td__link" [routerLink]="['/tickets', ref.id]" queryParamsHandling="preserve">{{ ref.number }}</a>
+          }
         </app-note>
       }
       @if (ticket.anonymizedAt) {
@@ -178,6 +179,20 @@
     @if (split()) {
       <h3 id="td-log" class="sr-only">{{ 'tickets.detail.log' | t }}</h3>
     }
+    @if (mailAnswer(); as answer) {
+      @if (answer.enabled) {
+        <app-note icon="mail">
+          {{ 'tickets.mail.goesTo' | t: { people: recipientsLine() } }}
+          <app-button-group>
+            <app-button variant="text" size="sm" data-testid="td-recipients" (click)="openRecipients()">{{
+              'tickets.mail.recipients.change' | t
+            }}</app-button>
+          </app-button-group>
+        </app-note>
+      } @else {
+        <app-note icon="mail" kind="warn">{{ 'tickets.mail.off' | t }}</app-note>
+      }
+    }
     <app-chat
       class="td__chat"
       [draftKey]="'ticket.' + (ticket()?.id ?? '')"
@@ -204,7 +219,9 @@
       @if (!manager) {
         <div class="td__pair">
           <ng-container *ngTemplateOutlet="reportedRow" />
-          <app-field-row [label]="'tickets.detail.kind' | t">{{ kindLabel() }}</app-field-row>
+          @if (categoryLabel()) {
+            <app-field-row [label]="'tickets.detail.kind' | t">{{ categoryLabel() }}</app-field-row>
+          }
         </div>
       } @else if (split()) {
         <div class="td__pair">
@@ -216,12 +233,21 @@
           <ng-container *ngTemplateOutlet="assigneeRow" />
           <ng-container *ngTemplateOutlet="kindRow" />
         </div>
+        @if (canMove()) {
+          <ng-container *ngTemplateOutlet="areaRow" />
+        }
       } @else {
         <ng-container *ngTemplateOutlet="reporterRow" />
         <ng-container *ngTemplateOutlet="emailRow" />
         <ng-container *ngTemplateOutlet="reportedRow" />
         <ng-container *ngTemplateOutlet="assigneeRow" />
         <ng-container *ngTemplateOutlet="kindRow" />
+        @if (canMove()) {
+          <ng-container *ngTemplateOutlet="areaRow" />
+        }
+      }
+      @if (manager) {
+        <app-field-row [label]="'tickets.detail.source' | t">{{ sourceLabel() }}</app-field-row>
       }
     </app-field-group>
     <ng-template #reporterRow>
@@ -253,16 +279,29 @@
         />
       </app-field-row>
     </ng-template>
+    <ng-template #areaRow>
+      <app-field-row [label]="'tickets.detail.area' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.area' | t"
+          [options]="areaOptions()"
+          [value]="ticket.areaId"
+          (valueChange)="setArea($event)"
+          [text]="area()?.name ?? ''"
+        />
+      </app-field-row>
+    </ng-template>
     <ng-template #kindRow>
       <app-field-row [label]="'tickets.detail.kind' | t">
         <app-filter-select
           class="td__select"
           size="md"
           [label]="'tickets.detail.kind' | t"
-          [options]="kindOptions()"
-          [value]="ticket.kind"
-          (valueChange)="setKind($event)"
-          [icon]="kindIcon()"
+          [options]="hasKind() ? kindOptions() : categoryOptions()"
+          [value]="ticket.kind ?? ticket.categoryId ?? ''"
+          (valueChange)="hasKind() ? setKind($event) : setCategory($event)"
+          [icon]="hasKind() ? kindIcon() : null"
           [text]="kindLabel()"
         />
       </app-field-row>
@@ -291,6 +330,43 @@
         [items]="todos()"
         [showTitle]="false"
       />
+    </app-section>
+  }
+
+  @if (paperlessFiles().length) {
+    <app-section [heading]="'tickets.paperless.title' | t">
+      <app-field-group>
+        @for (file of paperlessFiles(); track file.id) {
+          <app-field-row [label]="file.filename">
+            @switch (file.state) {
+              @case ('filed') {
+                <app-button-group>
+                  <a appButton="text" size="sm" target="_blank" rel="noopener" [href]="file.url">{{
+                    'tickets.paperless.open' | t
+                  }}</a>
+                </app-button-group>
+              }
+              @case ('pending') {
+                <span role="status">{{ 'tickets.paperless.pending' | t }}</span>
+              }
+              @default {
+                @if (file.state === 'failed') {
+                  <span>{{ 'tickets.paperless.failed' | t }}</span>
+                }
+                <app-button-group>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [attr.data-testid]="'td-paperless-' + file.id"
+                    (click)="fileInPaperless(file)"
+                    >{{ (file.state === 'failed' ? 'tickets.paperless.retry' : 'tickets.paperless.file') | t }}</app-button
+                  >
+                </app-button-group>
+              }
+            }
+          </app-field-row>
+        }
+      </app-field-group>
     </app-section>
   }
 
@@ -351,59 +427,114 @@
 
 <app-dialog
   [open]="closing() !== null"
-  [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
+  [heading]="
+    (closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t
+  "
   [closeLabel]="'action.close' | t"
   (closed)="cancelClose()"
+  [actions]="[
+    { key: 'cancelClose', label: ('action.cancel' | t) },
+    {
+      key: 'confirmClose',
+      label: ((closing() === 'rejected' ? 'tickets.detail.reject' : 'tickets.detail.done') | t),
+      kind: 'main',
+    },
+  ]"
+  (action)="
+    $event.key === 'cancelClose'
+      ? cancelClose()
+      : $event.key === 'confirmClose'
+        ? confirmClose()
+        : null
+  "
 >
-  <div class="td__closeBox">
-    <app-checkbox [ngModel]="completeTodos()" (ngModelChange)="completeTodos.set($event)">
-      <span class="td__closeLabel">
-        {{ (openTodoN() === 1 ? 'tickets.close.todosOne' : 'tickets.close.todosMany') | t: { n: openTodoN() } }}
-      </span>
-    </app-checkbox>
-    @if (openTodos().length) {
-      <ul class="td__closeList">
-        @for (card of openTodos(); track card.id) {
-          <li>{{ card.title }}</li>
-        }
-      </ul>
-    }
-  </div>
-  <app-button dialog-footer variant="text" (click)="cancelClose()">{{ 'action.cancel' | t }}</app-button>
-  <app-button dialog-footer variant="fill" (click)="confirmClose()">
-    {{ (closing() === 'rejected' ? 'tickets.detail.reject' : 'tickets.detail.done') | t }}
-  </app-button>
+  <ng-template dialogBody>
+    <div class="td__closeBox">
+      <app-checkbox [ngModel]="completeTodos()" (ngModelChange)="completeTodos.set($event)">
+        <span class="td__closeLabel">
+          {{
+            (openTodoN() === 1 ? 'tickets.close.todosOne' : 'tickets.close.todosMany')
+              | t: { n: openTodoN() }
+          }}
+        </span>
+      </app-checkbox>
+      @if (openTodos().length) {
+        <ul class="td__closeList">
+          @for (card of openTodos(); track card.id) {
+            <li>{{ card.title }}</li>
+          }
+        </ul>
+      }
+    </div>
+  </ng-template>
 </app-dialog>
 
 <app-dialog
   [open]="duplicateOpen()"
-  [title]="'tickets.duplicate.title' | t"
+  [heading]="'tickets.duplicate.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="duplicateOpen.set(false)"
+  [actions]="[{ key: 'duplicateOpen', label: ('action.cancel' | t) }]"
+  (action)="$event.key === 'duplicateOpen' ? duplicateOpen.set(false) : null"
 >
-  <div class="td__dup">
-    <app-input
-      [label]="'tickets.duplicate.search' | t"
-      [ngModel]="duplicateSearch.text()"
-      (ngModelChange)="duplicateSearch.set($event)"
-    />
-    @if (duplicateHits().length) {
-      <ul class="rowgroup td__dupList">
-        @for (hit of duplicateHits(); track hit.id) {
-          <li>
-            <button type="button" class="td__dupHit" (click)="pickDuplicate(hit)">
-              <span class="mono td__dupNo">{{ hit.number }}</span>
-              <span class="td__dupTitle">{{ hit.title }}</span>
-              <span class="td__dupState">{{ statusOf(hit.status) }}</span>
-            </button>
-          </li>
-        }
-      </ul>
-    } @else if (duplicateSearch.applied()) {
-      <app-empty-state icon="searchOff" rows="1" [heading]="'tickets.duplicate.none' | t" />
-    }
-  </div>
-  <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+  <ng-template dialogBody>
+    <div class="td__dup">
+      <app-input
+        [label]="'tickets.duplicate.search' | t"
+        [ngModel]="duplicateSearch.text()"
+        (ngModelChange)="duplicateSearch.set($event)"
+      />
+      @if (duplicateHits().length) {
+        <ul class="rowgroup td__dupList">
+          @for (hit of duplicateHits(); track hit.id) {
+            <li>
+              <button type="button" class="td__dupHit" (click)="pickDuplicate(hit)">
+                <span class="mono td__dupNo">{{ hit.number }}</span>
+                <span class="td__dupTitle">{{ hit.title }}</span>
+                <span class="td__dupState">{{ statusOf(hit.status) }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else if (duplicateSearch.applied()) {
+        <app-empty-state icon="searchOff" rows="1" [heading]="'tickets.duplicate.none' | t" />
+      }
+    </div>
+  </ng-template>
+</app-dialog>
+
+<app-dialog
+  [open]="recipientsOpen()"
+  [heading]="'tickets.mail.recipients.heading' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="recipientsOpen.set(false)"
+  [actions]="[
+    { key: 'cancel', label: ('action.cancel' | t) },
+    { key: 'save', label: ('tickets.mail.recipients.save' | t), kind: 'main' },
+  ]"
+  (action)="$event.key === 'save' ? saveRecipients() : recipientsOpen.set(false)"
+>
+  <ng-template dialogBody>
+    <app-section [heading]="'tickets.mail.recipients.heading' | t" [hideHeading]="true">
+      <app-input
+        name="mailTo"
+        autocomplete="off"
+        [label]="'tickets.mail.recipients.to' | t"
+        [required]="true"
+        [error]="recipientsTried() && recipientsError() ? (recipientsError()! | t) : ''"
+        [ngModel]="recipientsDraft().to"
+        (ngModelChange)="recipientsDraft.set({ to: $event, cc: recipientsDraft().cc })"
+      />
+      <app-input
+        name="mailCc"
+        autocomplete="off"
+        [label]="'tickets.mail.recipients.cc' | t"
+        [hint]="'tickets.mail.recipients.hint' | t"
+        [ngModel]="recipientsDraft().cc"
+        (ngModelChange)="recipientsDraft.set({ to: recipientsDraft().to, cc: $event })"
+      />
+    </app-section>
+  </ng-template>
 </app-dialog>
 
 @if (manager && ticket(); as ticket) {

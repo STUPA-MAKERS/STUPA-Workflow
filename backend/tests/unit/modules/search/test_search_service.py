@@ -299,6 +299,7 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
     """Tickets reuse `TicketService.list`, behind the gate of `GET /api/tickets`."""
     from datetime import UTC, datetime
 
+    from app.modules.tickets import access as ticket_access
     from app.modules.tickets import service as ticket_service
     from app.modules.tickets.schemas import TicketListItem, TicketReporter
     from app.shared.paging import Page
@@ -311,7 +312,8 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
         at = datetime(2026, 1, 1, tzinfo=UTC)
         item = TicketListItem(
             id=tid,
-            number="T-0040",
+            area_id=uuid.uuid4(),
+            number="T-AAAA0040",
             kind="bug",
             title="Drucker",
             status="in_progress",
@@ -321,16 +323,20 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
         )
         return Page[TicketListItem](items=[item], total=1, limit=PER_KIND + 1, offset=0)
 
+    async def _no_gremien(*_a: object, **_kw: object) -> set[uuid.UUID]:
+        return set()
+
     monkeypatch.setattr(ticket_service.TicketService, "list", _list)
+    monkeypatch.setattr(ticket_access, "held_gremium_ids", _no_gremien)
     svc = SearchService(session=None)  # type: ignore[arg-type]
     assert await svc._tickets("drucker", Principal(sub="u"), "de") == []
     assert seen == {}
     manager = Principal(sub="u", permissions={"ticket.manage"})
     (hit,) = await svc._tickets("drucker", manager, "en")
-    assert seen == {"q": "drucker", "limit": PER_KIND + 1}
+    assert seen == {"q": "drucker", "limit": PER_KIND + 1, "areas": None}
     assert (hit.kind, hit.title, hit.subtitle, hit.url) == (
         "ticket",
-        "T-0040 · Drucker",
+        "T-AAAA0040 · Drucker",
         "In progress",
         f"/tickets/{tid}",
     )

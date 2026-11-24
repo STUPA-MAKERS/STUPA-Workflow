@@ -20,12 +20,16 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ButtonGroupComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
   EmptyStateComponent,
+  FabComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
   NoteComponent,
   observeElementSize,
+  PageHeaderComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -34,8 +38,6 @@ import {
   SkeletonComponent,
   StatusTextComponent,
   ToastService,
-  FabComponent,
-  PageHeaderComponent,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -88,13 +90,14 @@ import {
   stateDisplayLabel,
   transitionGuardLabel,
 } from './flow-label.util';
-import { GroupInspectorComponent } from './group-inspector.component';
-import { StateInspectorComponent, type GuardPriorityRow } from './state-inspector.component';
 import { TransitionDetailComponent } from './transition-detail.component';
-import { TransitionInspectorComponent } from './transition-inspector.component';
-import { TransitionListsComponent } from './transition-lists.component';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
+import {
+  GroupInspectorViewComponent,
+  type GuardPriorityRow,
+  StateInspectorViewComponent,
+  TransitionInspectorViewComponent,
+  TransitionListsViewComponent,
+} from '@stupa-makers/ui-kit/views/flow-editor';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { injectPanePage } from '../pane-page';
 
@@ -147,10 +150,10 @@ const MIN_FIT_SCALE = 0.75;
     ButtonComponent,
     ButtonGroupComponent,
     VersionHistoryComponent,
-    StateInspectorComponent,
-    TransitionInspectorComponent,
-    GroupInspectorComponent,
-    TransitionListsComponent,
+    StateInspectorViewComponent,
+    TransitionInspectorViewComponent,
+    GroupInspectorViewComponent,
+    TransitionListsViewComponent,
     TransitionDetailComponent,
     PageHeaderComponent,
     BreadcrumbsComponent,
@@ -199,7 +202,6 @@ export class FlowEditorComponent {
 
   protected readonly gremiumOptions = this.opts.gremiumOptions;
   protected readonly globalRoleOptions = this.opts.globalRoleOptions;
-  protected readonly webhookOptions = this.opts.webhookOptions;
   protected readonly budgetTree = this.opts.budgetTree;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));
@@ -1017,7 +1019,10 @@ export class FlowEditorComponent {
     if (this.saving()) return;
     const v = this.validation();
     if (!v.valid) {
-      this.toast.error(this.validationMessages()[0] ?? this.i18n.translate('admin.common.invalid'));
+      this.toast.show(
+        this.validationMessages()[0] ?? this.i18n.translate('admin.common.invalid'),
+        'error',
+      );
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
@@ -1027,12 +1032,15 @@ export class FlowEditorComponent {
       next: () => {
         this.saving.set(false);
         this.savedJson.set(json);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.versionHistory()?.reload();
       },
       error: (err: { error?: { detail?: string } }) => {
         this.saving.set(false);
-        this.toast.error(err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(
+          err?.error?.detail ?? this.i18n.translate('admin.common.saveFailed'),
+          'error',
+        );
       },
     });
   }
@@ -1047,12 +1055,12 @@ export class FlowEditorComponent {
         }
         this.savedJson.set(this.json());
       },
-      error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.flow.loadFailed'), 'error'),
     });
   }
 
   /**
-   * Read the flow; also the retry of the load error (§ 000576) and "Verwerfen" (§ 000635),
+   * Read the flow; also the retry of the load error (§ui-kit:000576) and "Verwerfen" (§ui-kit:000635),
    * which reads the stored flow again.
    */
   protected loadFlow(): void {

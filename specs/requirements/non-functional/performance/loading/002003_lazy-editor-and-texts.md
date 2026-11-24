@@ -8,7 +8,7 @@ updated: 2026-11-20
 tests:
   - "frontend/src/app/bundle.contract.spec.ts:bundleContract"
 implementation:
-  - frontend/src/app/features/meetings/top-sheet/raw-format.ts
+  - frontend/vendor/ui-kit/views/protocol/src/raw-format.ts
   - frontend/src/app/core/i18n/translations.ts
   - frontend/src/app/core/i18n/translations.de.ts
   - frontend/src/main.ts

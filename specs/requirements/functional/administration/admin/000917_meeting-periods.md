@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
   - backend/app/modules/meetings/periods.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/settings_router.py
   - frontend/src/app/pages/admin/deadlines/meeting-periods/meeting-periods.component.ts
 scope:
   - backend/app/modules/admin

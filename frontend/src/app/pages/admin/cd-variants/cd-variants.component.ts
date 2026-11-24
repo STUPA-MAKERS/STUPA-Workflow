@@ -13,8 +13,31 @@ import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, ButtonGroupComponent, ConfirmDialogComponent, DialogComponent, EmptyStateComponent, FabComponent, FilePickerComponent, formatBytes, IconComponent, InputComponent, MetaLineComponent, NoteComponent, PageHeaderComponent, RowMenuComponent, type RowMenuItem, type RowMenuSection, SegmentedComponent, type SegmentedOption, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  FilePickerComponent,
+  formatBytes,
+  IconComponent,
+  InputComponent,
+  MetaLineComponent,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SegmentedComponent,
+  type SegmentedOption,
+  ToastService,
+  type Action,
+  type ListRow,
+  type LoadState,
+  DialogBodyDirective,
+  SearchPillComponent,
+} from '@stupa-makers/ui-kit';
+import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_LOGO_ACCEPT,
@@ -39,7 +62,7 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -94,10 +117,11 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
+    DialogBodyDirective,
     MetaLineComponent,
-    LoadStateComponent,
     FilePickerComponent,
-    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -109,10 +133,9 @@ function emptyForm(): VariantForm {
     InputComponent,
     NoteComponent,
     SegmentedComponent,
-    SkeletonComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
   ],
   templateUrl: './cd-variants.component.html',
   styleUrl: './cd-variants.component.scss',
@@ -129,7 +152,40 @@ export class AdminCdVariantsComponent {
   readonly variants = signal<CdVariant[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
+  /** The rows of the records screen (§ui-kit:002257). */
+  readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.cdVariants.error'),
+        retry: () => this.retryLoad(),
+      };
+    const rows = this.search
+      .filter(this.variants(), (v) => [v.name, v.key])
+      .map((v) => ({ id: v.id, title: v.key }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'palette', heading: this.i18n.translate('admin.cdVariants.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /** "Variante anlegen" as the FAB. */
+  protected readonly actions = computed<readonly Action[]>(() => [
+    { key: 'add', label: this.i18n.translate('fab.cdVariant'), priority: 'fab' },
+  ]);
+
+  /** The variant of a row of the records screen. */
+  protected variantOf(id: string): CdVariant {
+    return this.variants().find((v) => v.id === id)!;
+  }
 
   readonly expandedId = signal<Uuid | null>(null);
 
@@ -400,8 +456,7 @@ export class AdminCdVariantsComponent {
     return this.editingId() !== null || CD_VARIANT_KEY_PATTERN.test(f.key);
   }
 
-  submit(event: Event): void {
-    event.preventDefault();
+  submit(): void {
     if (!this.canSave()) return;
     const f = this.form();
     this.saving.set(true);
@@ -417,13 +472,13 @@ export class AdminCdVariantsComponent {
         this.variants.update((list) =>
           id ? list.map((v) => (v.id === id ? saved : v)) : [...list, saved],
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: (err: unknown) => {
         this.saving.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.keyExists' : 'admin.common.saveFailed';
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed') this.toast.show(this.i18n.translate(key), 'error');
         else this.formError.set(key);
       },
     });
@@ -445,13 +500,13 @@ export class AdminCdVariantsComponent {
         this.deleting.set(false);
         this.confirmDelete.set(null);
         this.variants.update((list) => list.filter((v) => v.id !== variant.id));
-        this.toast.success(this.i18n.translate('admin.cdVariants.deleted'));
+        this.toast.show(this.i18n.translate('admin.cdVariants.deleted'), 'success');
       },
       error: (err: unknown) => {
         this.deleting.set(false);
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.inUse' : 'admin.common.saveFailed';
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        if (key === 'admin.common.saveFailed') this.toast.show(this.i18n.translate(key), 'error');
         else this.deleteError.set(key);
       },
     });
@@ -560,14 +615,13 @@ export class AdminCdVariantsComponent {
             v.id === draft.variantId ? { ...v, logos: [...v.logos.filter(keep), logo] } : v,
           ),
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        const key: TranslationKey =
-          SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
-        if (key === 'admin.common.saveFailed') this.toast.error(this.i18n.translate(key));
+        const key: TranslationKey = SQUARE_ERROR_KEYS[problemCode(err)] ?? squareStatusKey(status);
+        if (key === 'admin.common.saveFailed') this.toast.show(this.i18n.translate(key), 'error');
         else this.logoError.set(key);
       },
     });
@@ -581,9 +635,9 @@ export class AdminCdVariantsComponent {
             v.id === variant.id ? { ...v, logos: v.logos.filter((l) => l.id !== logo.id) } : v,
           ),
         );
-        this.toast.success(this.i18n.translate('admin.cdVariants.logoRemoved'));
+        this.toast.show(this.i18n.translate('admin.cdVariants.logoRemoved'), 'success');
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -605,7 +659,7 @@ export class AdminCdVariantsComponent {
           ),
         );
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 }

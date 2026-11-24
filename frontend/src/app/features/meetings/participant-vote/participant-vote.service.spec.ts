@@ -6,6 +6,7 @@ import type { Meeting, MeetingVote, Vote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../../layout/rail-status.service';
 import { ParticipantVoteService } from './participant-vote.service';
+import { toastMock } from '../../../../testing/toast';
 
 function row(over: Partial<MeetingVote> = {}): MeetingVote {
   return {
@@ -68,7 +69,7 @@ function setup(opts: { votes?: Vote[]; status?: VoteDelegationStatus | Error } =
       opts.status instanceof Error ? throwError(() => opts.status) : of(opts.status ?? STATUS),
     ),
   };
-  const toast = { error: jest.fn() };
+  const toast = toastMock();
   const rail = { refresh: jest.fn() };
   TestBed.configureTestingModule({
     providers: [

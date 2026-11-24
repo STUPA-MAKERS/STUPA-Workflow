@@ -18,8 +18,15 @@ import { NO_FILTER } from '../../../features/todos/todos.util';
 import { TODAY, board, detail, tile } from '../../../../testing/todo-fixtures';
 import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
-import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
-import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId, type RowLead } from './todo-board-rows.component';
+import { DONE_PREVIEW } from '@stupa-makers/ui-kit/views/board';
+import {
+  COLLAPSED_KEY,
+  TodoBoardRowsComponent,
+  boardRows,
+  rowDropId,
+  type RowLead,
+} from './todo-board-rows.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ME = { principalId: 'me', displayName: 'Mara Keller' };
 
@@ -75,8 +82,14 @@ async function setup(opts: Opts = {}) {
         (() => of(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', rank: '0', title: 'Raum buchen', assignees: [ME] }))),
     ),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
-  const on = { openCard: jest.fn(), matches: jest.fn(), dropIn: jest.fn(), transferred: jest.fn(), menu: jest.fn() };
+  const toast = toastMock();
+  const on = {
+    openCard: jest.fn(),
+    matches: jest.fn(),
+    dropIn: jest.fn(),
+    transferred: jest.fn(),
+    menu: jest.fn(),
+  };
   const view = await render(TodoBoardRowsComponent, {
     inputs: { filter: NO_FILTER, today: TODAY, phone: opts.phone ?? false, ...opts.inputs },
     on,
@@ -239,20 +252,20 @@ describe('TodoBoardRowsComponent', () => {
   it('reads the collapsed rows back and survives a broken or blocked storage', async () => {
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify(['b-9', 7]));
     const first = await setup();
-    expect(first.cmp.collapsed()).toEqual(new Set(['b-9']));
+    expect(first.cmp.view()!.collapsed()).toEqual(new Set(['b-9']));
     first.fixture.destroy();
     localStorage.setItem(COLLAPSED_KEY, '{');
     const broken = await setup();
-    expect(broken.cmp.collapsed().size).toBe(0);
+    expect(broken.cmp.view()!.collapsed().size).toBe(0);
     broken.fixture.destroy();
     localStorage.setItem(COLLAPSED_KEY, '{"a":1}');
     const odd = await setup();
-    expect(odd.cmp.collapsed().size).toBe(0);
+    expect(odd.cmp.view()!.collapsed().size).toBe(0);
     jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('full');
     });
     fireEvent.click(screen.getByRole('button', { name: /Plattform/ }));
-    expect(odd.cmp.collapsed()).toEqual(new Set(['b-9']));
+    expect(odd.cmp.view()!.collapsed()).toEqual(new Set(['b-9']));
   });
 
   it('shows the newest done cards and opens the rest', async () => {
@@ -266,20 +279,20 @@ describe('TodoBoardRowsComponent', () => {
     await settle();
     expect(list().children).toHaveLength(DONE_PREVIEW + 1);
     const r = cmp.rows()[0];
-    expect(cmp.more(r, r.columns[3])).toBe(0);
+    expect(cmp.view()!.more(r, r.columns[3])).toBe(0);
   });
 
   it('moves a card by pointer inside its row through the move route', async () => {
     const { cmp, api, settle } = await setup();
     const r = cmp.rows()[0];
-    cmp.drop(r, dropEvent('k-1', 'c-1', 'c-1', 0, 0));
+    cmp.view()!.drop(r, dropEvent('k-1', 'c-1', 'c-1', 0, 0));
     expect(api.moveCard).not.toHaveBeenCalled();
-    cmp.drop(r, dropEvent('k-1', 'c-1', 'c-2', 0, 0));
+    cmp.view()!.drop(r, dropEvent('k-1', 'c-1', 'c-2', 0, 0));
     expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
     await settle();
     expect(cmp.boards()[0].cards.find((c) => c.id === 'k-1')?.columnId).toBe('c-2');
-    cmp.drop(r, dropEvent('k-2', 'c-1', 'c-9', 0, 0));
-    cmp.drop(r, dropEvent('k-77', 'c-1', 'c-2', 0, 0));
+    cmp.view()!.drop(r, dropEvent('k-2', 'c-1', 'c-9', 0, 0));
+    cmp.view()!.drop(r, dropEvent('k-77', 'c-1', 'c-2', 0, 0));
     expect(api.moveCard).toHaveBeenCalledTimes(1);
   });
 
@@ -288,7 +301,7 @@ describe('TodoBoardRowsComponent', () => {
     const vibrate = jest.fn(() => true);
     Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
     try {
-      cmp.onDragStart(cmp.rows()[0].columns[0]);
+      cmp.view()!.onDragStart(cmp.rows()[0].columns[0]);
       expect(vibrate).toHaveBeenCalledWith(15);
     } finally {
       delete (navigator as { vibrate?: unknown }).vibrate;
@@ -301,17 +314,17 @@ describe('TodoBoardRowsComponent', () => {
     );
     const { cmp } = await setup({ boards: [row({ cards: [tile({ id: 'k-1', columnId: 'c-1', title: 'A', assignees: [ME] }), ...done] })] });
     const r = cmp.rows()[0];
-    expect(cmp.more(r, r.columns[3])).toBe(1);
-    expect(cmp.more(r, r.columns[0])).toBe(0);
-    cmp.kb.set({ boardId: 'b-1', cardId: 'k-1', col: 1, index: 0, fromCol: 0, fromIndex: 0 });
-    expect(cmp.more(r, r.columns[0])).toBe(0);
-    expect(cmp.more(r, r.columns[3])).toBe(0);
+    expect(cmp.view()!.more(r, r.columns[3])).toBe(1);
+    expect(cmp.view()!.more(r, r.columns[0])).toBe(0);
+    cmp.view()!.kb.set({ boardId: 'b-1', cardId: 'k-1', col: 1, index: 0, fromCol: 0, fromIndex: 0 });
+    expect(cmp.view()!.more(r, r.columns[0])).toBe(0);
+    expect(cmp.view()!.more(r, r.columns[3])).toBe(0);
   });
 
   it('rolls a refused move back, says so and reads the rows again', async () => {
     const { cmp, api, toast } = await setup({ move: () => throwError(() => new Error('409')) });
     const before = cmp.boards()[0];
-    cmp.drop(cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-1', 1, 0));
+    cmp.view()!.drop(cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-1', 1, 0));
     expect(api.moveCard).toHaveBeenCalledWith('k-2', { columnId: 'c-1', beforeId: 'k-1' });
     expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
     expect(cmp.boards()[0]).toEqual(before);
@@ -322,7 +335,7 @@ describe('TodoBoardRowsComponent', () => {
     const answer = new Subject<TodoCardTile>();
     const { cmp, api } = await setup({ move: () => answer });
     api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
-    cmp.drop(cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-1', 1, 0));
+    cmp.view()!.drop(cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-1', 1, 0));
     cmp.commentsChanged({ id: 'k-1', commentCount: 4 });
     const newer = cmp.boards()[0];
     answer.error(new Error('x'));
@@ -332,13 +345,13 @@ describe('TodoBoardRowsComponent', () => {
   it('does not move a card of a read-only row or on a phone', async () => {
     const { cmp, api, key } = await setup();
     const ro = cmp.rows()[1];
-    expect(cmp.canDrag(ro)).toBe(false);
-    cmp.drop(ro, dropEvent('k-9', 't-1', 't-2', 0, 0));
+    expect(cmp.view()!.canDrag(ro)).toBe(false);
+    cmp.view()!.drop(ro, dropEvent('k-9', 't-1', 't-2', 0, 0));
     await key('Ticket prüfen', ' ');
-    expect(cmp.kb()).toBeNull();
+    expect(cmp.view()!.kb()).toBeNull();
     expect(api.moveCard).not.toHaveBeenCalled();
     const phone = await setup({ phone: true });
-    expect(phone.cmp.canDrag(phone.cmp.rows()[0])).toBe(false);
+    expect(phone.cmp.view()!.canDrag(phone.cmp.rows()[0])).toBe(false);
   });
 
   /** Without a drag, Space still opens the card of a read-only row. */
@@ -346,13 +359,13 @@ describe('TodoBoardRowsComponent', () => {
     const { cmp, on, api, settle } = await setup();
     firefoxSpace('Raum buchen');
     await settle();
-    expect(cmp.kb()).toMatchObject({ cardId: 'k-1' });
+    expect(cmp.view()!.kb()).toMatchObject({ cardId: 'k-1' });
     expect(on.openCard).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Raum buchen' }), { key: 'ArrowRight' });
     await settle();
     firefoxSpace('Raum buchen');
     await settle();
-    expect(cmp.kb()).toBeNull();
+    expect(cmp.view()!.kb()).toBeNull();
     expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
     expect(on.openCard).not.toHaveBeenCalled();
     firefoxSpace('Ticket prüfen');
@@ -369,72 +382,72 @@ describe('TodoBoardRowsComponent', () => {
   it('moves a card with the keyboard inside its row and names each step', async () => {
     const { cmp, api, key, item } = await setup();
     await key('Raum buchen', 'x');
-    expect(cmp.kb()).toBeNull();
+    expect(cmp.view()!.kb()).toBeNull();
     await key('Raum buchen', ' ');
-    expect(cmp.kb()).toMatchObject({ boardId: 'b-1', cardId: 'k-1', col: 0, index: 0 });
-    expect(cmp.announce()).toContain('aufgenommen');
+    expect(cmp.view()!.kb()).toMatchObject({ boardId: 'b-1', cardId: 'k-1', col: 0, index: 0 });
+    expect(cmp.view()!.announce()).toContain('aufgenommen');
     await key('Raum buchen', 'ArrowDown');
-    expect(cmp.kb()?.index).toBe(1);
+    expect(cmp.view()!.kb()?.index).toBe(1);
     await key('Raum buchen', 'ArrowUp');
     await key('Raum buchen', 'ArrowUp');
-    expect(cmp.kb()?.index).toBe(0);
+    expect(cmp.view()!.kb()?.index).toBe(0);
     await key('Raum buchen', 'ArrowLeft');
-    expect(cmp.kb()?.col).toBe(0);
+    expect(cmp.view()!.kb()?.col).toBe(0);
     await key('Raum buchen', 'ArrowRight');
     await key('Raum buchen', 'ArrowLeft');
-    expect(cmp.kb()?.col).toBe(0);
+    expect(cmp.view()!.kb()?.col).toBe(0);
     await key('Raum buchen', 'ArrowRight');
-    expect(cmp.kb()?.col).toBe(1);
+    expect(cmp.view()!.kb()?.col).toBe(1);
     await key('Raum buchen', 'a');
     fireEvent.keyDown(item('Haushalt Kapitel 3'), { key: 'ArrowDown' });
     await key('Raum buchen', 'Enter');
     expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
-    expect(cmp.announce()).toBe('„Raum buchen“ abgelegt in In Arbeit.');
+    expect(cmp.view()!.announce()).toBe('„Raum buchen“ abgelegt in In Arbeit.');
   });
 
   it('puts a lifted card back with Escape, Tab, the same place or a click elsewhere', async () => {
     const { cmp, api, key, settle } = await setup();
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'Escape');
-    expect(cmp.kb()).toBeNull();
-    expect(cmp.announce()).toContain('abgebrochen');
+    expect(cmp.view()!.kb()).toBeNull();
+    expect(cmp.view()!.announce()).toContain('abgebrochen');
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'Tab');
-    expect(cmp.kb()).toBeNull();
+    expect(cmp.view()!.kb()).toBeNull();
     await key('Raum buchen', ' ');
     await key('Raum buchen', ' ');
     expect(api.moveCard).not.toHaveBeenCalled();
     await key('Raum buchen', ' ');
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Raum buchen' }));
-    expect(cmp.kb()).not.toBeNull();
+    expect(cmp.view()!.kb()).not.toBeNull();
     fireEvent.pointerDown(document.body);
     await settle();
-    expect(cmp.kb()).toBeNull();
-    cmp.leaveDrag(new Event('focusin'));
+    expect(cmp.view()!.kb()).toBeNull();
+    cmp.view()!.leaveDrag(new Event('focusin'));
     await key('Raum buchen', ' ');
     fireEvent.click(screen.getByRole('button', { name: /Studierendenparlament/ }));
-    expect(cmp.kb()).toBeNull();
+    expect(cmp.view()!.kb()).toBeNull();
     await key('Ticket prüfen', 'ArrowDown');
   });
 
   it('shows a row as it is when the held card or the column is not in it', async () => {
     const { cmp } = await setup();
     const r = cmp.rows()[0];
-    cmp.kb.set({ boardId: 'b-1', cardId: 'k-0', col: 1, index: 0, fromCol: 1, fromIndex: 0 });
-    expect(cmp.list(r, r.columns[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
-    expect(cmp.list(r, { id: 'c-x', name: 'X', position: 9, isDone: false, cardCount: 0 })).toEqual([]);
-    expect(cmp.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
-    cmp.kb.set(null);
-    expect(cmp.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
+    cmp.view()!.kb.set({ boardId: 'b-1', cardId: 'k-0', col: 1, index: 0, fromCol: 1, fromIndex: 0 });
+    expect(cmp.view()!.list(r, r.columns[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
+    expect(cmp.view()!.list(r, { id: 'c-x', name: 'X', position: 9, isDone: false, cardCount: 0 })).toEqual([]);
+    expect(cmp.view()!.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
+    cmp.view()!.kb.set(null);
+    expect(cmp.view()!.more(r, { id: 'c-x', name: 'X', position: 9, isDone: true, cardCount: 0 })).toBe(0);
   });
 
   it('ends a keyboard drag on a row that left the rows without a word', async () => {
     const { cmp } = await setup();
-    cmp.kb.set({ boardId: 'gone', cardId: 'k-0', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
-    cmp.announce.set('');
-    cmp.leaveDrag(new Event('pointerdown'));
-    expect(cmp.kb()).toBeNull();
-    expect(cmp.announce()).toBe('');
+    cmp.view()!.kb.set({ boardId: 'gone', cardId: 'k-0', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
+    cmp.view()!.announce.set('');
+    cmp.view()!.leaveDrag(new Event('pointerdown'));
+    expect(cmp.view()!.kb()).toBeNull();
+    expect(cmp.view()!.announce()).toBe('');
   });
 
   it('polls with the ETag, keeps the rows on a 304 and drops a poll that a change overtook', async () => {
@@ -499,17 +512,17 @@ describe('TodoBoardRowsComponent', () => {
   it('connects the columns of every writable open row and the personal board', async () => {
     const { cmp, fixture, settle } = await setup({ inputs: { extraDrops: ['bv-list-p-1'] } });
     const own = row().columns.map((c) => rowDropId(c.id));
-    expect(cmp.dropIds()).toEqual(own);
-    expect(cmp.connected()).toEqual([...own, 'bv-list-p-1']);
+    expect(cmp.view()!.dropIds()).toEqual(own);
+    expect(cmp.view()!.connected()).toEqual([...own, 'bv-list-p-1']);
     const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
     const byId = new Map(lists.map((l) => [l.id, l]));
     expect(byId.get(rowDropId('c-1'))?.connectedTo).toEqual([...own, 'bv-list-p-1']);
     expect(byId.get(rowDropId('t-1'))?.connectedTo).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: /Studierendenparlament/ }));
     await settle();
-    expect(cmp.dropIds()).toEqual([]);
+    expect(cmp.view()!.dropIds()).toEqual([]);
     fixture.componentRef.setInput('phone', true);
-    expect(cmp.dropIds()).toEqual([]);
+    expect(cmp.view()!.dropIds()).toEqual([]);
   });
 
   it('transfers a card dropped on another row at once and takes the answer', async () => {
@@ -517,7 +530,7 @@ describe('TodoBoardRowsComponent', () => {
     const third = team({ id: 'b-8', name: 'Dritte', columns: [{ id: 'z-1', name: 'Neu', position: 0, isDone: false, cardCount: 1 }], cards: [tile({ id: 'k-8', boardId: 'b-8', columnId: 'z-1', assignees: [ME] })] });
     const { cmp, api, on } = await setup({ boards: [row(), team({ canWrite: true }), third], transfer: () => answer });
     const [, other] = cmp.rows();
-    cmp.drop(other, dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    cmp.view()!.drop(other, dropEvent('k-1', 'c-1', 't-1', 0, 0));
     expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-9', columnId: 't-1', beforeId: 'k-9' });
     expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
     expect(cmp.boards()[1].cards.map((c) => c.id)).toEqual(['k-1', 'k-9']);
@@ -547,10 +560,10 @@ describe('TodoBoardRowsComponent', () => {
   it('names a refused transfer into a personal board and a card moved meanwhile', async () => {
     const refused = (code: string) => () => throwError(() => new HttpErrorResponse({ status: 403, error: { code } }));
     const t = await setup({ boards: [row(), team({ canWrite: true })], transfer: refused('transfer_to_personal') });
-    t.cmp.drop(t.cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    t.cmp.view()!.drop(t.cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
     expect(t.toast.error).toHaveBeenCalledWith('Karten aus geteilten Boards können nicht ins persönliche Board verschoben werden.');
     const m = await setup({ move: () => throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'card_moved' } })) });
-    m.cmp.drop(m.cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-2', 1, 0));
+    m.cmp.view()!.drop(m.cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-2', 1, 0));
     expect(m.toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
     expect(m.api.pollMineBoards).toHaveBeenLastCalledWith(null);
   });
@@ -568,7 +581,7 @@ describe('TodoBoardRowsComponent', () => {
     const before = cmp.boards();
     const [, other] = cmp.rows();
     api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
-    cmp.drop(other, dropEvent('k-2', 'c-1', 't-1', 1, 1));
+    cmp.view()!.drop(other, dropEvent('k-2', 'c-1', 't-1', 1, 1));
     expect(api.transferCard).toHaveBeenCalledWith('k-2', { boardId: 'b-9', columnId: 't-1', afterId: 'k-9' });
     expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
     expect(cmp.boards()).toBe(before);
@@ -579,7 +592,7 @@ describe('TodoBoardRowsComponent', () => {
     const answer = new Subject<TodoCardDetail>();
     const { cmp, api } = await setup({ boards: [row(), team({ canWrite: true })], transfer: () => answer });
     api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
-    cmp.drop(cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    cmp.view()!.drop(cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
     cmp.commentsChanged({ id: 'k-9', commentCount: 3 });
     const changed = cmp.boards();
     answer.error(new Error('x'));
@@ -589,9 +602,9 @@ describe('TodoBoardRowsComponent', () => {
   it('drops nothing on a read-only row and hands a card of the personal board to the page', async () => {
     const { cmp, api, on } = await setup();
     const [r, readOnly] = cmp.rows();
-    cmp.drop(readOnly, dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    cmp.view()!.drop(readOnly, dropEvent('k-1', 'c-1', 't-1', 0, 0));
     expect(api.transferCard).not.toHaveBeenCalled();
-    cmp.drop(r, dropEvent('p-card', 'p-col', 'c-1', 0, 1));
+    cmp.view()!.drop(r, dropEvent('p-card', 'p-col', 'c-1', 0, 1));
     expect(on.dropIn).toHaveBeenCalledWith({ boardId: 'b-1', cardId: 'p-card', move: { columnId: 'c-1', afterId: 'k-1' } });
   });
 
@@ -671,17 +684,17 @@ describe('TodoBoardRowsComponent', () => {
     it('waits while a card is held, the page holds or a move is in flight', async () => {
       const move = new Subject<TodoCardTile>();
       const { cmp, api, live, settle, fixture } = await setup({ cardTile, move: () => move, inputs: { me: 'me' } });
-      cmp.ptr.set('c-1');
+      cmp.view()!.ptr.set('c-1');
       live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
       await wait(settle);
       expect(api.cardTile).not.toHaveBeenCalled();
-      cmp.ptr.set(null);
+      cmp.view()!.ptr.set(null);
       fixture.componentRef.setInput('hold', true);
       await wait(settle);
       expect(api.cardTile).not.toHaveBeenCalled();
       fixture.componentRef.setInput('hold', false);
       const [r] = cmp.rows();
-      cmp.drop(r, dropEvent('k-2', 'c-1', 'c-2', 1, 0));
+      cmp.view()!.drop(r, dropEvent('k-2', 'c-1', 'c-2', 1, 0));
       await wait(settle);
       expect(api.cardTile).not.toHaveBeenCalled();
       move.next(tile({ id: 'k-2', columnId: 'c-2', assignees: [ME] }));
@@ -695,9 +708,9 @@ describe('TodoBoardRowsComponent', () => {
       const { cmp, api, live, settle } = await setup({ cardTile: () => answer, inputs: { me: 'me' } });
       live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
       await wait(settle);
-      cmp.ptr.set('c-1');
+      cmp.view()!.ptr.set('c-1');
       answer.next(tile({ id: 'k-1', columnId: 'c-2', assignees: [ME] }));
-      cmp.ptr.set(null);
+      cmp.view()!.ptr.set(null);
       await wait(settle);
       expect(api.cardTile).toHaveBeenCalledTimes(2);
     });
@@ -804,10 +817,10 @@ describe('TodoBoardRowsComponent', () => {
       );
       const { settle } = await setup({ phone: true, boards: [row({ cards: done })] });
       const list = screen.getByRole('list', { name: 'Studierendenparlament' });
-      expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW);
+      expect(list.querySelectorAll('app-todo-card-tile-view')).toHaveLength(DONE_PREVIEW);
       fireEvent.click(within(list).getByRole('button', { name: /2 weitere/ }));
       await settle();
-      expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW + 2);
+      expect(list.querySelectorAll('app-todo-card-tile-view')).toHaveLength(DONE_PREVIEW + 2);
     });
 
     /**

@@ -306,8 +306,9 @@ describe('CalendarSubscribeComponent', () => {
       value: (query: string) => ({
         matches: false,
         media: query,
+        // The first listener is the one of the component; the sheet listens too.
         addEventListener: (_: string, fn: (e: { matches: boolean }) => void) => {
-          if (query === MEDIA.phone) listener = fn;
+          if (query === MEDIA.phone && !listener) listener = fn;
         },
         removeEventListener: () => {},
       }),

@@ -1,13 +1,19 @@
 """Ticket tables: ``ticket``, ``ticket_note`` and ``ticket_event``.
 
-``ticket.number`` comes from the sequence ``ticket_number_seq`` and reads as
-``T-0001`` on the wire. A ticket has exactly one reporter: an account
+``ticket.number`` holds eight random characters (``numbers.draw_number``) and reads as
+``T-7K3QX9MD`` on the wire. The service draws again when a ticket has the number. A
+ticket has exactly one reporter: an account
 (``reporter_principal_id``) or a bare e-mail address (``reporter_email``). The
 anonymization clears both, so the check accepts no reporter once ``anonymized_at``
 is set.
 
 ``closed_at`` is the retention clock. The status change into ``done`` or
-``rejected`` sets it, a reopen clears it. The retention cron anonymizes a ticket
+``rejected`` sets it, a reopen clears it. ``waiting`` (Wartet auf Antwort) is an open
+status and never starts the clock. ``source`` names the way the ticket came:
+``help`` (the help menu), ``mail`` or ``team`` (a person of the team wrote it by hand).
+The body of a ``team`` ticket is the note of the team, so the view of the reporter
+leaves it out. ``follow_up_of_id`` names the closed ticket that a late message of the
+sender answered (``REOPEN_DAYS``). The retention cron anonymizes a ticket
 ``tickets.retentionMonths`` after that moment.
 
 A note is ``internal`` (the holders of ``ticket.manage`` only) or ``public`` (the
@@ -15,9 +21,22 @@ reporter account reads it too). Notes are soft-deleted (``deleted_at``). A note 
 reporter is ``public``; the anonymization clears its ``author_id``. Events are the timeline of
 the status, the assignee and the kind. Both cascade with the ticket.
 
+A ticket belongs to exactly one Bereich (``ticket_area``). The Bereich ``Plattform`` is
+built in and has the fixed id ``PLATFORM_AREA_ID``, so the reports of the help menu have
+a place on every installation. A Bereich belongs to one Gremium or to none; the Gremium
+decides who works in it (``access.py``). A ticket of ``Plattform`` has a ``kind``, the
+fixed Kategorien of that Bereich. A ticket of a different Bereich has no kind and at most
+one Kategorie of its Bereich (``ticket_category``).
+
+``ticket_mail`` holds each mail of a ticket: its ``Message-ID``, which is the identity
+of a mail in its Postfach, the addresses of the thread and the storage key of its
+source. A ticket from a mail has the ``From`` address as ``reporter_email`` and the
+display name as ``reporter_name``; it never has an account
+(§F/integrations/ticket-mail/002739).
+
 ``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
 normalized e-mail address (``email``, stripped and lowercase). A report of a blocked
-sender is swallowed: it consumes a number and stores nothing (``hit_count``).
+sender is swallowed: it answers a number and stores nothing (``hit_count``).
 """
 
 from __future__ import annotations
@@ -27,13 +46,15 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
-    Sequence,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -41,33 +62,166 @@ from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
+from app.modules.tickets.numbers import draw_number
+from app.shared.sealed import Sealed
 
 #: The kinds of a ticket.
 TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea", "barrier")
 #: The statuses of a ticket.
-TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "done", "rejected")
+TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "waiting", "done", "rejected")
 #: The statuses that close a ticket and start the retention clock.
 CLOSED_STATUSES: frozenset[str] = frozenset({"done", "rejected"})
+#: The sources of a ticket: the help menu, a mail, or a person of the team.
+TICKET_SOURCES: tuple[str, ...] = ("help", "mail", "team")
+#: The days after the close in which a message of the sender opens the ticket again.
+REOPEN_DAYS = 14
 #: The visibilities of a note.
 TICKET_NOTE_VISIBILITIES: tuple[str, ...] = ("internal", "public")
 #: The kinds of a timeline event.
-TICKET_EVENT_KINDS: tuple[str, ...] = ("created", "status", "assignee", "kind", "todo_done")
-
-TICKET_NUMBER_SEQ = Sequence("ticket_number_seq")
+TICKET_EVENT_KINDS: tuple[str, ...] = (
+    "created",
+    "status",
+    "assignee",
+    "kind",
+    "todo_done",
+    "category",
+    "area",
+    "mail_auto",
+)
+#: The directions of a stored mail: ``in`` came through the fetch, ``out`` was sent.
+TICKET_MAIL_DIRECTIONS: tuple[str, ...] = ("in", "out")
+#: The states of a sent mail.
+TICKET_MAIL_STATES: tuple[str, ...] = ("sending", "sent", "failed")
+#: The id of the built-in Bereich ``Plattform``. The migration creates the row.
+PLATFORM_AREA_ID = uuid.UUID("7a11e700-0000-4000-8000-000000000001")
 
 
 def _in(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{v}'" for v in values)
 
 
+class TicketArea(UUIDPkMixin, TimestampMixin, Base):
+    """A Bereich: the unit that separates the tickets, the rights and the settings of a team.
+
+    Attributes:
+        name: The name, unique on the platform.
+        gremium_id: The Gremium that owns the Bereich, else NULL. The Bereich stays
+            without a Gremium when the Gremium is deleted.
+        platform: True only for the built-in Bereich ``Plattform``.
+        notify_new: Mail each new ticket to the team of the Bereich.
+        in_app: A signed-in person can choose the Bereich in the ticket dialog of the
+            help menu. ``Plattform`` is reachable without the switch.
+    """
+
+    __tablename__ = "ticket_area"
+
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
+    platform: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    notify_new: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    in_app: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+    __table_args__ = (
+        CheckConstraint("NOT platform OR gremium_id IS NULL", name="platform_without_gremium"),
+        Index(
+            "uq_ticket_area_one_platform",
+            "platform",
+            unique=True,
+            postgresql_where=text("platform"),
+        ),
+        Index("ix_ticket_area_gremium_id", "gremium_id"),
+    )
+
+
+class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
+    """The Postfach of a Bereich: one address with an IMAP and an SMTP account.
+
+    A Bereich has at most one Postfach (§F/integrations/ticket-mail/002720), and the
+    Postfach goes with its Bereich. No read of the API returns a password
+    (§NF/security/network/002746).
+
+    Attributes:
+        area_id: The Bereich, unique.
+        address: The e-mail address of the Postfach.
+        done_folder: The IMAP folder that takes each imported mail.
+        enabled: The switch. While it is off, the platform opens no connection.
+        uid_validity: The ``UIDVALIDITY`` of the inbox at the last fetch.
+        last_uid: The highest UID of the inbox that the fetch took.
+        failures: The failed fetch runs in sequence.
+        last_error: The short cause code of the newest failure, never a text of an
+            exception.
+        fetched_at: The moment of the last fetch without a failure.
+        signature: The text that ends each sent mail. ``{name}`` stands for the writer
+            (§F/integrations/ticket-mail/002736).
+        confirm: The switch "Eingang bestätigen": a new ticket from a mail gets a
+            confirmation (§F/integrations/ticket-mail/002738).
+    """
+
+    __tablename__ = "ticket_mailbox"
+
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_area.id", ondelete="CASCADE"), unique=True
+    )
+    address: Mapped[str] = mapped_column(CITEXT)
+    imap_host: Mapped[str] = mapped_column(Text)
+    imap_port: Mapped[int] = mapped_column(Integer)
+    imap_user: Mapped[str] = mapped_column(Text)
+    imap_password: Mapped[str] = mapped_column(Sealed("ticket_mailbox.imap_password"))
+    smtp_host: Mapped[str] = mapped_column(Text)
+    smtp_port: Mapped[int] = mapped_column(Integer)
+    smtp_user: Mapped[str] = mapped_column(Text)
+    smtp_password: Mapped[str] = mapped_column(Sealed("ticket_mailbox.smtp_password"))
+    done_folder: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    uid_validity: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_uid: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    failures: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    signature: Mapped[str] = mapped_column(Text, default="", server_default="")
+    confirm: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class TicketCategory(UUIDPkMixin, Base):
+    """A Kategorie of a Bereich. ``position`` orders the list of the Bereich.
+
+    The unique name of a Bereich is checked at the commit, so one save can swap the
+    names of two Kategorien.
+    """
+
+    __tablename__ = "ticket_category"
+
+    area_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket_area.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "area_id",
+            "name",
+            name="uq_ticket_category_area_name",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        Index("ix_ticket_category_area_id", "area_id"),
+    )
+
+
 class Ticket(UUIDPkMixin, TimestampMixin, Base):
     """One reported ticket.
 
     Attributes:
-        number: The running number from ``ticket_number_seq``.
+        area_id: The Bereich of the ticket; a ticket without one cannot exist.
+        category_id: The Kategorie, of the same Bereich, else NULL.
+        number: The eight random characters of the number, unique on the platform.
         reporter_principal_id: The account of the reporter, else NULL.
         reporter_email: The e-mail of a reporter without a session, else NULL.
+        reporter_name: The display name of ``From`` of a ticket from a mail, else NULL.
         duplicate_of_id: The ticket that this one duplicates (status ``rejected``).
+        follow_up_of_id: The closed ticket that this one follows, else NULL.
+        source: ``help``, ``mail`` or ``team``.
         context: The technical context of the report (url, route, appVersion, ...).
         closed_at: Entry into ``done`` or ``rejected``; NULL while open.
         anonymized_at: Set by the retention cron or by an erasure.
@@ -75,13 +229,14 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "ticket"
 
-    number: Mapped[int] = mapped_column(
-        Integer,
-        TICKET_NUMBER_SEQ,
-        server_default=TICKET_NUMBER_SEQ.next_value(),
-        unique=True,
+    number: Mapped[str] = mapped_column(Text, default=draw_number, unique=True)
+    area_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ticket_area.id"), default=PLATFORM_AREA_ID
     )
-    kind: Mapped[str] = mapped_column(Text)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_category.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default="new")
@@ -89,10 +244,15 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         ForeignKey("principal.id"), nullable=True
     )
     reporter_email: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
+    reporter_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     duplicate_of_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
     )
+    follow_up_of_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
+    )
+    source: Mapped[str] = mapped_column(Text, default="help", server_default="help")
     context: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     anonymized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -100,6 +260,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(TICKET_KINDS)})", name="kind"),
         CheckConstraint(f"status IN ({_in(TICKET_STATUSES)})", name="status"),
+        CheckConstraint(f"source IN ({_in(TICKET_SOURCES)})", name="source"),
         CheckConstraint(
             "anonymized_at IS NOT NULL OR num_nonnulls(reporter_principal_id, reporter_email) = 1",
             name="reporter",
@@ -107,6 +268,7 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_ticket_status", "status"),
         Index("ix_ticket_created_at", "created_at"),
         Index("ix_ticket_assignee", "assignee_id"),
+        Index("ix_ticket_area_id", "area_id"),
     )
 
 
@@ -151,6 +313,85 @@ class TicketEvent(UUIDPkMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(TICKET_EVENT_KINDS)})", name="kind"),
         Index("ix_ticket_event_ticket_id", "ticket_id"),
+    )
+
+
+class TicketMail(UUIDPkMixin, Base):
+    """One mail of a ticket: an imported mail or a sent mail.
+
+    ``mailbox_id`` and ``message_id`` together are the identity of a mail
+    (§F/integrations/ticket-mail/002724), so a second fetch of the same mail meets the
+    unique index. The row stays when its Postfach goes, because the ticket keeps its
+    mails. The anonymization of the ticket clears the addresses and the subject and
+    removes the source; the identity stays, so the mail is never imported again.
+
+    Attributes:
+        note_id: The message that the mail became, else NULL: the first mail of a
+            ticket is the ticket body, and an automatic mail is an event.
+        direction: ``in`` or ``out``.
+        message_id: The ``Message-ID`` with its angle brackets, else ``sha256:<hex>``.
+        from_address: The address of ``From``.
+        cc: The addresses of ``Cc``.
+        source_key: The storage key of the full source, else NULL.
+        source_size: The size of the source in bytes.
+        source_scan: NULL before a scan, ``clean``, or the signature of the finding.
+        skipped: The files that did not become files of the message, each with
+            ``name``, ``size`` and ``reason`` (``size`` or ``type``).
+        automatic: The mail came from a machine. A sent mail with this mark is the
+            confirmation of a new ticket.
+        to_addresses: The addresses of ``To`` of a sent mail.
+        state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; NULL for
+            an imported mail (§F/integrations/ticket-mail/002737).
+        attempts: The failed sends in sequence.
+        send_error: The short cause code of the newest failed send.
+        sender_checked: An imported mail answers a mail that the Postfach sent to its
+            ``From`` address (§F/integrations/ticket-mail/002816).
+        next_try_at: The moment from which the worker tries the send again.
+    """
+
+    __tablename__ = "ticket_mail"
+
+    mailbox_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_mailbox.id", ondelete="SET NULL"), nullable=True
+    )
+    ticket_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket.id", ondelete="CASCADE"))
+    note_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket_note.id", ondelete="SET NULL"), nullable=True
+    )
+    direction: Mapped[str] = mapped_column(Text, default="in", server_default="in")
+    message_id: Mapped[str] = mapped_column(Text)
+    from_address: Mapped[str | None] = mapped_column(CITEXT, nullable=True)
+    from_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cc: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
+    subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_size: Mapped[int] = mapped_column(BigInteger, default=0, server_default=text("0"))
+    source_scan: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skipped: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    automatic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sender_checked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    to_addresses: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    send_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_try_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(f"direction IN ({_in(TICKET_MAIL_DIRECTIONS)})", name="direction"),
+        CheckConstraint(f"state IS NULL OR state IN ({_in(TICKET_MAIL_STATES)})", name="state"),
+        UniqueConstraint("mailbox_id", "message_id", name="uq_ticket_mail_mailbox_message"),
+        Index("ix_ticket_mail_ticket_id", "ticket_id"),
+        Index("ix_ticket_mail_message_id", "message_id"),
+        Index(
+            "ix_ticket_mail_sending",
+            "next_try_at",
+            postgresql_where=text("state = 'sending'"),
+        ),
     )
 
 

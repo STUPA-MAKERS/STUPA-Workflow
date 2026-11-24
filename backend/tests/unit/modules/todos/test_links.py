@@ -218,12 +218,12 @@ async def test_free_agenda_items_need_no_title_lookup(meeting_scope: dict[str, A
 
 
 async def test_tickets_need_ticket_manage() -> None:
-    ticket = SimpleNamespace(id=TICKET, title="Fehler", number=4, status="new")
+    ticket = SimpleNamespace(id=TICKET, title="Fehler", number="AAAA0004", status="new")
     session = ScriptedSession(scalars=[[ticket]])
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
     out = await resolver.resolve([("ticket", TICKET)], READER)
     detail = out[("ticket", TICKET)].detail
-    assert detail is not None and detail.number == "T-0004" and detail.status == "new"
+    assert detail is not None and detail.number == "T-AAAA0004" and detail.status == "new"
     assert not (await resolver.resolve([("ticket", TICKET)], USER))[("ticket", TICKET)].accessible
 
 
@@ -257,7 +257,7 @@ async def test_search_every_kind(
     b = board()
     col = column(b.id)
     c = card(b, col, title="Plakat drucken")
-    ticket = SimpleNamespace(id=TICKET, title="Fehler", number=4, status="new")
+    ticket = SimpleNamespace(id=TICKET, title="Fehler", number="AAAA0004", status="new")
     session = ScriptedSession(
         scalars=[[_app(APP)], [MEETING], [_meeting()], [ITEM], [ticket], [c.id]],
         execute=[
@@ -272,7 +272,7 @@ async def test_search_every_kind(
     assert [h.kind for h in hits] == ["application", "meeting", "agenda_item", "ticket", "todo"]
     assert seen["apps"]["q"] == "pla" and seen["apps"]["owner_sub"] is None
     assert seen["apps"]["limit"] == PER_KIND
-    assert seen["tickets"] == {"q": "pla", "limit": PER_KIND}
+    assert seen["tickets"] == {"q": "pla", "limit": PER_KIND, "areas": None}
     todo_sql = str(session.statements[-2])
     assert "todo_card.id !=" in todo_sql
 

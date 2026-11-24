@@ -1,30 +1,46 @@
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
+  type Action,
   ButtonComponent,
   ButtonGroupComponent,
-  FabComponent,
   ConfirmDialogComponent,
-  EmptyStateComponent,
   IconComponent,
-  NoteComponent,
+  type ListRow,
+  type LoadState,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  SkeletonComponent,
+  scrollBehavior,
+  SearchPillComponent,
   StatusTextComponent,
   ToastService,
-  PageHeaderComponent,
   SectionComponent,
   FactsComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenHeadToolsDirective,
+  ScreenIntroDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { problemCode } from '@core/api/problem';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
@@ -32,7 +48,7 @@ import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix
 import { GremiumDefaultsDialogComponent } from './gremium-defaults-dialog/gremium-defaults-dialog.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 import { expandSet } from '@shared/expand-set';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { listSearch, hitCount, searchedRows } from '../list-search';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -67,7 +83,8 @@ interface Setting {
  *
  * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
  * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
- * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open. The
+ * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open, or the row
+ * of `?open=<gremium id>`, which the page then scrolls into view (002601). The
  * memberships come from the OIDC groups, so this page has no member editing. The dialog
  * `app-gremium-dialog` creates and edits a gremium. The header button "Vorgaben" opens
  * the values that the form of a new gremium starts with (§ 000906).
@@ -83,20 +100,18 @@ interface Setting {
     ButtonComponent,
     ButtonGroupComponent,
     GremiumDefaultsDialogComponent,
-    LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
-    FabComponent,
     ConfirmDialogComponent,
-    RouterLink,
     TranslatePipe,
     IconComponent,
-    EmptyStateComponent,
-    NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
+    RecordsScreenComponent,
+    ScreenHeadToolsDirective,
+    ScreenIntroDirective,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
     RowMenuComponent,
-    SkeletonComponent,
     StatusTextComponent,
     GremiumDialogComponent,
     GremiumRoleMatrixComponent,
@@ -110,11 +125,47 @@ export class AdminGremienComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly features = inject(FeatureService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly gremien = signal<Gremium[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.gremien.error'),
+        retry: () => this.reload(true),
+      };
+    const rows = this.search
+      .filter(this.gremien(), (g) => [g.name, g.slug, this.counts(g)])
+      .map((g) => ({ id: g.id, title: g.name }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'landmark', heading: this.i18n.translate('admin.gremien.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+  /** "Gremium anlegen" as the FAB; "Vorgaben" is a button at the end of the head. */
+  protected readonly actions = computed<readonly Action[]>(() => [
+    {
+      key: 'create',
+      label: this.i18n.translate('fab.gremium'),
+      icon: 'plus',
+      priority: 'fab',
+    },
+  ]);
   /** CD variants from `GET /cd-variants`: the dropdown source and the read-out names. */
   readonly cdVariants = signal<CdVariantOption[]>([]);
   /** The ids of the open rows. */
@@ -131,8 +182,10 @@ export class AdminGremienComponent {
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
 
-  /** The note links to the group mappings only with that permission. */
-  protected readonly canMappings = computed(() => this.auth.can('admin.group_mappings'));
+  /** "Stellvertretungen" in the ⋮ menu: the page needs `admin.delegations` and Sitzungen on. */
+  protected readonly canPool = computed(
+    () => this.auth.can('admin.delegations') && this.features.isOn('meetings'),
+  );
 
   constructor() {
     this.reload(true);
@@ -140,6 +193,16 @@ export class AdminGremienComponent {
       next: (v) => this.cdVariants.set(v),
       error: () => this.cdVariants.set([]),
     });
+  }
+
+  /** The gremium of a row of the records screen. */
+  protected gremiumOf(id: string): Gremium {
+    return this.gremien().find((g) => g.id === id)!;
+  }
+
+  /** An action of the head or the FAB. */
+  protected onAction(key: string): void {
+    if (key === 'create') this.openCreate();
   }
 
   protected isOpen(g: Gremium): boolean {
@@ -266,6 +329,15 @@ export class AdminGremienComponent {
       items: [
         { id: 'edit', label: this.i18n.translate('admin.gremien.editAction'), icon: 'edit' },
         { id: 'members', label: this.i18n.translate('admin.gremien.members'), icon: 'users' },
+        ...(this.canPool()
+          ? [
+              {
+                id: 'substitutes',
+                label: this.i18n.translate('admin.substitutes.title'),
+                icon: 'handshake' as const,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -278,6 +350,8 @@ export class AdminGremienComponent {
   protected onRowMenu(item: RowMenuItem, g: Gremium): void {
     if (item.id === 'edit') this.openEdit(g);
     if (item.id === 'members') void this.router.navigate(['/admin/committees', g.id, 'members']);
+    if (item.id === 'substitutes')
+      void this.router.navigate(['/admin/committees', g.id, 'substitutes']);
     if (item.id === 'delete') this.askDelete(g);
   }
 
@@ -297,10 +371,11 @@ export class AdminGremienComponent {
   }): void {
     this.dialogGremium.set(undefined);
     if (event.recipients) this.setRecipients(event.gremium.id, event.recipients);
-    this.toast.success(
+    this.toast.show(
       this.i18n.translate(
         event.created ? 'admin.gremien.toast.created' : 'admin.gremien.toast.updated',
       ),
+      'success',
     );
     if (event.created) this.expanded.open(event.gremium.id);
     this.reload(false);
@@ -337,17 +412,17 @@ export class AdminGremienComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.gremien.toast.deleted'));
+        this.toast.show(this.i18n.translate('admin.gremien.toast.deleted'), 'success');
         this.reload(false);
       },
       error: (err: unknown) => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate(deleteErrorKey(err)));
+        this.toast.show(this.i18n.translate(deleteErrorKey(err)), 'error');
       },
     });
   }
 
-  /** `first`: the first load opens the first row. */
+  /** `first`: the first load opens the row of `?open=<id>`, else the first row (002601). */
   protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);
@@ -355,12 +430,31 @@ export class AdminGremienComponent {
       next: (g) => {
         this.gremien.set(g);
         this.loading.set(false);
-        if (first && g.length) this.toggle(g[0]);
+        if (first && g.length) this.openFirst(g);
       },
       error: () => {
         this.loadError.set(true);
         this.loading.set(false);
       },
     });
+  }
+
+  /** Opens the row that `?open=` names and scrolls it into view; else the first row. */
+  private openFirst(list: readonly Gremium[]): void {
+    const asked = this.route.snapshot.queryParamMap.get('open');
+    const target = list.find((g) => g.id === asked);
+    this.toggle(target ?? list[0]);
+    if (!target) return;
+    afterNextRender(
+      () => {
+        // The head of the row, not the whole row: an open row is taller than the screen,
+        // and the centre keeps the head clear of a sticky page head.
+        const head = this.host.nativeElement.querySelector<HTMLElement>(
+          `[data-gremium="${CSS.escape(target.id)}"] [aria-expanded]`,
+        );
+        head?.scrollIntoView?.({ block: 'center', behavior: scrollBehavior() });
+      },
+      { injector: this.injector },
+    );
   }
 }

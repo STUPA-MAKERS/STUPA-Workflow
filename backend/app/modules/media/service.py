@@ -309,9 +309,17 @@ class MediaService:
     # -- embedded PDFs (specs 000862, 000868, 000869) ------------------------
 
     async def upload_document(
-        self, data: bytes, filename: str | None, meeting_id: uuid.UUID | None = None
+        self,
+        data: bytes,
+        filename: str | None,
+        meeting_id: uuid.UUID | None = None,
+        *,
+        paperless_document_id: int | None = None,
     ) -> MarkdownDocumentOut:
         """Scan, check and store one PDF for a protocol text of the Sitzung ``meeting_id``.
+
+        ``paperless_document_id`` is the number of the Paperless document of which the
+        PDF is a copy (§F/integrations/paperless/002528).
 
         The ClamAV scan runs before pypdf reads the bytes. The stored bytes are the
         bytes of the client: a PDF has no clean re-encode.
@@ -328,10 +336,17 @@ class MediaService:
         if len(data) > self.max_document_bytes:
             raise PayloadTooLargeError(f"PDF exceeds {self.max_document_bytes} bytes.")
         await scan_or_raise(data, self.settings or get_settings())
-        return await self.add_document(data, filename, meeting_id)
+        return await self.add_document(
+            data, filename, meeting_id, paperless_document_id=paperless_document_id
+        )
 
     async def add_document(
-        self, data: bytes, filename: str | None, meeting_id: uuid.UUID | None = None
+        self,
+        data: bytes,
+        filename: str | None,
+        meeting_id: uuid.UUID | None = None,
+        *,
+        paperless_document_id: int | None = None,
     ) -> MarkdownDocumentOut:
         """Check and store one PDF that the platform made itself, without a virus scan.
 
@@ -355,6 +370,7 @@ class MediaService:
             size=len(data),
             pages=checked.pages,
             meeting_id=meeting_id,
+            paperless_document_id=paperless_document_id,
         )
         self.session.add(row)
         await self.session.flush()

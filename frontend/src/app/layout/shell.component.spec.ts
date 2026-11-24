@@ -162,12 +162,16 @@ describe('ShellComponent', () => {
 
     /** No route with `footer: true` is open, so a signed-in page has no footer. */
     it('frames a signed-in principal with the rail, without the public bar', async () => {
-      const { container } = await setup(MEMBER);
+      const { container, fixture } = await setup(MEMBER);
       expect(mainNav()).toBeInTheDocument();
       expect(container.querySelector('app-nav-rail')).not.toBeNull();
       expect(container.querySelector('app-bottom-bar')).toBeNull();
       expect(container.querySelector('app-public-header')).toBeNull();
       expect(container.querySelector('app-site-footer')).toBeNull();
+      // The search palette loads after the start, so it stays out of the start bundle (002003).
+      expect(container.querySelector('app-command-palette')).toBeNull();
+      const [block] = await fixture.getDeferBlocks();
+      await block.render(DeferBlockState.Complete);
       expect(container.querySelector('app-command-palette')).not.toBeNull();
     });
 
@@ -465,7 +469,7 @@ describe('ShellComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
     });
 
-    /** §000593 the person sets one display switch after the other, so the sheet stays open. */
+    /** §ui-kit:000593 the person sets one display switch after the other, so the sheet stays open. */
     it('keeps the sheet open when a display switch changes and when the display settings reset', async () => {
       const { fixture } = await setup(ADMIN);
       await userEvent.click(more());
@@ -520,7 +524,7 @@ describe('ShellComponent', () => {
   });
 
   describe('rail foot', () => {
-    /** §000647 "Barrierefreiheit" sits directly above "Hilfe". */
+    /** §ui-kit:000647 "Barrierefreiheit" sits directly above "Hilfe". */
     it('puts the accessibility menu, the help menu and the account menu at the foot of the rail', async () => {
       const { container } = await setup(MEMBER);
       const tools = Array.from(container.querySelectorAll('.rail__tools app-help-menu'));

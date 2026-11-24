@@ -7,6 +7,7 @@ import { BudgetTreeApi } from '../budget-tree.api';
 import { BudgetPlanApi } from '../plan/budget-plan.api';
 import { plan, planTreeOf, QSM, TOP } from '../plan/budget-plan.fixtures';
 import { CostCentreCreateComponent } from './cost-centre-create.component';
+import { kindSpies } from '../../../../testing/toast';
 
 async function setup(inputs: Record<string, unknown> = {}, fail = '') {
   TestBed.resetTestingModule();
@@ -32,8 +33,8 @@ async function setup(inputs: Record<string, unknown> = {}, fail = '') {
     created,
     closed,
     dialog,
-    success: jest.spyOn(toast, 'success'),
-    error: jest.spyOn(toast, 'error'),
+    success: jest.spyOn(kindSpies(toast), 'success'),
+    error: jest.spyOn(kindSpies(toast), 'error'),
     submit: within(dialog).getByRole('button', { name: 'Anlegen' }),
     field: (name: string) => dialog.querySelector<HTMLInputElement>(`[name="${name}"] input, input[name="${name}"]`) as HTMLInputElement,
     parent: () => dialog.querySelector('[data-cc-trigger]') as HTMLElement,

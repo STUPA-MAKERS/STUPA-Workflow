@@ -47,7 +47,12 @@ describe('PublicProtocolDetailComponent', () => {
     expect(att).not.toHaveTextContent('Gäste');
     expect(screen.getByRole('link', { name: /Alle Protokolle: Studierendenparlament/ })).toHaveAttribute(
       'href',
-      '/protocols?committee=g-1',
+      '/protocols/stupa',
+    );
+    const crumbs = screen.getByRole('navigation', { name: 'Pfad' });
+    expect(within(crumbs).getByRole('link', { name: 'Studierendenparlament' })).toHaveAttribute(
+      'href',
+      '/protocols/stupa',
     );
   });
 

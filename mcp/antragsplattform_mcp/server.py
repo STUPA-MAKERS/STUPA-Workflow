@@ -127,8 +127,9 @@ TYPICAL FLOWS:
   `tickets_block_sender(ticket_id)` / `tickets_unblock_sender(ticket_id)` block the reporter
   ("Absender sperren": later reports get a number and are dropped);
   `tickets_blocked_senders` lists the blocks, `tickets_delete_blocked_sender(block_id)`
-  lifts one whose ticket is gone or anonymized. As a reporter: `tickets_report`,
-  `tickets_mine`, `tickets_mine_note`.
+  lifts one whose ticket is gone or anonymized. As a reporter: `tickets_report`
+  (Bereiche: `tickets_report_areas`), `tickets_mine`, `tickets_mine_note`. The team
+  writes a ticket by hand with `tickets_create_manual`.
 - Chat files: `tickets_note`, `todo_comment` and `comment_application` take
   `file_paths` (local files, at most 5, same types and 10 MB cap as `upload_attachment`;
   the body may then be empty). The tool uploads each file as a draft and binds it to the

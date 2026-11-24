@@ -207,7 +207,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
         this.done(r.id);
         this.replace({ ...r, permissions: before });
         box.checked = !on;
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -243,7 +243,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
       this.replace(saved);
     }
     this.dialogRole.set(undefined);
-    this.toast.success(this.i18n.translate('admin.gremiumRoles.saved'));
+    this.toast.show(this.i18n.translate('admin.gremiumRoles.saved'), 'success');
   }
 
   /**
@@ -282,14 +282,15 @@ export class GremiumRoleMatrixComponent implements OnInit {
         this.confirmDelete.set(null);
         this.roles.update((list) => list.filter((x) => x.id !== r.id));
         this.countChange.emit(this.roles().length);
-        this.toast.success(this.i18n.translate('admin.gremiumRoles.deleted'));
+        this.toast.show(this.i18n.translate('admin.gremiumRoles.deleted'), 'success');
       },
       error: (err: { status?: number }) => {
         this.deleting.set(false);
-        this.toast.error(
+        this.toast.show(
           this.i18n.translate(
             err.status === 409 ? 'admin.gremiumRoles.inUse' : 'admin.gremiumRoles.deleteFailed',
           ),
+          'error',
         );
       },
     });

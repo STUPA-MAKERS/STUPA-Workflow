@@ -18,7 +18,7 @@ import {
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
-import { type CanvasNode, GraphCanvasComponent } from './graph-canvas.component';
+import { type CanvasNode, GraphCanvasViewComponent as GraphCanvasComponent } from '@stupa-makers/ui-kit/views/graph';
 import { GraphComponent, SEARCH_PAUSE } from './graph.component';
 import { AUTO_NODES, defaultFilters, localDay } from './graph.util';
 
@@ -29,7 +29,7 @@ const FRESH = defaultFilters(localDay(new Date()));
 class TargetStub {}
 
 /** The drawing without its layout, for a test of the build-up with hundreds of nodes. */
-@Component({ selector: 'app-graph-canvas', standalone: true, template: '' })
+@Component({ selector: 'app-graph-canvas-view', standalone: true, template: '' })
 class CanvasStub {
   readonly nodes = input<readonly CanvasNode[]>([]);
   readonly lines = input<readonly unknown[]>([]);
@@ -141,11 +141,14 @@ describe('GraphComponent', () => {
   it('draws the first page and names the drawing for a screen reader', async () => {
     const { calls, el, router } = await start('/graph', [() => of(FULL)]);
     expect(calls).toEqual([{ filters: FRESH, cursor: null }]);
-    // § 001425: no title shows, and the filters are in the layer over the drawing.
+    // §ui-kit:001425: no title shows, and the filters are in the layer over the drawing.
     expect(el.querySelector('#gr-title')).toHaveTextContent('Graph');
     expect(el.querySelector('#gr-title')).toHaveClass('sr-only');
     expect(el.querySelector('.gr__float .gr__bar [role="search"]')).not.toBeNull();
-    expect(el.querySelector('.gr__foot')).toBeNull();
+    // "Schritte" is in the foot, opposite the zoom buttons, not in the bar (spec 001434).
+    expect(el.querySelector('.gr__float .gr__foot .gr__depth')).not.toBeNull();
+    expect(el.querySelector('.gr__bar .gr__depth')).toBeNull();
+    expect(el.querySelector('.gr__foot .gr__state')).toBeNull();
     expect(screen.queryByRole('group', { name: 'Legende' })).toBeNull();
     expect(
       screen.getByRole('group', {
@@ -154,7 +157,7 @@ describe('GraphComponent', () => {
     ).toBeInTheDocument();
     const meeting = screen.getByRole('button', { name: 'Sitzung: Sondersitzung' });
     expect(meeting).toHaveAttribute('data-kind', 'meeting');
-    // § 001428: a node names its neighbours for a screen reader.
+    // §ui-kit:001428: a node names its neighbours for a screen reader.
     expect(meeting).toHaveAccessibleDescription(
       'Verbunden mit: TOP 1: Haushalt, Flyer drucken, Antrag Sommerfest, Rechnung (kein Zugriff)',
     );
@@ -172,12 +175,13 @@ describe('GraphComponent', () => {
   it('does not offer the kinds of a feature that is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['invoices']));
     const { cmp } = await start();
-    expect(cmp.kinds()).toEqual(GRAPH_KINDS.filter((k) => k !== 'invoice'));
+    // A Paperless document is a kind only with `paperless.use` and its switch (002768).
+    expect(cmp.kinds()).toEqual(GRAPH_KINDS.filter((k) => k !== 'invoice' && k !== 'paperless'));
     expect(cmp.kindOptions().map((o) => o.label)).not.toContain('Rechnung');
     expect(cmp.kindOptions().map((o) => o.label)).toContain('TOP');
   });
 
-  /** § F/collaboration/graph/001426: the build-up, page by page, until 300 nodes show. */
+  /** §ui-kit:F/collaboration/graph/001426: the build-up, page by page, until 300 nodes show. */
   it('loads the pages by itself until 300 nodes show, then "Mehr laden" loads on', async () => {
     const first = cards(0, 60, '60');
     const { calls, cmp, settle } = await start(
@@ -199,8 +203,14 @@ describe('GraphComponent', () => {
     expect(cmp.graph().nodes[59]).toBe(first.nodes[59]);
     expect(cmp.canvasNodes()).toHaveLength(300);
     expect(cmp.growing()).toBe(false);
+    // "Mehr laden" is a tonal button over the zoom buttons, out of the foot (spec 002790).
+    const more = screen.getByTestId('gr-more');
+    expect(more.closest('.gr__float > .gr__state')).not.toBeNull();
+    expect(more.closest('.gr__foot')).toBeNull();
+    expect(more.querySelector('.btn--tonal')).not.toBeNull();
+    expect(more.querySelector('app-icon')).toBeNull();
 
-    screen.getByTestId('gr-more').click();
+    more.click();
     await settle();
     expect(calls.map((c) => c.cursor)).toEqual([null, '60', '120', '180', '240', '300']);
     expect(cmp.limit()).toBe(2 * AUTO_NODES);
@@ -217,6 +227,7 @@ describe('GraphComponent', () => {
     expect(cmp.growing()).toBe(true);
     expect(el.querySelector('.gr__growing')).toHaveTextContent('Weitere Elemente werden geladen …');
     expect(el.querySelector('.gr__growing')).toHaveAttribute('role', 'status');
+    expect(el.querySelector('.gr__float > .gr__state.gr__growing')).not.toBeNull();
     expect(screen.queryByTestId('gr-more')).toBeNull();
     cmp.loadMore();
     expect(calls).toHaveLength(2);
@@ -239,7 +250,7 @@ describe('GraphComponent', () => {
     expect(el.querySelector('.gr__body')).toHaveAttribute('aria-busy', 'true');
     expect(el.querySelectorAll('.gr__skel .gr__skelNode')).toHaveLength(6);
     expect(el.querySelectorAll('.gr__skelTools .skel-btn')).toHaveLength(3);
-    expect(el.querySelector('app-graph-canvas')).toBeNull();
+    expect(el.querySelector('app-graph-canvas-view')).toBeNull();
     cmp.loadMore();
     expect(calls).toHaveLength(1);
   });
@@ -252,14 +263,14 @@ describe('GraphComponent', () => {
     await settle();
     expect(calls).toHaveLength(2);
     expect(cmp.error()).toBe(false);
-    expect(el.querySelector('app-graph-canvas')).not.toBeNull();
+    expect(el.querySelector('app-graph-canvas-view')).not.toBeNull();
   });
 
   it('shows an empty state, another one with filters', async () => {
     const plain = await start('/graph', [() => of(page([]))]);
     expect(screen.getByText('Noch keine Verknüpfungen')).toBeInTheDocument();
     expect(screen.getByText('Sobald Elemente miteinander verknüpft sind, erscheinen sie hier.')).toBeInTheDocument();
-    expect(plain.el.querySelector('app-graph-canvas')).toBeNull();
+    expect(plain.el.querySelector('app-graph-canvas-view')).toBeNull();
     expect(plain.cmp.empty()).toBe(true);
     expect(plain.cmp.filtered()).toBe(false);
   });
@@ -270,7 +281,7 @@ describe('GraphComponent', () => {
     expect(screen.queryByText('Noch keine Verknüpfungen')).toBeNull();
   });
 
-  /** § F/collaboration/graph/001425: the filters are in the query of the URL, the server applies them. */
+  /** §ui-kit:F/collaboration/graph/001425: the filters are in the query of the URL, the server applies them. */
   it('reads the filters from the URL and resets them', async () => {
     const { calls, cmp, settle, router } = await start(
       '/graph?kinds=meeting,todo&from=2026-01-01&to=2026-12-31&rel=links&q=Haushalt&single=1&noaccess=1',
@@ -422,7 +433,7 @@ describe('GraphComponent', () => {
     expect(calls).toHaveLength(count);
   });
 
-  /** § F/collaboration/graph/001429: a press chooses a node: the panel, the dimmed nodes and "Öffnen". */
+  /** §ui-kit:F/collaboration/graph/001429: a press chooses a node: the panel, the dimmed nodes and "Öffnen". */
   it('shows the panel of the pressed node with "Öffnen" and dims the other nodes', async () => {
     const { settle, cmp, el } = await start('/graph', [() => of(FULL)]);
     expect(el.querySelector('.gr__panel')).toBeNull();
@@ -484,7 +495,7 @@ describe('GraphComponent', () => {
     expect(cmp.selected()).toBeNull();
   });
 
-  /** § F/collaboration/graph/001429: on a phone the chosen element shows in a sheet. */
+  /** §ui-kit:F/collaboration/graph/001429: on a phone the chosen element shows in a sheet. */
   it('shows the chosen element in a sheet on a phone', async () => {
     const restore = matchMediaQueries(MEDIA.phone);
     try {

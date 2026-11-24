@@ -105,18 +105,18 @@ export class DeleteMeetingDialogComponent {
     this.api.deleteMeeting(m.id).subscribe({
       next: () => {
         this.deleting.set(false);
-        this.toast.success(this.i18n.translate('meetings.toast.deleted'));
+        this.toast.show(this.i18n.translate('meetings.toast.deleted'), 'success');
         this.deleted.emit(m.id);
       },
       error: (err: unknown) => {
         this.deleting.set(false);
         if (problemCode(err) === 'open_vote') {
-          this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
+          this.toast.show(this.i18n.translate('meetings.toast.closeOpenVote'), 'error');
           return;
         }
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }

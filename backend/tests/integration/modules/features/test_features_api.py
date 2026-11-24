@@ -38,17 +38,16 @@ REVERT_ONLY = Principal(
 
 #: One read route and one write route of each feature.
 ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
+    Feature.ACTIVITY: (("GET", "/api/activity"), ("POST", "/api/activity/seen")),
     Feature.TODOS: (("GET", "/api/todos/boards"), ("POST", "/api/todos/cards")),
     Feature.CALENDAR: (
         ("GET", "/api/calendar/entries"),
         ("POST", "/api/calendar/appointments"),
-        ("GET", "/api/public/calendar/entries"),
         ("GET", "/api/admin/calendars"),
     ),
     Feature.MEETINGS: (
         ("GET", "/api/meetings"),
         ("POST", "/api/meetings"),
-        ("GET", "/api/public/protocols"),
         ("GET", "/api/delegations"),
     ),
     Feature.VOTING: (
@@ -64,6 +63,29 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
     ),
     Feature.INVOICES: (("GET", "/api/invoices"), ("POST", "/api/invoices/parse")),
     Feature.TICKETS: (("GET", "/api/tickets"), ("POST", "/api/tickets")),
+    Feature.GRAPH: (("GET", "/api/graph"),),
+    Feature.PUSH: (("GET", "/api/push/key"), ("GET", "/api/push/devices")),
+    #: §F/integrations/paperless/002762. The copy route is a route of `Sitzungen` too.
+    Feature.PAPERLESS: (
+        ("GET", "/api/paperless/insert"),
+        ("GET", "/api/admin/paperless"),
+        ("POST", f"/api/meetings/{uuid.uuid4()}/documents/paperless"),
+    ),
+    #: Each public page also needs the feature of its records, so these routes close with
+    #: `Sitzungen` and with `Kalender` too (§F/administration/admin/000756).
+    Feature.PUBLIC: (
+        ("GET", "/api/public/protocols"),
+        ("GET", "/api/public/decisions"),
+        ("GET", "/api/public/calendar/entries"),
+    ),
+}
+
+#: The routes of other features that close with a feature: the routes of the features
+#: that need it and the public routes of its records.
+CLOSED_WITH: dict[Feature, int] = {
+    Feature.BUDGET: len(ROUTES[Feature.INVOICES]),
+    Feature.MEETINGS: 3,
+    Feature.CALENDAR: 1,
 }
 
 
@@ -123,7 +145,7 @@ async def test_a_feature_that_is_off_answers_feature_disabled_to_the_admin(
         assert all(_disabled(client, method, path) for method, path in ROUTES[feature])
         others = [route for other in Feature if other != feature for route in ROUTES[other]]
         still_open = [route for route in others if not _disabled(client, *route)]
-        closed_with_it = {Feature.BUDGET: len(ROUTES[Feature.INVOICES])}.get(feature, 0)
+        closed_with_it = CLOSED_WITH.get(feature, 0)
         assert len(still_open) == len(others) - closed_with_it
         api.login(None)
         assert all(_disabled(client, method, path) for method, path in ROUTES[feature])
@@ -200,9 +222,7 @@ async def test_a_save_writes_a_version_and_an_audit_entry_that_a_revert_sets_bac
         _save(client, todos=False)
         async with maker() as session:
             versions = (
-                await session.scalars(
-                    select(SiteConfigVersion).order_by(SiteConfigVersion.version)
-                )
+                await session.scalars(select(SiteConfigVersion).order_by(SiteConfigVersion.version))
             ).all()
             entry = (
                 await session.scalars(select(AuditEntry).order_by(AuditEntry.id.desc()))
@@ -356,9 +376,7 @@ async def test_budget_is_in_use_while_an_antragsart_has_a_budget(
             "/api/admin/application-types", json={**new_type, "hasBudget": True}
         )
         assert with_budget.status_code == 422
-        assert with_budget.json()["errors"] == [
-            {"field": "hasBudget", "msg": "feature_disabled"}
-        ]
+        assert with_budget.json()["errors"] == [{"field": "hasBudget", "msg": "feature_disabled"}]
         patched = client.patch(
             f"/api/admin/application-types/{seed.type_id}", json={"hasBudget": True}
         )
@@ -388,3 +406,14 @@ async def test_budget_is_in_use_while_an_antragsart_has_a_budget(
         await session.execute(text("DELETE FROM application_type"))
         assert (await session.scalars(select(ApplicationType))).first() is None
         await session.commit()
+
+
+async def test_the_navigation_status_answers_without_the_activity_dot(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    await _admin(api, maker)
+    with TestClient(api.app) as client:
+        _save(client, activity=False)
+        resp = client.get("/api/navigation/status")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["activity"] is False

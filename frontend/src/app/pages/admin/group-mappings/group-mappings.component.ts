@@ -9,24 +9,27 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
-  ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
-  EmptyStateComponent,
   IconComponent,
   InputComponent,
   RowMenuComponent,
   type RowMenuSection,
   SelectFieldComponent,
   type SelectOption,
-  SkeletonComponent,
   ToastService,
   TruncatedDirective,
-  PageHeaderComponent,
-  SectionComponent,
+  DialogBodyDirective,
+  type Action,
+  type ListRow,
+  type LoadState as ListState,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordSectionComponent,
+  ScreenRecordDirective,
+  SectionsScreenComponent,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -36,8 +39,6 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
-import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -70,11 +71,12 @@ export interface MappingRow {
   readonly role: string | null;
 }
 
-/** One section of the page. */
+/** One section of the page: its rows by id and the load state of its list (002258). */
 export interface MappingSection {
   readonly kind: MappingKind;
-  readonly rows: readonly MappingRow[];
-  readonly state: LoadState;
+  readonly byId: ReadonlyMap<string, MappingRow>;
+  readonly list: ListState<readonly ListRow[]>;
+  readonly actions: readonly Action[];
 }
 
 /** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */
@@ -101,19 +103,16 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    LoadStateComponent,
-    SectionComponent,
+    DialogBodyDirective,
+    RecordSectionComponent,
+    ScreenRecordDirective,
+    SectionsScreenComponent,
     ConfirmDialogComponent,
-    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     RouterLink,
     TranslatePipe,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
-    SkeletonComponent,
-    ButtonComponent,
     ButtonGroupComponent,
     InputComponent,
     SelectFieldComponent,
@@ -149,7 +148,7 @@ export class GroupMappingsComponent {
     membership: true,
     role: true,
   });
-  /** The sections whose last read failed (§ 000576). */
+  /** The sections whose last read failed (§ui-kit:000576). */
   private readonly failed = signal<Record<MappingKind, boolean>>({
     global: false,
     membership: false,
@@ -225,22 +224,42 @@ export class GroupMappingsComponent {
 
   /** The three sections in page order. */
   readonly sections = computed<MappingSection[]>(() => [
-    {
-      kind: 'global',
-      state: this.stateOf('global'),
-      rows: this.globalRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.roleLabel, role: null })),
-    },
-    {
-      kind: 'membership',
-      state: this.stateOf('membership'),
-      rows: this.membershipRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: null })),
-    },
-    {
-      kind: 'role',
-      state: this.stateOf('role'),
-      rows: this.roleRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: r.roleLabel })),
-    },
+    this.section(
+      'global',
+      this.globalRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.roleLabel, role: null })),
+    ),
+    this.section(
+      'membership',
+      this.membershipRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: null })),
+    ),
+    this.section(
+      'role',
+      this.roleRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: r.roleLabel })),
+    ),
   ]);
+
+  /** One section: the rows by id, the list state of the record section and its Anlegen button. */
+  private section(kind: MappingKind, rows: readonly MappingRow[]): MappingSection {
+    const t = (k: TranslationKey): string => this.i18n.translate(k);
+    const list: ListState<readonly ListRow[]> = this.loading()[kind]
+      ? { state: 'loading' }
+      : this.failed()[kind]
+        ? { state: 'error', message: t('admin.groupMappings.loadFailed'), retry: () => this.retry(kind) }
+        : rows.length
+          ? { state: 'ready', data: rows.map((r) => ({ id: r.id, title: r.oidcGroup })) }
+          : { state: 'empty', icon: 'users', heading: t(this.key(kind, 'empty')) };
+    return {
+      kind,
+      byId: new Map(rows.map((r) => [r.id, r])),
+      list,
+      actions: [{ key: 'add', label: t('admin.groupMappings.create'), icon: 'plus' }],
+    };
+  }
+
+  /** The row of a record in a section. */
+  protected rowOf(sec: MappingSection, id: string): MappingRow {
+    return sec.byId.get(id) as MappingRow;
+  }
 
   readonly roleOptions = computed<SelectOption[]>(() =>
     this.roles().map((r) => ({ value: r.id, label: this.roleName(r) })),
@@ -269,11 +288,6 @@ export class GroupMappingsComponent {
     this.refresh('global');
     this.refresh('membership');
     this.refresh('role');
-  }
-
-  /** The load state of one section. */
-  private stateOf(kind: MappingKind): LoadState {
-    return this.loading()[kind] ? 'loading' : this.failed()[kind] ? 'error' : 'ok';
   }
 
   /** The retry of the load error of one section. */
@@ -450,13 +464,13 @@ export class GroupMappingsComponent {
     req.subscribe({
       next: () => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('admin.groupMappings.saved'));
+        this.toast.show(this.i18n.translate('admin.groupMappings.saved'), 'success');
         this.dialog.set(null);
         this.refresh(kind);
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate(this.errorKey(err?.status)));
+        this.toast.show(this.i18n.translate(this.errorKey(err?.status)), 'error');
       },
     });
   }
@@ -484,11 +498,11 @@ export class GroupMappingsComponent {
           : this.api.deleteRoleMapping(id);
     req.subscribe({
       next: () => {
-        this.toast.success(this.i18n.translate('admin.groupMappings.deleted'));
+        this.toast.show(this.i18n.translate('admin.groupMappings.deleted'), 'success');
         this.confirm.set(null);
         this.refresh(c.kind);
       },
-      error: () => this.toast.error(this.i18n.translate('admin.groupMappings.failed')),
+      error: () => this.toast.show(this.i18n.translate('admin.groupMappings.failed'), 'error'),
     });
   }
 }

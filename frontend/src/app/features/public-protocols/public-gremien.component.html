@@ -1,0 +1,17 @@
+<app-public-screen
+  width="wide"
+  [head]="head()"
+  [lede]="kind === 'protocols' ? ('publicProtocols.lede' | t) : null"
+  [crumbs]="crumbs()"
+  [state]="state()"
+  [skeletonRows]="3"
+  [emptyAction]="home()"
+>
+  <ng-template screenBody>
+    <div class="rowgroup" role="list" [attr.aria-label]="'publicProtocols.gremien.label' | t">
+      @for (row of rows(); track row.id) {
+        <app-list-item role="listitem" [title]="row.name" [sub]="row.sub" [link]="row.link" />
+      }
+    </div>
+  </ng-template>
+</app-public-screen>

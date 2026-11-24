@@ -38,16 +38,19 @@ from worker.drafts import process_draft_reminders
 from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
+from worker.paperless import process_paperless_filings
 from worker.protocol import backfill_public_protocols, heal_public_protocols, render_protocol
 from worker.protocol import on_startup as protocol_on_startup
+from worker.push import send_push
 from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 from worker.task_reminders import process_task_reminders
+from worker.ticket_mail import fetch_ticket_mails, send_ticket_mails
 from worker.tickets import anonymize_tickets
 from worker.todos import archive_done_todos
 from worker.watchdog import watchdog_on_shutdown, watchdog_on_startup
-from worker.webhook import deliver_webhook
+from worker.webhook import deliver_webhook, enqueue_pending_webhooks
 from worker.webhook import on_startup as webhook_on_startup
 
 
@@ -149,7 +152,10 @@ class WorkerSettings:
     03:50 archives cards longer than ``archive_after_days`` in the done column. The
     deadline and vote scan runs every minute; it is idempotent and uses SKIP LOCKED.
     The fetch of the external calendars runs every minute at second 30 and fetches
-    only the calendars whose interval is over.
+    only the calendars whose interval is over. The webhook sweep runs every ten seconds
+    and enqueues the new pending deliveries. The Paperless filing runs every minute
+    at second 45: it opens a job for each new final file and runs the due jobs. The
+    fetch of the ticket mails runs every minute at second 15 for each Postfach that is on.
     Task reminders run hourly (thresholds in days); ``task_reminder_log`` prevents
     duplicate sends. Draft reminders run hourly too; ``draft_reminder_at`` sends each
     draft one reminder at most. Expired wizard drafts go hourly with their objects. The public
@@ -164,11 +170,13 @@ class WorkerSettings:
         ping,
         refresh_budget_stats,
         send_mail,
+        send_push,
         scan_attachment,
         render_protocol,
         backfill_public_protocols,
         heal_public_protocols,
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
+        enqueue_pending_webhooks,
         process_deadlines,
         process_task_reminders,
         process_draft_reminders,
@@ -182,6 +190,9 @@ class WorkerSettings:
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         migrate_builtin_cd_logos,
         fetch_external_calendars,
+        process_paperless_filings,
+        fetch_ticket_mails,
+        send_ticket_mails,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -189,7 +200,11 @@ class WorkerSettings:
         cron(anonymize_tickets, hour=3, minute=45),
         cron(archive_done_todos, hour=3, minute=50),
         cron(process_deadlines, second=0),
+        cron(enqueue_pending_webhooks, second={0, 10, 20, 30, 40, 50}),
         cron(fetch_external_calendars, second=30),
+        cron(process_paperless_filings, second=45),
+        cron(fetch_ticket_mails, second=15),
+        cron(send_ticket_mails, second={5, 35}),
         cron(process_task_reminders, minute=10),
         cron(process_draft_reminders, minute=15),
         cron(purge_draft_attachments, minute=20),

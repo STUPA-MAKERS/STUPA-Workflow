@@ -15,6 +15,9 @@ import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/l
  * and the paging helpers directly. All of them go through `load`.
  */
 type Cmp = AuditLogComponent & {
+  setSearch(text: string): void;
+  runSearch(): void;
+  hits(): number | null;
   setAction(v: string): void;
   setActor(v: string): void;
   setRange(v: { from: string; to: string }): void;
@@ -187,6 +190,10 @@ const BACKEND_AUDIT_ACTIONS = [
   'guest_admit_all',
   'gremium_info_update',
   'gremium_notify',
+  'paperless_connection',
+  'paperless_filed',
+  'paperless_inserted',
+  'ticket_mailbox',
   'pii_export',
   'anonymization',
   'erasure_requested',
@@ -345,6 +352,54 @@ describe('AuditLogComponent', () => {
     expect((cmp as unknown as { actors(): AuditActor[] }).actors()).toEqual([]);
   });
 
+  /** §002693: the search goes to the server with the action keys whose label holds it. */
+  it('searches on the server with q and the matching action labels', async () => {
+    const { cmp, listAuditLog } = await setup();
+    listAuditLog.mockClear();
+    cmp.setSearch('  anmeldung ');
+    cmp.runSearch();
+    expect(listAuditLog).toHaveBeenCalledTimes(1);
+    const opts = listAuditLog.mock.calls[0][0] as { q?: string; labelActions?: string[]; before?: number };
+    expect(opts.q).toBe('anmeldung');
+    expect(opts.before).toBeUndefined();
+    expect(opts.labelActions).toContain('login');
+    expect(opts.labelActions).not.toContain('logout');
+    expect(cmp.hits()).toBe(1);
+    cmp.runSearch();
+    expect(listAuditLog).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads again after a pause in typing, and shows "Keine Treffer." for an empty search', async () => {
+    jest.useFakeTimers();
+    try {
+      const { fixture, cmp, listAuditLog } = await setup();
+      listAuditLog.mockClear();
+      listAuditLog.mockReturnValue(of({ items: [], nextCursor: null, hasMore: false }));
+      cmp.setSearch('nobody');
+      expect(listAuditLog).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1000);
+      fixture.detectChanges();
+      expect(listAuditLog).toHaveBeenCalledWith(expect.objectContaining({ q: 'nobody', labelActions: [] }));
+      expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+      expect(cmp.hits()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('shows no hit count while further pages follow, and sends no search without words', async () => {
+    const { cmp, listAuditLog } = await setup({
+      page: { items: [entry(1)], nextCursor: 1, hasMore: true },
+    });
+    cmp.setSearch('root');
+    cmp.runSearch();
+    expect(cmp.hits()).toBeNull();
+    listAuditLog.mockClear();
+    cmp.setSearch('   ');
+    cmp.runSearch();
+    expect(listAuditLog).toHaveBeenCalledWith(expect.objectContaining({ q: undefined, labelActions: [] }));
+  });
+
   it('setAction reloads with the action filter', async () => {
     const { cmp, listAuditLog } = await setup();
     listAuditLog.mockClear();
@@ -470,17 +525,39 @@ describe('AuditLogComponent', () => {
    * The first call from the constructor reload hangs, and a filter change must not fire a second. A
    * filter setter triggers reload and load(true), but the loading guard holds.
    */
-  it('skips concurrent loads while a request is in flight', async () => {
-    const subj = new Subject<AuditPage>();
-    const listAuditLog = jest.fn(() => subj.asObservable());
+  /** A filter or a search cancels the request in flight; "Mehr laden" waits for it. */
+  it('cancels the load in flight for a new filter and skips a further page while loading', async () => {
+    const first = new Subject<AuditPage>();
+    const second = new Subject<AuditPage>();
+    const listAuditLog = jest
+      .fn()
+      .mockReturnValueOnce(first.asObservable())
+      .mockReturnValueOnce(second.asObservable());
     const { cmp } = await setup({ listAuditLog });
     expect(cmp.loading()).toBe(true);
     expect(listAuditLog).toHaveBeenCalledTimes(1);
     cmp.setAction('login');
-    expect(listAuditLog).toHaveBeenCalledTimes(1);
-    subj.next({ items: [], nextCursor: null, hasMore: false });
-    subj.complete();
+    expect(listAuditLog).toHaveBeenCalledTimes(2);
+    expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'login' }));
+    expect(first.observed).toBe(false);
+    cmp.loadMore();
+    expect(listAuditLog).toHaveBeenCalledTimes(2);
+    second.next({ items: [], nextCursor: null, hasMore: false });
+    second.complete();
     expect(cmp.loading()).toBe(false);
+  });
+
+  it('asks for one further page while that page loads', async () => {
+    const { cmp, listAuditLog } = await setup({
+      page: { items: [entry(2)], nextCursor: 2, hasMore: true },
+    });
+    const pending = new Subject<AuditPage>();
+    listAuditLog.mockClear();
+    listAuditLog.mockReturnValue(pending.asObservable());
+    cmp.loadMore();
+    cmp.loadMore();
+    expect(listAuditLog).toHaveBeenCalledTimes(1);
+    expect(listAuditLog).toHaveBeenCalledWith(expect.objectContaining({ before: 2 }));
   });
 
   it('flags a load error and shows the alert', async () => {
@@ -892,5 +969,14 @@ describe('AuditLogComponent', () => {
     expect(cmp.entries().map((e) => e.id)).toEqual([1, 2]);
 
     (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = original;
+  });
+
+  it('shows the search-off face when a filter finds no entry', async () => {
+    const { cmp } = await setup({ page: { items: [], nextCursor: null, hasMore: false } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = () => (cmp as any).rows();
+    expect(rows()).toEqual(expect.objectContaining({ state: 'empty', icon: 'clipcheck' }));
+    cmp.setAction('login');
+    expect(rows()).toEqual(expect.objectContaining({ state: 'empty', icon: 'searchOff' }));
   });
 });

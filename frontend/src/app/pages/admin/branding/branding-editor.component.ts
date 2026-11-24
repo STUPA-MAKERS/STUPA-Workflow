@@ -21,19 +21,21 @@ import {
   normalizeHex,
 } from '@core/theme/accent';
 import {
-  ThemeService,
-  FabComponent,
   ButtonComponent,
   ButtonGroupComponent,
+  type ContentLang,
+  ContentLangSwitchComponent,
+  FabComponent,
   FilePickerComponent,
   formatBytes,
   IconComponent,
   InputComponent,
   NoteComponent,
-  SwitchComponent,
-  ToastService,
   PageHeaderComponent,
   SectionComponent,
+  SwitchComponent,
+  ThemeService,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import type { I18nMap } from '@core/api/models';
@@ -54,10 +56,6 @@ import {
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
-import {
-  type ContentLang,
-  ContentLangSwitchComponent,
-} from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
 /** The language of the texts in the editor. */
 type TextLang = ContentLang;
@@ -228,7 +226,7 @@ export class BrandingEditorComponent {
     this.saved = JSON.stringify(branding);
   }
 
-  /** "Verwerfen": every field goes back to the stored value (§ 000635). */
+  /** "Verwerfen": every field goes back to the stored value (§ui-kit:000635). */
   protected discard(): void {
     this.draft.set(JSON.parse(this.saved) as Branding);
     this.markSaved(this.editRev());
@@ -377,11 +375,14 @@ export class BrandingEditorComponent {
   /** Check the type and the size, then keep the file as a data URL in the draft. */
   private readLogo(slot: LogoSlot, file: File): void {
     if (!LOGO_ACCEPT_MIME.includes(file.type)) {
-      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      this.toast.show(this.i18n.translate('admin.brand.badType'), 'error');
       return;
     }
     if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
-      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      this.toast.show(
+        this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }),
+        'error',
+      );
       return;
     }
     const reader = new FileReader();
@@ -433,11 +434,14 @@ export class BrandingEditorComponent {
   /** Check the type and the size, then upload the graphic at once. */
   private uploadPdfAsset(slot: PdfSlot, file: File): void {
     if (!PDF_ASSET_ACCEPT_MIME.includes(file.type)) {
-      this.toast.error(this.i18n.translate('admin.brand.badType'));
+      this.toast.show(this.i18n.translate('admin.brand.badType'), 'error');
       return;
     }
     if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
-      this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
+      this.toast.show(
+        this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }),
+        'error',
+      );
       return;
     }
     this.savePdfAsset(slot, this.api.uploadPdfAsset(slot, file));
@@ -455,9 +459,9 @@ export class BrandingEditorComponent {
     request.subscribe({
       next: (asset) => {
         this.setPdfAsset(slot, asset);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -516,7 +520,7 @@ export class BrandingEditorComponent {
     const d = this.draft();
     if (!d || this.saving()) return;
     if (this.linkErrors().length > 0) {
-      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
+      this.toast.show(this.i18n.translate('admin.brand.badUrl'), 'error');
       return;
     }
     if (this.accentIssues().length > 0) return;
@@ -529,11 +533,11 @@ export class BrandingEditorComponent {
         this.markSaved(rev);
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }

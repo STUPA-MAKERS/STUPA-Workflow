@@ -466,7 +466,7 @@ export class ApplyWizardComponent {
         this.typesLoaded = true;
         this.openFromUrl(true);
       },
-      error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
+      error: () => this.toast.show(this.i18n.translate('apply.error.typesLoad'), 'error'),
     });
     this.contactForm.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -518,7 +518,7 @@ export class ApplyWizardComponent {
     if (!slug && this.oldUrlType) {
       const old = this.typeBySlug(this.oldUrlType);
       this.navigateToType(old?.key ?? old?.id ?? null, true);
-      if (!old) this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      if (!old) this.toast.show(this.i18n.translate('apply.error.typeUnknown'), 'error');
       return;
     }
     if (!slug) {
@@ -532,7 +532,7 @@ export class ApplyWizardComponent {
     }
     const type = this.typeBySlug(slug);
     if (!type) {
-      this.toast.error(this.i18n.translate('apply.error.typeUnknown'));
+      this.toast.show(this.i18n.translate('apply.error.typeUnknown'), 'error');
       this.activeIndex.set(0);
       this.navigateToType(null, true);
       return;
@@ -565,7 +565,7 @@ export class ApplyWizardComponent {
       },
       error: () => {
         this.predecessor.set(null);
-        this.toast.error(this.i18n.translate('applications.predecessor.error'));
+        this.toast.show(this.i18n.translate('applications.predecessor.error'), 'error');
       },
     });
   }
@@ -599,7 +599,7 @@ export class ApplyWizardComponent {
       },
       error: () => {
         this.loadingForm.set(false);
-        this.toast.error(this.i18n.translate('apply.error.formLoad'));
+        this.toast.show(this.i18n.translate('apply.error.formLoad'), 'error');
       },
     });
   }
@@ -701,7 +701,7 @@ export class ApplyWizardComponent {
   private checkForm(form: FormGroup): boolean {
     if (form.valid) return true;
     form.markAllAsTouched();
-    this.toast.error(this.i18n.translate('apply.error.invalid'));
+    this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
     this.revealError();
     return false;
   }
@@ -788,7 +788,8 @@ export class ApplyWizardComponent {
         this.altchaSolution.set(null);
         this.altchaRound.update((n) => n + 1);
         if (err.status === 422) this.onInvalid(err.error ?? null);
-        else this.toast.error(err.error?.detail ?? this.i18n.translate('apply.error.submit'));
+        else
+          this.toast.show(err.error?.detail ?? this.i18n.translate('apply.error.submit'), 'error');
       },
     });
   }
@@ -813,18 +814,18 @@ export class ApplyWizardComponent {
    */
   private onInvalid(problem: ProblemDetail | null): void {
     if (problem?.code === 'form_rule_failed') {
-      this.toast.error(this.serverRuleText(problem));
+      this.toast.show(this.serverRuleText(problem), 'error');
       return;
     }
     if (problem?.code === 'attachment_required') {
-      this.toast.error(this.i18n.translate('apply.files.requiredByType'));
+      this.toast.show(this.i18n.translate('apply.files.requiredByType'), 'error');
       this.goTo(this.stepKeys().indexOf('details'));
       return;
     }
     const lost = this.drafts.markFailed(problem);
     if (lost.length) {
       this.dropFileRefs(new Set(lost));
-      this.toast.error(this.i18n.translate('apply.files.error.lost'));
+      this.toast.show(this.i18n.translate('apply.files.error.lost'), 'error');
       this.goTo(this.stepKeys().indexOf('details'));
       return;
     }
@@ -833,12 +834,12 @@ export class ApplyWizardComponent {
     const inDetails = errors.length > 0 && applyServerErrors(this.detailsFields(), errors, t);
     const inPii = errors.length > 0 && applyServerErrors(this.piiFields(), errors, t);
     if (inDetails || inPii) {
-      this.toast.error(this.i18n.translate('apply.error.invalid'));
+      this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
       this.goTo(this.stepKeys().indexOf(inDetails ? 'details' : 'contact'));
       this.revealError();
       return;
     }
-    this.toast.error(problem?.detail ?? this.i18n.translate('apply.error.submit'));
+    this.toast.show(problem?.detail ?? this.i18n.translate('apply.error.submit'), 'error');
   }
 
   /**

@@ -12,13 +12,13 @@ const UNREACHABLE = new Set([0, 502, 503, 504]);
 /** How long the app waits between two health checks while the server is unreachable. */
 export const HEALTH_POLL_MS = 5_000;
 
-/** Tells whether a failed API answer means that the server is unreachable (§ 000578). */
+/** Tells whether a failed API answer means that the server is unreachable (§ui-kit:000578). */
 export function isUnreachableStatus(status: number): boolean {
   return UNREACHABLE.has(status);
 }
 
 /**
- * Whether the API server answers (§ 000578, § 000579).
+ * Whether the API server answers (§ui-kit:000578, §ui-kit:000579).
  *
  * `reachabilityInterceptor` reports each API answer. An answer with no status, 502, 503
  * or 504 starts a check of `GET /api/health`. Only a failed check makes the state `down`,
@@ -50,7 +50,7 @@ export class ServerReachabilityService {
   /**
    * The app cannot reach the server now, or it does not know yet: the browser is offline,
    * a check runs, or the server is unreachable. A failed load waits for the end of this
-   * state, and then loads again (§ 000579).
+   * state, and then loads again (§ui-kit:000579).
    */
   readonly waiting = computed(() => !this.offline.online() || this._state() !== 'up');
 
@@ -116,12 +116,14 @@ export class ServerReachabilityService {
 
   private showBar(): void {
     if (this.noticeId !== null) return;
-    this.noticeId = this.toast.showNotice({
-      message: this.i18n.translate('pwa.serverUnreachable'),
-      variant: 'danger',
+    this.noticeId = this.toast.show({
+      text: this.i18n.translate('pwa.serverUnreachable'),
+      kind: 'error',
       icon: 'cloud-off',
       iconPosition: 'end',
-      phonePlacement: 'top',
+      placement: 'top',
+      sticky: true,
+      closable: false,
     });
   }
 

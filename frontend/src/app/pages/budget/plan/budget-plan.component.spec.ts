@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/ang
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { downloadBlob, ToastService } from '@stupa-makers/ui-kit';
+import { PaperlessService } from '@core/api/paperless.service';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -18,6 +19,7 @@ import { BudgetPlanApi, type BudgetPlan, type PlanMeeting, type PlanStep } from 
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BudgetPlanComponent } from './budget-plan.component';
 import { FY25, FY26, QSM, TOP, fy, line, node, plan, version } from './budget-plan.fixtures';
+import { kindSpies } from '../../../../testing/toast';
 
 function setViewport(wide: boolean, phone = false, roomy = wide): void {
   window.matchMedia = ((query: string) => ({
@@ -113,8 +115,8 @@ async function setup(opts: Opts = {}) {
   const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
   const back = jest.spyOn(TestBed.inject(Location), 'back').mockImplementation(() => params.next(convertToParamMap({})));
   const toast = TestBed.inject(ToastService);
-  const success = jest.spyOn(toast, 'success');
-  const error = jest.spyOn(toast, 'error');
+  const success = jest.spyOn(kindSpies(toast), 'success');
+  const error = jest.spyOn(kindSpies(toast), 'error');
   return { ...view, api, treeApi, gremien, router, navigate, success, error, params, back };
 }
 
@@ -435,7 +437,7 @@ describe('BudgetPlanComponent', () => {
       expect(view.container.querySelector('app-load-error')).not.toBeNull();
     });
 
-    it('§NF/performance/loading/000893: the first load shows the pane and the plan sheet as a skeleton', async () => {
+    it('§ui-kit:NF/performance/loading/000893: the first load shows the pane and the plan sheet as a skeleton', async () => {
       setViewport(true);
       const view = await render(BudgetPlanComponent, {
         providers: [
@@ -458,7 +460,7 @@ describe('BudgetPlanComponent', () => {
       expect(page.querySelector('app-skeleton')).toBeNull();
     });
 
-    it('§NF/performance/loading/000893: a plan read keeps the tree and shows the plan skeleton in the sheet', async () => {
+    it('§ui-kit:NF/performance/loading/000893: a plan read keeps the tree and shows the plan skeleton in the sheet', async () => {
       const view = await setup();
       const pending = new Subject<BudgetPlan>();
       view.api.plan.mockReturnValueOnce(pending);
@@ -1150,7 +1152,7 @@ describe('BudgetPlanComponent', () => {
       expect(field()).toHaveClass('bp__field--wide');
     });
 
-    it('§F/finance/budget/001020: the sum of a parent beside the fields has the width of a field, with cents and the € apart', async () => {
+    it('§ui-kit:F/finance/budget/001020: the sum of a parent beside the fields has the width of a field, with cents and the € apart', async () => {
       const large = plan([version({ lines: [line('fees', '10000000'), line('staff', '70'), line('wages', '60'), line('grants', '30')] })]);
       const view = await setup({ plans: { 'fy-26': large } });
       const sum = view.container.querySelector('.bp__sum') as HTMLElement;
@@ -1330,7 +1332,7 @@ describe('BudgetPlanComponent', () => {
       expect(view.success).toHaveBeenCalledWith('Die Version ist wieder ein Entwurf.');
     });
 
-    it('§F/finance/budget/000875 §F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
+    it('§F/finance/budget/000875 §ui-kit:F/administration/files/001080: a reader opens the PDF in the viewer and loads the XLSX', async () => {
       const view = await setup({ perms: ['budget.view'] });
       const open = jest.spyOn(TestBed.inject(FileOpenService), 'open').mockImplementation(() => undefined);
       await choose('Als PDF öffnen');
@@ -1338,6 +1340,24 @@ describe('BudgetPlanComponent', () => {
       await choose('Als XLSX exportieren');
       expect(view.api.exportVersion).toHaveBeenLastCalledWith('v0', 'xlsx');
       expect((downloadBlob as jest.Mock).mock.calls.map((call) => call[1])).toEqual(['Haushaltsplan_VS.xlsx']);
+    });
+
+    it('§F/integrations/paperless/002525: the menu opens the filed plan in Paperless', async () => {
+      const link = jest
+        .spyOn(PaperlessService.prototype, 'documentUrl')
+        .mockReturnValue(of('https://paperless.example.org/documents/9/details'));
+      const open = jest.spyOn(window, 'open').mockReturnValue(null);
+      await setup({ perms: ['budget.view'] });
+      await choose('In Paperless öffnen');
+      expect(link).toHaveBeenLastCalledWith('plan', plan().id);
+      expect(open).toHaveBeenCalledWith('https://paperless.example.org/documents/9/details', '_blank', 'noopener');
+      link.mockRestore();
+      open.mockRestore();
+    });
+
+    it('§F/integrations/paperless/002525: a plan without a filed document has no Paperless entry', async () => {
+      await setup({ perms: ['budget.view'] });
+      expect(await openMenu()).not.toContain('In Paperless öffnen');
     });
 
     it('§F/finance/budget/000875: a failed export shows a toast and frees the menu', async () => {
@@ -1834,7 +1854,7 @@ describe('BudgetPlanComponent', () => {
       const view = await setup({ perms: PERMS, plans: { 'fy-26': stepped() } });
       await choose('Zustand setzen');
       const open = await dialog();
-      const save = within(screen.getByTestId('bp-state-save')).getByRole('button');
+      const save = within(open).getByRole('button', { name: 'Setzen' });
       expect(save).toBeDisabled();
       await pickState(open, 'Genehmigung');
       expect(save).toBeDisabled();
@@ -1893,7 +1913,7 @@ describe('BudgetPlanComponent', () => {
       const none = await setup({ perms: PERMS, plans: {} });
       expect(none.fixture.componentInstance.canSetState()).toBe(false);
       expect(none.fixture.componentInstance.stateOptions()).toEqual([]);
-      none.fixture.componentInstance.setStateByHand(new Event('submit'));
+      none.fixture.componentInstance.setStateByHand();
       expect(none.api.setStateByHand).not.toHaveBeenCalled();
     });
 

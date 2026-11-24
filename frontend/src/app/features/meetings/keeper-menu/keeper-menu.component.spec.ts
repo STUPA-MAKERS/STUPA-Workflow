@@ -2,19 +2,19 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Attendance, Meeting } from '@core/api/models';
 import { ATTENDANCE, WITH_VOTER, meeting } from '../../../../testing/meeting-fixtures';
-import { KeeperMenuComponent } from './keeper-menu.component';
+import { KeeperMenuViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 
 async function setup(m: Meeting, attendance: Attendance[] = ATTENDANCE, inSheet = false) {
   const pick = jest.fn();
   const discard = jest.fn();
-  const view = await render(KeeperMenuComponent, {
+  const view = await render(KeeperMenuViewComponent, {
     inputs: { meeting: m, attendance, inSheet },
     on: { pick, discard },
   });
   return { ...view, pick, discard };
 }
 
-describe('KeeperMenuComponent', () => {
+describe('KeeperMenuViewComponent', () => {
   it('lists the members with protocol.write, the current one marked', async () => {
     const { pick } = await setup(meeting(), WITH_VOTER);
     expect(screen.getByText('Protokollführung übergeben an')).toBeInTheDocument();
@@ -30,8 +30,14 @@ describe('KeeperMenuComponent', () => {
 
   it('assigns in a planned meeting and shows no planned handover there', async () => {
     const plan = {
-      principalId: 'pr-2', name: 'Mika Mitglied', fromAt: null, toAt: null,
-      fromAgendaItemId: null, toAgendaItemId: null, fromPosition: 2, toPosition: null,
+      principalId: 'pr-2',
+      name: 'Mika Mitglied',
+      fromAt: null,
+      toAt: null,
+      fromAgendaItemId: null,
+      toAgendaItemId: null,
+      fromPosition: 2,
+      toPosition: null,
     };
     await setup(meeting({ status: 'planned', plannedHandover: plan }));
     expect(screen.getByText('Protokollführung zuweisen')).toBeInTheDocument();
@@ -40,8 +46,14 @@ describe('KeeperMenuComponent', () => {
 
   it('discards the planned handover of a live meeting', async () => {
     const plan = {
-      principalId: 'pr-2', name: 'Mika Mitglied', fromAt: null, toAt: null,
-      fromAgendaItemId: 't-2', toAgendaItemId: null, fromPosition: 2, toPosition: null,
+      principalId: 'pr-2',
+      name: 'Mika Mitglied',
+      fromAt: null,
+      toAt: null,
+      fromAgendaItemId: 't-2',
+      toAgendaItemId: null,
+      fromPosition: 2,
+      toPosition: null,
     };
     const { discard } = await setup(meeting({ plannedHandover: plan }));
     expect(screen.getByRole('status')).toHaveTextContent('Mika Mitglied');

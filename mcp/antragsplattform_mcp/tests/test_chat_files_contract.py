@@ -46,6 +46,7 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test"
 )
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
+os.environ.setdefault("SECRETS_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
@@ -103,6 +104,7 @@ from antragsplattform_mcp.tools import (  # noqa: E402
 )
 
 TICKET_ID = uuid4()
+AREA_ID = uuid4()
 CARD_ID = uuid4()
 APP_ID = uuid4()
 BLOCK_ID = uuid4()
@@ -205,6 +207,7 @@ class _Drafts:
 def _detail(blocked: bool) -> TicketDetail:
     return TicketDetail(
         id=TICKET_ID,
+        area_id=AREA_ID,
         number="T-0040",
         kind="bug",
         title="Absturz",

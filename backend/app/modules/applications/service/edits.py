@@ -28,6 +28,7 @@ from app.modules.applications.service.service_base import (
     _whitelist,
     _without_keys,
 )
+from app.modules.applications.webhook_fields import emit_application_event
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
@@ -38,6 +39,7 @@ from app.modules.forms.validation import (
     AnswerValidationError,
     system_title_field,
     validate_answers,
+    with_computed,
 )
 from app.shared.errors import ConflictError, ValidationProblem
 
@@ -100,8 +102,8 @@ class EditOps(ApplicationsServiceBase):
         app_type = await self.session.get(ApplicationType, app.type_id)
         pii_keys = await self._pii_keys_for_type(app.type_id) if preserve_pii else set[str]()
         sent = _with_stored_pii(data, app.data or {}, pii_keys) if preserve_pii else data
-        clean = _whitelist(fields, sent)
         context = {"has_budget": app_type.has_budget if app_type is not None else False}
+        clean = with_computed(fields, _whitelist(fields, sent), context)
         try:
             validate_answers(fields, clean, context)
         except AnswerValidationError as exc:
@@ -155,6 +157,7 @@ class EditOps(ApplicationsServiceBase):
                 "changedFields": sorted({*diff["added"], *diff["removed"], *diff["changed"]}),
             },
         )
+        await emit_application_event(self.session, "application.updated", app)
         try:
             await self.session.commit()
         except IntegrityError as exc:
@@ -225,6 +228,8 @@ class EditOps(ApplicationsServiceBase):
                 .values(expires_at=now)
             )
         app.archived_at = now if archived else None
+        if archived:
+            await emit_application_event(self.session, "application.archived", app)
         await self.session.commit()
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)

@@ -71,10 +71,17 @@
 @if (isOpen()) {
   @if (phone()) {
     <div #layer class="cs__layer" popover="manual">
-      <app-side-sheet side="bottom" [heading]="'account.calendar.title' | t" [open]="true" (openChange)="onSheetOpen($event)">
-        <div class="cs cs--sheet">
-          <ng-container [ngTemplateOutlet]="body" />
-        </div>
+      <app-side-sheet
+        side="bottom"
+        [heading]="'account.calendar.title' | t"
+        [open]="true"
+        (openChange)="onSheetOpen($event)"
+      >
+        <ng-template sheetBody>
+          <div class="cs cs--sheet">
+            <ng-container [ngTemplateOutlet]="body" />
+          </div>
+        </ng-template>
       </app-side-sheet>
     </div>
   } @else {

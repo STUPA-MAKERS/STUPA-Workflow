@@ -1,0 +1,118 @@
+<app-records-screen
+  class="sp"
+  [head]="{ title: ('admin.substitutes.title' | t) + ': ' + (gremiumName() ?? '…') }"
+  [rows]="rows()"
+  [actions]="actions()"
+  variant="records"
+  [keepOnError]="entries().length > 0"
+  [skeleton]="3"
+  (action)="$event.key === 'add' && openAdd()"
+>
+  <ng-template screenSearch>
+    <div role="search">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'admin.substitutes.listSearch' | t"
+        [label]="'admin.substitutes.listSearch' | t"
+        [results]="hits()"
+        [value]="listSearch.text()"
+        (valueChange)="listSearch.set($event)"
+      />
+    </div>
+  </ng-template>
+  <ng-template screenRecord let-row>
+    @let s = entryOf(row.id);
+    <li class="sp__row">
+      <span class="sp__pair">
+        <span class="sp__member rowgroup__title" [class.sp__all]="!memberName(s)">{{
+          memberName(s) || ('admin.substitutes.allMembers' | t)
+        }}</span>
+        <app-icon class="sp__arrow" name="arrow" [size]="16" />
+        <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
+        <span class="sp__who">
+          <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
+          <span class="sp__name">{{ entryName(s) }}</span>
+        </span>
+      </span>
+      <app-button-group>
+        <app-row-menu
+          [sections]="rowMenu()"
+          [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+          (selected)="remove(s)"
+        />
+      </app-button-group>
+    </li>
+  </ng-template>
+</app-records-screen>
+
+<app-dialog
+  [open]="addOpen()"
+  [heading]="'admin.substitutes.add' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="addOpen.set(false)"
+  [actions]="[
+    { key: 'addOpen', label: ('action.cancel' | t) },
+    {
+      key: 'add',
+      label: ('admin.common.add' | t),
+      kind: 'main',
+      disabled: !selected(),
+      busy: adding(),
+    },
+  ]"
+  (action)="$event.key === 'addOpen' ? addOpen.set(false) : $event.key === 'add' ? add() : null"
+>
+  <ng-template dialogBody>
+    <form class="sp__form" (submit)="$event.preventDefault(); add()">
+      <div class="sp__search">
+        <app-search-pill
+          size="md"
+          [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+          [label]="'admin.substitutes.search' | t"
+          [busy]="search.pending()"
+          [value]="search.text()"
+          (valueChange)="onSearch($event)"
+          (commit)="search.flush()"
+        />
+        @if (candidates().length) {
+          <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
+            @for (c of candidates(); track c.id) {
+              <li>
+                <app-list-item
+                  [title]="label(c)"
+                  [selected]="selected()?.id === c.id"
+                  subWrap
+                  [attr.title]="c.displayName || c.email ? null : c.sub"
+                  (activate)="pick(c)"
+                >
+                  @if (c.email) {
+                    <span sub class="mono">{{ c.email }}</span>
+                  }
+                </app-list-item>
+              </li>
+            }
+          </ul>
+        } @else if (search.applied() && !search.pending() && !selected()) {
+          <p class="sp__none">{{ 'admin.substitutes.noHits' | t }}</p>
+        }
+      </div>
+      @if (selected(); as s) {
+        <p class="sp__picked" role="status">
+          {{ 'admin.gremien.memberPicked' | t }}: <strong>{{ label(s) }}</strong>
+        </p>
+      }
+      <app-select
+        [label]="'admin.substitutes.forMember' | t"
+        [options]="memberOptions()"
+        [ngModel]="memberId()"
+        (ngModelChange)="memberId.set($event)"
+        name="member"
+      />
+      @if (addError()) {
+        <app-note kind="error" icon="alert" role="alert">{{ addError() }}</app-note>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
+</app-dialog>

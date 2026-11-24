@@ -9,6 +9,7 @@ import { AuthService } from '@core/auth/auth.service';
 import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
+  type TicketArea,
   type TicketListItem,
   type TicketPage,
   type TicketQuery,
@@ -36,7 +37,9 @@ function ticket(over: Partial<TicketListItem> = {}): TicketListItem {
   return {
     id: 't42',
     number: 'T-0042',
+    areaId: 'a-plat',
     kind: 'bug',
+    categoryId: null,
     title: 'Upload bricht bei PDF über 10 MB ab',
     status: 'new',
     reporter: { principalId: 'r1', displayName: 'Lea Hoffmann', email: null, anonymized: false },
@@ -80,8 +83,32 @@ const defaultAnswer: Answer = (q) => {
   return of(pageOf(OPEN));
 };
 
+function area(over: Partial<TicketArea> = {}): TicketArea {
+  return {
+    id: 'a-plat',
+    name: 'Plattform',
+    gremiumId: null,
+    platform: true,
+    notifyNew: true,
+    inApp: true,
+    categories: [],
+    mine: true,
+    ...over,
+  };
+}
+const ASTA = area({
+  id: 'a-asta',
+  name: 'AStA-Büro',
+  gremiumId: 'g1',
+  platform: false,
+  categories: [{ id: 'c1', name: 'Raumanfrage' }],
+});
+
 interface Opts {
   answer?: Answer;
+  areas?: Observable<TicketArea[]>;
+  /** The viewer holds only `ticket.work` in a Gremium, not `ticket.manage`. */
+  workOnly?: boolean;
   assignees?: Observable<PersonRef[]>;
   /** The viewer holds `ticket.manage` (default); false: the own tickets of a reporter. */
   manager?: boolean;
@@ -99,6 +126,7 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ),
     ),
     assignees: jest.fn(() => opts.assignees ?? of([MARA, { principalId: null, displayName: 'Weg' }, { principalId: 'p3', displayName: null }])),
+    areas: jest.fn(() => opts.areas ?? of([area()])),
   };
   const rail = { refresh: jest.fn() };
   TestBed.configureTestingModule({
@@ -115,7 +143,14 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ]),
       { provide: TicketsApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
-      { provide: AuthService, useValue: { displayName: () => 'Mia', can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage' } },
+      {
+        provide: AuthService,
+        useValue: {
+          displayName: () => 'Mia',
+          can: (p: string) => (opts.manager ?? true) && !opts.workOnly && p === 'ticket.manage',
+          worksOnTickets: () => opts.manager ?? true,
+        },
+      },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -144,7 +179,9 @@ describe('TicketsComponent', () => {
     const { cmp } = await start();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = cmp as any;
-    expect(c.phoneMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['refresh']);
+    expect(c.phoneMenu().map((sec: { items: { id: string }[] }) => sec.items[0].id)).toEqual(['new', 'refresh']);
+    c.onPhoneMenu({ id: 'new', label: '' });
+    expect(c.newOpen()).toBe(true);
     const refresh = jest.spyOn(c, 'refreshList');
     c.onPhoneMenu({ id: 'other', label: '' });
     expect(refresh).not.toHaveBeenCalled();
@@ -152,13 +189,36 @@ describe('TicketsComponent', () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  /** "Ticket anlegen" (spec 002712): the new ticket opens and the list loads again. */
+  it('opens a ticket that the team wrote by hand and loads the list again', async () => {
+    const { cmp, api, router, harness } = await start();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    await userEvent.click(screen.getByRole('button', { name: 'Ticket anlegen' }));
+    expect(c.newOpen()).toBe(true);
+    const calls = api.list.mock.calls.length;
+    c.onCreated({ id: 't99' });
+    await harness.fixture.whenStable();
+    expect(c.newOpen()).toBe(false);
+    expect(api.list.mock.calls.length).toBeGreaterThan(calls);
+    expect(router.url).toBe('/tickets/t99');
+  });
+
+  it('offers no "Ticket anlegen" to a reporter', async () => {
+    const { cmp } = await start('/tickets', { manager: false });
+    expect(screen.queryByRole('button', { name: 'Ticket anlegen' })).toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((cmp as any).phoneMenu()).toHaveLength(1);
+  });
+
   it('groups the open tickets and folds the closed ones with their number', async () => {
     const { api, rail } = await start();
     expect(api.list).toHaveBeenCalledWith({
       kind: [],
+      area: [],
       assignee: null,
       q: null,
-      status: ['new', 'in_progress'],
+      status: ['new', 'in_progress', 'waiting'],
       limit: TICKET_PAGE,
       offset: 0,
     });
@@ -248,7 +308,7 @@ describe('TicketsComponent', () => {
     harness.detectChanges();
     expect(router.url).toBe('/tickets?status=done&kind=bug&assignee=me');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ kind: ['bug'], assignee: 'me' }));
-    expect(cmp.kindChipLabel()).toBe('Art: Fehler');
+    expect(cmp.kindChipLabel()).toBe('Kategorie: Fehler');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen: Mir');
     expect(cmp.statusChipLabel()).toBe('Status: Erledigt');
 
@@ -262,7 +322,7 @@ describe('TicketsComponent', () => {
     await harness.fixture.whenStable();
     harness.detectChanges();
     expect(router.url).toBe('/tickets');
-    expect(cmp.kindChipLabel()).toBe('Art');
+    expect(cmp.kindChipLabel()).toBe('Kategorie');
     expect(cmp.assigneeChipLabel()).toBe('Zugewiesen');
     expect(cmp.statusChipLabel()).toBe('Status: Offen');
   });
@@ -288,6 +348,7 @@ describe('TicketsComponent', () => {
       'Offen',
       'Neu',
       'In Bearbeitung',
+      'Wartet auf Antwort',
       'Erledigt',
       'Abgelehnt',
       'Alle',
@@ -436,7 +497,7 @@ describe('TicketsComponent', () => {
     expect(cmp.selectedId()).toBe('t42');
   });
 
-  /** § 000675: a phone list row ends with its last text, not with an arrow. */
+  /** §ui-kit:000675: a phone list row ends with its last text, not with an arrow. */
   it('ends a phone row without an arrow, and keeps the arrow on a one-pane tablet', async () => {
     const tablet = await start('/tickets');
     expect((tablet.harness.routeNativeElement as HTMLElement).querySelector('app-row-chevron')).not.toBeNull();
@@ -483,5 +544,54 @@ describe('TicketsComponent', () => {
     expect(row.sub).not.toContain('Lea');
     expect(row.assignee).toBeNull();
   });
-});
 
+  describe('Bereiche', () => {
+    it('shows no Bereich chip with one own Bereich, and reads the Bereiche once', async () => {
+      const { api, page } = await start();
+      expect(api.areas).toHaveBeenCalledTimes(1);
+      expect(page.areas()).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: /Bereich/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Kategorie/ })).toBeInTheDocument();
+    });
+
+    it('filters by the Bereich with more than one own Bereich, and names it in the row', async () => {
+      const rows = [ticket(), ticket({ id: 't50', areaId: 'a-asta', kind: null, categoryId: 'c1', title: 'Raum 9-012' })];
+      const { cmp, api, go } = await start('/tickets', {
+        areas: of([area(), ASTA, area({ id: 'a-x', name: 'Fremd', platform: false, mine: false })]),
+        answer: (q) => of(pageOf(isClosedQuery(q) ? [] : rows)),
+      });
+      expect(cmp.areaOptions().map((o) => o.label)).toEqual(['Alle', 'Plattform', 'AStA-Büro']);
+      expect(screen.getByRole('button', { name: /Bereich/ })).toBeInTheDocument();
+      const row = cmp.groups()[0].rows[1];
+      expect(row.icon).toBe('ticket');
+      expect(row.kindLabel).toBe('Raumanfrage');
+      expect(row.sub).toContain('AStA-Büro');
+      expect(cmp.chips().map((c) => c.key)).toEqual(['area', 'kind', 'assignee']);
+      cmp.setFilter('area', 'a-asta');
+      cmp.setFilter('area', '');
+      cmp.setArea('');
+      cmp.setArea('a-asta');
+      await go('/tickets?area=a-asta');
+      expect(cmp.areaFilter()).toBe('a-asta');
+      expect(cmp.activeFilterCount()).toBe(1);
+      expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ area: ['a-asta'] }));
+      expect(cmp.areaChipLabel()).toContain('AStA-Büro');
+    });
+
+    it('shows no kind chip to a person who does not work in Plattform', async () => {
+      const row = ticket({ areaId: 'a-asta', kind: null, categoryId: null });
+      const { cmp } = await start('/tickets', {
+        workOnly: true,
+        areas: of([area({ mine: false }), ASTA]),
+        answer: (q) => of(pageOf(isClosedQuery(q) ? [] : [row])),
+      });
+      expect(screen.queryByRole('button', { name: /Kategorie/ })).not.toBeInTheDocument();
+      expect(cmp.groups()[0].rows[0].kindLabel).toBe('Keine');
+    });
+
+    it('works without the list of the Bereiche', async () => {
+      const { page } = await start('/tickets', { areas: throwError(() => new Error('x')) });
+      expect(page.areas()).toEqual([]);
+    });
+  });
+});

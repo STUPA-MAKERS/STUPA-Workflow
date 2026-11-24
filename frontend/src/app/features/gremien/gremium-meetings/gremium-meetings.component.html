@@ -31,10 +31,12 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="4" [label]="'gremien.meetings.loading' | t" />
 } @else if (!groups().length) {
-  @if (filterActive()) {
-    <app-empty-state icon="searchOff" shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
+  @if (error()) {
+    <app-empty-state fill icon="alert" [heading]="'gremien.meetings.error' | t" />
+  } @else if (filterActive()) {
+    <app-empty-state fill icon="searchOff" shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
   } @else {
-    <app-empty-state icon="users" shape="date" rows="3" [heading]="'gremien.meetings.empty' | t" />
+    <app-empty-state fill icon="users" shape="date" rows="3" [heading]="'gremien.meetings.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {

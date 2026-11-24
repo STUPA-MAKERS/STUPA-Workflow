@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/angular';
 import type { ExternalEntry } from '@core/api/calendar.service';
-import { ExternalEntryComponent } from './external-entry.component';
+import { ExternalEntryViewComponent as ExternalEntryComponent } from '@stupa-makers/ui-kit/views/calendar';
 
 const ENTRY: ExternalEntry = {
   id: 'x-1',

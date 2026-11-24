@@ -21,13 +21,22 @@ from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.privacy.mails import notify_erasure_executed, notify_erasure_rejected
 from app.modules.privacy.models import ErasureRequest
+from app.modules.privacy.paperless import (
+    Documents,
+    documents_of_email,
+    documents_of_principal,
+    documents_of_requests,
+    export_rows,
+)
 from app.modules.privacy.schemas import (
     EmailErasureBody,
     EmailErasureOut,
     ErasureRejectBody,
     ErasureRequestOut,
+    PrincipalErasureOut,
     PrivacySettingsOut,
     PrivacySettingsUpdate,
+    TicketMailCountOut,
 )
 from app.modules.privacy.service import (
     AuskunftService,
@@ -37,6 +46,7 @@ from app.modules.privacy.service import (
     build_auskunft_workbook,
     erase_email,
 )
+from app.modules.tickets.privacy import mail_counts_of, mail_counts_of_principal
 from app.shared.errors import ProblemDetail, ValidationProblem
 from app.shared.xlsx import XLSX_MEDIA_TYPE
 
@@ -95,8 +105,10 @@ ErasureServiceDep = Annotated[ErasureRequestService, Depends(get_erasure_service
 SettingsServiceDep = Annotated[PrivacySettingsService, Depends(get_settings_service)]
 
 
-def _out(request_row: ErasureRequest) -> ErasureRequestOut:
-    return ErasureRequestOut.model_validate(request_row, from_attributes=True)
+def _out(request_row: ErasureRequest, documents: Documents = ()) -> ErasureRequestOut:
+    return ErasureRequestOut.model_validate(request_row, from_attributes=True).model_copy(
+        update={"paperless_documents": documents}
+    )
 
 
 @router.get(
@@ -107,10 +119,13 @@ def _out(request_row: ErasureRequest) -> ErasureRequestOut:
 )
 async def list_erasures(
     service: ErasureServiceDep,
+    session: DbSession,
     status: Annotated[str | None, Query()] = None,
 ) -> list[ErasureRequestOut]:
-    """List the erasure requests, optionally by status."""
-    return [_out(r) for r in await service.list(status=status)]
+    """List the erasure requests, optionally by status, with their Paperless documents."""
+    rows = await service.list(status=status)
+    documents = await documents_of_requests(session, rows)
+    return [_out(r, documents.get(r.id, ())) for r in rows]
 
 
 @router.post(
@@ -130,6 +145,8 @@ async def execute_erasure(
 ) -> ErasureRequestOut:
     """Execute an erasure request and mail the confirmation in the background."""
     files = _files_with_storage(session, request)
+    before = await session.get(ErasureRequest, request_id)
+    mails = await mail_counts_of(session, before.email if before is not None else None)
     result = await service.execute(request_id, actor=principal.sub, files=files)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
@@ -140,7 +157,10 @@ async def execute_erasure(
         email=result.email,
         subject_type=result.subject_type,
     )
-    return _out(result)
+    documents = await documents_of_requests(session, [result])
+    return _out(result, documents.get(result.id, ())).model_copy(
+        update={"ticket_mails": TypeAdapter(tuple[TicketMailCountOut, ...]).validate_python(mails)}
+    )
 
 
 @router.post(
@@ -174,7 +194,7 @@ async def reject_erasure(
 
 @router.post(
     "/principals/{principal_id}/erase",
-    status_code=204,
+    response_model=PrincipalErasureOut,
     dependencies=[_CONFIG],
     responses=_errors(401, 403, 404, 409),
 )
@@ -183,14 +203,22 @@ async def erase_principal(
     principal: ConfigPrincipal,
     session: DbSession,
     request: Request,
-) -> Response:
-    """Erase a principal (GDPR Art. 17)."""
+) -> PrincipalErasureOut:
+    """Erase a principal (GDPR Art. 17) and name the documents that stay in Paperless.
+
+    The route reads the documents before the erasure, because the erasure removes the
+    address that finds them.
+    """
+    documents = await documents_of_principal(session, principal_id)
+    mails = await mail_counts_of_principal(session, principal_id)
     await PrincipalService(session).erase(
         principal_id,
         actor=principal.sub,
         files=_files_with_storage(session, request),
     )
-    return Response(status_code=204)
+    return PrincipalErasureOut.model_validate(
+        {"paperlessDocuments": documents, "ticketMails": mails}
+    )
 
 
 @router.post(
@@ -211,13 +239,18 @@ async def erase_by_email(
     without a session, who has no application to file an erasure request from. An
     account under the address stays and comes back as ``principalId``.
     """
+    email = _canonical_email(body.email)
+    documents = await documents_of_email(session, email)
+    mails = await mail_counts_of(session, email)
     result = await erase_email(
         session,
-        _canonical_email(body.email),
+        email,
         actor=principal.sub,
         files=_files_with_storage(session, request),
     )
-    return EmailErasureOut.model_validate(result)
+    return EmailErasureOut.model_validate({**result, "ticketMails": mails}).model_copy(
+        update={"paperless_documents": documents}
+    )
 
 
 @router.get(
@@ -259,7 +292,8 @@ async def auskunft(
     """
     email = _canonical_email(email)
     data = await AuskunftService(session).collect(email)
-    workbook = build_auskunft_workbook(**data)
+    paperless_documents = await export_rows(session, email)
+    workbook = build_auskunft_workbook(**data, paperless_documents=paperless_documents)
     await audit_record(
         session,
         actor=principal.sub,
@@ -276,6 +310,7 @@ async def auskunft(
             "todos": len(data["todos"]),
             "todoComments": len(data["todo_comments"]),
             "appointments": len(data["appointments"]),
+            "paperlessDocuments": len(paperless_documents),
             "hasPrincipal": data["principal"] is not None,
         },
     )

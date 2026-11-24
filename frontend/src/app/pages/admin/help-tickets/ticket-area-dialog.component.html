@@ -1,0 +1,27 @@
+<app-dialog
+  size="md"
+  [open]="open()"
+  [heading]="title() | t"
+  [subtitle]="platform() ? area()!.name : ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+  [actions]="actions()"
+  (action)="onAction($event.key)"
+>
+  <ng-template dialogBody>
+    <app-form
+      [form]="form()"
+      [value]="value()"
+      [errors]="errors()"
+      (valueChange)="onValue($event)"
+    />
+  </ng-template>
+</app-dialog>
+
+<app-confirm-dialog
+  [open]="confirmDelete()"
+  [title]="'admin.helpTickets.areas.deleteTitle' | t"
+  [body]="'admin.helpTickets.areas.deleteConfirm' | t: { name: area()?.name || '' }"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(false)"
+/>

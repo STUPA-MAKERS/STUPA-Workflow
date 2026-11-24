@@ -269,7 +269,7 @@
 
       @if (!showVersions()) {
         @if (selectedState(); as s) {
-          <app-state-inspector
+          <app-state-inspector-view
             [state]="s"
             [kindOptions]="kindOptionsSel"
             [gremiumOptions]="gremiumOptions()"
@@ -289,7 +289,7 @@
             (remove)="removeSelectedState()"
           />
           @if (stateTransitionLists(); as lists) {
-            <app-transition-lists [lists]="lists" (selectTransition)="selectEdge($event)" />
+            <app-transition-lists-view [lists]="lists" (selectTransition)="selectEdge($event)" />
           }
           <app-button-group>
             <app-button
@@ -300,7 +300,7 @@
             ><app-icon name="plus" /> {{ 'admin.flow.addTransition' | t }}</app-button>
           </app-button-group>
         } @else if (selectedTransition(); as sel) {
-          <app-transition-inspector
+          <app-transition-inspector-view
             [transition]="sel.t"
             [stateOptions]="stateOptions()"
             [branchOptions]="branchOptionsSel(sel.t.from)"
@@ -320,7 +320,6 @@
             [transition]="sel.t"
             [roleOptions]="globalRoleOptions()"
             [gremiumOptions]="gremiumOptions()"
-            [webhookOptions]="webhookOptions()"
             [budgetTree]="budgetTree()"
             [targetBudgetVote]="targetIsBudgetVote(sel.t.to)"
             (guardChange)="setGuard(sel.index, $event)"
@@ -334,7 +333,7 @@
             (recipientRefChange)="setRecipientRef(sel.index, $event.ai, $event.ri, $event.ref)"
           />
         } @else if (currentGroup(); as grp) {
-          <app-group-inspector
+          <app-group-inspector-view
             [group]="grp"
             (nameChange)="renameGroup(grp.id, $event)"
             (colorChange)="setGroupColor(grp.id, $event)"

@@ -6,7 +6,7 @@ import { createApplication, readArtifacts, uniqueEmail } from './helpers';
 import { measureYellow } from './very-high-contrast';
 
 /**
- * § NF/accessibility/conformance/000491: every route passes an axe check in both themes.
+ * §ui-kit:NF/accessibility/conformance/000491: every route passes an axe check in both themes.
  *
  * jsdom cannot compute contrast or layout, so only a real browser finds these errors. The
  * check uses the WCAG 2.0, 2.1 and 2.2 A and AA tags, and a violation fails the test. The

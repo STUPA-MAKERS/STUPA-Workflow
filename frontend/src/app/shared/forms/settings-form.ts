@@ -54,7 +54,7 @@ export interface SettingsForm<S, D> {
   reset(): void;
   /** Send the draft. A toast names the result. */
   save(): void;
-  /** Read the stored values again, after a failed read (§ 000576). */
+  /** Read the stored values again, after a failed read (§ui-kit:000576). */
   reload(): void;
 }
 
@@ -152,11 +152,11 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
         next: (s) => {
           saving.set(false);
           apply(s);
-          toast.success(i18n.translate('admin.common.saved'));
+          toast.show(i18n.translate('admin.common.saved'), 'success');
         },
         error: () => {
           saving.set(false);
-          toast.error(i18n.translate('admin.common.saveFailed'));
+          toast.show(i18n.translate('admin.common.saveFailed'), 'error');
         },
       });
     },

@@ -6,9 +6,13 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { setI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  BadgeComponent,
   ButtonComponent,
   ButtonGroupComponent,
+  type ContentLang,
+  ContentLangSwitchComponent,
   EmptyStateComponent,
+  FabComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   IconComponent,
@@ -16,18 +20,15 @@ import {
   ListItemComponent,
   MEDIA,
   mediaQuery,
-  ScrollFadeDirective,
-  SkeletonComponent,
-  BadgeComponent,
-  ToastService,
-  FabComponent,
   PageHeaderComponent,
+  ScrollFadeDirective,
   SectionComponent,
+  SkeletonComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
-import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 
 type Lang = ContentLang;
@@ -92,7 +93,7 @@ export class MailTemplatesComponent {
   readonly draft = signal<MailTemplate | null>(null);
   /** The list has not arrived yet. */
   readonly loading = signal(true);
-  /** The read of the templates failed (§ 000576). */
+  /** The read of the templates failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
   protected readonly loadState = loadStateOf(this.loading, this.loadError);
   readonly lang = signal<Lang>('de');
@@ -175,7 +176,7 @@ export class MailTemplatesComponent {
     });
   }
 
-  /** "Verwerfen": the open template goes back to its stored texts (§ 000635). */
+  /** "Verwerfen": the open template goes back to its stored texts (§ui-kit:000635). */
   discard(): void {
     const key = this.selectedKey();
     if (key) this.select(key);
@@ -202,11 +203,11 @@ export class MailTemplatesComponent {
         next: (updated) => {
           this.saving.set(false);
           this.applyUpdate(updated);
-          this.toast.success(this.i18n.translate('admin.mailTemplates.saved'));
+          this.toast.show(this.i18n.translate('admin.mailTemplates.saved'), 'success');
         },
         error: () => {
           this.saving.set(false);
-          this.toast.error(this.i18n.translate('admin.mailTemplates.failed'));
+          this.toast.show(this.i18n.translate('admin.mailTemplates.failed'), 'error');
         },
       });
   }
@@ -219,11 +220,11 @@ export class MailTemplatesComponent {
       next: (builtin) => {
         this.resetting.set(false);
         this.applyUpdate(builtin);
-        this.toast.success(this.i18n.translate('admin.mailTemplates.resetDone'));
+        this.toast.show(this.i18n.translate('admin.mailTemplates.resetDone'), 'success');
       },
       error: () => {
         this.resetting.set(false);
-        this.toast.error(this.i18n.translate('admin.mailTemplates.failed'));
+        this.toast.show(this.i18n.translate('admin.mailTemplates.failed'), 'error');
       },
     });
   }
@@ -255,7 +256,7 @@ export class MailTemplatesComponent {
         },
         error: () => {
           this.previewing.set(false);
-          this.toast.error(this.i18n.translate('admin.mailTemplates.previewFailed'));
+          this.toast.show(this.i18n.translate('admin.mailTemplates.previewFailed'), 'error');
         },
       });
   }

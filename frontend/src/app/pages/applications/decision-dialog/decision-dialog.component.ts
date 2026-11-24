@@ -21,7 +21,13 @@ import {
   emptyDraft,
   toProposal,
 } from '@shared/decision/decision.util';
-import { ButtonComponent, DialogComponent, ToastService, ErrorTextComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  ToastService,
+  ErrorTextComponent,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 /** The server refused the decision: the codes of the 422 answers. */
 const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = {
@@ -45,7 +51,14 @@ const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = 
   selector: 'app-decision-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ErrorTextComponent, TranslatePipe, ButtonComponent, DialogComponent, DecisionEditorComponent],
+  imports: [
+    DialogBodyDirective,
+    ErrorTextComponent,
+    TranslatePipe,
+    ButtonComponent,
+    DialogComponent,
+    DecisionEditorComponent,
+  ],
   templateUrl: './decision-dialog.component.html',
   styleUrl: './decision-dialog.component.scss',
 })
@@ -108,7 +121,7 @@ export class DecisionDialogComponent {
       .subscribe({
         next: () => {
           this.saving.set(false);
-          this.toast.success(this.i18n.translate('applications.actions.success'));
+          this.toast.show(this.i18n.translate('applications.actions.success'), 'success');
           this.open.set(false);
           this.done.emit();
         },
@@ -120,15 +133,18 @@ export class DecisionDialogComponent {
             return;
           }
           if (err.status === 409) {
-            this.toast.error(this.i18n.translate('applications.actions.conflict'));
+            this.toast.show(this.i18n.translate('applications.actions.conflict'), 'error');
             this.open.set(false);
             this.done.emit();
             return;
           }
-          this.toast.error(
+          this.toast.show(
             this.i18n.translate(
-              err.status === 403 ? 'applications.transitions.forbidden' : 'applications.actions.error',
+              err.status === 403
+                ? 'applications.transitions.forbidden'
+                : 'applications.actions.error',
             ),
+            'error',
           );
         },
       });

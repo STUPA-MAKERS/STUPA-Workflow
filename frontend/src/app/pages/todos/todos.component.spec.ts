@@ -27,6 +27,7 @@ import { TodoLiveService } from '@core/ws/todo-live.service';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../testing/load-error';
+import { toastMock } from '../../../testing/toast';
 
 /** Keeps what the page reads but reads nothing ahead, so a test counts the reads of the page. */
 @Injectable()
@@ -90,7 +91,7 @@ async function start(url: string, opts: Opts = {}) {
     entries: jest.fn(() => of([])),
     entryOptions: jest.fn(() => of({ gremien: [], persons: [] })),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(),
@@ -250,7 +251,7 @@ describe('TodosComponent', () => {
   it('draws the board in its loaded shape while it loads, with the count of the board list', async () => {
     const { cmp } = await start('/todos/b-1', { pending: true });
     expect(cmp.loading()).toBe(true);
-    expect(document.querySelector('app-todo-board-skeleton')).not.toBeNull();
+    expect(document.querySelector('app-todo-board-skeleton-view')).not.toBeNull();
     expect(document.querySelectorAll('.bv__col')).toHaveLength(4);
     expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
     expect(cmp.openCount()).toBe(2);
@@ -415,7 +416,7 @@ describe('TodosComponent', () => {
     harness.detectChanges();
     expect(cmp.loading()).toBe(false);
     expect(cmp.board()).not.toBeNull();
-    expect(harness.routeNativeElement!.querySelector('app-todo-board-skeleton')).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-todo-board-skeleton-view')).toBeNull();
     expect(cmp.board()?.id).toBe('b-2');
     expect(api.pollBoard).toHaveBeenLastCalledWith('b-2', 'W/"b-2"');
     await settle();
@@ -1077,13 +1078,13 @@ describe('TodosComponent', () => {
     it('loads the personal board in the shape it will have: natural height, no label chip', async () => {
       const { harness } = await start('/todos/b-0', { pending: true });
       const root = harness.routeNativeElement!;
-      expect(root.querySelector('app-todo-board-skeleton')).toHaveClass('bv-host--natural');
+      expect(root.querySelector('app-todo-board-skeleton-view')).toHaveClass('bv-host--natural');
       expect(root.querySelector('.td__body--rows')).not.toBeNull();
       expect(root.querySelectorAll('.td__skelChip')).toHaveLength(2);
       TestBed.resetTestingModule();
       const gremium = await start('/todos/b-1', { pending: true });
       const other = gremium.harness.routeNativeElement!;
-      expect(other.querySelector('app-todo-board-skeleton')).not.toHaveClass('bv-host--natural');
+      expect(other.querySelector('app-todo-board-skeleton-view')).not.toHaveClass('bv-host--natural');
       expect(other.querySelectorAll('.td__skelChip')).toHaveLength(3);
     });
 
@@ -1124,7 +1125,7 @@ describe('TodosComponent', () => {
       await router.navigateByUrl('/todos/b-0');
       await settle();
       const root = harness.routeNativeElement!;
-      expect(root.querySelector('app-todo-board-skeleton')).toBeNull();
+      expect(root.querySelector('app-todo-board-skeleton-view')).toBeNull();
       expect(cmp.loading()).toBe(false);
       expect(cmp.board()?.columns).toHaveLength(3);
       expect(cmp.rowMatches()).toBe(1);
@@ -1378,12 +1379,12 @@ describe('TodosComponent', () => {
     it('shows the skeleton until the rows answer and the empty state without a card', async () => {
       const read = new Subject<TodoAssignedPoll>();
       const { cmp, settle } = await start(`/todos/${ALL_BOARDS}`, { all: read });
-      expect(document.querySelector('app-todo-board-skeleton')).not.toBeNull();
+      expect(document.querySelector('app-todo-board-skeleton-view')).not.toBeNull();
       expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
       read.next({ boards: [row({ id: 'b-0', kind: 'personal' })], etag: 'W/"a"' });
       await settle();
       expect(cmp.allEmpty()).toBe(true);
-      expect(document.querySelector('app-todo-board-skeleton')).toBeNull();
+      expect(document.querySelector('app-todo-board-skeleton-view')).toBeNull();
       expect(screen.getByText('Auf deinen Boards gibt es noch keine To-Dos.')).toBeInTheDocument();
       expect(screen.queryByRole('region')).toBeNull();
     });
@@ -1682,7 +1683,7 @@ describe('TodosComponent', () => {
         expect(cmp.tileMenuOpen()).toBe(false);
         expect(cmp.tileTransferOpen()).toBe(false);
         expect(cmp.tileMenu()).toBeNull();
-        expect(document.querySelector('app-todo-move-sheet')).toBeNull();
+        expect(document.querySelector('app-todo-move-sheet-view')).toBeNull();
       });
 
       it('has no link to the board in the head of the personal section', async () => {
@@ -1783,7 +1784,7 @@ describe('TodosComponent', () => {
     expect(cmp.phoneList()).toBe(false);
     expect(cmp.lead()).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-board-view')).not.toBeNull();
-    expect(harness.routeNativeElement!.querySelector('app-todo-move-sheet')).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-todo-move-sheet-view')).toBeNull();
     expect(harness.routeNativeElement!.querySelector('.bv__scroll')).toHaveAttribute('appScrollFade', 'y');
   });
 });

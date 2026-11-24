@@ -1,16 +1,16 @@
 import { render, screen } from '@testing-library/angular';
 import { runAxe } from '../../../testing/a11y';
-import { VoteBarsComponent } from './vote-bars.component';
+import { VoteBarsViewComponent } from '@stupa-makers/ui-kit/views/voting';
 
 const OPTIONS = ['yes', 'no', 'abstain'];
 
 async function setup(inputs: Record<string, unknown> = {}) {
-  return render(VoteBarsComponent, {
+  return render(VoteBarsViewComponent, {
     inputs: { options: OPTIONS, counts: { yes: 15, no: 3, abstain: 2 }, ...inputs },
   });
 }
 
-describe('VoteBarsComponent', () => {
+describe('VoteBarsViewComponent', () => {
   it('shows one row per option with count and share of the cast ballots', async () => {
     await setup();
     expect(screen.getByText('Ja')).toBeInTheDocument();

@@ -13,45 +13,6 @@
             (valueChange)="setSearch($event)"
           />
         </div>
-        <div class="gr__depth" role="group" [attr.aria-label]="'graph.depth.group' | t">
-          <label class="gr__depthName" for="gr-depth">{{ 'graph.depth.label' | t }}</label>
-          <app-button-group class="gr__depthGroup">
-          <app-button
-            variant="text"
-            size="sm"
-            data-testid="gr-depth-less"
-            [iconOnly]="true"
-            [ariaLabel]="'graph.depth.less' | t"
-            [disabled]="filters().depth <= 0"
-            (click)="setDepth(filters().depth - 1)"
-          >
-            <app-icon name="minus" />
-          </app-button>
-          <input
-            id="gr-depth"
-            class="gr__depthInput"
-            type="number"
-            inputmode="numeric"
-            min="0"
-            step="1"
-            data-testid="gr-depth"
-            [max]="maxDepth"
-            [value]="filters().depth"
-            (change)="onDepth($event)"
-          />
-          <app-button
-            variant="text"
-            size="sm"
-            data-testid="gr-depth-more"
-            [iconOnly]="true"
-            [ariaLabel]="'graph.depth.more' | t"
-            [disabled]="filters().depth >= maxDepth"
-            (click)="setDepth(filters().depth + 1)"
-          >
-            <app-icon name="plus" />
-          </app-button>
-          </app-button-group>
-        </div>
         <div class="gr__chips" role="group" [attr.aria-label]="'graph.filter.group' | t">
           <app-filter-select
             class="gr__chip"
@@ -127,21 +88,54 @@
           </aside>
         }
       }
-      @if (drawing() && (growing() || cursor())) {
-        <div class="gr__foot">
-          @if (growing()) {
-            <p class="gr__growing gr__pill" role="status">{{ 'graph.growing' | t }}</p>
-          } @else {
-            <div class="gr__more gr__pill">
-              <app-button-group>
-                <app-button variant="text" size="sm" data-testid="gr-more" (click)="loadMore()">
-                  <app-icon name="down" />
-                  {{ 'graph.loadMore' | t }}
-                </app-button>
-              </app-button-group>
-            </div>
-          }
+      <div class="gr__foot">
+        <div class="gr__depth" role="group" [attr.aria-label]="'graph.depth.group' | t">
+          <label class="gr__depthName" for="gr-depth">{{ 'graph.depth.label' | t }}</label>
+          <app-button-group class="gr__depthGroup">
+            <app-button
+              variant="text"
+              size="sm"
+              data-testid="gr-depth-less"
+              [iconOnly]="true"
+              [ariaLabel]="'graph.depth.less' | t"
+              [disabled]="filters().depth <= 0"
+              (click)="setDepth(filters().depth - 1)"
+            >
+              <app-icon name="minus" />
+            </app-button>
+            <input
+              id="gr-depth"
+              class="gr__depthInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1"
+              data-testid="gr-depth"
+              [max]="maxDepth"
+              [value]="filters().depth"
+              (change)="onDepth($event)"
+            />
+            <app-button
+              variant="text"
+              size="sm"
+              data-testid="gr-depth-more"
+              [iconOnly]="true"
+              [ariaLabel]="'graph.depth.more' | t"
+              [disabled]="filters().depth >= maxDepth"
+              (click)="setDepth(filters().depth + 1)"
+            >
+              <app-icon name="plus" />
+            </app-button>
+          </app-button-group>
         </div>
+      </div>
+      <!-- The state of the build-up stands over the zoom buttons, at the end edge (spec 002790). -->
+      @if (drawing() && growing()) {
+        <p class="gr__state gr__growing" role="status">{{ 'graph.growing' | t }}</p>
+      } @else if (drawing() && cursor()) {
+        <app-button-group class="gr__state">
+          <app-button variant="tonal" data-testid="gr-more" (click)="loadMore()">{{ 'graph.loadMore' | t }}</app-button>
+        </app-button-group>
       }
     </div>
 
@@ -171,15 +165,15 @@
           </span>
         </div>
       } @else if (error()) {
-        <app-load-error [message]="'graph.loadError' | t" (retry)="retry()" />
+        <app-load-error face [message]="'graph.loadError' | t" (retry)="retry()" />
       } @else if (empty()) {
         @if (filtered()) {
-          <app-empty-state icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
+          <app-empty-state fill icon="searchOff" [heading]="'graph.emptyFiltered' | t" />
         } @else {
-          <app-empty-state icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
+          <app-empty-state fill icon="shapes" [heading]="'graph.empty' | t" [body]="'graph.emptyBody' | t" />
         }
       } @else {
-        <app-graph-canvas
+        <app-graph-canvas-view
           class="gr__canvas"
           [nodes]="canvasNodes()"
           [lines]="graph().lines"
@@ -202,19 +196,21 @@
     [open]="chosen() !== null"
     (openChange)="$event ? null : choose(null)"
   >
-    @if (sheetRow(); as c) {
-      <div class="gr__sheet">
-        <div class="gr__sheetHead" [attr.data-kind]="c.node.kind">
-          <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
-            <app-icon [name]="c.icon" [size]="18" />
-          </span>
-          <div class="gr__panelText">
-            <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+    <ng-template sheetBody>
+      @if (sheetRow(); as c) {
+        <div class="gr__sheet">
+          <div class="gr__sheetHead" [attr.data-kind]="c.node.kind">
+            <span class="gr__mark" [class.gr__mark--muted]="!c.node.accessible">
+              <app-icon [name]="c.icon" [size]="18" />
+            </span>
+            <div class="gr__panelText">
+              <ng-container *ngTemplateOutlet="lines; context: { $implicit: c }" />
+            </div>
           </div>
+          <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
         </div>
-        <ng-container *ngTemplateOutlet="action; context: { $implicit: c }" />
-      </div>
-    }
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -231,9 +227,9 @@
 <ng-template #action let-c let-close="close">
   <app-button-group class="gr__actions" [main]="true">
     @if (c.route; as to) {
-      <a class="gr__open" appButton="fill" [routerLink]="to.path" [queryParams]="to.query">
+      <a class="gr__open" appButton="fill" [appLinkTo]="to">
         {{ 'graph.panel.open' | t }}
-        <app-icon name="arrow" />
+        <app-icon [name]="c.external ? 'ext' : 'arrow'" />
       </a>
     }
     @if (close) {

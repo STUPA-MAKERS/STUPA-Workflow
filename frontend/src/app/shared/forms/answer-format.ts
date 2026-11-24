@@ -2,6 +2,7 @@ import type { FormFieldDef } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
 import { resolveI18n } from './i18n-text';
 import { formatMoney } from '@shared/format-money';
+import { isComputedAmount } from './form-rules';
 
 /**
  * Stringify an answer value without a field definition.
@@ -120,6 +121,10 @@ export function formatAnswer(field: FormFieldDef, value: unknown, env: AnswerFor
     case 'currency':
     case 'funding':
       return formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value);
+    case 'computed':
+      return isComputedAmount(field)
+        ? formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value)
+        : formatFieldValue(value);
     default:
       return formatFieldValue(value);
   }

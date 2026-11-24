@@ -8,7 +8,13 @@ import {
   untracked,
 } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, DialogComponent, NoteComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  NoteComponent,
+  SwitchComponent,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 /**
  * "Protokoll finalisieren?": the question before each finalize (§ 000952).
@@ -23,7 +29,14 @@ import { ButtonComponent, DialogComponent, NoteComponent, SwitchComponent } from
   selector: 'app-finalize-protocol-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, DialogComponent, NoteComponent, SwitchComponent],
+  imports: [
+    DialogBodyDirective,
+    TranslatePipe,
+    ButtonComponent,
+    DialogComponent,
+    NoteComponent,
+    SwitchComponent,
+  ],
   templateUrl: './finalize-protocol-dialog.component.html',
   styleUrl: './finalize-protocol-dialog.component.scss',
 })

@@ -1,10 +1,12 @@
 /**
  * API of the tickets (`/api/tickets`): the "Problem melden" dialog sends a ticket, and
- * the page `/tickets` (permission `ticket.manage`) reads and works them.
+ * the page `/tickets` reads and works them. A person works the tickets of a Bereich with
+ * `ticket.manage` (every Bereich) or with the Gremium permission `ticket.work` in the
+ * Gremium of the Bereich.
  *
  * A reporter account reads its own tickets under `/tickets/mine`: the report, the
  * public notes and the status changes, and it writes, edits and deletes its own
- * messages. Every other read and write below the create needs `ticket.manage`; an
+ * messages. Every other read and write below the create needs the work right; an
  * unknown ticket and a ticket the caller may not read both answer 404. The client only
  * binds the data; the server stays authoritative.
  */
@@ -19,7 +21,9 @@ import { detailContext } from '@core/cache/cache.interceptor';
 import { httpParams } from './http-params';
 
 export type TicketKind = 'bug' | 'question' | 'idea' | 'barrier';
-export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
+export type TicketStatus = 'new' | 'in_progress' | 'waiting' | 'done' | 'rejected';
+/** The way a ticket came: the help menu, a mail, or a person of the team wrote it by hand. */
+export type TicketSource = 'help' | 'mail' | 'team';
 
 /** The kinds in the order of the dialog and the filter. */
 export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea', 'barrier'];
@@ -36,7 +40,12 @@ export interface TicketContext {
 }
 
 export interface TicketCreate {
-  readonly kind: TicketKind;
+  /** Required for the Bereich "Plattform"; not sent for another Bereich. */
+  readonly kind?: TicketKind;
+  /** A Bereich of `reportAreas`; without it the report goes to "Plattform". */
+  readonly areaId?: Uuid;
+  /** A Kategorie of that Bereich. */
+  readonly categoryId?: Uuid;
   readonly title: string;
   readonly body: string;
   /** Required without a session; the server ignores it with one. */
@@ -48,7 +57,7 @@ export interface TicketCreate {
   readonly altcha?: string | null;
 }
 
-/** The only answer to the reporter: the number, for example "T-0042". */
+/** The only answer to the reporter: the number, for example "T-7K3QX9MD". */
 export interface TicketCreated {
   readonly number: string;
 }
@@ -61,12 +70,148 @@ export interface TicketReporter {
   readonly anonymized: boolean;
 }
 
+/** A Kategorie of a Bereich. The Bereich "Plattform" has none: its Kategorien are the kinds. */
+export interface TicketCategory {
+  readonly id: Uuid;
+  readonly name: string;
+}
+
+/** A Bereich: a group of tickets with its own team and its own Kategorien. */
+export interface TicketArea {
+  readonly id: Uuid;
+  readonly name: string;
+  /** The Gremium whose roles give `ticket.work`; null: only `ticket.manage` works here. */
+  readonly gremiumId: Uuid | null;
+  /** The built-in Bereich of the help menu reports. Nobody deletes it. */
+  readonly platform: boolean;
+  /** A new ticket sends a mail to the team of the Bereich. */
+  readonly notifyNew: boolean;
+  /** A signed-in person can choose the Bereich in the ticket dialog; always true for "Plattform". */
+  readonly inApp: boolean;
+  readonly categories: readonly TicketCategory[];
+  /** The caller works in the Bereich. */
+  readonly mine: boolean;
+}
+
+/** A Bereich that a signed-in person can choose in the ticket dialog of the help menu. */
+export interface TicketAreaChoice {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly platform: boolean;
+  readonly categories: readonly TicketCategory[];
+}
+
+/**
+ * A ticket that a person of the team writes by hand for an account. `body` is the note of
+ * the team, which the person does not read; `message` is the first public message.
+ */
+export interface TicketManualCreate {
+  readonly areaId: Uuid;
+  readonly title: string;
+  readonly body: string;
+  readonly kind?: TicketKind;
+  readonly categoryId?: Uuid;
+  readonly reporterId?: Uuid;
+  /** Needs a Postfach of the Bereich (422 `ticket_area_without_mailbox`). */
+  readonly email?: string;
+  readonly message: string;
+}
+
+/** A reference to another ticket. */
+export interface TicketRef {
+  readonly id: Uuid;
+  readonly number: string;
+}
+
+/** The answer to a message on a ticket that is closed for more than 14 days: the new ticket. */
+export interface TicketFollowUp {
+  readonly followUp: TicketRef;
+}
+
+/** A Kategorie in the save of a Bereich: `id` keeps a stored one, without it a new one. */
+export interface TicketCategoryInput {
+  readonly id?: Uuid | null;
+  readonly name: string;
+}
+
+export interface TicketAreaInput {
+  readonly name: string;
+  readonly gremiumId: Uuid | null;
+  readonly notifyNew: boolean;
+  readonly inApp: boolean;
+  /** The whole ordered list; a stored Kategorie that it leaves out is deleted. */
+  readonly categories: readonly TicketCategoryInput[];
+}
+
+/** The Postfach of a Bereich, without its passwords (`admin.ticket_mail`). */
+export interface TicketMailbox {
+  readonly areaId: Uuid;
+  readonly address: string;
+  readonly imapHost: string;
+  readonly imapPort: number;
+  readonly imapUser: string;
+  readonly smtpHost: string;
+  readonly smtpPort: number;
+  readonly smtpUser: string;
+  /** The IMAP folder that takes each imported mail. */
+  readonly doneFolder: string;
+  readonly enabled: boolean;
+  /** The text that ends each sent mail; `{name}` stands for the writer. */
+  readonly signature?: string;
+  /** "Eingang bestätigen": a new ticket from a mail gets a confirmation. */
+  readonly confirm?: boolean;
+  /** The cause code of the fetch after eight failed runs in sequence, else null. */
+  readonly error?: string | null;
+  readonly fetchedAt?: string | null;
+}
+
+/** The body of a new Postfach. A change sends a part of it; a password it leaves out stays. */
+export interface TicketMailboxInput {
+  readonly address: string;
+  readonly imapHost: string;
+  readonly imapPort: number;
+  readonly imapUser: string;
+  readonly imapPassword: string;
+  readonly smtpHost: string;
+  readonly smtpPort: number;
+  readonly smtpUser: string;
+  readonly smtpPassword: string;
+  readonly doneFolder: string;
+  readonly enabled: boolean;
+  readonly signature: string;
+  readonly confirm: boolean;
+}
+
+/** Each Postfach and the hosts of the deploy setting `TICKET_MAIL_HOST_ALLOWLIST`. */
+export interface TicketMailboxList {
+  readonly items: readonly TicketMailbox[];
+  readonly allowedHosts: readonly string[];
+}
+
+/** The result of one connection of the test. `error` is the cause code of a failure. */
+export interface TicketMailboxCheck {
+  readonly ok: boolean;
+  readonly error?: string | null;
+}
+
+export interface TicketMailboxTest {
+  readonly imap: TicketMailboxCheck;
+  readonly smtp: TicketMailboxCheck;
+}
+
 export interface TicketListItem {
   readonly id: Uuid;
   readonly number: string;
-  readonly kind: TicketKind;
+  /** The Bereich of the ticket. */
+  readonly areaId: Uuid;
+  /** The kind of a report; null outside the Bereich "Plattform". */
+  readonly kind: TicketKind | null;
+  /** The Kategorie of the Bereich; null in "Plattform" and without one. */
+  readonly categoryId: Uuid | null;
   readonly title: string;
   readonly status: TicketStatus;
+  /** Absent on an older server: the help menu. */
+  readonly source?: TicketSource;
   readonly reporter: TicketReporter;
   readonly assignee: PersonRef | null;
   readonly createdAt: IsoDateTime;
@@ -85,15 +230,28 @@ export interface TicketAttachment {
   readonly scanState?: ScanState;
 }
 
-export type TicketEventKind = 'created' | 'status' | 'assignee' | 'kind' | 'todo_done';
+export type TicketEventKind =
+  | 'created'
+  | 'status'
+  | 'assignee'
+  | 'kind'
+  | 'category'
+  | 'area'
+  | 'todo_done'
+  | 'mail_auto';
 
 /** The payloads of the event kinds, all optional so one type reads every kind. */
 export interface TicketEventPayload {
   /** created */
   readonly confirmationSent?: boolean;
-  /** status, assignee, kind */
-  readonly from?: TicketStatus | TicketKind | PersonRef | null;
-  readonly to?: TicketStatus | TicketKind | PersonRef | null;
+  /** mail_auto: the subject of the automatic mail. */
+  readonly subject?: string | null;
+  /** status, assignee, kind; category: the names; area: the ids */
+  readonly from?: TicketStatus | TicketKind | PersonRef | string | null;
+  readonly to?: TicketStatus | TicketKind | PersonRef | string | null;
+  /** area: the names of both Bereiche at the time of the move. */
+  readonly fromName?: string | null;
+  readonly toName?: string | null;
   /** status: the number of the ticket this one duplicates. */
   readonly duplicateOf?: string;
   /** todo_done */
@@ -131,6 +289,56 @@ export interface TicketNote {
   readonly mentions?: readonly PersonRef[];
 }
 
+/** A file of a mail that did not become a file of the message. */
+export interface TicketSkippedFile {
+  readonly name: string;
+  readonly size: number;
+  /** `size`: above the size limit; `type`: a type that an upload refuses. */
+  readonly reason: 'size' | 'type';
+}
+
+/**
+ * One mail of a ticket from a Postfach. `noteId` names the message that the mail became;
+ * null for the first mail of the ticket and for an automatic mail. `source` tells if the
+ * full source downloads: only a `clean` one does.
+ */
+export interface TicketMail {
+  readonly id: Uuid;
+  readonly noteId: Uuid | null;
+  readonly direction: 'in' | 'out';
+  readonly fromName: string | null;
+  readonly fromAddress: string | null;
+  readonly cc: readonly string[];
+  readonly subject: string | null;
+  readonly automatic: boolean;
+  /** An imported mail answers a mail that the Postfach sent to its sender (002816). */
+  readonly senderChecked: boolean;
+  readonly source: 'clean' | 'infected' | 'closed' | 'gone';
+  readonly sourceSize: number;
+  readonly skipped: readonly TicketSkippedFile[];
+  /** The `To` addresses of a sent mail. */
+  readonly to?: readonly string[];
+  /** The state of a sent mail; null for an imported mail. */
+  readonly state?: 'sending' | 'sent' | 'failed' | null;
+  /** The cause code of the newest failed send. */
+  readonly error?: string | null;
+  readonly at: IsoDateTime;
+}
+
+/** The addresses of a mail. */
+export interface TicketMailRecipients {
+  readonly to: readonly string[];
+  readonly cc: readonly string[];
+}
+
+/**
+ * The recipients of the next public message on a mail ticket. `enabled` is false while
+ * the Postfach of the Bereich is off: a public message then answers 409 `mailbox_off`.
+ */
+export interface TicketMailAnswer extends TicketMailRecipients {
+  readonly enabled: boolean;
+}
+
 export interface TicketDetail extends TicketListItem {
   readonly body: string;
   readonly context: TicketContext;
@@ -138,6 +346,8 @@ export interface TicketDetail extends TicketListItem {
   readonly notes: readonly TicketNote[];
   readonly events: readonly TicketEvent[];
   readonly duplicateOf: { readonly id: Uuid; readonly number: string } | null;
+  /** The closed ticket that a late message of the sender answered. */
+  readonly followUpOf?: TicketRef | null;
   /** The application or meeting of `context.route`, when the viewer may read it. */
   readonly contextTarget: {
     readonly kind: 'application' | 'meeting';
@@ -150,6 +360,30 @@ export interface TicketDetail extends TicketListItem {
   readonly anonymizedAt: IsoDateTime | null;
   /** The reporter is blocked; false for an anonymized ticket. */
   readonly senderBlocked: boolean;
+  /** The mails of a ticket from a Postfach, oldest first. Absent on an older server. */
+  readonly mails?: readonly TicketMail[];
+  /** The recipients of a public message on a mail ticket; null on another ticket. */
+  readonly mailAnswer?: TicketMailAnswer | null;
+  /**
+   * The clean files that the person can file in Paperless; null without `paperless.use`
+   * and while the Paperless connection is off.
+   */
+  readonly paperless?: TicketPaperless | null;
+}
+
+/** One clean file of a ticket with the state of its filing in Paperless. */
+export interface TicketPaperlessFile {
+  readonly id: Uuid;
+  readonly filename: string;
+  /** `none` before the action, `pending` while the job runs, `filed` with a document. */
+  readonly state: 'none' | 'pending' | 'filed' | 'failed';
+  /** The address of the document in Paperless; null before `filed`. */
+  readonly url: string | null;
+}
+
+/** The files of a ticket for the action "In Paperless ablegen". */
+export interface TicketPaperless {
+  readonly files: readonly TicketPaperlessFile[];
 }
 
 /**
@@ -177,7 +411,8 @@ export interface TicketBlockedSender {
 export interface MyTicketItem {
   readonly id: Uuid;
   readonly number: string;
-  readonly kind: TicketKind;
+  /** null after a move out of the Bereich "Plattform". */
+  readonly kind: TicketKind | null;
   readonly title: string;
   readonly status: TicketStatus;
   readonly createdAt: IsoDateTime;
@@ -199,6 +434,8 @@ export interface MyTicketDetail extends MyTicketItem {
   readonly closedAt: IsoDateTime | null;
   /** False while a block holds back the reporter. */
   readonly canReply: boolean;
+  /** The ticket is closed for more than 14 days: a message becomes a new ticket. */
+  readonly replyOpensNew?: boolean;
 }
 
 export interface MyTicketPage {
@@ -213,6 +450,10 @@ export interface TicketPatch {
   /** Explicit null unassigns. */
   readonly assigneeId?: Uuid | null;
   readonly kind?: TicketKind;
+  /** A Kategorie of the Bereich of the ticket; explicit null clears it. */
+  readonly categoryId?: Uuid | null;
+  /** Move the ticket to this Bereich. The kind and the Kategorie go. */
+  readonly areaId?: Uuid;
   /** Only with status `rejected`. */
   readonly duplicateOfId?: Uuid;
   /** Only with status `done` or `rejected`. */
@@ -222,6 +463,7 @@ export interface TicketPatch {
 export interface TicketCounts {
   readonly new: number;
   readonly inProgress: number;
+  readonly waiting?: number;
   readonly done: number;
   readonly rejected: number;
 }
@@ -235,6 +477,8 @@ function readContext(opts: { readonly detail?: boolean }): HttpContext {
 export interface TicketQuery {
   readonly status?: readonly TicketStatus[];
   readonly kind?: readonly TicketKind[];
+  /** Only the tickets of these Bereiche. */
+  readonly area?: readonly Uuid[];
   /** A principal id, `me` or `none`. */
   readonly assignee?: string | null;
   readonly q?: string | null;
@@ -269,14 +513,55 @@ export class TicketsApiService {
     return this.http.get<MyTicketPage>(`${this.base}/tickets/mine`, { params, context: skipLoading() });
   }
 
+  /** Each Postfach of the page "Hilfe & Tickets" (`admin.ticket_mail`). */
+  adminMailboxes(): Observable<TicketMailboxList> {
+    return this.http.get<TicketMailboxList>(`${this.base}/admin/ticket-mailboxes`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** 409 `ticket_mailbox_exists`, 422 `mail_host_not_allowed`. */
+  createMailbox(areaId: Uuid, body: TicketMailboxInput): Observable<TicketMailbox> {
+    return this.http.post<TicketMailbox>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`, body);
+  }
+
+  updateMailbox(areaId: Uuid, body: Partial<TicketMailboxInput>): Observable<TicketMailbox> {
+    return this.http.patch<TicketMailbox>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`, body);
+  }
+
+  deleteMailbox(areaId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/ticket-areas/${areaId}/mailbox`);
+  }
+
+  /** Log in to both accounts of the stored Postfach. */
+  testMailbox(areaId: Uuid): Observable<TicketMailboxTest> {
+    return this.http.post<TicketMailboxTest>(
+      `${this.base}/admin/ticket-areas/${areaId}/mailbox/test`,
+      {},
+    );
+  }
+
   /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
   getMine(id: Uuid, opts: { detail?: boolean } = {}): Observable<MyTicketDetail> {
     return this.http.get<MyTicketDetail>(`${this.base}/tickets/mine/${id}`, { context: readContext(opts) });
   }
 
-  /** A message of the reporter: always public. */
-  addMyNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote> {
-    return this.http.post<TicketNote>(`${this.base}/tickets/mine/${id}/notes`, {
+  /** The Bereiche that a signed-in person can choose in the ticket dialog. */
+  reportAreas(): Observable<TicketAreaChoice[]> {
+    return this.http.get<TicketAreaChoice[]>(`${this.base}/tickets/report-areas`, { context: skipLoading() });
+  }
+
+  /** A ticket by hand for an account; the caller needs the work right in the Bereich. */
+  createManual(body: TicketManualCreate): Observable<TicketDetail> {
+    return this.http.post<TicketDetail>(`${this.base}/tickets/manual`, body);
+  }
+
+  /**
+   * A message of the reporter: always public. On a ticket that is closed for more than
+   * 14 days the answer is the new ticket that the message became.
+   */
+  addMyNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote | TicketFollowUp> {
+    return this.http.post<TicketNote | TicketFollowUp>(`${this.base}/tickets/mine/${id}/notes`, {
       body,
       ...messageFiles(files),
     });
@@ -295,9 +580,35 @@ export class TicketsApiService {
     return this.http.get<TicketCounts>(`${this.base}/tickets/counts`, { context: skipLoading() });
   }
 
-  /** The people a ticket can go to, by name. */
-  assignees(): Observable<PersonRef[]> {
-    return this.http.get<PersonRef[]>(`${this.base}/tickets/assignees`, { context: skipLoading() });
+  /** The people a ticket of the Bereich can go to, by name; without `area`: of every own Bereich. */
+  assignees(area?: Uuid): Observable<PersonRef[]> {
+    return this.http.get<PersonRef[]>(`${this.base}/tickets/assignees`, {
+      params: httpParams({ area }),
+      context: skipLoading(),
+    });
+  }
+
+  /** Every Bereich by name, each with `mine`: a ticket can move to any of them. */
+  areas(): Observable<TicketArea[]> {
+    return this.http.get<TicketArea[]>(`${this.base}/tickets/areas`, { context: skipLoading() });
+  }
+
+  /** The Bereiche of the page "Hilfe & Tickets" (`admin.site`). */
+  adminAreas(): Observable<TicketArea[]> {
+    return this.http.get<TicketArea[]>(`${this.base}/admin/ticket-areas`, { context: skipLoading() });
+  }
+
+  createArea(body: TicketAreaInput): Observable<TicketArea> {
+    return this.http.post<TicketArea>(`${this.base}/admin/ticket-areas`, body);
+  }
+
+  updateArea(id: Uuid, body: Partial<TicketAreaInput>): Observable<TicketArea> {
+    return this.http.patch<TicketArea>(`${this.base}/admin/ticket-areas/${id}`, body);
+  }
+
+  /** 409 `ticket_area_has_tickets` while the Bereich holds a ticket. */
+  deleteArea(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/ticket-areas/${id}`);
   }
 
   /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
@@ -319,9 +630,11 @@ export class TicketsApiService {
     files: MessageFiles = {},
     visibility?: TicketNoteVisibility,
     mentions?: Uuid[],
+    recipients?: TicketMailRecipients | null,
   ): Observable<TicketNote> {
     return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, {
       body,
+      ...(recipients ? { to: recipients.to, cc: recipients.cc } : {}),
       ...(mentions?.length ? { mentions } : {}),
       ...messageFiles(files),
       ...(visibility ? { visibility } : {}),
@@ -365,6 +678,27 @@ export class TicketsApiService {
   attachmentUrl(attachmentId: Uuid): string {
     return `${this.base}/attachments/${attachmentId}/download`;
   }
+
+  /** "Erneut senden": start the send of a failed mail again. */
+  resendMail(ticketId: Uuid, mailId: Uuid): Observable<TicketMail> {
+    return this.http.post<TicketMail>(`${this.base}/tickets/${ticketId}/mails/${mailId}/resend`, {});
+  }
+
+  /**
+   * "In Paperless ablegen": open the job that files one clean file of a ticket
+   * (§F/integrations/ticket-mail/002742). The answer is the file with its new state.
+   */
+  fileInPaperless(ticketId: Uuid, attachmentId: Uuid): Observable<TicketPaperlessFile> {
+    return this.http.post<TicketPaperlessFile>(
+      `${this.base}/tickets/${ticketId}/files/${attachmentId}/paperless`,
+      {},
+    );
+  }
+
+  /** The download of the full source of a mail of a ticket (`.eml`). */
+  mailSourceUrl(ticketId: Uuid, mailId: Uuid): string {
+    return `${this.base}/tickets/${ticketId}/mails/${mailId}/source`;
+  }
 }
 
 /** The query params of a ticket list. */
@@ -372,6 +706,7 @@ function queryParams(query: TicketQuery): HttpParams {
   return httpParams({
     status: query.status ?? [],
     kind: query.kind ?? [],
+    area: query.area ?? [],
     assignee: query.assignee || undefined,
     q: query.q?.trim() || undefined,
     limit: query.limit,

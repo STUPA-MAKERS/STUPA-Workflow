@@ -69,11 +69,16 @@ import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-c
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import {
-  TodoMoveSheetComponent,
+  TodoBoardSkeletonViewComponent,
+  TodoBoardViewComponent,
+  TodoListViewComponent,
+  TodoMoveSheetViewComponent,
+  boardDropId,
+  type BoardMove,
   type MoveChoice,
   type MoveColumn,
   type TileMenuRequest,
-} from '../../features/todos/move-sheet/todo-move-sheet.component';
+} from '@stupa-makers/ui-kit/views/board';
 import {
   TodoTransferDialogComponent,
   type TodoTransferTarget,
@@ -98,9 +103,6 @@ import { TodoArchivedBoardsComponent } from './archived-boards/todo-archived-boa
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
 import { TodoBoardRowsComponent, type RowDrop, type RowLead } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
-import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
-import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
-import { TodoListViewComponent } from './list-view/todo-list-view.component';
 import { TodoNewBoardDialogComponent } from './new-board-dialog/todo-new-board-dialog.component';
 import { isoDay } from '@shared/date-format';
 import { pageItemTitle } from '../../layout/page-title.service';
@@ -143,7 +145,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * Phone: "Meine To-Dos" (board view) and "Alle" are one list of board sections
  * (`app-todo-board-rows`); the personal board is the first section (`lead`), not the tab
  * board. Nothing drags there. A long press on a tile of a writable board, on these lists
- * and on the tab board, opens the "Verschieben" sheet (`app-todo-move-sheet`, the sheet
+ * and on the tab board, opens the "Verschieben" sheet (`app-todo-move-sheet-view`, the sheet
  * of the card detail): a column and its top or end move the card, "In anderes Board
  * verschieben" opens the transfer dialog.
  *
@@ -195,14 +197,14 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoArchivedBoardsComponent,
     TodoBoardPickerComponent,
     TodoBoardRowsComponent,
-    TodoBoardSkeletonComponent,
+    TodoBoardSkeletonViewComponent,
     TodoBoardSettingsComponent,
     TodoBoardViewComponent,
     TodoCardDetailComponent,
     TodoListViewComponent,
     TodoNewBoardDialogComponent,
     TodoNewDialogComponent,
-    TodoMoveSheetComponent,
+    TodoMoveSheetViewComponent,
     TodoTransferDialogComponent,
   ],
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
@@ -451,7 +453,7 @@ export class TodosComponent implements OnDestroy {
   /** The entry of the shown board in the board list: known before the board loads. */
   readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
 
-  /** The search placeholder with the number of open to-dos (§ 000661). */
+  /** The search placeholder with the number of open to-dos (§ui-kit:000661). */
   readonly searchPlaceholder = computed(() =>
     searchPlaceholder(
       this.i18n,
@@ -1087,7 +1089,7 @@ export class TodosComponent implements OnDestroy {
         if (now) this.board.set(replaceTile(now, tile));
       },
       error: (err: unknown) => {
-        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
+        this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.move')), 'error');
         if (this.board() === optimistic) this.board.set(board);
         this.resync(board.id);
       },
@@ -1108,10 +1110,12 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board) return;
     this.wrote();
-    this.api.createCard({ boardId: board.id, columnId: event.columnId, title: event.title }).subscribe({
-      next: (card) => this.onCreated(card),
-      error: () => this.toast.error(this.i18n.translate('todos.error.create')),
-    });
+    this.api
+      .createCard({ boardId: board.id, columnId: event.columnId, title: event.title })
+      .subscribe({
+        next: (card) => this.onCreated(card),
+        error: () => this.toast.show(this.i18n.translate('todos.error.create'), 'error'),
+      });
   }
 
   onCreated(card: TodoCardDetail): void {
@@ -1248,13 +1252,16 @@ export class TodosComponent implements OnDestroy {
         this.onTransferred({ card, fromBoardId: req.boardId });
         this.onCardChanged(card);
         if (!this.board()) this.refreshBoards();
-        this.toast.success(this.i18n.translate('todos.card.transferred', { board: target.boardName }));
+        this.toast.show(
+          this.i18n.translate('todos.card.transferred', { board: target.boardName }),
+          'success',
+        );
         this.tileMenu.set(null);
       },
       error: (err: unknown) => {
         this.tileTransferring.set(false);
         this.tileTransferOpen.set(false);
-        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
+        this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')), 'error');
         const board = this.board();
         if (board) this.resync(board.id);
         this.rowsView()?.refresh();
@@ -1316,7 +1323,7 @@ export class TodosComponent implements OnDestroy {
 
   /** Roll a refused drag between the board and the rows back, then read both again. */
   private transferFailed(board: TodoBoard, optimistic: TodoBoard, err: unknown): void {
-    this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
+    this.toast.show(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')), 'error');
     if (this.board() === optimistic) this.board.set(board);
     this.resync(board.id);
     this.rowsView()?.refresh();

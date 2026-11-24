@@ -1,0 +1,29 @@
+---
+id: "002743"
+title: A change of a Postfach is in the audit log
+kind: functional
+status: approved
+owner: frederikbeimgraben
+updated: 2026-11-23
+tests:
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_a_new_password_is_in_the_audit_by_name_only"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_the_switch_is_a_change_with_an_audit_entry"
+  - "backend/tests/unit/modules/tickets/test_ticket_mailbox.py:test_delete_removes_the_postfach_with_an_audit_entry"
+implementation:
+  - backend/app/modules/tickets/mailbox.py
+  - backend/app/modules/audit/actions.py
+scope:
+  - backend/app/modules/tickets
+  - frontend/src/app/pages/admin/help-tickets
+---
+
+# A change of a Postfach is in the audit log
+
+Each create, change and delete of a Postfach and each change of its switch must write an audit
+entry with the person and the changed fields. The entry must not hold a password.
+
+Reason: The Postfach decides where the mails of a team go, so a change must be traceable
+(000291).
+
+Test: A unit test changes the password and expects an entry that names the field and not the
+value.

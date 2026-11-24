@@ -38,6 +38,7 @@ import {
   TextareaComponent,
   ToastService,
   TruncatedDirective,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { problemDetail } from '@core/api/problem';
@@ -93,6 +94,7 @@ export interface AgendaTodoOption {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     TruncatedDirective,
     ScrollFadeDirective,
     FormsModule,
@@ -437,7 +439,7 @@ export class AgendaItemDialogComponent {
         this.saving.set(false);
         const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
       },
     });
   }

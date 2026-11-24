@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.notifications.links import todo_board_link, todo_link
+from app.modules.notifications.push_service import PushButton
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.texts.todos import (
@@ -115,6 +116,7 @@ async def send_todo_mail(
             str(mail.event_id),
         ),
         link=todo_link(settings, card.id),
+        push_buttons=(PushButton("todo_done", target_id=card.id),),
     )
 
 
@@ -201,4 +203,5 @@ async def send_todo_due(
         context={"cardTitle": card.title, "boardName": board.name, "dueDate": due.isoformat()},
         idempotency_parts=(TODO_DUE_KEY, str(card.id), due.isoformat()),
         link=todo_link(settings, card.id),
+        push_buttons=(PushButton("todo_done", target_id=card.id),),
     )

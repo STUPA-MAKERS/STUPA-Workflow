@@ -137,6 +137,10 @@ const MOCK_PRINCIPAL: Principal = {
     'flow.configure',
     'webhook.manage',
     'admin.calendars',
+    'admin.paperless',
+    'admin.features',
+    'admin.ticket_mail',
+    'paperless.use',
     'calendar.manage',
     'calendar.publish',
     'admin.users',
@@ -1734,6 +1738,29 @@ function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
 
 let MOCK_MEDIA_SEQ = 0;
 
+/** The documents of the mock Paperless (§F/integrations/paperless/002534), the newest first. */
+const MOCK_PAPERLESS_HITS = [
+  { documentId: 418, title: 'Angebot Beamer Hörsaal 3', documentType: 'Angebot', created: '2026-11-18' },
+  { documentId: 417, title: 'Zuwendungsbescheid Sommerfest', documentType: 'Bescheid', created: '2026-11-12' },
+  { documentId: 415, title: 'Mietvertrag Lastenrad', documentType: 'Vertrag', created: '2026-10-30' },
+  { documentId: 409, title: 'Stellungnahme Rechtsaufsicht', documentType: null, created: '2026-10-02' },
+  { documentId: 398, title: 'Kassenprüfbericht 2025', documentType: 'Bericht', created: '2026-09-15' },
+];
+
+/** The mock search: the documents whose title holds the query. */
+export function mockPaperlessSearch(query: string) {
+  const wanted = query.trim().toLowerCase();
+  return MOCK_PAPERLESS_HITS.filter((hit) => hit.title.toLowerCase().includes(wanted));
+}
+
+/** The answer to a copy from Paperless: an embedded PDF with the title as its name. */
+export function mockPaperlessCopy(body: unknown) {
+  const documentId = (body as { documentId?: number } | null)?.documentId;
+  const hit = MOCK_PAPERLESS_HITS.find((h) => h.documentId === documentId);
+  const id = `00000000-0000-4000-8000-${String(++MOCK_MEDIA_SEQ).padStart(12, '0')}`;
+  return { id, url: `/api/media/documents/${id}`, name: `${hit?.title ?? 'Dokument'}.pdf`, size: 48_213, pages: 3 };
+}
+
 /** The answer to a Markdown image upload. The mock keeps no bytes, so the image does not
  *  load in the mock mode; the reference in the text is real. */
 export function mockMediaImage(body: unknown): MediaImage {
@@ -1966,6 +1993,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/me/profile')) {
       return ok(MOCK_PROFILE);
     }
+    if (p.endsWith('/paperless/insert')) return ok({ enabled: true, linkEnabled: true });
+    if (p.endsWith('/paperless/search')) return ok(mockPaperlessSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/auth/me')) {
       return mockAnonymous()
         ? throwError(() => new HttpErrorResponse({ status: 401, url: req.url }))
@@ -2161,6 +2190,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
     if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);
     if (p.endsWith('/media/images')) return ok(mockMediaImage(req.body), 201);
+    if (p.endsWith('/documents/paperless')) return ok(mockPaperlessCopy(req.body), 201);
     if (p.endsWith('/invoices/parse')) {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
       const name = file instanceof File ? file.name : 'rechnung.pdf';

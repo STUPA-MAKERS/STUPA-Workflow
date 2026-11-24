@@ -163,7 +163,7 @@
     [class.td__body--rows]="all() || phoneList() || view() === 'list' || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {
       @if (rowMatches() === null) {
-        <app-todo-board-skeleton
+        <app-todo-board-skeleton-view
           animate.enter="motion-fade-in"
           [view]="phone() ? 'rows' : 'board'"
           [phone]="phone()"
@@ -190,7 +190,7 @@
         (transferred)="onRowTransferred()"
       />
     } @else if (loading()) {
-      <app-todo-board-skeleton
+      <app-todo-board-skeleton-view
         animate.enter="motion-fade-in"
         [view]="phoneList() ? 'rows' : view()"
         [phone]="phone()"
@@ -203,7 +203,7 @@
       <app-empty-state plain icon="circleok" fill [heading]="'todos.notFound' | t" />
     } @else if (error()) {
       <div class="td__state">
-        <app-load-error [message]="'todos.error.load' | t" (retry)="reload()" />
+        <app-load-error face [message]="'todos.error.load' | t" (retry)="reload()" />
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {
@@ -306,7 +306,7 @@
 
 @if (phone()) {
   <p class="sr-only" aria-live="assertive">{{ tileSaid() }}</p>
-  <app-todo-move-sheet
+  <app-todo-move-sheet-view
     [(open)]="tileMenuOpen"
     [columns]="tileColumns()"
     [current]="tileMenu()?.card?.columnId ?? null"

@@ -107,7 +107,7 @@ function links(container: Element): string[] {
   );
 }
 
-describe('AdminListComponent (spec 001480, 001481)', () => {
+describe('AdminListComponent (spec 001480, 001481, ui-kit:000193)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('is an ordinary list/detail page: the list in the list slot, the page in the detail', async () => {
@@ -222,6 +222,20 @@ describe('AdminListComponent (spec 001480, 001481)', () => {
     expect(screen.queryByRole('heading', { name: 'Verwaltung', level: 1 })).toBeNull();
   });
 
+  it('rounds the top corners of the page body only while it is scrolled down (ui-kit:000193)', async () => {
+    const view = await setup(ALL);
+    const body = view.container.querySelector<HTMLElement>('.adl__body')!;
+    expect(body).not.toHaveAttribute('data-scrolled');
+    Object.defineProperty(body, 'scrollTop', { configurable: true, value: 40 });
+    body.dispatchEvent(new Event('scroll'));
+    view.fixture.detectChanges();
+    expect(body).toHaveAttribute('data-scrolled');
+    Object.defineProperty(body, 'scrollTop', { configurable: true, value: 0 });
+    body.dispatchEvent(new Event('scroll'));
+    view.fixture.detectChanges();
+    expect(body).not.toHaveAttribute('data-scrolled');
+  });
+
   it('one pane at a time: no fill and no crumb root', async () => {
     const view = await setup(ALL, '/admin/users', false);
     const injector = view.fixture.debugElement.injector;
@@ -244,6 +258,18 @@ describe('AdminListComponent in account mode', () => {
   it('shows "API-Zugang" only with mcp.use, like the account menu', async () => {
     const view = await setup([], '/account', true, 'account');
     expect(links(view.container)).toEqual(['/account/profile', '/account/notifications']);
+  });
+
+  it('names push under "Benachrichtigungen" only while the feature push is on', async () => {
+    await setup([], '/account', true, 'account');
+    expect(screen.getByText('Mail und Push je Anlass ein- und ausschalten')).toBeInTheDocument();
+  });
+
+  it('names only the mails while the feature push is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['push']));
+    await setup([], '/account', true, 'account');
+    localStorage.removeItem('ap.features.off');
+    expect(screen.getByText('E-Mails je Anlass ein- und ausschalten')).toBeInTheDocument();
   });
 
   it('leads an account page back to /account', async () => {

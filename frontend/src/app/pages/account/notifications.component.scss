@@ -1,27 +1,3 @@
 :host {
   display: block;
 }
-
-.nt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.nt__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.nt__row {
-  display: flex;
-  align-items: center;
-}
-.nt__row app-switch {
-  flex: 1 1 auto;
-}
-
-.nt__label {
-  font-weight: var(--fw-medium);
-}

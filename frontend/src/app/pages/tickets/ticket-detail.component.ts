@@ -7,14 +7,15 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { type Observable, map, tap } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { EMPTY, type Observable, map, mergeMap, of, tap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -24,9 +25,13 @@ import {
   TicketsApiService,
   type MyTicketDetail,
   type TicketAttachment,
+  type TicketPaperlessFile,
   type TicketDetail,
+  type TicketMail,
+  type TicketMailRecipients,
   type TicketKind,
   type TicketListItem,
+  type TicketFollowUp,
   type TicketNote,
   type TicketPatch,
   type TicketReporter,
@@ -40,6 +45,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
+  ChatAttachment,
   ChatEdit,
   ChatEvent,
   ChatMessage,
@@ -52,6 +58,7 @@ import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import {
   ButtonComponent,
+  ButtonLinkComponent,
   ButtonGroupComponent,
   CheckboxComponent,
   DialogComponent,
@@ -80,6 +87,8 @@ import {
   TabsComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
+  type IconName,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -89,14 +98,26 @@ import {
 } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TicketsPageService } from './tickets-page.service';
 import {
-  KIND_ICON,
   KIND_LABEL,
   STATUS_KIND,
+  MAIL_SOURCE_NAME,
+  SOURCE_LABEL,
   STATUS_LABEL,
+  areaOf,
+  categoryName,
   eventText,
+  addressesValid,
+  mailSourceScan,
+  parseAddresses,
+  recipientsText,
+  sentLine,
+  skippedLine,
+  uncheckedLine,
+  withSkipped,
   isOpen,
   reporterEventText,
   reporterName,
+  ticketIcon,
 } from './tickets.util';
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
@@ -110,6 +131,16 @@ interface ContextRow {
   readonly label: TranslationKey;
   readonly value: string;
   readonly href?: string;
+}
+
+/** The wait before the page reads a ticket with a waiting mail again. */
+export const MAIL_STATE_POLL_MS = 10_000;
+
+/** The chat state of a message from the state of its mail; none for a sent or no mail. */
+export function mailChatState(mail: TicketMail | undefined): { readonly state?: 'sending' | 'failed' } {
+  return mail?.direction === 'out' && (mail.state === 'sending' || mail.state === 'failed')
+    ? { state: mail.state }
+    : {};
 }
 
 /** The fragment of a link to one note: `#note-<id>`. */
@@ -136,6 +167,25 @@ export function blockErrorKey(err: unknown): TranslationKey {
   return (code && BLOCK_ERROR[code]) || 'tickets.detail.error.block';
 }
 
+/** A note under the header of the detail, with the ticket it names. */
+export interface TicketHint {
+  readonly icon: IconName;
+  readonly text: string;
+  readonly ref: { readonly id: Uuid; readonly number: string } | null;
+}
+
+/**
+ * The writer of the ticket body. A sender without an account (a mail, a report without a
+ * login) is a person with a name and no id, as in the later messages of the same sender, so
+ * each message of the sender has the avatar and the same indent. An anonymized ticket has
+ * no writer.
+ */
+export function bodyAuthor(reporter: TicketReporter): ChatMessage['author'] {
+  const displayName = reporter.displayName ?? reporter.email ?? null;
+  if (reporter.principalId) return { principalId: reporter.principalId, displayName };
+  return displayName ? { principalId: null, displayName } : null;
+}
+
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
 
@@ -150,9 +200,12 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   return {
     id: m.id,
     number: m.number,
+    areaId: '',
     kind: m.kind,
+    categoryId: null,
     title: m.title,
     status: m.status,
+    source: 'help',
     reporter,
     assignee: null,
     createdAt: m.createdAt,
@@ -175,19 +228,27 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
  * The detail of a ticket in the geometry of the
  * application detail: a header with the state, the kind and the assignee and the main
  * actions ("Erledigt", "Ablehnen"), then side by side the thread "Verlauf" (`app-chat`:
- * the report, the internal notes and the events) and "Details" (reporter, assignee, kind,
- * the linked to-dos, the technical context). One pane at a time the two are tabs.
+ * the report, the internal notes and the events) and "Details" (reporter, assignee,
+ * Bereich, Kategorie, the linked to-dos, the technical context). One pane at a time the
+ * two are tabs.
+ *
+ * A ticket of the Bereich "Plattform" has one of the four kinds as its Kategorie; a
+ * ticket of another Bereich has a Kategorie of that Bereich or none. The select
+ * "Bereich" moves the ticket to any other Bereich. The server then clears the Kategorie,
+ * and the assignee when that person does not work there. After a move to a Bereich in
+ * which the viewer does not work the page goes back to the list, because the ticket
+ * then answers 404. The assignee select and the "@" list hold the team of the Bereich.
  *
  * A note of the team is internal or public; the composer offers the switch (internal
  * first) when an account reported the ticket, because only an account reads a public
  * note. A note takes up to 5 files (not on an anonymized ticket).
  *
- * Without `ticket.manage` the page is the view of the reporter on an own ticket (`/tickets/mine`):
+ * Without a Bereich to work in the page is the view of the reporter on an own ticket (`/tickets/mine`):
  * the report, the public notes and the status changes, the own messages, the kind and the report
  * time. No actions, no menu, no assignee, no to-dos, no technical context. A block of the sender
  * hides the composer. Closing a ticket with open to-dos asks "Offene To-Dos mit erledigen?"
- * (default yes). The ⋮ menu blocks or unblocks the sender at once, with a toast and no question;
- * the own report offers no block. While a file of the report or a note is in the scan, the chat
+ * (default yes). With `ticket.manage` the ⋮ menu blocks or unblocks the sender at once, with a
+ * toast and no question; the own report offers no block. While a file of the report or a note is in the scan, the chat
  * asks for the thread again (`refreshThread`), and only the scan states of that read change the
  * page.
  *
@@ -199,6 +260,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadErrorComponent,
     SectionComponent,
     FormsModule,
@@ -207,6 +269,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
+    ButtonLinkComponent,
     ButtonGroupComponent,
     ChatComponent,
     CheckboxComponent,
@@ -242,6 +305,7 @@ export class TicketDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly page = inject(TicketsPageService, { optional: true });
   private readonly injector = inject(Injector);
   /** The status buttons: a close or a reopen swaps them, so the focus moves to the new one. */
@@ -249,9 +313,11 @@ export class TicketDetailComponent {
 
   readonly split = computed(() => this.page?.split() ?? false);
   /** The team view; else the view of the reporter on an own ticket. */
-  readonly manager = this.auth.can('ticket.manage');
+  readonly manager = this.auth.worksOnTickets();
   /** The reporter may write: false while a block holds back the sender. */
   readonly canReply = signal(true);
+  /** The own ticket is closed for more than 14 days: a message becomes a new ticket. */
+  readonly replyOpensNew = signal(false);
   readonly phone = mediaQuery(MEDIA.phone);
 
   private id: Uuid = '';
@@ -265,8 +331,10 @@ export class TicketDetailComponent {
   readonly notes = signal<readonly TicketNote[]>([]);
   readonly todos = signal<TodoLinkedCard[]>([]);
   readonly assignees = signal<PersonRef[]>([]);
-  /** A change in flight: the state, the assignee or the kind. */
-  readonly saving = signal<'status' | 'assignee' | 'kind' | null>(null);
+  /** The Bereich whose team `assignees` holds. */
+  private assigneesOf: Uuid | null = null;
+  /** A change in flight: the state, the assignee, the Kategorie or the Bereich. */
+  readonly saving = signal<'status' | 'assignee' | 'kind' | 'area' | null>(null);
   readonly tab = signal<DetailTab>('log');
 
   /** The done question: the state to set, and whether the to-dos go along. */
@@ -286,7 +354,7 @@ export class TicketDetailComponent {
   readonly todoOpen = signal(false);
   /** A to-do of the ticket starts on the team board of `ticket.manage`, else the personal one. */
   readonly todoBoardKinds: readonly TodoBoardKind[] = ['team', 'personal'];
-  /** The link of a new to-do to this ticket: "Ticket · T-0040 Titel". */
+  /** The link of a new to-do to this ticket: "Ticket · T-7K3QX9MD Titel". */
   readonly todoLinks = computed<NewTodoLink[]>(() => {
     const t = this.ticket();
     if (!t) return [];
@@ -314,8 +382,52 @@ export class TicketDetailComponent {
 
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
   readonly statusLabel = computed(() => this.t(STATUS_LABEL[this.ticket()?.status ?? 'new']));
-  readonly kindLabel = computed(() => this.t(KIND_LABEL[this.ticket()?.kind ?? 'bug']));
-  readonly kindIcon = computed(() => KIND_ICON[this.ticket()?.kind ?? 'bug']);
+  /** Every Bereich, from the list page; empty while they load and for the reporter. */
+  readonly areas = computed(() => this.page?.areas() ?? []);
+  readonly area = computed(() => {
+    const t = this.ticket();
+    return t ? areaOf(t.areaId, this.areas()) : null;
+  });
+  /** The ticket has a kind as its Kategorie: a ticket of "Plattform". */
+  readonly hasKind = computed(() => !!this.ticket()?.kind);
+  /** The Kategorie by name; the empty string without one. */
+  readonly categoryLabel = computed(() => {
+    const t = this.ticket();
+    return t ? categoryName(t, this.areas(), this.t) : '';
+  });
+  /** The parts of the header line after the number: the Bereich, the Kategorie, the assignee. */
+  readonly lineParts = computed(() => [
+    ...(this.canMove() && this.area() ? [this.area()!.name] : []),
+    ...(this.categoryLabel() ? [this.categoryLabel()] : []),
+    ...(this.manager ? [this.assigneeName()] : []),
+  ]);
+  readonly sourceLabel = computed(() => this.t(SOURCE_LABEL[this.ticket()?.source ?? 'help']));
+  /**
+   * The notes under the header: the ticket that this one duplicates or follows, and for
+   * the reporter that a message on a ticket closed long ago becomes a new ticket.
+   */
+  readonly hints = computed<readonly TicketHint[]>(() => {
+    const t = this.ticket();
+    if (!t) return [];
+    return [
+      ...(t.duplicateOf ? [{ icon: 'copy' as const, text: this.t('tickets.detail.duplicateOf'), ref: t.duplicateOf }] : []),
+      ...(t.followUpOf ? [{ icon: 'history' as const, text: this.t('tickets.detail.followUpOf'), ref: t.followUpOf }] : []),
+      ...(!this.manager && this.replyOpensNew() && this.canReply()
+        ? [{ icon: 'info' as const, text: this.t('tickets.detail.replyOpensNew'), ref: null }]
+        : []),
+    ];
+  });
+  readonly kindLabel = computed(() => this.categoryLabel() || this.t('tickets.detail.noCategory'));
+  readonly kindIcon = computed(() => ticketIcon(this.ticket()?.kind ?? null));
+  /** The select "Bereich" shows with a second Bereich to move to. */
+  readonly canMove = computed(() => this.manager && this.areas().length > 1);
+  readonly areaOptions = computed<FilterSelectOption[]>(() =>
+    this.areas().map((a) => ({ value: a.id, label: a.name })),
+  );
+  readonly categoryOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.t('tickets.detail.noCategory') },
+    ...(this.area()?.categories ?? []).map((c) => ({ value: c.id, label: c.name })),
+  ]);
   readonly assigneeName = computed(() => {
     const a = this.ticket()?.assignee;
     return a ? personName(a, this.t) : this.t('tickets.detail.unassigned');
@@ -331,19 +443,25 @@ export class TicketDetailComponent {
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();
     if (!t || !this.manager) return [];
-    const reset: RowMenuSection[] =
-      t.status !== 'new'
-        ? [{ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] }]
-        : [];
+    const reset: RowMenuItem[] =
+      t.status !== 'new' ? [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] : [];
+    const wait: RowMenuItem[] =
+      t.status === 'waiting'
+        ? [{ id: 'progress', label: this.t('tickets.detail.setInProgress'), icon: 'play' }]
+        : isOpen(t.status)
+          ? [{ id: 'wait', label: this.t('tickets.detail.setWaiting'), icon: 'clock' }]
+          : [];
     const duplicate: RowMenuItem[] = isOpen(t.status)
       ? [{ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' }]
       : [];
     const blockItem: RowMenuItem = t.senderBlocked
       ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
       : { id: 'block', label: this.t('tickets.detail.blockSender'), icon: 'lock' };
-    const block = !t.anonymizedAt && !this.ownReport(t.reporter) ? [blockItem] : [];
+    const mayBlock = this.auth.can('ticket.manage') && !t.anonymizedAt && !this.ownReport(t.reporter);
+    const block = mayBlock ? [blockItem] : [];
     const apart = [...duplicate, ...block];
-    return [...reset, ...(apart.length ? [{ items: apart }] : [])];
+    const states = [...wait, ...reset];
+    return [...(states.length ? [{ items: states }] : []), ...(apart.length ? [{ items: apart }] : [])];
   });
 
   readonly tabs = computed<TabItem[]>(() => [
@@ -374,7 +492,31 @@ export class TicketDetailComponent {
   /** The visibility switch of the team composer: only an account reads a public note. */
   readonly visibilityOptions = computed<readonly ChatVisibility[]>(() => {
     const t = this.ticket();
-    return this.manager && t && t.reporter.principalId && !t.anonymizedAt ? TEAM_VISIBILITIES : [];
+    return this.manager && t && (t.reporter.principalId || t.mailAnswer) && !t.anonymizedAt
+      ? TEAM_VISIBILITIES
+      : [];
+  });
+
+  /** The recipients of a public message on a mail ticket; null on another ticket. */
+  readonly mailAnswer = computed(() => (this.manager ? (this.ticket()?.mailAnswer ?? null) : null));
+  /** The recipients that the writer chose for the next public message. */
+  private readonly chosenRecipients = signal<TicketMailRecipients | null>(null);
+  readonly recipients = computed<TicketMailRecipients | null>(
+    () => this.chosenRecipients() ?? this.mailAnswer(),
+  );
+  readonly recipientsLine = computed(() => {
+    const r = this.recipients();
+    return r ? recipientsText(r.to, r.cc, this.t) : '';
+  });
+  readonly recipientsOpen = signal(false);
+  readonly recipientsDraft = signal({ to: '', cc: '' });
+  /** The person tried to save the recipients: a wrong address shows its error. */
+  readonly recipientsTried = signal(false);
+  readonly recipientsError = computed<TranslationKey | null>(() => {
+    const draft = this.recipientsDraft();
+    const to = parseAddresses(draft.to);
+    if (!to.length) return 'tickets.mail.recipients.toMissing';
+    return addressesValid([...to, ...parseAddresses(draft.cc)]) ? null : 'tickets.mail.recipients.invalid';
   });
 
   readonly placeholder = computed<TranslationKey>(() =>
@@ -387,55 +529,101 @@ export class TicketDetailComponent {
   private readonly outbox = new ChatOutbox<TicketNote>(
     (req) =>
       this.manager
-        ? this.api.addNote(this.id, req.body, req, req.visibility, req.mentions)
-        : this.api.addMyNote(this.id, req.body, req),
-    (created) => this.notes.update((list) => appendOnce(list, created)),
+        ? this.api.addNote(
+            this.id,
+            req.body,
+            req,
+            req.visibility,
+            req.mentions,
+            req.visibility === 'public' ? this.chosenRecipients() : null,
+          )
+        : this.api.addMyNote(this.id, req.body, req).pipe(mergeMap((sent) => this.sentByReporter(sent))),
+    (created) => {
+      this.notes.update((list) => appendOnce(list, created));
+      if (created.visibility === 'public' && this.mailAnswer()) this.reload();
+    },
     (err) =>
-      this.toast.error(
+      this.toast.show(
         this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
+        'error',
       ),
     draftDropper(this.files),
   );
 
-  /** The "@" list of the staff: the holders of `ticket.manage`. The reporter gets none. */
+  /** The "@" list of the staff: the team of the Bereich. The reporter gets none. */
   readonly mentionables = computed(() => (this.manager ? chatPeople(this.assignees()) : []));
 
   readonly messages = computed<ChatMessage[]>(() => {
     const t = this.ticket();
     if (!t) return [];
+    const locale = this.i18n.formatLocale();
+    const mails = (t.mails ?? []).filter((m) => !m.automatic);
+    const first = mails.find((m) => m.noteId === null && m.direction === 'in');
+    const byNote = new Map(mails.filter((m) => m.noteId).map((m) => [m.noteId, m]));
     const body: ChatMessage = {
       id: BODY_ID,
-      author: t.reporter.principalId
-        ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
-        : null,
+      author: bodyAuthor(t.reporter),
       authorLabel: this.manager ? this.reporter() : null,
-      body: t.body,
+      body: withSkipped(
+        withSkipped(t.body, skippedLine(first, locale, this.t)),
+        uncheckedLine(first, this.t),
+      ),
       at: t.createdAt,
       own: !this.manager,
       canEdit: false,
       visibility: this.visibilityOptions().length ? 'public' : null,
-      attachments: t.attachments.map((a) => ({
-        id: a.id,
-        filename: a.filename,
-        mime: a.mime,
-        size: a.size,
-        url: this.api.attachmentUrl(a.id),
-        scanState: reportScanState(a),
-      })),
+      attachments: [
+        ...t.attachments.map((a) => ({
+          id: a.id,
+          filename: a.filename,
+          mime: a.mime,
+          size: a.size,
+          url: this.api.attachmentUrl(a.id),
+          scanState: reportScanState(a),
+        })),
+        ...this.sourceFiles(first),
+      ],
     };
     const notes = this.notes().map<ChatMessage>((n) => ({
       id: n.id,
       author: n.author,
-      body: n.body,
+      body: withSkipped(
+        withSkipped(
+          withSkipped(n.body, skippedLine(byNote.get(n.id), locale, this.t)),
+          uncheckedLine(byNote.get(n.id), this.t),
+        ),
+        sentLine(byNote.get(n.id), this.t),
+      ),
+      ...mailChatState(byNote.get(n.id)),
       at: n.at,
       editedAt: n.editedAt,
       own: n.isOwn,
-      attachments: toChatAttachments(this.apiBase, n.attachments),
+      attachments: [
+        ...toChatAttachments(this.apiBase, n.attachments),
+        ...this.sourceFiles(byNote.get(n.id)),
+      ],
       visibility: this.manager ? (n.visibility ?? 'internal') : null,
       mentions: n.mentions,
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
+
+  /** The source of a mail as a file of its message; none once the source is gone. */
+  private sourceFiles(mail: TicketMail | undefined): ChatAttachment[] {
+    const t = this.ticket();
+    const scanState = mail ? mailSourceScan(mail) : null;
+    if (!t || !mail || !scanState) return [];
+    return [
+      {
+        id: mail.id,
+        filename: MAIL_SOURCE_NAME,
+        mime: 'message/rfc822',
+        size: mail.sourceSize,
+        url: this.api.mailSourceUrl(t.id, mail.id),
+        scanState,
+      },
+    ];
+  }
 
   readonly events = computed<ChatEvent[]>(() => {
     const t = this.ticket();
@@ -478,13 +666,53 @@ export class TicketDetailComponent {
     };
   });
 
+  /**
+   * The clean files of the ticket for "In Paperless ablegen"; empty without `paperless.use`,
+   * while the connection is off and for a reporter (§F/integrations/ticket-mail/002742).
+   */
+  protected readonly paperlessFiles = computed<readonly TicketPaperlessFile[]>(() =>
+    this.manager ? (this.ticket()?.paperless?.files ?? []) : [],
+  );
+
+  /** "In Paperless ablegen": open the job of one file and show its new state at once. */
+  fileInPaperless(file: TicketPaperlessFile): void {
+    const t = this.ticket();
+    if (!t) return;
+    this.api.fileInPaperless(t.id, file.id).subscribe({
+      next: (filed) => {
+        const cur = this.ticket();
+        if (!cur?.paperless || cur.id !== t.id) return;
+        const files = cur.paperless.files.map((f) => (f.id === filed.id ? filed : f));
+        this.ticket.set({ ...cur, paperless: { files } });
+      },
+      error: () => this.toast.show(this.t('tickets.paperless.error'), 'error'),
+    });
+  }
+
   constructor() {
     pageItemTitle(() => this.ticket()?.title);
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
-    if (!this.manager) return;
-    this.api.assignees().subscribe({
-      next: (list) => this.assignees.set(list),
-      error: () => this.assignees.set([]),
+    effect((onCleanup) => {
+      const sending = this.ticket()?.mails?.some((m) => m.state === 'sending') ?? false;
+      const filing = this.paperlessFiles().some((f) => f.state === 'pending');
+      if (!sending && !filing) return;
+      const timer = setTimeout(() => this.reload(), MAIL_STATE_POLL_MS);
+      onCleanup(() => clearTimeout(timer));
+    });
+  }
+
+  /** Read the team of the Bereich of the ticket, once per Bereich. */
+  private loadAssignees(areaId: Uuid): void {
+    if (!this.manager || !areaId || areaId === this.assigneesOf) return;
+    this.assigneesOf = areaId;
+    this.assignees.set([]);
+    this.api.assignees(areaId).subscribe({
+      next: (list) => {
+        if (areaId === this.assigneesOf) this.assignees.set(list);
+      },
+      error: () => {
+        if (areaId === this.assigneesOf) this.assigneesOf = null;
+      },
     });
   }
 
@@ -500,6 +728,7 @@ export class TicketDetailComponent {
     if (opened) {
       this.id = id;
       this.outbox.clear();
+      this.chosenRecipients.set(null);
       this.ticket.set(null);
       this.todos.set([]);
       this.loading.set(true);
@@ -534,7 +763,10 @@ export class TicketDetailComponent {
       anonymized: false,
     };
     return this.api.getMine(id, { detail }).pipe(
-      tap((m) => this.canReply.set(m.canReply)),
+      tap((m) => {
+        this.canReply.set(m.canReply);
+        this.replyOpensNew.set(!!m.replyOpensNew);
+      }),
       map((m) => fromMine(m, me)),
     );
   }
@@ -572,6 +804,7 @@ export class TicketDetailComponent {
   private show(t: TicketDetail): void {
     this.ticket.set(t);
     this.notes.set(t.notes);
+    this.loadAssignees(t.areaId);
     this.showLinkedNote();
   }
 
@@ -613,6 +846,8 @@ export class TicketDetailComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'reset') this.patch({ status: 'new' }, 'status');
+    if (item.id === 'wait') this.patch({ status: 'waiting' }, 'status');
+    if (item.id === 'progress') this.patch({ status: 'in_progress' }, 'status');
     if (item.id === 'duplicate') {
       this.duplicateSearch.clear();
       this.duplicateHits.set([]);
@@ -631,13 +866,14 @@ export class TicketDetailComponent {
         this.blocking.set(false);
         if (id !== this.id) return;
         this.ticket.set(t);
-        this.toast.success(
+        this.toast.show(
           this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
+          'success',
         );
       },
       error: (err: unknown) => {
         this.blocking.set(false);
-        this.toast.error(this.t(blockErrorKey(err)));
+        this.toast.show(this.t(blockErrorKey(err)), 'error');
       },
     });
   }
@@ -656,8 +892,8 @@ export class TicketDetailComponent {
     const t = this.ticket();
     const title = t ? `${t.number} ${t.title}` : undefined;
     const outcome = await shareOrCopy({ url: location.href.split('?')[0], title });
-    if (outcome === 'copied') this.toast.success(this.t('tickets.detail.linkCopied'));
-    else if (outcome === 'failed') this.toast.error(this.t('tickets.detail.linkFailed'));
+    if (outcome === 'copied') this.toast.show(this.t('tickets.detail.linkCopied'), 'success');
+    else if (outcome === 'failed') this.toast.show(this.t('tickets.detail.linkFailed'), 'error');
   }
 
   /** "Erledigt" or "Ablehnen". With open to-dos the dialog asks first. */
@@ -725,7 +961,30 @@ export class TicketDetailComponent {
     this.patch({ kind: value as TicketKind }, 'kind');
   }
 
-  private patch(body: TicketPatch, what: 'status' | 'assignee' | 'kind', todos = false): void {
+  setCategory(value: string): void {
+    if (value === (this.ticket()?.categoryId ?? '')) return;
+    this.patch({ categoryId: value || null }, 'kind');
+  }
+
+  /**
+   * Move the ticket to another Bereich. In a Bereich in which the viewer does not work
+   * the ticket answers 404 from then on, so the page goes back to the list.
+   */
+  setArea(value: string): void {
+    const target = areaOf(value, this.areas());
+    if (!target || value === this.ticket()?.areaId) return;
+    this.patch({ areaId: value }, 'area', false, () => {
+      this.toast.show(this.t('tickets.detail.moved', { name: target.name }), 'success');
+      if (!target.mine) void this.router.navigate(['/tickets'], { queryParamsHandling: 'preserve' });
+    });
+  }
+
+  private patch(
+    body: TicketPatch,
+    what: 'status' | 'assignee' | 'kind' | 'area',
+    todos = false,
+    done?: () => void,
+  ): void {
     if (this.saving()) return;
     const id = this.id;
     this.saving.set(what);
@@ -738,10 +997,11 @@ export class TicketDetailComponent {
         if (what === 'status' && wasOpen !== this.open()) this.focusActions();
         this.page?.notify(id);
         if (todos) this.loadTodos();
+        done?.();
       },
       error: (err: unknown) => {
         this.saving.set(null);
-        this.toast.error(this.t(this.patchError(err)));
+        this.toast.show(this.t(this.patchError(err)), 'error');
       },
     });
   }
@@ -759,6 +1019,19 @@ export class TicketDetailComponent {
     );
   }
 
+  /**
+   * The answer to a message of the reporter. A message on a ticket that is closed for
+   * more than 14 days became a new ticket: the page opens it, and the outbox of the old
+   * ticket clears with the change of the thread.
+   */
+  private sentByReporter(sent: TicketNote | TicketFollowUp): Observable<TicketNote> {
+    if (!('followUp' in sent)) return of(sent);
+    this.toast.show(this.t('tickets.detail.followUpCreated', { number: sent.followUp.number }), 'success');
+    this.page?.notify(sent.followUp.id);
+    void this.router.navigate(['/tickets', sent.followUp.id], { queryParamsHandling: 'preserve' });
+    return EMPTY;
+  }
+
   /** A block that the team set while the reporter had the ticket open closes the composer. */
   private blockedKey(err: unknown): TranslationKey | null {
     const code =
@@ -767,6 +1040,8 @@ export class TicketDetailComponent {
       this.canReply.set(false);
       return 'tickets.detail.error.blocked';
     }
+    if (code === 'mailbox_off') return 'tickets.mail.off';
+    if (code === 'mail_without_recipient') return 'tickets.mail.recipients.toMissing';
     return null;
   }
 
@@ -782,12 +1057,58 @@ export class TicketDetailComponent {
     this.outbox.send(req);
   }
 
+  /** "Erneut senden": a message of the outbox, or the failed mail of a stored message. */
   retryNote(ref: ChatRef): void {
-    this.outbox.retry(ref.id);
+    const mail = this.failedMail(ref.id);
+    if (!mail) {
+      this.outbox.retry(ref.id);
+      return;
+    }
+    this.api.resendMail(this.id, mail.id).subscribe({
+      next: () => this.reload(),
+      error: (err: unknown) =>
+        this.toast.show(this.t(sendErrorKey(err, 'tickets.mail.error.resend')), 'error'),
+    });
   }
 
+  /** "Verwerfen": a message of the outbox, or the stored message whose mail failed. */
   discardNote(ref: ChatRef): void {
-    this.outbox.discard(ref.id);
+    if (this.failedMail(ref.id)) this.deleteNote(ref);
+    else this.outbox.discard(ref.id);
+  }
+
+  private failedMail(noteId: string): TicketMail | undefined {
+    return this.ticket()?.mails?.find((m) => m.noteId === noteId && m.state === 'failed');
+  }
+
+  openRecipients(): void {
+    const r = this.recipients();
+    this.recipientsDraft.set({ to: (r?.to ?? []).join(', '), cc: (r?.cc ?? []).join(', ') });
+    this.recipientsTried.set(false);
+    this.recipientsOpen.set(true);
+  }
+
+  saveRecipients(): void {
+    this.recipientsTried.set(true);
+    if (this.recipientsError()) return;
+    const draft = this.recipientsDraft();
+    const to = parseAddresses(draft.to);
+    this.chosenRecipients.set({ to, cc: parseAddresses(draft.cc).filter((a) => !to.includes(a)) });
+    this.recipientsOpen.set(false);
+  }
+
+  /** Read the ticket again without the loading state, for the states of its mails. */
+  private reload(): void {
+    const id = this.id;
+    const seq = this.seq;
+    this.read(id).subscribe({
+      next: (t) => {
+        if (id !== this.id || seq !== this.seq) return;
+        this.ticket.set(t);
+        this.notes.set(t.notes);
+      },
+      error: () => undefined,
+    });
   }
 
   editNote(change: ChatEdit): void {
@@ -799,7 +1120,7 @@ export class TicketDetailComponent {
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
       error: (err: unknown) => {
         change.restore?.();
-        this.toast.error(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'));
+        this.toast.show(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'), 'error');
       },
     });
   }
@@ -811,7 +1132,7 @@ export class TicketDetailComponent {
       : this.api.deleteMyNote(this.id, ref.id);
     remove.subscribe({
       next: () => this.notes.update((list) => list.filter((x) => x.id !== ref.id)),
-      error: () => this.toast.error(this.t('tickets.detail.error.note')),
+      error: () => this.toast.show(this.t('tickets.detail.error.note'), 'error'),
     });
   }
 

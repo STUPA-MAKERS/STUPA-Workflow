@@ -8,6 +8,7 @@ import {
   AGENDA_REFRESH_SPREAD_MS,
   MeetingAgendaService,
 } from './meeting-agenda.service';
+import { toastMock } from '../../../testing/toast';
 
 const item = (body: string): AgendaItem => ({
   id: 't-1',
@@ -47,7 +48,7 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
       providers: [
         MeetingAgendaService,
         { provide: ApiClient, useValue: api },
-        { provide: ToastService, useValue: { error: jest.fn() } },
+        { provide: ToastService, useValue: toastMock() },
       ],
     });
     svc = TestBed.inject(MeetingAgendaService);
@@ -176,7 +177,7 @@ describe('MeetingAgendaService — the item a link names', () => {
       providers: [
         MeetingAgendaService,
         { provide: ApiClient, useValue: api },
-        { provide: ToastService, useValue: { error: jest.fn() } },
+        { provide: ToastService, useValue: toastMock() },
       ],
     });
     svc = TestBed.inject(MeetingAgendaService);
@@ -226,7 +227,7 @@ describe('MeetingAgendaService — the duration of a TOP', () => {
         return s;
       }),
     };
-    toast = { error: jest.fn() };
+    toast = toastMock();
     TestBed.configureTestingModule({
       providers: [
         MeetingAgendaService,
@@ -279,7 +280,7 @@ describe('MeetingAgendaService — the tick of "Nächster TOP"', () => {
       providers: [
         MeetingAgendaService,
         { provide: ApiClient, useValue: api },
-        { provide: ToastService, useValue: { error: jest.fn() } },
+        { provide: ToastService, useValue: toastMock() },
       ],
     });
     svc = TestBed.inject(MeetingAgendaService);

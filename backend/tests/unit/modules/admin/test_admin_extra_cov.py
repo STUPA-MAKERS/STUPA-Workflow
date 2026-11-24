@@ -531,7 +531,6 @@ async def test_help_tickets_reads_the_active_settings() -> None:
     assert out.model_dump(by_alias=True) == {
         "wikiUrl": "https://wiki.reutlingen.university/books/antragsplattform",
         "publicEnabled": True,
-        "notifyNew": False,
         "retentionMonths": None,
     }
 
@@ -560,7 +559,6 @@ def _settings(**kw: object):
         {
             "wikiUrl": "https://w.example.org",
             "publicEnabled": False,
-            "notifyNew": False,
             "retentionMonths": 6,
             **kw,
         }

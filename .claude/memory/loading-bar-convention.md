@@ -9,4 +9,4 @@ metadata:
 The rules are specs in `specs/` of the STUPA-Workflow repository. Read the spec, not this
 file:
 
-- `NF/performance/loading/000189` The load bar shows only for slow foreground reads
+- `ui-kit:NF/performance/loading/000189` The load bar shows only for slow foreground reads

@@ -13,6 +13,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
@@ -26,6 +27,7 @@ import {
   SkeletonComponent,
   SwitchComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import {
@@ -147,6 +149,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     NoteComponent,
     SkeletonComponent,
@@ -167,6 +170,9 @@ export class GremiumDialogComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly features = inject(FeatureService);
+  /** The link to the public protocols shows only while that page exists (spec 000758). */
+  protected readonly publicPagesOn = computed(() => this.features.isOn('meetings', 'public'));
 
   readonly open = input(false);
   /** The gremium to edit. `null` creates a new gremium. */
@@ -373,7 +379,7 @@ export class GremiumDialogComponent {
     this.save();
   }
 
-  /** Read the counts of the question; also the retry of the load error (§ 000576). */
+  /** Read the counts of the question; also the retry of the load error (§ui-kit:000576). */
   protected loadPreview(): void {
     const g = this.gremium();
     if (!g) return;
@@ -476,7 +482,7 @@ export class GremiumDialogComponent {
     this.saving.set(false);
     const text = this.i18n.translate(key);
     if (key === 'admin.gremien.toast.failed' || key === 'admin.gremien.recipientsFailed') {
-      this.toast.error(text);
+      this.toast.show(text, 'error');
     } else {
       this.error.set(text);
     }

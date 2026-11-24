@@ -361,7 +361,7 @@ export class ApplicationCaptureComponent {
         this.effForm.set(null);
         this.fields.set([]);
         this.loadingForm.set(false);
-        this.toast.error(this.i18n.translate('apply.error.formLoad'));
+        this.toast.show(this.i18n.translate('apply.error.formLoad'), 'error');
       },
     });
   }
@@ -383,7 +383,7 @@ export class ApplicationCaptureComponent {
       },
       error: () => {
         this.predecessor.set(null);
-        this.toast.error(this.i18n.translate('applications.predecessor.error'));
+        this.toast.show(this.i18n.translate('applications.predecessor.error'), 'error');
       },
     });
   }
@@ -423,7 +423,7 @@ export class ApplicationCaptureComponent {
     if (this.saving()) return;
     if (!this.canSubmit()) {
       this.form.markAllAsTouched();
-      this.toast.error(this.i18n.translate('applications.capture.incomplete'));
+      this.toast.show(this.i18n.translate('applications.capture.incomplete'), 'error');
       const root = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
       setTimeout(() => revealFirstInvalid(root));
       return;
@@ -449,7 +449,7 @@ export class ApplicationCaptureComponent {
       next: (res) => {
         this.saving.set(false);
         this.drafts.clear();
-        this.toast.success(this.i18n.translate('applications.capture.done'));
+        this.toast.show(this.i18n.translate('applications.capture.done'), 'success');
         this.created.emit(res.applicationId);
       },
       error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -467,7 +467,7 @@ export class ApplicationCaptureComponent {
   private onError(status: number | undefined, problem: ProblemDetail | null): void {
     const known = problem?.code ? ERROR_TEXTS[problem.code] : undefined;
     if (known) {
-      this.toast.error(this.i18n.translate(known));
+      this.toast.show(this.i18n.translate(known), 'error');
       return;
     }
     if (status === 422) {
@@ -475,11 +475,11 @@ export class ApplicationCaptureComponent {
       const t = (key: TranslationKey) => this.i18n.translate(key);
       const errors = problem?.errors ?? [];
       if (errors.length && applyServerErrors(this.fields(), errors, t)) {
-        this.toast.error(this.i18n.translate('apply.error.invalid'));
+        this.toast.show(this.i18n.translate('apply.error.invalid'), 'error');
         return;
       }
     }
-    this.toast.error(this.i18n.translate('applications.capture.error'));
+    this.toast.show(this.i18n.translate('applications.capture.error'), 'error');
   }
 }
 

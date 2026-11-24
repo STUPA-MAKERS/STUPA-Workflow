@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { type Observable, concat, defer, forkJoin, of } from 'rxjs';
 import { catchError, last, map } from 'rxjs/operators';
 import {
+  type Action,
   ButtonComponent,
   ButtonGroupComponent,
   CellDirective,
@@ -13,12 +14,13 @@ import {
   DataTableComponent,
   DialogComponent,
   EmptyStateComponent,
-  FabComponent,
   IconComponent,
   InputComponent,
+  ListItemComponent,
+  type ListRow,
+  type LoadState as ScreenLoadState,
   MoveButtonsComponent,
   NoteComponent,
-  PageHeaderComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -27,8 +29,15 @@ import {
   type SelectOption,
   StatusTextComponent,
   SwitchComponent,
+  SearchPillComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
+import {
+  RecordsScreenComponent,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { errorStatus, problemCode } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -36,8 +45,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -104,11 +113,11 @@ const STEP_NAME_MAX = 120;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     NgTemplateOutlet,
     FormsModule,
     TranslatePipe,
     SimplifyPathPipe,
-    BreadcrumbsComponent,
     ButtonComponent,
     ButtonGroupComponent,
     CellDirective,
@@ -117,13 +126,16 @@ const STEP_NAME_MAX = 120;
     DataTableComponent,
     DialogComponent,
     EmptyStateComponent,
-    FabComponent,
     IconComponent,
     InputComponent,
+    ListItemComponent,
     LoadStateComponent,
     MoveButtonsComponent,
     NoteComponent,
-    PageHeaderComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
+    ScreenSearchDirective,
+    SearchPillComponent,
     RowMenuComponent,
     SectionComponent,
     SelectFieldComponent,
@@ -148,7 +160,37 @@ export class AdminBudgetsComponent {
   readonly budgets = signal<readonly BudgetTreeNode[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /**
+   * The rows of the records screen (§ui-kit:002257): one row per budget with the name, then
+   * the key, the start of the fiscal year and "mit/ohne Haushaltsplan".
+   */
+  protected readonly rows = computed<ScreenLoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('budget.tree.error'),
+        retry: () => this.reload(),
+      };
+    const rows: ListRow[] = this.budgets()
+      .map((b) => ({ id: b.id, title: b.name, meta: this.metaOf(b) }))
+      .filter((r) => this.search.matches([r.title, ...r.meta]));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'pie', heading: this.i18n.translate('admin.budgets.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+  /** "Haushalt anlegen" as the FAB. */
+  protected readonly actions = computed<readonly Action[]>(() => [
+    { key: 'create', label: this.i18n.translate('fab.budget'), icon: 'plus', priority: 'fab' },
+  ]);
   readonly gremiumOptions = signal<SelectOption[]>([]);
   readonly busy = signal(false);
 
@@ -270,20 +312,6 @@ export class AdminBudgetsComponent {
     this.i18n.translate('admin.budgets.fyTitle', { name: this.fyBudget()?.name ?? '' }),
   );
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'node', label: this.i18n.translate('admin.budgets.col.budget'), card: 'title', width: '16rem' },
-    { key: 'start', label: this.i18n.translate('admin.budgets.col.start'), width: '14rem' },
-    { key: 'plan', label: this.i18n.translate('admin.budgets.col.plan') },
-    {
-      key: 'actions',
-      label: this.i18n.translate('budget.tree.col.actions'),
-      align: 'end',
-      width: '3.5rem',
-      card: 'actions',
-      sticky: 'end',
-    },
-  ]);
-  readonly rowId = (row: unknown): string => (row as BudgetTreeNode).id;
   readonly start = cutoffLabel;
 
   readonly rowMenu = computed<RowMenuSection[]>(() => [
@@ -336,7 +364,7 @@ export class AdminBudgetsComponent {
 
   private fail(err: unknown, fallback: TranslationKey = 'budget.tree.toast.failed'): void {
     this.busy.set(false);
-    this.toast.error(this.i18n.translate(costCentreError(problemCode(err), fallback)));
+    this.toast.show(this.i18n.translate(costCentreError(problemCode(err), fallback)), 'error');
   }
 
   onRowMenu(budget: BudgetTreeNode, item: RowMenuItem): void {
@@ -379,8 +407,7 @@ export class AdminBudgetsComponent {
       : '';
   }
 
-  createTop(event: Event): void {
-    event.preventDefault();
+  createTop(): void {
     const t = this.newTop();
     if (!this.topValid() || this.busy()) return;
     this.busy.set(true);
@@ -389,7 +416,7 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('admin.budgets.toast.created'));
+          this.toast.show(this.i18n.translate('admin.budgets.toast.created'), 'success');
           this.topOpen.set(false);
           this.reload();
         },
@@ -527,7 +554,7 @@ export class AdminBudgetsComponent {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+          this.toast.show(this.i18n.translate('budget.tree.toast.saved'), 'success');
           this.closeEdit();
           this.reload();
         },
@@ -542,7 +569,10 @@ export class AdminBudgetsComponent {
   private saveFailed(err: unknown): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.error(this.i18n.translate(SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save')));
+    this.toast.show(
+      this.i18n.translate(SAVE_ERRORS[code] ?? costCentreError(code, 'admin.budgets.error.save')),
+      'error',
+    );
     const id = this.editNode()?.id;
     this.api.tree().subscribe({
       next: (tree) => {
@@ -562,7 +592,7 @@ export class AdminBudgetsComponent {
     this.api.deleteNode(node.id).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('admin.budgets.toast.deleted'));
+        this.toast.show(this.i18n.translate('admin.budgets.toast.deleted'), 'success');
         this.deleteTarget.set(null);
         this.reload();
       },
@@ -625,7 +655,14 @@ export class AdminBudgetsComponent {
   private fyError(err: unknown, fallback: TranslationKey): void {
     this.busy.set(false);
     const code = problemCode(err);
-    this.toast.error(this.i18n.translate(code === 'fiscal_year_exists' ? 'budget.tree.toast.fyDuplicate' : fyBlockerKey(code, fallback)));
+    this.toast.show(
+      this.i18n.translate(
+        code === 'fiscal_year_exists'
+          ? 'budget.tree.toast.fyDuplicate'
+          : fyBlockerKey(code, fallback),
+      ),
+      'error',
+    );
   }
 
   createFiscalYear(event: Event): void {
@@ -636,7 +673,7 @@ export class AdminBudgetsComponent {
     this.api.createFiscalYear(budget.id, { year: Number(this.newFyYear()) }).subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
+        this.toast.show(this.i18n.translate('budget.tree.toast.fyCreated'), 'success');
         this.loadFiscalYears();
       },
       error: (err: unknown) => this.fyError(err, 'budget.tree.toast.fyFailed'),
@@ -716,7 +753,7 @@ export class AdminBudgetsComponent {
     request.subscribe({
       next: () => {
         this.busy.set(false);
-        this.toast.success(toast);
+        this.toast.show(toast, 'success');
         this.backToYears();
         this.loadFiscalYears();
       },
@@ -761,6 +798,20 @@ export class AdminBudgetsComponent {
       this.i18n.translate('budget.tree.toast.fyDeleted'),
       'budget.tree.toast.fyDeleteFailed',
     );
+  }
+
+  /** The budget of a row of the records screen. */
+  protected budgetOf(id: string): BudgetTreeNode {
+    return this.budgets().find((b) => b.id === id)!;
+  }
+
+  /** The second line of a row: the key, the start of the fiscal year and the plan. */
+  private metaOf(b: BudgetTreeNode): string[] {
+    return [
+      b.pathKey,
+      `${this.i18n.translate('admin.budgets.col.start')}: ${this.start(b)}`,
+      this.i18n.translate(b.planEnabled ? 'admin.budgets.withPlan' : 'admin.budgets.withoutPlan'),
+    ];
   }
 
   asBudget(row: unknown): BudgetTreeNode {

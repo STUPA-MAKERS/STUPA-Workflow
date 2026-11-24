@@ -1,17 +1,16 @@
-"""Webhook dispatch service.
+"""Webhook delivery service.
 
-The service has two strictly separated jobs.
+`emit_event` (module `events`) creates the `pending` deliveries in the transaction of a
+domain event. This service has the two jobs after that.
 
-* `dispatch_to_webhook` runs on the flow side. The flow action `webhook` names one
-  webhook. The method creates one `webhook_delivery` row in state `pending` and
-  enqueues a `deliver_webhook` job. It is idempotent over
-  `(webhook_id, idempotency_key)`. A flow retry of the same status event creates no
-  duplicate delivery. A webhook has no event subscriptions, so no other caller
-  sends to it (§F/integrations/webhooks/000402).
-* `deliver` runs on the worker side. It sends one delivery: SSRF guard at send time,
+* `enqueue_pending` runs in the worker cron. It hands each `pending` delivery without an
+  attempt to the queue. The job key `webhook:<id>` coalesces a second enqueue of a
+  delivery whose job is still queued or running, so a sweep is harmless.
+* `deliver` runs in the worker job. It sends one delivery: SSRF guard at send time,
   HMAC signature, POST without redirects, and a write-back of status, attempts and
   backoff. It returns a `DeliveryOutcome`. The worker translates `retry` into
-  `arq.Retry`.
+  `arq.Retry`. A delivery that is already `ok` or `dead` gives `gone`, so a late
+  second job sends nothing twice (§F/integrations/webhooks/000299).
 
 The service never logs the per-webhook `secret`.
 """
@@ -26,7 +25,6 @@ from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from app.modules.webhooks.models import Webhook, WebhookDelivery
 from app.modules.webhooks.signing import build_headers, canonical_body
@@ -39,8 +37,6 @@ from app.shared.ssrf import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +50,12 @@ OutcomeKind = Literal["ok", "retry", "dead", "gone"]
 #: Cap of a read response body. Only the status code matters, and a malicious receiver
 #: could OOM-kill the shared worker with a multi-GB body, so the reader stops here.
 _MAX_RESPONSE_BYTES = 64 * 1024
+
+#: The most deliveries that one sweep enqueues. The next sweep takes the rest.
+_SWEEP_LIMIT = 500
+
+#: The states that end a delivery. A job for such a row sends nothing.
+_FINAL = frozenset({"ok", "dead"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,69 +80,31 @@ class WebhookService:
     settings: Settings
     queue: WebhookQueue | None = None
 
-    async def dispatch_to_webhook(
-        self,
-        webhook_id: UUID,
-        *,
-        event: str,
-        payload: dict[str, object] | None = None,
-        idempotency_base: str | None = None,
-    ) -> int:
-        """Create and enqueue a delivery for exactly one active webhook.
+    async def enqueue_pending(self, *, older_than: dt.datetime) -> int:
+        """Enqueue every `pending` delivery without an attempt created before `older_than`.
 
-        The flow action `webhook` references a webhook by id. An admin maintains that
-        webhook under `/admin/webhooks`. The dedup runs over
-        `(webhook_id, idempotency_key)`.
+        The grace time keeps the sweep away from a row whose transaction is still open.
 
         Returns:
-            The number of new deliveries. A missing or inactive webhook gives `0`, and
-            the service skips it without an error.
+            The number of enqueued deliveries; 0 without a queue.
         """
-        hook = await self.session.get(Webhook, webhook_id)
-        if hook is None or not hook.active:
-            logger.warning("webhook %s missing/inactive — flow action skipped", webhook_id)
+        if self.queue is None:
             return 0
-        key = f"{idempotency_base}:{hook.id}" if idempotency_base else None
-        if key is not None and key in await self._existing_keys(event, [key]):
-            logger.info("webhook delivery deduped (event=%s hook=%s)", event, hook.id)
-            return 0
-        delivery = WebhookDelivery(
-            webhook_id=hook.id,
-            event=event,
-            payload=dict(payload or {}),
-            status="pending",
-            attempts=0,
-            idempotency_key=key,
-        )
-        try:
-            async with self.session.begin_nested():
-                self.session.add(delivery)
-                await self.session.flush()
-        except IntegrityError:
-            logger.info("webhook delivery race-deduped (event=%s hook=%s)", event, hook.id)
-            return 0
-        await self.session.commit()
-        if self.queue is not None:
-            await self.queue.enqueue(delivery.id)
-        return 1
-
-    async def _existing_keys(self, event: str, candidate_keys: Sequence[str]) -> set[str]:
-        """Return the idempotency keys of this event that exist already.
-
-        The query uses an `IN` over the concrete candidate keys. It does not scan every
-        delivery ever created for the event. The constraint
-        `unique(webhook_id, idempotency_key)` and the savepoint give correctness on
-        their own. This pre-check is only an optimization.
-        """
-        rows = (
+        ids = (
             await self.session.scalars(
-                select(WebhookDelivery.idempotency_key).where(
-                    WebhookDelivery.event == event,
-                    WebhookDelivery.idempotency_key.in_(candidate_keys),
+                select(WebhookDelivery.id)
+                .where(
+                    WebhookDelivery.status == "pending",
+                    WebhookDelivery.attempts == 0,
+                    WebhookDelivery.created_at < older_than,
                 )
+                .order_by(WebhookDelivery.created_at)
+                .limit(_SWEEP_LIMIT)
             )
         ).all()
-        return {k for k in rows if k is not None}
+        for delivery_id in ids:
+            await self.queue.enqueue(delivery_id)
+        return len(ids)
 
     async def deliver(
         self,
@@ -162,8 +126,8 @@ class WebhookService:
 
         moment = now or dt.datetime.now(tz=dt.UTC)
         delivery = await self.session.get(WebhookDelivery, delivery_id)
-        if delivery is None:
-            logger.info("webhook delivery %s gone — skipped", delivery_id)
+        if delivery is None or delivery.status in _FINAL:
+            logger.info("webhook delivery %s gone or final — skipped", delivery_id)
             return DeliveryOutcome(kind="gone")
 
         hook = await self.session.get(Webhook, delivery.webhook_id)

@@ -260,7 +260,7 @@ async def test_public_list_and_detail_hide_names_and_non_public_tops(
         gremien = client.get("/api/public/committees").json()
         ours = [g for g in gremien if g["id"] == str(gremium_id)]
         assert ours and ours[0]["protocolCount"] == 1
-        assert set(ours[0]) == {"id", "name", "slug", "protocolCount"}
+        assert set(ours[0]) == {"id", "name", "slug", "protocolCount", "latestDate"}
 
 
 async def test_application_items_carry_the_application_title(

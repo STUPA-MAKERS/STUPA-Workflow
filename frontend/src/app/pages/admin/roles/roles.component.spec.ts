@@ -6,6 +6,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import type { Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { AdminRolesComponent } from './roles.component';
+import { toastMock } from '../../../../testing/toast';
 
 const ROLES: Role[] = [
   { id: 'r-admin', key: 'admin', label: { de: 'administrator', en: 'administrator' }, permissions: ['admin.roles'] },
@@ -27,7 +28,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 }
 
 function makeToast() {
-  return { success: jest.fn(), error: jest.fn() };
+  return toastMock();
 }
 
 async function setup(api = makeApi(), toast = makeToast()) {
@@ -211,7 +212,7 @@ describe('AdminRolesComponent', () => {
     expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the rights back and hides with "Speichern"', async () => {
     const { fixture, inst, api } = await setup();
     const before = inst.roles().find((r: Role) => r.id === 'r-member').permissions;
@@ -388,7 +389,7 @@ describe('AdminRolesComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry. */
   it('names a failed read in a toast with a retry', async () => {
     const api = makeApi();
     api.listRoles.mockReturnValueOnce(throwError(() => new Error('boom')));
@@ -396,5 +397,22 @@ describe('AdminRolesComponent', () => {
     expect(loadErrorToast()).toBe('Rollen konnten nicht geladen werden.');
     retryLoadError();
     expect(api.listRoles).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows the empty state without roles, and "Rolle anlegen" opens the dialog', async () => {
+    const api = makeApi();
+    api.listRoles.mockReturnValueOnce(of([]));
+    const { inst } = await setup(api);
+    expect(screen.getByText('Noch keine globalen Rollen.')).toBeInTheDocument();
+    inst.onAction('add');
+    expect(inst.addOpen()).toBe(true);
+  });
+
+  it('gives the records screen loading rows, and saves nothing without a change', async () => {
+    const { inst, api } = await setup();
+    inst.loading.set(true);
+    expect(inst.rows()).toEqual({ state: 'loading' });
+    inst.onAction('save');
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
   });
 });

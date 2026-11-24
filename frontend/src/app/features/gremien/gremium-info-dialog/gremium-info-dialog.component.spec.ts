@@ -9,6 +9,7 @@ import {
   linkBlank,
   linkErrors,
 } from './gremium-info-dialog.component';
+import { toastMock } from '../../../../testing/toast';
 
 const INFO = gremiumInfo({
   bodyMd: 'Hallo',
@@ -22,7 +23,7 @@ const INFO = gremiumInfo({
 
 async function setup(api = gremienApiMock()) {
   localStorage.setItem('ap.locale', 'de');
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(GremiumInfoDialogComponent, {
     inputs: { open: true, gremiumId: 'g-1', gremiumName: 'STUPA', info: INFO },
     providers: [

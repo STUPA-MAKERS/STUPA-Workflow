@@ -14,38 +14,111 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ExpandRowComponent } from '@shared/ui/expand-row/expand-row.component';
 import {
-  FabComponent,
   ButtonComponent,
   ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogComponent,
   EmptyStateComponent,
   InputComponent,
+  type Action,
+  type ListRow,
+  type LoadState,
   RowMenuComponent,
+  type RowMenuItem,
   type RowMenuSection,
-  SkeletonComponent,
+  type FilterSelectOption,
+  FilterSelectComponent,
+  filterChipText,
+  CheckboxComponent,
   StatusTextComponent,
   SwitchComponent,
   ToastService,
-  PageHeaderComponent,
   SectionComponent,
   ErrorTextComponent,
   FactsComponent,
+  DialogBodyDirective,
+  FieldGroupComponent,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
+import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import { withEntry } from '@shared/util/immutable';
 import { AdminApiService } from '../admin-api.service';
+import { stateDisplayLabel } from '../flow/flow-label.util';
 import {
+  type WebhookCatalogEvent,
   type WebhookConfig,
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
+  type WebhookEventGroup,
+  type WebhookSubscription,
 } from '../admin.models';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 function emptyHook(): WebhookConfig {
-  return { id: '', name: '', url: '', active: true };
+  return {
+    id: '',
+    name: '',
+    url: '',
+    active: true,
+    subscriptions: [],
+    gremiumIds: [],
+    typeIds: [],
+    stateKeys: [],
+  };
 }
+
+/** The order of the event groups in the dialog. */
+const GROUPS: readonly WebhookEventGroup[] = [
+  'applications',
+  'votes',
+  'meetings',
+  'protocols',
+  'budget',
+  'tickets',
+];
+
+/** The event whose subscription takes the target status filter. */
+const TRANSITION = 'application.transition';
+
+/** The example ID of the payload preview. */
+const EXAMPLE_ID = '3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f';
+
+/** The fields of a new subscription: every field that is not personal (§F/integrations/webhooks/002413). */
+function defaultFields(event: WebhookCatalogEvent): readonly string[] {
+  return event.fields.filter((f) => !f.personal).map((f) => f.key);
+}
+
+/** Returns `subs` with the subscription of `event` set to `fields`, or removed for `null`. */
+export function withSubscription(
+  subs: readonly WebhookSubscription[],
+  event: string,
+  fields: readonly string[] | null,
+): readonly WebhookSubscription[] {
+  const rest = subs.filter((s) => s.event !== event);
+  return fields === null ? rest : [...rest, { event, fields }];
+}
+
+/**
+ * The example body of one event with the chosen fields, as the receiver gets it
+ * (§F/integrations/webhooks/002415, P/integrations/webhooks/000963).
+ */
+export function previewBody(event: WebhookCatalogEvent, fields: readonly string[]): string {
+  const chosen = new Set(fields);
+  const body = {
+    event: event.name,
+    occurredAt: '2026-11-23T09:00:00+00:00',
+    ...Object.fromEntries(event.idKeys.map((key) => [key, EXAMPLE_ID])),
+    data: Object.fromEntries(
+      event.fields.filter((f) => chosen.has(f.key)).map((f) => [f.key, f.example]),
+    ),
+  };
+  return JSON.stringify(body, null, 2);
+}
+
+/** Time until the delivery status reads again after a test delivery, in ms. */
+const TEST_RELOAD_MS = 15_000;
 
 /** The client check of a target URL: http or https with something after the scheme. */
 const HTTP_URL = /^https?:\/\/.+/i;
@@ -96,8 +169,12 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
  * Without P(`webhook.manage`) a press on the row opens the body, because there is no edit.
  *
  * Create and edit run in a dialog. The client validation asks for a valid http or https
- * URL. A webhook has no event list: it sends only through the `webhook` action of a flow
- * transition (§F/integrations/webhooks/000402). Delete runs through a confirm dialog. Every
+ * URL. The dialog lists the events of the catalog by group (§F/integrations/webhooks/002410,
+ * 002411). A checked event shows its fields as checkboxes; a personal field carries the mark
+ * "personenbezogen" and a new subscription starts with it off (002412, 002413). The filters
+ * Gremien, Antragsarten and (with a subscribed status change) Ziel-Status narrow the events
+ * (002414). The preview shows the body of each subscribed event with example values (002415).
+ * The ⋮ menu sends a test delivery (002416) and deletes through a confirm dialog. Every
  * change needs P(`webhook.manage`), which the backend enforces.
  */
 @Component({
@@ -105,12 +182,13 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchPillComponent,
+    ScreenSearchDirective,
+    DialogBodyDirective,
     FactsComponent,
     ErrorTextComponent,
-    LoadStateComponent,
     SectionComponent,
     ExpandRowComponent,
-    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -120,12 +198,15 @@ function withMember(set: ReadonlySet<string>, id: string, on: boolean): Readonly
     ButtonGroupComponent,
     DialogComponent,
     InputComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
-    SkeletonComponent,
     StatusTextComponent,
     SwitchComponent,
+    RecordsScreenComponent,
+    ScreenRecordDirective,
+    FilterSelectComponent,
+    CheckboxComponent,
+    FieldGroupComponent,
+    MarkdownViewComponent,
   ],
   templateUrl: './webhooks.component.html',
   styleUrl: './webhooks.component.scss',
@@ -141,11 +222,35 @@ export class WebhooksComponent {
    * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
-  /** The read of the webhooks failed (§ 000576). */
+  /** The read of the webhooks failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
 
   protected readonly hooks = signal<readonly WebhookConfig[]>([]);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.webhook.error'),
+        retry: () => this.load(),
+      };
+    const rows = this.search
+      .filter(this.hooks(), (h) => [h.name, h.url])
+      .map((h) => ({ id: h.id, title: h.name || h.url }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'webhook', heading: this.i18n.translate('admin.webhook.none') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
   protected readonly draft = signal<WebhookConfig | null>(null);
   protected readonly editingIndex = signal<number | null>(null);
   /** The webhook whose delete the user confirms now. */
@@ -163,16 +268,86 @@ export class WebhooksComponent {
   /** `webhook.manage` as a front-end gate. The backend stays authoritative. The value
    *  is reactive, because the principal loads asynchronously. */
   protected readonly canManage = computed(() => this.auth.can('webhook.manage'));
-  /** The ⋮ menu of a webhook: delete is its only action. */
+  /** The ⋮ menu of a webhook: the test delivery, then delete. */
   protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'test', label: this.i18n.translate('admin.webhook.test'), icon: 'send' }] },
     { items: [{ id: 'delete', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
   ]);
+
+  /** The event catalog, loaded with the permission. */
+  protected readonly catalog = signal<readonly WebhookCatalogEvent[]>([]);
+  /** The catalog by group, in the order of `GROUPS`. */
+  protected readonly groups = computed(() =>
+    GROUPS.map((group) => ({
+      group,
+      events: this.catalog().filter((e) => e.group === group),
+    })).filter((g) => g.events.length > 0),
+  );
+  /** The choices of the Gremium filter. */
+  protected readonly gremiumOptions = signal<readonly FilterSelectOption[]>([]);
+  /** The choices of the Antragsart filter. */
+  protected readonly typeOptions = signal<readonly FilterSelectOption[]>([]);
+  /** The choices of the target status filter: the states of the global flow. */
+  protected readonly stateOptions = signal<readonly FilterSelectOption[]>([]);
+  /**
+   * The text of a filter select in the dialog: its name alone while no value is chosen, else
+   * the name and the chosen values ("Gremien: AStA, StuPa"), so the dialog shows what the
+   * webhook filters (spec 002581).
+   */
+  protected filterText(
+    label: TranslationKey,
+    options: readonly FilterSelectOption[],
+    values: readonly string[],
+  ): string {
+    const names = values.map((v) => options.find((o) => o.value === v)?.label ?? v);
+    return filterChipText(this.i18n.translate(label), names.join(', '));
+  }
+  /** The subscribed events of the draft with their catalog entry, for the preview. */
+  protected readonly previews = computed(() => {
+    const d = this.draft();
+    if (!d) return [];
+    return d.subscriptions.flatMap((sub) => {
+      const event = this.catalog().find((e) => e.name === sub.event);
+      return event
+        ? [
+            {
+              name: event.name,
+              body: previewBody(event, sub.fields),
+              markdown: `**${this.eventLabel(event.name)}**\n\n\`\`\`json\n${previewBody(event, sub.fields)}\n\`\`\``,
+            },
+          ]
+        : [];
+    });
+  });
+  /** "Webhook hinzufügen" as the FAB, with `webhook.manage`. */
+  protected readonly actions = computed<readonly Action[]>(() =>
+    this.canManage()
+      ? [{ key: 'add', label: this.i18n.translate('fab.webhook'), priority: 'fab' }]
+      : [],
+  );
+
+  /** The webhook of a row of the records screen. */
+  protected hookOf(id: string): WebhookConfig {
+    return this.hooks().find((h) => h.id === id)!;
+  }
+
+  /** The place of a webhook in the list, for the edit dialog. */
+  protected indexOf(id: string): number {
+    return this.hooks().findIndex((h) => h.id === id);
+  }
+
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
 
   protected readonly errors = computed<readonly string[]>(() => {
     const d = this.draft();
     return d && !HTTP_URL.test(d.url) ? ['admin.webhook.badUrl'] : [];
+  });
+
+  /** The save needs a name and a valid URL, because the server refuses a webhook without them (spec 002582). */
+  protected readonly canSave = computed(() => {
+    const d = this.draft();
+    return !!d && d.name.trim().length > 0 && this.errors().length === 0;
   });
 
   /**
@@ -185,6 +360,7 @@ export class WebhooksComponent {
       if (!this.canManage() || this.statusRequested) return;
       this.statusRequested = true;
       this.loadDeliveryStatus();
+      this.loadChoices();
     });
   }
 
@@ -209,6 +385,88 @@ export class WebhooksComponent {
     this.api.listWebhookDeliveryStatus().subscribe({
       next: (list) => this.delivery.set(new Map(list.map((s) => [s.webhookId, s]))),
       error: () => this.delivery.set(new Map()),
+    });
+  }
+
+  /** Read the catalog and the choices of the filters; a failed read leaves a list empty. */
+  private loadChoices(): void {
+    this.api.getWebhookCatalog().subscribe({
+      next: (c) => this.catalog.set(c),
+      error: () => this.catalog.set([]),
+    });
+    this.api.listGremienOptions().subscribe({
+      next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+      error: () => this.gremiumOptions.set([]),
+    });
+    this.api.listApplicationTypes().subscribe({
+      next: (list) => this.typeOptions.set(list.map((t) => ({ value: t.id, label: t.name }))),
+      error: () => this.typeOptions.set([]),
+    });
+    this.api.getGlobalFlow().subscribe({
+      next: (flow) =>
+        this.stateOptions.set(
+          (flow?.states ?? []).map((st) => ({ value: st.key, label: stateDisplayLabel(st) })),
+        ),
+      error: () => this.stateOptions.set([]),
+    });
+  }
+
+  /** The subscription of `event` in the draft, or null. */
+  protected subscriptionOf(event: string): WebhookSubscription | null {
+    return this.draft()?.subscriptions.find((s) => s.event === event) ?? null;
+  }
+
+  /** Subscribe to an event with its default fields, or end the subscription. */
+  protected setEvent(event: WebhookCatalogEvent, on: boolean): void {
+    const d = this.draft();
+    if (!d) return;
+    this.patch(
+      'subscriptions',
+      withSubscription(d.subscriptions, event.name, on ? defaultFields(event) : null),
+    );
+  }
+
+  /** Put one field into the payload of an event, or take it out. */
+  protected setField(event: WebhookCatalogEvent, key: string, on: boolean): void {
+    const sub = this.subscriptionOf(event.name);
+    const d = this.draft();
+    if (!d || !sub) return;
+    const fields = event.fields
+      .map((f) => f.key)
+      .filter((k) => (k === key ? on : sub.fields.includes(k)));
+    this.patch('subscriptions', withSubscription(d.subscriptions, event.name, fields));
+  }
+
+  /** True while the draft subscribes to a status change, which shows the status filter. */
+  protected readonly hasTransition = computed(() => this.subscriptionOf(TRANSITION) !== null);
+
+  /** The label of an event, a group or a field. */
+  protected eventLabel(name: string): string {
+    return this.tr(`admin.webhook.event.${name}`);
+  }
+
+  protected groupLabel(group: WebhookEventGroup): string {
+    return this.tr(`admin.webhook.group.${group}`);
+  }
+
+  protected fieldLabel(key: string): string {
+    return this.tr(`admin.webhook.field.${key}`);
+  }
+
+  /** The ⋮ menu: the test delivery or the delete. */
+  protected onMenu(hook: WebhookConfig, item: RowMenuItem): void {
+    if (item.id === 'test') this.sendTest(hook);
+    else this.askDelete(hook);
+  }
+
+  /** Queue a test delivery; the delivery status reads again after the worker had time. */
+  protected sendTest(hook: WebhookConfig): void {
+    this.api.sendWebhookTest(hook.id).subscribe({
+      next: () => {
+        this.toast.show(this.i18n.translate('admin.webhook.testSent'), 'success');
+        setTimeout(() => this.loadDeliveryStatus(), TEST_RELOAD_MS);
+      },
+      error: () => this.toast.show(this.i18n.translate('admin.webhook.testFailed'), 'error'),
     });
   }
 
@@ -254,7 +512,7 @@ export class WebhooksComponent {
 
   protected save(): void {
     const d = this.draft();
-    if (!d || this.errors().length > 0) return;
+    if (!d || !this.canSave()) return;
     const idx = this.editingIndex();
     this.api.saveWebhook(d).subscribe({
       next: (saved) => {
@@ -262,10 +520,10 @@ export class WebhooksComponent {
         if (idx === null && !this.delivery().has(saved.id)) {
           this.delivery.update((m) => withEntry(m, saved.id, neverDelivered(saved.id)));
         }
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.close();
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -301,7 +559,7 @@ export class WebhooksComponent {
       error: () => {
         this.setToggling(hook.id, false);
         this.hooks.update((list) => withActive(list, hook.id, before));
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -318,9 +576,9 @@ export class WebhooksComponent {
         this.hooks.update((list) => list.filter((h) => h.id !== hook.id));
         this.delivery.update((m) => new Map([...m].filter(([id]) => id !== hook.id)));
         this.confirmDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.webhook.deleted'));
+        this.toast.show(this.i18n.translate('admin.webhook.deleted'), 'success');
       },
-      error: () => this.toast.error(this.i18n.translate('admin.webhook.deleteFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.webhook.deleteFailed'), 'error'),
     });
   }
 }

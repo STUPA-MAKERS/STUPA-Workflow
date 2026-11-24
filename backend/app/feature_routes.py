@@ -31,19 +31,24 @@ _COMMITTEE: Final = r"/committees/\{gremium_id\}"
 ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
     (feature, re.compile(rf"^(?:{pattern})(?:/|$|\.)"))
     for feature, pattern in (
+        (Feature.ACTIVITY, r"/activity"),
         (Feature.TODOS, r"/todos"),
         (Feature.TODOS, r"/ws/todos"),
         (Feature.CALENDAR, r"/calendar"),
         (Feature.CALENDAR, r"/admin/calendars"),
         (Feature.CALENDAR, r"/public/calendar"),
+        (Feature.PUBLIC, r"/public/calendar"),
         (Feature.MEETINGS, r"/meetings"),
         (Feature.MEETINGS, r"/ws/meetings"),
         (Feature.MEETINGS, r"/public/meetings"),
         (Feature.MEETINGS, r"/protocols"),
         (Feature.MEETINGS, r"/public/protocols"),
+        (Feature.PUBLIC, r"/public/protocols"),
         (Feature.MEETINGS, r"/media/documents"),
         (Feature.MEETINGS, r"/public/committees"),
+        (Feature.PUBLIC, r"/public/committees"),
         (Feature.MEETINGS, r"/public/decisions"),
+        (Feature.PUBLIC, r"/public/decisions"),
         (Feature.MEETINGS, r"/delegations"),
         (Feature.MEETINGS, r"/admin/meeting-settings"),
         (Feature.MEETINGS, rf"{_COMMITTEE}/meeting-(?:defaults|members)"),
@@ -66,6 +71,12 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.BUDGET, rf"{_APPLICATION}/(?:assign-budget|move-fiscal-year)"),
         (Feature.INVOICES, r"/invoices"),
         (Feature.TICKETS, r"/tickets"),
+        (Feature.GRAPH, r"/graph"),
+        (Feature.PUSH, r"/push"),
+        (Feature.PAPERLESS, r"/paperless"),
+        (Feature.PAPERLESS, r"/admin/paperless"),
+        (Feature.PAPERLESS, r"/meetings/\{meeting_id\}/documents/paperless"),
+        (Feature.PAPERLESS, r"/tickets/\{ticket_id\}/files/\{attachment_id\}/paperless"),
     )
 )
 

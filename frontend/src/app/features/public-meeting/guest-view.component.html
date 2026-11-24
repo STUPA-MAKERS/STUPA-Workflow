@@ -3,7 +3,13 @@
   <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
     <div class="gv__voteHead">
       <app-button-group>
-        <app-button class="btn-back" variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
+        <app-button
+          class="btn-back"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'guests.vote.back' | t"
+          (click)="openVoteId.set(null)"
+        >
           <app-icon name="back" />
         </app-button>
       </app-button-group>
@@ -13,9 +19,13 @@
       </span>
     </div>
     @if (voteNote(); as n) {
-      <app-note [icon]="n.icon">{{ n.key | t: { gremium: me_.meeting.gremiumName ?? '' } }}</app-note>
+      <app-note [icon]="n.icon">{{
+        n.key | t: { gremium: me_.meeting.gremiumName ?? '' }
+      }}</app-note>
     }
-    <app-vote-panel
+    <app-vote-panel-view
+      [meetingLink]="meetingLink"
+      [applicationLink]="applicationLink"
       layout="phone"
       [vote]="panelVote()!"
       [own]="own()"
@@ -46,7 +56,10 @@
 
     @if (current(); as c) {
       <div class="gv__now">
-        <span class="gv__nowLine"><span class="gv__nowLabel">{{ 'meetings.follow.now' | t }}</span> · {{ currentLine() }}</span>
+        <span class="gv__nowLine"
+          ><span class="gv__nowLabel">{{ 'meetings.follow.now' | t }}</span> ·
+          {{ currentLine() }}</span
+        >
         <h2 class="gv__nowTitle">
           @if (c.nonPublic) {
             <app-icon name="lock" [size]="18" />
@@ -57,7 +70,12 @@
     }
 
     @if (focusVote(); as fv) {
-      <button type="button" class="gv__voteCard" [class.gv__voteCard--go]="fv.canCast" (click)="openVoteId.set(fv.id)">
+      <button
+        type="button"
+        class="gv__voteCard"
+        [class.gv__voteCard--go]="fv.canCast"
+        (click)="openVoteId.set(fv.id)"
+      >
         <app-icon class="gv__voteIcon" name="vote" [size]="22" />
         <span class="gv__voteText">
           @if (fv.status === 'open') {
@@ -67,12 +85,22 @@
               } @else if (fv.myBallot.cast) {
                 {{ 'guests.view.voteCast' | t }}
               } @else {
-                {{ (fv.guestsVote && !watch() ? 'guests.view.voteRunning' : 'guests.view.voteMembers') | t }}
+                {{
+                  (fv.guestsVote && !watch()
+                    ? 'guests.view.voteRunning'
+                    : 'guests.view.voteMembers'
+                  ) | t
+                }}
               }
             </strong>
             <span>{{ progressOf(fv) }}</span>
           } @else {
-            <strong>{{ 'guests.view.voteResult' | t }}: <app-status-text [kind]="resultOf(fv).kind">{{ resultOf(fv).key | t }}</app-status-text></strong>
+            <strong
+              >{{ 'guests.view.voteResult' | t }}:
+              <app-status-text [kind]="resultOf(fv).kind">{{
+                resultOf(fv).key | t
+              }}</app-status-text></strong
+            >
             <span class="ell">{{ fv.question }}</span>
           }
         </span>
@@ -98,39 +126,54 @@
       (activeChange)="setTab($event)"
     >
       <ng-template appTabPage="agenda">
-          <ol class="gv__agenda">
-            @for (row of rows(); track row.item.id) {
-              <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done" [attr.aria-current]="row.now ? 'step' : null">
-                <app-top-badge
-                  class="gv__badge"
-                  [number]="row.item.position"
-                  [state]="row.done && !row.item.nonPublic ? 'done' : row.now ? 'now' : 'todo'"
-                  [lock]="row.item.nonPublic"
-                  [iconSize]="15"
-                />
-                <span class="gv__itemText">
-                  <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{ row.item.title || ('meetings.agenda.untitled' | t) }}</span>
-                  @if (row.sub) {
-                    <span class="gv__itemSub ell">{{ row.sub }}</span>
-                  }
-                </span>
-              </li>
-            }
-          </ol>
+        <ol class="gv__agenda">
+          @for (row of rows(); track row.item.id) {
+            <li
+              class="gv__item"
+              [class.gv__item--now]="row.now"
+              [class.gv__item--done]="row.done"
+              [attr.aria-current]="row.now ? 'step' : null"
+            >
+              <app-top-badge-view
+                class="gv__badge"
+                [number]="row.item.position"
+                [state]="row.done && !row.item.nonPublic ? 'done' : row.now ? 'now' : 'todo'"
+                [lock]="row.item.nonPublic"
+                [iconSize]="15"
+              />
+              <span class="gv__itemText">
+                <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{
+                  row.item.title || ('meetings.agenda.untitled' | t)
+                }}</span>
+                @if (row.sub) {
+                  <span class="gv__itemSub ell">{{ row.sub }}</span>
+                }
+              </span>
+            </li>
+          }
+        </ol>
       </ng-template>
       <ng-template appTabPage="protocol">
-          <section class="gv__proto" [attr.aria-label]="'guests.view.protocol' | t">
-            <p class="gv__protoNote">
-              <app-icon name="edit" [size]="14" />
-              {{ 'guests.view.protocolNote' | t }}
-            </p>
-            @for (item of excerpts(); track item.id) {
-              <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
-              <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" [documentSrc]="null" />
-            } @empty {
-              <app-empty-state icon="file" shape="text" rows="3" [heading]="'guests.view.protocolEmpty' | t" />
-            }
-          </section>
+        <section class="gv__proto" [attr.aria-label]="'guests.view.protocol' | t">
+          <p class="gv__protoNote">
+            <app-icon name="edit" [size]="14" />
+            {{ 'guests.view.protocolNote' | t }}
+          </p>
+          @for (item of excerpts(); track item.id) {
+            <h3 class="gv__protoHead">
+              {{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}
+            </h3>
+            <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" [documentSrc]="null" />
+          } @empty {
+            <app-empty-state
+              icon="file"
+              fill
+              shape="text"
+              rows="3"
+              [heading]="'guests.view.protocolEmpty' | t"
+            />
+          }
+        </section>
       </ng-template>
     </app-tab-pager>
   </div>

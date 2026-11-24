@@ -51,6 +51,9 @@ import type {
   McpSetup,
   NotificationPreference,
   Profile,
+  PushDevice,
+  PushDeviceIn,
+  PushKey,
   OAuthGrant,
   PersonRef,
   Application,
@@ -1561,6 +1564,40 @@ export class ApiClient {
     preferences: NotificationPreference[],
   ): Observable<NotificationPreference[]> {
     return this.http.put<NotificationPreference[]>(`${this.base}/notifications/preferences`, {
+      preferences,
+    });
+  }
+
+  /** GET /push/key — the public VAPID key of the platform. */
+  getPushKey(): Observable<PushKey> {
+    return this.http.get<PushKey>(`${this.base}/push/key`, { context: skipLoading() });
+  }
+
+  /** GET /push/devices — the own devices with push. */
+  listPushDevices(): Observable<PushDevice[]> {
+    return this.http.get<PushDevice[]>(`${this.base}/push/devices`, { context: skipLoading() });
+  }
+
+  /** POST /push/devices — store the subscription of this device. */
+  addPushDevice(device: PushDeviceIn): Observable<PushDevice> {
+    return this.http.post<PushDevice>(`${this.base}/push/devices`, device);
+  }
+
+  /** DELETE /push/devices/{id} — remove one own device. */
+  removePushDevice(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/push/devices/${encodeURIComponent(id)}`);
+  }
+
+  /** GET /push/preferences — the own push switch of every kind. */
+  listPushPreferences(): Observable<NotificationPreference[]> {
+    return this.http.get<NotificationPreference[]>(`${this.base}/push/preferences`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /push/preferences — set the own push switches (bulk). */
+  setPushPreferences(preferences: NotificationPreference[]): Observable<NotificationPreference[]> {
+    return this.http.put<NotificationPreference[]>(`${this.base}/push/preferences`, {
       preferences,
     });
   }

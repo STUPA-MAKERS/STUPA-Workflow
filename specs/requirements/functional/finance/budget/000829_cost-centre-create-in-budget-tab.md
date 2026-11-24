@@ -22,7 +22,7 @@ scope:
 # A Kostenstelle is created in the Haushalt tab
 
 The Haushalt tab must offer the action "Kostenstelle anlegen" to a person with
-`budget.structure`, as the main action of the page (000198). The form must take the parent
+`budget.structure`, as the main action of the page (ui-kit:000198). The form must take the parent
 (the budget or a Kostenstelle below it), the key and the name. The form of the view
 Bewirtschaftung must take no side, because a node holds none (000853). The view
 Bewirtschaftung must offer the action for a fiscal year without a version in force. The view Planung must offer it only while the shown

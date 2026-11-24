@@ -9,40 +9,6 @@
   @include surface.context(1);
 }
 
-.bp__nodeRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  padding-inline-start: calc(var(--bp-depth, 0) * 1.25rem);
-}
-.bp__node {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.bp__name {
-  overflow-wrap: anywhere;
-}
-// A Vermerk of a line breaks between its words, and inside a word when the column has no
-// room for the word, as the name above it does. A text that cannot break sets the least
-// width of the name column, and the five columns of a draft then do not fit the table area.
-.bp__node app-status-text {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-.bp__path {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.bp__num {
-  white-space: nowrap;
-}
-.bp__plan {
-  font-weight: var(--fw-semibold);
-}
 .bp__sheet {
   display: flex;
   flex-direction: column;
@@ -72,37 +38,6 @@
 }
 :host .bp__table ::ng-deep .dt__table :is(th, td):last-child {
   padding-inline-end: var(--space-3);
-}
-
-
-/* Wide enough for an Ansatz below 10 million euro, so the five columns of a draft fit a
-   laptop window. A plan that holds a larger Ansatz takes the width of the largest one that a
-   plan takes (9.999.999.999,99 €), so the field never shows a part of an amount that reads
-   as another amount. */
-.bp__field {
-  display: block;
-  width: 9.5rem;
-  margin-inline-start: auto;
-}
-.bp__field--wide {
-  width: 12rem;
-}
-
-/* A field in a table row has no fill, only a thin edge. A filled field is a dark block in
-   each row, and the hover of a row takes the same surface step as the fill, so the box of
-   the field disappears under the pointer. The edge stays visible on every row surface.
-   The tokens of a display setting (highlighted fields, very high contrast) still win,
-   because the rule reads them first. */
-:host app-currency-input.bp__field ::ng-deep .cur {
-  background: var(--field-bg, transparent);
-}
-:host app-currency-input.bp__field ::ng-deep .cur:not(:focus-within, .cur--invalid) {
-  box-shadow: var(--field-edge, inset 0 0 0 1px var(--color-border));
-}
-@media (hover: hover) {
-  :host app-currency-input.bp__field ::ng-deep .cur:hover {
-    background: var(--field-bg-hover, transparent);
-  }
 }
 
 /* The Erläuterung of a version that takes no change shows the disabled state of the amount
@@ -137,33 +72,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-/* The sum of a parent in a table with amount fields has the geometry of a field without its
-   box: the same width, the same inner padding and the € in the same place. So every
-   amount and every € of the column end on one edge, and the sum reads as a value that
-   nobody types. */
-.bp__sum {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-1);
-  min-height: var(--control-height);
-  padding: 0 var(--space-4);
-  box-sizing: border-box;
-}
-.bp__sumDigits {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.bp__sumSign {
-  color: var(--color-text-muted);
-}
-
-.bp__sub {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-2);
 }
 
 .bp__addForm {
@@ -241,32 +149,13 @@
   width: 8em;
 }
 
-/* The plan tree (001130). A row with children has a chevron that opens and closes it, and a
-   line for each level above a row runs through the column of the chevrons, so a row shows
-   where it belongs also far below its Titel. The rows of the tree stand 2px apart, and a line
-   reaches 1px into each gap, so the lines do not break. The first line belongs to the Titel:
-   in the list beside the plan a Titel has depth 1 below the top-level row, on a phone 0. */
+/* The plan tree (001130): the rows are `app-plan-tree-row-view` of the kit, which draws the
+   lines of the levels. The first line belongs to the Titel: in the list beside the plan a Titel
+   has depth 1 below the top-level row, on a phone 0 (`--bp-g0`). */
 .tn {
   position: relative;
-}
-.bp__tree .tn::before {
-  content: '';
-  position: absolute;
-  inset-block: -1px;
-  inset-inline-start: calc(4px + var(--bp-g0, 1) * 20px + 0.875rem);
-  width: max(0px, calc((var(--tn-depth, 1) - var(--bp-g0, 1)) * 20px));
-  background: repeating-linear-gradient(to right, var(--color-border-strong) 0 1px, transparent 1px 20px);
-  pointer-events: none;
 }
 .bp__phoneTree {
   --bp-g0: 0;
   overflow: visible;
-}
-/* A Haushaltstitel has a long name. It breaks into a second line before it is cut. */
-.bp__treeName {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow-wrap: anywhere;
 }

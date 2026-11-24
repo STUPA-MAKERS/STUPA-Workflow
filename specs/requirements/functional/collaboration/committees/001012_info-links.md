@@ -20,7 +20,7 @@ scope:
 Each link of the Info tab must have a label of 1 to 80 characters and a URL with the scheme
 `https`, `http` or `mailto`. The server must refuse every other scheme with 422. The list must
 keep the order that the editor sets. A Gremium must have at most 30 links. A link must open in
-a new tab with `rel="noopener"` (000209).
+a new tab with `rel="noopener"` (ui-kit:000209).
 
 Reason: A `javascript:` or `data:` address in a shared list is an attack on every reader.
 

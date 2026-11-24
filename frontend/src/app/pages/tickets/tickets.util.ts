@@ -1,9 +1,12 @@
-import type { PersonRef } from '@core/api/models';
+import type { PersonRef, ScanState } from '@core/api/models';
 import type {
+  TicketArea,
   TicketEvent,
   TicketEventPayload,
   TicketKind,
+  TicketMail,
   TicketReporter,
+  TicketSource,
   TicketStatus,
 } from '@core/api/tickets.service';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
@@ -11,6 +14,7 @@ import type { IconName } from '@stupa-makers/ui-kit';
 import { daysUntil, shortDay } from '@shared/date-format';
 import { personLabel, personName } from '@shared/person-label.util';
 import {
+  formatBytes,
   type StatusKind,
 } from '@stupa-makers/ui-kit';
 
@@ -28,24 +32,60 @@ export const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   barrier: 'tickets.kind.barrier',
 };
 
+/** The icon of a ticket: the icon of its kind, else the ticket of a Bereich without kinds. */
+export function ticketIcon(kind: TicketKind | null): IconName {
+  return kind ? KIND_ICON[kind] : 'ticket';
+}
+
+/** The Bereich of a ticket in the list of the Bereiche; null while the list loads. */
+export function areaOf(areaId: string, areas: readonly TicketArea[]): TicketArea | null {
+  return areas.find((a) => a.id === areaId) ?? null;
+}
+
+/**
+ * The Kategorie of a ticket by name: the kind in the Bereich "Plattform", else the
+ * Kategorie of its Bereich. The empty string: no Kategorie.
+ */
+export function categoryName(
+  ticket: { readonly kind: TicketKind | null; readonly categoryId: string | null; readonly areaId: string },
+  areas: readonly TicketArea[],
+  t: Translate,
+): string {
+  if (ticket.kind) return t(KIND_LABEL[ticket.kind]);
+  const area = areaOf(ticket.areaId, areas);
+  return area?.categories.find((c) => c.id === ticket.categoryId)?.name ?? '';
+}
+
 export const STATUS_LABEL: Record<TicketStatus, TranslationKey> = {
   new: 'tickets.status.new',
   in_progress: 'tickets.status.in_progress',
+  waiting: 'tickets.status.waiting',
   done: 'tickets.status.done',
   rejected: 'tickets.status.rejected',
+};
+
+/** The source of a ticket by name. */
+export const SOURCE_LABEL: Record<TicketSource, TranslationKey> = {
+  help: 'tickets.source.help',
+  mail: 'tickets.source.mail',
+  team: 'tickets.source.team',
 };
 
 /** The colour of a state: new is the accent, work in progress the warning colour. */
 export const STATUS_KIND: Record<TicketStatus, StatusKind> = {
   new: 'accent',
   in_progress: 'warn',
+  waiting: 'neutral',
   done: 'neutral',
   rejected: 'muted',
 };
 
-/** Done and rejected close a ticket; the other two are open. */
+/** The open states in the order of the list. "Wartet auf Antwort" is open. */
+export const OPEN_STATUSES: readonly TicketStatus[] = ['new', 'in_progress', 'waiting'];
+
+/** Done and rejected close a ticket; the other three are open. */
 export function isOpen(status: TicketStatus): boolean {
-  return status === 'new' || status === 'in_progress';
+  return OPEN_STATUSES.includes(status);
 }
 
 /** The reporter: the name, else the e-mail, else "Anonymisiert". */
@@ -122,9 +162,96 @@ export function eventText(event: TicketEvent, reporter: string, t: Translate): s
       const to = t(KIND_LABEL[p.to as TicketKind] ?? 'tickets.kind.bug');
       return t('tickets.event.kind', { actor, from, to });
     }
+    case 'category': {
+      const none = t('tickets.detail.noCategory');
+      const from = typeof p.from === 'string' ? p.from : none;
+      const to = typeof p.to === 'string' ? p.to : none;
+      return t('tickets.event.kind', { actor, from, to });
+    }
+    case 'area':
+      return t('tickets.event.area', {
+        actor,
+        from: p.fromName ?? t('tickets.event.areaGone'),
+        to: p.toName ?? t('tickets.event.areaGone'),
+      });
     case 'todo_done':
       return p.cardTitle
         ? t('tickets.event.todoDone', { actor, title: p.cardTitle })
         : t('tickets.event.todoDoneHidden', { actor });
+    case 'mail_auto':
+      return t('tickets.event.mailAuto', {
+        name: typeof p.from === 'string' ? p.from : reporter,
+        subject: p.subject ?? '',
+      });
   }
+}
+
+/** The file name of the source of a mail in the thread. */
+export const MAIL_SOURCE_NAME = 'Original-Mail.eml';
+
+/** The scan state of a mail source as the chat shows it; null when the source is gone. */
+export function mailSourceScan(mail: TicketMail): ScanState | null {
+  if (mail.source === 'gone') return null;
+  if (mail.source === 'clean') return 'clean';
+  return mail.source === 'infected' ? 'quarantined' : 'scanning';
+}
+
+/**
+ * The line that names the files of a mail that were left out, with the size of each
+ * ("Nicht übernommen: plan.zip (2 MB, Dateityp nicht erlaubt)"); empty without one.
+ */
+export function skippedLine(mail: TicketMail | undefined, locale: string, t: Translate): string {
+  if (!mail?.skipped.length) return '';
+  const files = mail.skipped.map((f) =>
+    t(f.reason === 'size' ? 'tickets.mail.skippedSize' : 'tickets.mail.skippedType', {
+      name: f.name,
+      size: formatBytes(f.size, locale, 'file'),
+    }),
+  );
+  return t('tickets.mail.skipped', { files: files.join(', ') });
+}
+
+/**
+ * The hint under an imported mail whose sender is not checked: it answers no mail that
+ * the Postfach sent to its address (§F/integrations/ticket-mail/002816); empty otherwise.
+ */
+export function uncheckedLine(mail: TicketMail | undefined, t: Translate): string {
+  return mail?.direction === 'in' && !mail.senderChecked ? t('tickets.mail.unchecked') : '';
+}
+
+/** The text of a message with the line of its left-out files under it. */
+export function withSkipped(body: string, line: string): string {
+  return line ? (body ? `${body}\n\n${line}` : line) : body;
+}
+
+/** The addresses of a sent mail as one text: "a@x.org (Cc: b@x.org)". */
+export function recipientsText(to: readonly string[], cc: readonly string[], t: Translate): string {
+  return cc.length ? t('tickets.mail.toCc', { to: to.join(', '), cc: cc.join(', ') }) : to.join(', ');
+}
+
+/**
+ * The line under a message that went out as a mail: its recipients ("Gesendet an
+ * anna@example.org (Cc: ben@example.org)"). A mail that waits or failed has "Mail an …",
+ * because the chat names that state under the message. Empty for another message.
+ */
+export function sentLine(mail: TicketMail | undefined, t: Translate): string {
+  if (mail?.direction !== 'out' || !mail.state) return '';
+  const people = recipientsText(mail.to ?? [], mail.cc, t);
+  return t(mail.state === 'sent' ? 'tickets.mail.sent' : 'tickets.mail.waiting', { people });
+}
+
+const MAIL_ADDRESS = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** The addresses that a person typed with commas, semicolons or spaces between them. */
+export function parseAddresses(text: string): readonly string[] {
+  const found = text
+    .split(/[\s,;]+/)
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set(found)];
+}
+
+/** True when each entry is an e-mail address. */
+export function addressesValid(list: readonly string[]): boolean {
+  return list.every((a) => MAIL_ADDRESS.test(a));
 }

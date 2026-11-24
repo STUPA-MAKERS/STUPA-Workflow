@@ -1,128 +1,35 @@
-<div class="ap__head" [class.ap__head--sheet]="inSheet()">
-  <h2 class="ap__title" [class.sr-only]="inSheet()">{{ 'meetings.agenda.title' | t }}</h2>
-  @if (canChangeAgenda() && !inSheet()) {
-    <button
-      type="button"
-      class="ap__add"
-      [attr.aria-label]="'meetings.agenda.dialogTitle' | t"
-      [title]="'meetings.agenda.dialogTitle' | t"
-      (click)="add.emit()"
-    >
-      <app-icon name="plus" [size]="20" />
-    </button>
-  }
-</div>
-
-@if (agenda().length) {
-  <ol
-    class="ap__list"
-    cdkDropList
-    [cdkDropListDisabled]="!canChangeAgenda()"
-    (cdkDropListDropped)="dropped($event)"
-  >
-    @for (item of agenda(); track item.id; let i = $index) {
-      @let done = isDone(item);
-      <li
-        class="ap__row"
-        cdkDrag
-        cdkDragPreviewClass="ap__preview"
-        [cdkDragStartDelay]="dragDelay"
-        [cdkDragDisabled]="!canDrag(item)"
-        [class.ap__row--done]="done"
-        [class.ap__row--drag]="canChangeAgenda()"
-      >
-        @if (renaming(item)) {
-          <div class="ap__rename">
-            <app-top-badge [number]="i + 1" decorative />
-            <input
-              class="ap__input"
-              name="renameTop"
-              [ngModel]="renameDraft()"
-              (ngModelChange)="renameDraft.set($event)"
-              (keyup.enter)="renameTop.emit(item)"
-              (keyup.escape)="cancelRename.emit()"
-              (blur)="renameTop.emit(item)"
-              [placeholder]="'meetings.agenda.renamePlaceholder' | t"
-              [attr.aria-label]="'meetings.agenda.rename' | t"
-              #renameInput
-            />
-          </div>
-        } @else {
-          <app-list-item
-            [title]="title(item)"
-            [sub]="sub(item, i)"
-            [selected]="item.id === selectedId()"
-            (activate)="pick.emit(item.id)"
-          >
-            <span lead>
-              <app-top-badge [number]="i + 1" [state]="done ? 'done' : isNow(item) ? 'now' : 'todo'" decorative />
-            </span>
-            @if (isNow(item) || done) {
-              <span sub class="sr-only">{{ (done ? 'meetings.dock.done' : 'meetings.dock.now') | t }}</span>
-            }
-            <span trail class="ap__trail">
-              @if (item.nonPublic) {
-                <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
-              }
-              @if (menus()[i].length) {
-                <app-button-group>
-                  <app-row-menu
-                    class="ap__menu"
-                    [sections]="menus()[i]"
-                    [label]="menuLabel(item)"
-                    (selected)="onAction(item, i, $event)"
-                  />
-                </app-button-group>
-              }
-            </span>
-          </app-list-item>
-        }
-        <div *cdkDragPlaceholder class="ap__placeholder"></div>
-      </li>
-    }
-  </ol>
-} @else {
-  <app-empty-state icon="list" shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
-}
-
-@if (todoOpen()) {
-  <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
-}
-<app-todo-link-picker [(open)]="linkOpen" [exclude]="linkEnd()" (picked)="linkPicked($event)" />
-
-<app-confirm-dialog
-  appBodyPortal
-  [open]="removing() !== null"
-  [title]="'meetings.agenda.removeTitle' | t"
-  [body]="'meetings.agenda.removeConfirm' | t: { title: removing() ? title(removing()!) : '' }"
-  [confirmLabel]="'action.remove' | t"
-  (confirm)="confirmRemove()"
-  (cancel)="removing.set(null)"
+<app-agenda-pane-view
+  [meeting]="meeting()"
+  [agenda]="agenda()"
+  [selectedId]="selectedId()"
+  [locked]="locked()"
+  [savingAgenda]="savingAgenda()"
+  [renamingTopId]="renamingTopId()"
+  [(renameDraft)]="renameDraft"
+  [inSheet]="inSheet()"
+  [canTick]="canTick()"
+  [canTodo]="canTodo()"
+  (pick)="pick.emit($event)"
+  (add)="add.emit()"
+  (startRename)="startRename.emit($event)"
+  (cancelRename)="cancelRename.emit()"
+  (renameTop)="renameTop.emit($event)"
+  (setNonPublic)="setNonPublic.emit($event)"
+  (setDone)="setDone.emit($event)"
+  (setDuration)="setDuration.emit($event)"
+  (move)="move.emit($event)"
+  (remove)="remove.emit($event)"
+  (todoNew)="openTodo($event)"
+  (todoLink)="openLink($event)"
 />
 
-@if (durationItem(); as item) {
-  <app-dialog
+@if (todoOpen()) {
+  <app-todo-new-dialog
     appBodyPortal
-    [open]="true"
-    [title]="'meetings.agenda.durationEdit' | t"
-    [closeLabel]="'action.close' | t"
-    size="form"
-    (closed)="durationItem.set(null)"
-  >
-    <form (submit)="$event.preventDefault(); saveDuration()">
-      <app-input
-        type="number"
-        name="minutes"
-        [id]="'ap-minutes'"
-        [label]="'meetings.agenda.duration' | t"
-        [suffix]="'meetings.agenda.durationUnit' | t"
-        [error]="durationInvalid() ? ('meetings.agenda.durationRange' | t) : ''"
-        [ngModel]="durationDraft()"
-        (ngModelChange)="durationDraft.set($event)"
-      />
-      <button type="submit" hidden></button>
-    </form>
-    <app-button dialog-footer variant="text" (click)="durationItem.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button dialog-footer variant="fill" [disabled]="durationInvalid()" (click)="saveDuration()">{{ 'action.save' | t }}</app-button>
-  </app-dialog>
+    [(open)]="todoOpen"
+    [gremiumId]="meeting().gremiumId"
+    [initialLinks]="todoLinks()"
+    (created)="onTodoCreated($event)"
+  />
 }
+<app-todo-link-picker [(open)]="linkOpen" [exclude]="linkEnd()" (picked)="linkPicked($event)" />

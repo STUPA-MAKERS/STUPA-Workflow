@@ -21,6 +21,7 @@ import type {
   VoteKind,
 } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { DecisionEditorComponent } from '@shared/decision/decision-editor.component';
 import {
@@ -48,6 +49,8 @@ import {
   TextareaComponent,
   ToastService,
   TruncatedDirective,
+  DialogBodyDirective,
+  type Action,
 } from '@stupa-makers/ui-kit';
 import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
 import { problemDetail } from '@core/api/problem';
@@ -131,6 +134,7 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     TextareaComponent,
     MoveButtonsComponent,
     EmptyStateComponent,
@@ -271,6 +275,55 @@ export class VoteOpenDialogComponent {
     if (!this.isElection()) return !this.proposalInvalid();
     return !this.tooFew() && !this.nameTwice() && this.question().trim().length > 0;
   });
+
+  /**
+   * The footer: Abbrechen, then Speichern while it edits, else Vorbereiten, and Öffnen while
+   * the vote can open at once (then Vorbereiten is the second action).
+   */
+  readonly footer = computed<readonly Action[]>(() => {
+    const t = (k: TranslationKey) => this.i18n.translate(k);
+    const busy = this.submitting();
+    const preparing = this.preparing();
+    const ok = this.canSubmit();
+    const cancel: Action = { key: 'cancel', label: t('action.cancel') };
+    if (this.editing()) {
+      return [
+        cancel,
+        { key: 'prepare', label: t('meetings.vote.save'), kind: 'main', busy, disabled: !ok },
+      ];
+    }
+    const open = this.canOpen();
+    const prepare: Action = {
+      key: 'prepare',
+      label: t('meetings.vote.prepare'),
+      kind: open ? 'normal' : 'main',
+      busy: busy && preparing,
+      disabled: !ok || (busy && !preparing),
+    };
+    if (!open) return [cancel, prepare];
+    const openLabel: TranslationKey = this.isPoll()
+      ? 'poll.dialog.submit'
+      : this.isElection()
+        ? 'election.dialog.submit'
+        : 'meetings.vote.openSubmit';
+    return [
+      cancel,
+      prepare,
+      {
+        key: 'open',
+        label: t(openLabel),
+        icon: 'vote',
+        kind: 'main',
+        busy: busy && !preparing,
+        disabled: !ok || (busy && preparing),
+      },
+    ];
+  });
+
+  onFooter(key: string): void {
+    if (key === 'cancel') this.cancel();
+    else this.submit(key === 'prepare');
+  }
 
   /** "Jede Person hat 2 Stimmen …": the rule of the election in one sentence. */
   readonly ruleSentence = computed(() => {
@@ -521,26 +574,27 @@ export class VoteOpenDialogComponent {
             ...(src?.mode === 'repeat' ? { repeatOf: src.vote.id } : {}),
           });
     request.subscribe({
-        next: (updated) => {
-          this.submitting.set(false);
-          this.toast.success(
-            this.i18n.translate(
-              src?.mode === 'edit'
-                ? 'meetings.toast.voteSaved'
-                : prepare
-                  ? 'meetings.toast.votePrepared'
-                  : 'meetings.toast.voteOpened',
-            ),
-          );
-          this.opened.emit(updated);
-        },
-        error: (err: unknown) => {
-          this.submitting.set(false);
-          const detail = problemDetail(err);
-          const base = this.i18n.translate('meetings.toast.actionFailed');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
-        },
-      });
+      next: (updated) => {
+        this.submitting.set(false);
+        this.toast.show(
+          this.i18n.translate(
+            src?.mode === 'edit'
+              ? 'meetings.toast.voteSaved'
+              : prepare
+                ? 'meetings.toast.votePrepared'
+                : 'meetings.toast.voteOpened',
+          ),
+          'success',
+        );
+        this.opened.emit(updated);
+      },
+      error: (err: unknown) => {
+        this.submitting.set(false);
+        const detail = problemDetail(err);
+        const base = this.i18n.translate('meetings.toast.actionFailed');
+        this.toast.show(detail ? `${base}: ${detail}` : base, 'error');
+      },
+    });
   }
 }
 

@@ -1,52 +1,59 @@
 <app-dialog
   [open]="open()"
-  [title]="'observers.title' | t"
+  [heading]="'observers.title' | t"
   [closeLabel]="'action.close' | t"
   (closed)="closed.emit()"
 >
-  <div class="od">
-    @if (loading()) {
-      <ul class="rowgroup rowgroup--records od__list" aria-hidden="true">
-        <li class="od__row skel-in"><span class="skel-text od__skel"></span></li>
-      </ul>
-    } @else if (observers().length) {
-      <ul class="rowgroup rowgroup--records od__list" [attr.aria-label]="'observers.title' | t">
-        @for (o of observers(); track o.id) {
-          <li class="od__row">
-            <span class="od__who">
-              <app-avatar size="sm" [name]="o.email" [decorative]="true" />
-              <span class="od__mail" [title]="o.email">{{ o.email }}</span>
-            </span>
-            <app-button-group>
-              <app-row-menu
-                [sections]="menu(o)"
-                [label]="'observers.menu' | t: { email: o.email }"
-                (selected)="remove($event)"
-              />
-            </app-button-group>
-          </li>
-        }
-      </ul>
-    } @else {
-      <app-empty-state icon="eye" shape="person" rows="1" [heading]="'observers.empty' | t" />
-    }
-    @if (!loading() && !full()) {
-      <form class="od__add" (submit)="$event.preventDefault(); add()">
-        <app-input
-          class="od__input"
-          name="email"
-          type="email"
-          [label]="'observers.email' | t"
-          [error]="error() ? (error()! | t) : ''"
-          [ngModel]="text()"
-          (ngModelChange)="onText($event)"
-        />
-        <app-button-group>
-          <app-button type="submit" variant="tonal" [loading]="saving()" [disabled]="!text().trim()">
-            <app-icon name="plus" /> {{ 'observers.add' | t }}
-          </app-button>
-        </app-button-group>
-      </form>
-    }
-  </div>
+  <ng-template dialogBody>
+    <div class="od">
+      @if (loading()) {
+        <ul class="rowgroup rowgroup--records od__list" aria-hidden="true">
+          <li class="od__row skel-in"><span class="skel-text od__skel"></span></li>
+        </ul>
+      } @else if (observers().length) {
+        <ul class="rowgroup rowgroup--records od__list" [attr.aria-label]="'observers.title' | t">
+          @for (o of observers(); track o.id) {
+            <li class="od__row">
+              <span class="od__who">
+                <app-avatar size="sm" [name]="o.email" [decorative]="true" />
+                <span class="od__mail" [title]="o.email">{{ o.email }}</span>
+              </span>
+              <app-button-group>
+                <app-row-menu
+                  [sections]="menu(o)"
+                  [label]="'observers.menu' | t: { email: o.email }"
+                  (selected)="remove($event)"
+                />
+              </app-button-group>
+            </li>
+          }
+        </ul>
+      } @else {
+        <app-empty-state icon="eye" shape="person" rows="1" [heading]="'observers.empty' | t" />
+      }
+      @if (!loading() && !full()) {
+        <form class="od__add" (submit)="$event.preventDefault(); add()">
+          <app-input
+            class="od__input"
+            name="email"
+            type="email"
+            [label]="'observers.email' | t"
+            [error]="error() ? (error()! | t) : ''"
+            [ngModel]="text()"
+            (ngModelChange)="onText($event)"
+          />
+          <app-button-group>
+            <app-button
+              type="submit"
+              variant="tonal"
+              [loading]="saving()"
+              [disabled]="!text().trim()"
+            >
+              <app-icon name="plus" /> {{ 'observers.add' | t }}
+            </app-button>
+          </app-button-group>
+        </form>
+      }
+    </div>
+  </ng-template>
 </app-dialog>

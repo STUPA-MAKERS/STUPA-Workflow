@@ -5,9 +5,19 @@ import userEvent from '@testing-library/user-event';
 import type { MeetingStatus, MeetingVote } from '@core/api/models';
 import { vote } from '../../../../testing/meeting-fixtures';
 import { liveOpenedVote } from '../meetings-display.util';
-import { VoteCardComponent } from './vote-card.component';
+import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
+import { provideVotingApi } from '../../voting/voting-api.provider';
 
-const OUTPUTS = ['close', 'cancel', 'open', 'remove', 'cast', 'insertResult', 'edit', 'repeat'] as const;
+const OUTPUTS = [
+  'close',
+  'cancel',
+  'open',
+  'remove',
+  'cast',
+  'insertResult',
+  'edit',
+  'repeat',
+] as const;
 
 interface Inputs {
   vote: MeetingVote;
@@ -31,7 +41,7 @@ async function setup(over: Partial<Inputs> = {}) {
     (typeof OUTPUTS)[number],
     jest.Mock
   >;
-  const view = await render(VoteCardComponent, {
+  const view = await render(VoteCardViewComponent, {
     inputs: {
       vote: vote(),
       meetingStatus: 'live',
@@ -48,7 +58,7 @@ async function setup(over: Partial<Inputs> = {}) {
       ...over,
     },
     on,
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideVotingApi()],
   });
   return { ...view, on };
 }
@@ -65,7 +75,7 @@ async function menuItem(name: string): Promise<HTMLElement | null> {
   return item;
 }
 
-describe('VoteCardComponent', () => {
+describe('VoteCardViewComponent', () => {
   describe('an open vote', () => {
     /** The lead gets no interim tally and no line that explains it. */
     it('shows the question, the rules and the progress, but no tally before all voted', async () => {
@@ -79,17 +89,23 @@ describe('VoteCardComponent', () => {
         }),
       });
       expect(screen.queryByText('Abstimmung offen')).toBeNull();
-      expect(screen.getByRole('heading', { name: 'Wird der Nachtragshaushalt beschlossen?' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Wird der Nachtragshaushalt beschlossen?' }),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/Einfache Mehrheit/)).toBeNull();
       expect(screen.getByText('3 von 4 Anwesenden haben abgestimmt')).toBeInTheDocument();
       expect(screen.getByText('75 %')).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' }),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
       expect(screen.queryByRole('definition')).toBeNull();
     });
 
     it('shows the counts once the server reveals them', async () => {
-      await setup({ vote: vote({ voted: 4, revealed: true, counts: { yes: 3, no: 1 }, leading: 'yes' }) });
+      await setup({
+        vote: vote({ voted: 4, revealed: true, counts: { yes: 3, no: 1 }, leading: 'yes' }),
+      });
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
       expect(screen.getByText('Ja').closest('.vc__count')).toHaveClass('vc__count--lead');
       expect(screen.getByText('3')).toBeInTheDocument();
@@ -97,7 +113,9 @@ describe('VoteCardComponent', () => {
     });
 
     it('names the rules of a planned vote with a percentage quorum, not its secrecy', async () => {
-      await setup({ vote: vote({ status: 'draft', secret: true, quorum: { type: 'percent', value: 50 } }) });
+      await setup({
+        vote: vote({ status: 'draft', secret: true, quorum: { type: 'percent', value: 50 } }),
+      });
       expect(screen.getByText(/Quorum 50 %/)).toBeInTheDocument();
       expect(screen.queryByText(/geheime Abstimmung/)).toBeNull();
       expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
@@ -126,7 +144,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
-    /** An open vote is part of the record, so there is no delete (§ 001007). */
+    /** An open vote is part of the record, so there is no delete (§ui-kit:001007). */
     it('closes with the one button and cancels from the menu, both as danger', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
@@ -213,7 +231,7 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
     });
 
-    /** The pending lot is the next step; the insert waits in the menu (§ 001006, § 001007). */
+    /** The pending lot is the next step; the insert waits in the menu (§ui-kit:001006, §ui-kit:001007). */
     it('states a pending lot once and makes "Los ziehen" the one button', async () => {
       const tie = vote({
         status: 'closed',
@@ -221,7 +239,14 @@ describe('VoteCardComponent', () => {
         kind: 'election',
         counts: { c1: 2, c2: 2, abstain: 0 },
         revealed: true,
-        election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+        election: {
+          seats: 1,
+          candidates: [
+            { id: 'c1', name: 'A' },
+            { id: 'c2', name: 'B' },
+          ],
+          secret: true,
+        },
         electionResult: {
           counts: { c1: 2, c2: 2 },
           abstentions: 0,
@@ -249,7 +274,9 @@ describe('VoteCardComponent', () => {
 
   describe('a planned or cancelled vote', () => {
     it('opens and deletes a planned vote while the meeting is live', async () => {
-      const { on } = await setup({ vote: vote({ status: 'draft', majorityRule: 'absolute', secret: true }) });
+      const { on } = await setup({
+        vote: vote({ status: 'draft', majorityRule: 'absolute', secret: true }),
+      });
       expect(screen.getByText('Abstimmung vorbereitet')).toBeInTheDocument();
       expect(screen.getByText('Absolute Mehrheit')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
@@ -264,7 +291,9 @@ describe('VoteCardComponent', () => {
       const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
       expect(open).toBeDisabled();
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
-      expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.')).toHaveClass('vc__hint');
+      expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.')).toHaveClass(
+        'vc__hint',
+      );
       await userEvent.click(open);
       expect(on.open).not.toHaveBeenCalled();
       expect(await menuItem('Beschlussfrage löschen')).not.toBeNull();
@@ -273,19 +302,27 @@ describe('VoteCardComponent', () => {
     it('does not open a planned vote before the meeting runs', async () => {
       await setup({ vote: vote({ status: 'draft' }), meetingStatus: 'planned' });
       expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
-      expect(screen.getByText('Öffnen kannst du sie, sobald die Sitzung eröffnet ist.')).toHaveClass('vc__hint');
+      expect(
+        screen.getByText('Öffnen kannst du sie, sobald die Sitzung eröffnet ist.'),
+      ).toHaveClass('vc__hint');
       expect(await menuItem('Beschlussfrage löschen')).not.toBeNull();
     });
 
     it('deletes a cancelled vote, but not twice while the delete is in flight', async () => {
-      const { on } = await setup({ vote: vote({ status: 'cancelled', closedAt: null }), deleting: 'v-1' });
+      const { on } = await setup({
+        vote: vote({ status: 'cancelled', closedAt: null }),
+        deleting: 'v-1',
+      });
       expect(screen.getByText('Abstimmung abgebrochen')).toBeInTheDocument();
       await userEvent.click((await menuItem('Beschlussfrage löschen'))!);
       expect(on.remove).not.toHaveBeenCalled();
     });
 
     it('keeps the votes of a closed meeting, of a locked protocol and of a reader', async () => {
-      const { fixture } = await setup({ vote: vote({ status: 'cancelled' }), meetingStatus: 'closed' });
+      const { fixture } = await setup({
+        vote: vote({ status: 'cancelled' }),
+        meetingStatus: 'closed',
+      });
       expect(screen.queryByRole('button', { name: MENU })).toBeNull();
       fixture.componentRef.setInput('meetingStatus', 'live');
       fixture.componentRef.setInput('locked', true);
@@ -306,7 +343,14 @@ describe('VoteCardComponent', () => {
 
   describe('a vote with guests', () => {
     it('leaves the room and the rules off while open', async () => {
-      await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
+      await setup({
+        vote: vote({
+          guestsVote: true,
+          majorityRule: 'simple',
+          presentMembers: 19,
+          presentGuests: 7,
+        }),
+      });
       expect(screen.queryByText('19 Mitglieder + 7 Gäste anwesend')).toBeNull();
       expect(screen.queryByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeNull();
     });
@@ -331,7 +375,13 @@ describe('VoteCardComponent', () => {
 
     it('says "nicht erreicht" for a rejection and skips the room while unknown', async () => {
       await setup({
-        vote: vote({ guestsVote: true, status: 'closed', result: 'rejected', counts: null, revealed: true }),
+        vote: vote({
+          guestsVote: true,
+          status: 'closed',
+          result: 'rejected',
+          counts: null,
+          revealed: true,
+        }),
       });
       const sum = document.querySelector('.vc__sum')!;
       expect(sum).toHaveTextContent('nicht erreicht');
@@ -371,7 +421,14 @@ describe('VoteCardComponent', () => {
           status: 'closed',
           result: 'elected',
           kind: 'election',
-          election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+          election: {
+            seats: 1,
+            candidates: [
+              { id: 'c1', name: 'A' },
+              { id: 'c2', name: 'B' },
+            ],
+            secret: true,
+          },
           electionResult: { counts: { c1: 2, c2: 1 }, abstentions: 0, ballots: 3, elected: ['c1'] },
         }),
         canRepeat: true,
@@ -396,7 +453,14 @@ describe('VoteCardComponent', () => {
           attempt: 2,
           repeatOfId: 'v-0',
           kind: 'election',
-          election: { seats: 1, candidates: [{ id: 'c1', name: 'A' }, { id: 'c2', name: 'B' }], secret: true },
+          election: {
+            seats: 1,
+            candidates: [
+              { id: 'c1', name: 'A' },
+              { id: 'c2', name: 'B' },
+            ],
+            secret: true,
+          },
         }),
       });
       expect(screen.getByText(/^2\. Wahlgang · /)).toBeInTheDocument();

@@ -9,8 +9,8 @@ metadata:
 The rules are specs in `specs/` of the STUPA-Workflow repository. Read the spec, not this
 file:
 
-- `NF/usability/controls/000205` Empty states use one component
-- `NF/usability/controls/001360` An empty list shows a face in a ring of dots
-- `NF/usability/controls/001361` The face of an empty state moves until motion is reduced
-- `NF/usability/controls/001362` The face of an empty state is white in very high contrast
-- `NF/usability/controls/001363` An empty state has no reset button
+- `ui-kit:NF/usability/controls/000205` Empty states use one component
+- `ui-kit:NF/usability/controls/001360` An empty list shows a face in a ring of dots
+- `ui-kit:NF/usability/controls/001361` The face of an empty state moves until motion is reduced
+- `ui-kit:NF/usability/controls/001362` The face of an empty state is white in very high contrast
+- `ui-kit:NF/usability/controls/001363` An empty state has no reset button

@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { LinkToDirective } from '../../../shared/link-to.directive';
 import { catchError, forkJoin, map, of, switchMap, type Observable, type Subscription } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -78,12 +79,17 @@ import {
   SectionComponent,
   ConfirmDialogComponent,
   FactsComponent,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { TodoAgendaDialogComponent } from '../agenda-dialog/todo-agenda-dialog.component';
-import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoLinkViewComponent } from '../link-view/todo-link-view.component';
-import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import {
+  TodoDueChipViewComponent,
+  TodoMoveSheetViewComponent,
+  type MoveChoice,
+  type MoveColumn,
+} from '@stupa-makers/ui-kit/views/board';
 import { type NewTodoLink, type TodoCardCopy, TodoNewDialogComponent } from '../new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
@@ -96,7 +102,6 @@ import {
   linkTitle,
   relativeDays,
   sheetMove,
-  splitUrl,
 } from '../todos.util';
 import { dayMonthYear, isoDay, weekdayDate } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
@@ -159,6 +164,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBodyDirective,
     FactsComponent,
     LoadErrorComponent,
     ConfirmDialogComponent,
@@ -167,6 +173,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
+    LinkToDirective,
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
@@ -188,9 +195,9 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SideSheetComponent,
     SkeletonComponent,
     TimeInputComponent,
-    TodoDueChipComponent,
+    TodoDueChipViewComponent,
     TodoLinkPickerComponent,
-    TodoMoveSheetComponent,
+    TodoMoveSheetViewComponent,
     TodoNewDialogComponent,
     TodoAgendaDialogComponent,
     TodoTransferDialogComponent,
@@ -302,7 +309,7 @@ export class TodoCardDetailComponent {
         comments: appendOnce(c.comments, comment),
         commentCount: c.commentCount + (c.comments.some((x) => x.id === comment.id) ? 0 : 1),
       })),
-    (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
+    (err) => this.toast.show(this.t(sendErrorKey(err, 'todos.error.comment')), 'error'),
     draftDropper(this.files),
   );
 
@@ -625,10 +632,6 @@ export class TodoCardDetailComponent {
     return linkTitle(link, this.t);
   }
 
-  route(url: string) {
-    return splitUrl(url);
-  }
-
   /** The card as a link end: the picker leaves it and its links out (spec 001408). */
   readonly linkSelf = computed<LinkEnd | null>(() => {
     const c = this.card();
@@ -861,7 +864,7 @@ export class TodoCardDetailComponent {
       this.card.set(null);
       return;
     }
-    this.toast.error(this.t((code && ERROR_TEXT[code]) || 'todos.error.save'));
+    this.toast.show(this.t((code && ERROR_TEXT[code]) || 'todos.error.save'), 'error');
     this.reload();
   }
 
@@ -1158,7 +1161,7 @@ export class TodoCardDetailComponent {
       next: (card) => {
         if (!current()) return;
         this.busy.set(false);
-        this.toast.success(this.t('todos.eventCard.followUpDone'));
+        this.toast.show(this.t('todos.eventCard.followUpDone'), 'success');
         void this.router.navigate(['/todos', card.boardId], { queryParams: { card: card.id } });
       },
       error: (err: unknown) => {
@@ -1316,7 +1319,7 @@ export class TodoCardDetailComponent {
         this.transferred.emit({ card, fromBoardId: c.boardId });
         this.apply(card);
         this.loadMembers(card.boardId);
-        this.toast.success(this.t('todos.card.transferred', { board: target.boardName }));
+        this.toast.show(this.t('todos.card.transferred', { board: target.boardName }), 'success');
       },
       error: (err: unknown) => {
         if (!current()) return;
@@ -1324,7 +1327,7 @@ export class TodoCardDetailComponent {
         this.transferOpen.set(false);
         if (err instanceof HttpErrorResponse && err.status === 404) {
           this.busy.set(false);
-          this.toast.error(this.t('todos.error.transfer'));
+          this.toast.show(this.t('todos.error.transfer'), 'error');
           this.reload();
           return;
         }
@@ -1342,7 +1345,7 @@ export class TodoCardDetailComponent {
       next: () => {
         if (!current()) return;
         this.busy.set(false);
-        this.toast.success(this.t('todos.card.archived'));
+        this.toast.show(this.t('todos.card.archived'), 'success');
         this.archived.emit(c.id);
       },
       error: (err: unknown) => {
@@ -1366,8 +1369,8 @@ export class TodoCardDetailComponent {
     if (!c) return;
     const url = `${location.origin}/todos?card=${c.id}`;
     void shareOrCopy({ url, title: c.title }).then((outcome) => {
-      if (outcome === 'copied') this.toast.success(this.t('todos.card.linkCopied'));
-      else if (outcome === 'failed') this.toast.error(this.t('todos.card.linkFailed'));
+      if (outcome === 'copied') this.toast.show(this.t('todos.card.linkCopied'), 'success');
+      else if (outcome === 'failed') this.toast.show(this.t('todos.card.linkFailed'), 'error');
     });
   }
 
@@ -1402,7 +1405,7 @@ export class TodoCardDetailComponent {
       error: () => {
         if (!current()) return;
         edit.restore?.();
-        this.toast.error(this.t('todos.error.comment'));
+        this.toast.show(this.t('todos.error.comment'), 'error');
       },
     });
   }
@@ -1421,7 +1424,7 @@ export class TodoCardDetailComponent {
         }));
       },
       error: () => {
-        if (current()) this.toast.error(this.t('todos.error.comment'));
+        if (current()) this.toast.show(this.t('todos.error.comment'), 'error');
       },
     });
   }

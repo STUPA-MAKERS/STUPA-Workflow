@@ -25,11 +25,14 @@ function valueImports(source: string, from: string): string[] {
 }
 
 describe('bundleContract', () => {
-  it('imports values of the Markdown editor only in the TOP sheet, which defers it', () => {
+  it('imports values of the Markdown editor only in the TOP sheet of the kit, which defers it', () => {
     const offenders = tsFiles(APP)
       .filter((file) => valueImports(read(file), '@stupa-makers/ui-kit/markdown-editor').length > 0)
       .map((file) => relative(APP, file));
-    expect(offenders).toEqual(['features/meetings/top-sheet/top-sheet.component.ts']);
+    expect(offenders).toEqual([]);
+    const kitSheet = join(FRONTEND, 'vendor', 'ui-kit', 'views', 'protocol', 'src', 'top-sheet-view.component');
+    expect(valueImports(read(`${kitSheet}.ts`), '@stupa-makers/ui-kit/markdown-editor')).toHaveLength(1);
+    expect(read(`${kitSheet}.html`)).toContain('@defer (on immediate)');
   });
 
   it('keeps the DE texts out of the main bundle', () => {

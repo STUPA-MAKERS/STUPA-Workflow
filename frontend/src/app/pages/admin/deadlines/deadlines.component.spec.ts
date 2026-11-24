@@ -50,7 +50,7 @@ describe('AdminDeadlinesComponent', () => {
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
-  /** § 000635 */
+  /** §ui-kit:000635 */
   it('"Verwerfen" sets the fields back and hides with "Speichern"', async () => {
     const { api, fixture } = await setup();
     const hours = screen.getByLabelText<HTMLInputElement>('Unbestätigte Anträge verwerfen nach');

@@ -6,6 +6,7 @@ import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { asPhone, detail, tile } from '../../../../testing/todo-fixtures';
 import { ARCHIVE_PAGE, TodoArchiveSheetComponent } from './todo-archive-sheet.component';
 import { loadErrorToast, toastWith } from '../../../../testing/load-error';
+import { toastMock } from '../../../../testing/toast';
 
 const page = (items: TodoCardTile[], total = items.length): Page<TodoCardTile> => ({
   items,
@@ -23,7 +24,7 @@ async function setup(first: Page<TodoCardTile> = page([A, B], 3)) {
     archive: jest.fn(() => of(first)),
     restoreCard: jest.fn(() => of(detail({ id: 'a-1' }))),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const on = { openCard: jest.fn(), restored: jest.fn() };
   const view = await render(TodoArchiveSheetComponent, {
     inputs: { open: false, boardId: 'b-1' },

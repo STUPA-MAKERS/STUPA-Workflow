@@ -1,6 +1,6 @@
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <app-load-error [message]="'budget.plan.loadError' | t" (retry)="retry()" />
+  <app-load-error face [message]="'budget.plan.loadError' | t" (retry)="retry()" />
 } @else if (loading()) {
   <!-- The skeleton uses the containers of the page, so nothing moves when the plan arrives. -->
   <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
@@ -177,8 +177,7 @@
             </div>
           }
           @case ('error') {
-            <app-load-error [message]="'budget.plan.loadError' | t" (retry)="reloadPlan()" />
-            <app-empty-state plain icon="cal" fill [heading]="'budget.plan.loadError' | t" />
+            <app-load-error face [message]="'budget.plan.loadError' | t" (retry)="reloadPlan()" />
           }
           @case ('none') {
             @if (year()) {
@@ -207,40 +206,15 @@
 }
 
 <ng-template #treeRow let-row let-base="base">
-  <div
-    class="tn"
-    [class.tn--on]="row.id === selId()"
-    [style.--tn-depth]="row.depth + (base ?? 1)"
-  >
-    @if (row.hasChildren) {
-      <button
-        type="button"
-        class="tn__chev"
-        [attr.aria-expanded]="isOpen(row)"
-        [attr.aria-label]="(isOpen(row) ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: row.name }"
-        [disabled]="!!query().trim()"
-        (click)="toggle(row)"
-      >
-        <app-icon [name]="isOpen(row) ? 'down' : 'right'" [size]="17" />
-      </button>
-    } @else {
-      <span class="tn__chev" aria-hidden="true"></span>
-    }
-    <button
-      type="button"
-      class="tn__main"
-      [attr.aria-current]="row.id === selId() ? 'true' : null"
-      (click)="selectId(row.id)"
-    >
-      <span class="tn__line">
-        <span class="tn__name bp__treeName">{{ row.name }}</span>
-        @if (!row.active) {
-          <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
-        }
-        <span class="tn__amt mono">{{ money(row.amount) }}</span>
-      </span>
-    </button>
-  </div>
+  <app-plan-tree-row-view
+    [row]="row"
+    [base]="base ?? 1"
+    [selected]="row.id === selId()"
+    [open]="isOpen(row)"
+    [searching]="!!query().trim()"
+    (toggle)="toggle($event)"
+    (pick)="selectId($event.id)"
+  />
 </ng-template>
 
 <ng-template #modes>
@@ -310,21 +284,7 @@
   <app-stepper class="bp__stepper" orientation="vertical" [steps]="steps()" [activeIndex]="stepAt()" [ariaLabel]="'budget.plan.steps' | t" />
   <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
 
-  <dl class="bd__figs">
-    <div class="bd__fig">
-      <dt class="bd__figLabel">{{ 'budget.plan.income' | t }}</dt>
-      <dd class="bd__figValue mono">{{ money(incomeTotal()) }}</dd>
-    </div>
-    <div class="bd__fig">
-      <dt class="bd__figLabel">{{ 'budget.plan.expense' | t }}</dt>
-      <dd class="bd__figValue mono">{{ money(expenseTotal()) }}</dd>
-    </div>
-    <div class="bd__fig bd__fig--main bp__figWide">
-      <dt class="bd__figLabel">{{ 'budget.plan.difference' | t }}</dt>
-      <dd class="bd__figValue mono" [class.bd__neg]="!balanced()">{{ money(difference()) }}</dd>
-      <dd class="bp__figNote">{{ (balanced() ? 'budget.plan.balanced' : 'budget.plan.unbalanced') | t }}</dd>
-    </div>
-  </dl>
+  <app-plan-figures-view [income]="incomeTotal()" [expense]="expenseTotal()" />
 
   @for (group of groups(); track group.side) {
     @let sideRows = rowsOf(group.side);
@@ -504,82 +464,47 @@
 </ng-template>
 
 <ng-template #table let-rows let-nested="nested">
-  <app-data-table class="bp__table" surface="rowgroup" [loading]="load().kind === 'loading'" [columns]="columns()" [rows]="rows" [rowKey]="rowId" [clickable]="true" (rowClick)="select($event)">
-    <ng-template appCell="node" let-row>
-      <span class="bp__nodeRow" [style.--bp-depth]="nested ? $any(row).depth : 0">
-      @if (nested) {
-        @if ($any(row).hasChildren) {
-          <button type="button" class="tn__chev" [attr.aria-expanded]="isOpen($any(row))" [attr.aria-label]="(isOpen($any(row)) ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: $any(row).name }" [disabled]="!!query().trim()" (click)="$event.stopPropagation(); toggle($any(row))">
-            <app-icon [name]="isOpen($any(row)) ? 'down' : 'right'" [size]="17" />
-          </button>
-        } @else {
-          <span class="tn__chev" aria-hidden="true"></span>
-        }
-      }
-      <span class="bp__node">
-        <span class="bp__name">{{ $any(row).name }}</span>
-        <span class="bp__sub">
-          <span class="bp__path mono">{{ $any(row).pathKey | simplifyPath }}</span>
-          @if (!$any(row).active) {
-            <app-status-text kind="muted">{{ 'budget.cc.inactive' | t }}</app-status-text>
-          }
-          @if ($any(row).transferable) {
-            <app-status-text>{{ 'budget.plan.marks.transferable' | t }}</app-status-text>
-          }
-          @if ($any(row).coverable) {
-            <app-status-text>{{ 'budget.plan.marks.coverable' | t }}</app-status-text>
-          }
-          @if ($any(row).blocked > 0) {
-            <app-status-text kind="warn">{{ 'budget.plan.marks.blockedBadge' | t: { amount: money($any(row).blocked) } }}</app-status-text>
-          }
-        </span>
-      </span>
-      </span>
-    </ng-template>
-    <ng-template appCell="amount" let-row>
-      @if (tableFields() && !$any(row).hasChildren) {
-        <app-currency-input
-          class="bp__field"
-          [class.bp__field--wide]="wideFields()"
-          [name]="'amount-' + $any(row).id"
-          [ariaLabel]="'budget.plan.amountOf' | t: { name: $any(row).name }"
-          [ngModel]="fieldValue($any(row), 'amount')"
-          (ngModelChange)="edit($any(row), 'amount', $event)"
-          (focusout)="saveAmount($any(row))"
-          (click)="$event.stopPropagation()"
-          (keydown.enter)="onFieldEnter($event, $any(row))"
-        />
-      } @else if (tableFields()) {
-        <span class="bp__field bp__sum" [class.bp__field--wide]="wideFields()">
-          <span class="bp__sumDigits mono">{{ sumDigits($any(row).amount) }}</span>
-          <span class="bp__sumSign">€</span>
-        </span>
-      } @else {
-        <span class="bp__num bp__plan mono">{{ money($any(row).amount) }}</span>
-      }
-    </ng-template>
-    <ng-template appCell="base" let-row><span class="bp__num mono">{{ money($any(row).base) }}</span></ng-template>
-    <ng-template appCell="prev" let-row><span class="bp__num mono">{{ money($any(row).prev) }}</span></ng-template>
-    <ng-template appCell="actual" let-row><span class="bp__num mono">{{ money($any(row).actual) }}</span></ng-template>
-    <ng-template appCell="change" let-row><span class="bp__num mono">{{ changeText($any(row)) }}</span></ng-template>
-  </app-data-table>
+  <app-plan-table-view
+    [rows]="rows"
+    [columns]="columns()"
+    [nested]="nested"
+    [loading]="load().kind === 'loading'"
+    [opened]="opened()"
+    [searching]="!!query().trim()"
+    [fields]="tableFields()"
+    [wideFields]="wideFields()"
+    [nachtrag]="nachtrag()"
+    [fieldValue]="amountValue"
+    (rowClick)="select($event)"
+    (toggle)="toggle($event)"
+    (edit)="edit($event.row, 'amount', $event.value)"
+    (save)="saveAmount($event)"
+  />
 </ng-template>
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="sheetRow()?.name ?? ''" [open]="!!sheetRow()" (closed)="selectId('')">
-  @if (sheetMenu().length) {
-    <app-row-menu sheet-actions [sections]="sheetMenu()" (selected)="onAction($event.id, sheetRow())" />
-  }
-  @if (sheetRow(); as row) {
-    <div class="bp__sheet">
-      <p class="bp__sheetPath"><span class="mono">{{ row.pathKey | simplifyPath }}</span> · {{ sideLabel(row) }}</p>
-      @if (version(); as v) {
-        <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
-      }
-      <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
-      <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: false }" />
-      <ng-container *ngTemplateOutlet="lineChildren" />
-    </div>
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="sheetRow()?.name ?? ''"
+  [open]="!!sheetRow()"
+  (closed)="selectId('')"
+  [actions]="sheetActions()"
+  (action)="onAction($event.key, sheetRow())"
+>
+  <ng-template sheetBody>
+    @if (sheetRow(); as row) {
+      <div class="bp__sheet">
+        <p class="bp__sheetPath">
+          <span class="mono">{{ row.pathKey | simplifyPath }}</span> · {{ sideLabel(row) }}
+        </p>
+        @if (version(); as v) {
+          <ng-container *ngTemplateOutlet="stateNote; context: { $implicit: v }" />
+        }
+        <ng-container *ngTemplateOutlet="lineFigs; context: { $implicit: row }" />
+        <ng-container *ngTemplateOutlet="lineForm; context: { $implicit: row, cols: false }" />
+        <ng-container *ngTemplateOutlet="lineChildren" />
+      </div>
+    }
+  </ng-template>
 </app-side-sheet>
 
 @if (fab(); as f) {
@@ -596,43 +521,90 @@
   (cancel)="ask.set(null)"
 />
 
-<app-dialog [open]="addOpen()" [title]="'budget.plan.action.add' | t" [closeLabel]="'action.close' | t" (closed)="addOpen.set(false)">
-  <form id="bp-add-form" class="bp__addForm" (submit)="addLine($event)">
-    <app-cost-centre-select [nodes]="addNodes()" [value]="addId()" [label]="'budget.plan.col.node' | t" [required]="true" (picked)="addId.set($event)" />
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="addLine($event)" [disabled]="!addId() || busy()">{{ 'budget.plan.action.add' | t }}</app-button>
-  </div>
+<app-dialog
+  [open]="addOpen()"
+  [heading]="'budget.plan.action.add' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="addOpen.set(false)"
+  [actions]="[
+    { key: 'addOpen', label: ('action.cancel' | t) },
+    {
+      key: 'addLine',
+      label: ('budget.plan.action.add' | t),
+      kind: 'main',
+      disabled: !addId() || busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'addOpen' ? addOpen.set(false) : $event.key === 'addLine' ? addLine() : null
+  "
+>
+  <ng-template dialogBody>
+    <form id="bp-add-form" class="bp__addForm" (submit)="$event.preventDefault(); addLine()">
+      <app-cost-centre-select
+        [nodes]="addNodes()"
+        [value]="addId()"
+        [label]="'budget.plan.col.node' | t"
+        [required]="true"
+        (picked)="addId.set($event)"
+      />
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>
 
-<app-dialog [open]="stateOpen()" [title]="'budget.plan.action.setState' | t" [closeLabel]="'action.close' | t" (closed)="stateOpen.set(false)">
-  <form id="bp-state-form" class="bp__addForm" (submit)="setStateByHand($event)">
-    <app-select
-      name="bpState"
-      [label]="'budget.plan.setState.state' | t"
-      [required]="true"
-      [clearable]="false"
-      [options]="stateOptions()"
-      [ngModel]="stateTarget()"
-      (ngModelChange)="stateTarget.set($event || '')"
-    />
-    <app-textarea [label]="'budget.plan.setState.reason' | t">
-      <textarea name="bpReason" rows="3" maxlength="2000" required [value]="stateReason()" (input)="stateReason.set($any($event.target).value)"></textarea>
-    </app-textarea>
-    @if (stateTarget() === 'in_force') {
-      <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
-    }
-    @if (version()?.state === 'in_force' && stateTarget() && stateTarget() !== 'in_force') {
-      <app-note kind="warn" icon="alert">{{ 'budget.plan.setState.leavesForce' | t }}</app-note>
-    }
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="stateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" data-testid="bp-state-save" (click)="setStateByHand($event)" [disabled]="!stateTarget() || !stateReason().trim() || busy()">{{ 'budget.plan.setState.confirm' | t }}</app-button>
-  </div>
+<app-dialog
+  [open]="stateOpen()"
+  [heading]="'budget.plan.action.setState' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="stateOpen.set(false)"
+  [actions]="[
+    { key: 'stateOpen', label: ('action.cancel' | t) },
+    {
+      key: 'setStateByHand',
+      label: ('budget.plan.setState.confirm' | t),
+      kind: 'main',
+      disabled: !stateTarget() || !stateReason().trim() || busy(),
+    },
+  ]"
+  (action)="
+    $event.key === 'stateOpen'
+      ? stateOpen.set(false)
+      : $event.key === 'setStateByHand'
+        ? setStateByHand()
+        : null
+  "
+>
+  <ng-template dialogBody>
+    <form id="bp-state-form" class="bp__addForm" (submit)="$event.preventDefault(); setStateByHand()">
+      <app-select
+        name="bpState"
+        [label]="'budget.plan.setState.state' | t"
+        [required]="true"
+        [clearable]="false"
+        [options]="stateOptions()"
+        [ngModel]="stateTarget()"
+        (ngModelChange)="stateTarget.set($event || '')"
+      />
+      <app-textarea [label]="'budget.plan.setState.reason' | t">
+        <textarea
+          name="bpReason"
+          rows="3"
+          maxlength="2000"
+          required
+          [value]="stateReason()"
+          (input)="stateReason.set($any($event.target).value)"
+        ></textarea>
+      </app-textarea>
+      @if (stateTarget() === 'in_force') {
+        <app-note kind="warn" icon="alert">{{ 'budget.plan.inForce.body' | t }}</app-note>
+      }
+      @if (version()?.state === 'in_force' && stateTarget() && stateTarget() !== 'in_force') {
+        <app-note kind="warn" icon="alert">{{ 'budget.plan.setState.leavesForce' | t }}</app-note>
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>
 
 <app-cost-centre-create

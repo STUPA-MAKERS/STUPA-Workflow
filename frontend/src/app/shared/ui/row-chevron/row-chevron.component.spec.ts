@@ -42,7 +42,7 @@ describe('RowChevronComponent', () => {
     expect(scss).toMatch(/:host\(\.rch--open\) \{\s*transform: rotate\(180deg\);/);
   });
 
-  /** § NF/accessibility/conformance/000493 */
+  /** §ui-kit:NF/accessibility/conformance/000493 */
   it('has no axe violations', async () => {
     const { container } = await render(`<app-row-chevron />`, { imports: [RowChevronComponent] });
     expect(await runAxe(container)).toHaveNoViolations();

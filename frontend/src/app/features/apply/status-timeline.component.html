@@ -227,6 +227,7 @@
           [canUpload]="canUploadAttachments()"
           [canDelete]="canEdit()"
           [dropTarget]="false"
+          [fill]="!split()"
         />
       </ng-template>
 
@@ -235,7 +236,7 @@
           @if (historyEntries().length) {
             <app-history [entries]="historyEntries()" />
           } @else {
-            <app-empty-state icon="history" rows="1" [heading]="'status.history.empty' | t" />
+            <app-empty-state icon="history" rows="1" [fill]="!split()" [heading]="'status.history.empty' | t" />
           }
         </app-section>
       </ng-template>
@@ -247,20 +248,22 @@
         [side]="phone() ? 'bottom' : 'end'"
         [contentScrolls]="true"
       >
-        <app-chat
-          class="sp__chat"
-          [draftKey]="'status.' + app.id"
-          [messages]="chatMessages()"
-          [canAttach]="!app.applicant?.anonymized"
-          [canPost]="!observer()"
-          placeholder="status.comments.placeholder"
-          (send)="sendComment($event)"
-          (retry)="retryComment($event)"
-          (discard)="discardComment($event)"
-          (edit)="editComment($event)"
-          (delete)="deleteComment($event)"
-          (refresh)="refreshComments(app.id)"
-        />
+        <ng-template sheetBody>
+          <app-chat
+            class="sp__chat"
+            [draftKey]="'status.' + app.id"
+            [messages]="chatMessages()"
+            [canAttach]="!app.applicant?.anonymized"
+            [canPost]="!observer()"
+            placeholder="status.comments.placeholder"
+            (send)="sendComment($event)"
+            (retry)="retryComment($event)"
+            (discard)="discardComment($event)"
+            (edit)="editComment($event)"
+            (delete)="deleteComment($event)"
+            (refresh)="refreshComments(app.id)"
+          />
+        </ng-template>
       </app-side-sheet>
 
       @if (!observer()) {

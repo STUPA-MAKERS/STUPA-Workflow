@@ -44,10 +44,20 @@ import {
   SegmentedComponent,
   type SegmentedOption,
   SideSheetComponent,
+  SheetBodyDirective,
+  UI_KIT_INTL,
+  UiKitTranslatePipe,
 } from '@stupa-makers/ui-kit';
 import { meetingStatus, protocolStatus } from '@shared/status-kind.util';
-import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
-import { protocolActions, protocolMenuItems } from '../protocol-bar/protocol-actions.util';
+import {
+  ProtocolBarViewComponent,
+  type ProtocolPdfOpen,
+  protocolActions,
+  protocolMenuItems,
+} from '@stupa-makers/ui-kit/views/protocol';
+import { FileOpenService } from '@shared/viewer/file-open.service';
+import { MeetingSessionService } from '../meeting-session.service';
+import { ProtocolApprovalDialogComponent } from '../protocol-approval-dialog/protocol-approval-dialog.component';
 import { longDate } from '@shared/date-format';
 import {
   type AgendaMove,
@@ -59,22 +69,40 @@ import {
   type AttendanceChange,
   AttendanceSheetComponent,
 } from '../attendance-sheet/attendance-sheet.component';
-import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
+import { type DockPanel, SessionDockViewComponent } from '@stupa-makers/ui-kit/views/meeting';
+import { MeetingGuestsService } from '../meeting-guests.service';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
-import { VoteCardComponent } from '../vote-card/vote-card.component';
+import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { firstMeetingLink } from '../meeting-kind.util';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { JoinQrComponent } from '../public-join/join-qr.component';
-import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { MeetingHeadViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 import { topLead } from '../top-application-lead.util';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { clock, weekdayDate } from '@shared/date-format';
 import { pageItemTitle } from '../../../layout/page-title.service';
+import { provideVotingApi } from '../../voting/voting-api.provider';
+import { openInPaperless, paperlessLink } from '@core/api/paperless.service';
+
+/** The menu item `In Paperless öffnen` of the protocol. */
+const PAPERLESS_ITEM = 'paperless';
 
 /** The ids of the session menu. */
-type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'attendance' | 'votes' | 'keeper' | 'beamer' | 'qr' | 'close' | 'delete';
+type SessionAction =
+  | 'todos'
+  | 'links'
+  | 'open'
+  | 'agenda'
+  | 'settings'
+  | 'attendance'
+  | 'votes'
+  | 'keeper'
+  | 'beamer'
+  | 'qr'
+  | 'close'
+  | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -110,10 +138,12 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
  */
 @Component({
   selector: 'app-meeting-page',
+  providers: [provideVotingApi()],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    MeetingHeadComponent,
+    SheetBodyDirective,
+    MeetingHeadViewComponent,
     ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
@@ -125,14 +155,16 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
     SegmentedComponent,
     SideSheetComponent,
     AgendaPaneComponent,
-    SessionDockComponent,
+    SessionDockViewComponent,
     TopSheetComponent,
     TodoLinkedListComponent,
-    VoteCardComponent,
+    VoteCardViewComponent,
     AttendanceSheetComponent,
     JoinQrComponent,
     AvatarComponent,
-    ProtocolBarComponent,
+    ProtocolBarViewComponent,
+    UiKitTranslatePipe,
+    ProtocolApprovalDialogComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -141,8 +173,11 @@ type SessionAction = 'todos' | 'links' | 'open' | 'agenda' | 'settings' | 'atten
   },
 })
 export class MeetingPageComponent {
+  /** The guests of a public meeting that the lead has loaded: the counts on the dock chip. */
+  private readonly guests = inject(MeetingGuestsService, { optional: true });
+  protected readonly dockGuests = computed(() => this.guests?.countsFor(this.meeting()) ?? null);
   private readonly i18n = inject(I18nService);
-  private readonly dock = viewChild.required(SessionDockComponent, { read: ElementRef });
+  private readonly dock = viewChild.required(SessionDockViewComponent, { read: ElementRef });
 
   /** Three columns from 1200px; below that the agenda is a sheet. */
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -155,6 +190,8 @@ export class MeetingPageComponent {
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
+  /** The filed protocol in Paperless, for a holder of `paperless.use` (002525). */
+  private readonly paperlessUrl = paperlessLink('protocol', computed(() => (this.protocol()?.status === 'final' ? this.protocol()?.id : null)));
   readonly agenda = input.required<AgendaItem[]>();
   /** The agenda item open in the sheet, plus its 0-based index. */
   readonly top = input.required<AgendaItem | null>();
@@ -274,7 +311,41 @@ export class MeetingPageComponent {
     return m.status === 'closed' && p ? protocolStatus(p) : meetingStatus(m.status);
   });
   /** The protocol part of the head: its action, its dialogs and its menu section. */
-  private readonly protocolBar = viewChild(ProtocolBarComponent);
+  private readonly protocolBar = viewChild(ProtocolBarViewComponent);
+  /** The page session: it saves the protocol actions of the head (spec 001304). */
+  private readonly session = inject(MeetingSessionService, { optional: true });
+  private readonly files = inject(FileOpenService);
+  private readonly kitIntl = inject(UI_KIT_INTL);
+  protected readonly hasSession = this.session !== null;
+  protected readonly approvalSaving = computed(() => this.session?.approvalSaving() ?? false);
+  /** The dialog "Als genehmigt markieren" is open (§ 000924). */
+  protected readonly approvalOpen = signal(false);
+  /** The dialog closes when the server stored the mark. */
+  private readonly approvalDone = effect(() => {
+    if (this.protocol()?.approvedAt) this.approvalOpen.set(false);
+  });
+
+  /** A PDF of the protocol: a link click keeps a new tab with a modifier, an item opens the viewer. */
+  protected openProtocolPdf({ file, event }: ProtocolPdfOpen): void {
+    if (event) this.files.click(event, file);
+    else this.files.open(file);
+  }
+
+  protected sendProtocolDraft(): void {
+    this.session?.sendProtocolDraft();
+  }
+
+  protected reopenProtocol(): void {
+    this.session?.reopenProtocol();
+  }
+
+  protected approveProtocol(meetingId: Uuid | null): void {
+    this.session?.setProtocolApproval(meetingId);
+  }
+
+  protected publishProtocol(publish: boolean): void {
+    this.session?.setPublicWithheld(!publish);
+  }
   protected readonly locked = computed(() => this.protocol()?.isLocked ?? false);
   /**
    * The text of the item can be written. A planned meeting has no protocol yet, but its
@@ -388,7 +459,11 @@ export class MeetingPageComponent {
   });
   protected readonly presenceTitle = computed(() =>
     this.viewers().length
-      ? this.i18n.translate('meetings.page.viewers', { names: this.viewers().map((v) => v.name).join(', ') })
+      ? this.i18n.translate('meetings.page.viewers', {
+          names: this.viewers()
+            .map((v) => v.name)
+            .join(', '),
+        })
       : this.i18n.translate('meetings.viewers.empty'),
   );
 
@@ -452,7 +527,11 @@ export class MeetingPageComponent {
       // of sight (spec 000551).
       { id: 'todos', label: t('todos.meeting.sheet'), icon: 'link' },
       // The linked rows of the open item; above the phone width the edge tab opens them (spec 001800).
-      ...when(this.phone() && !!this.top(), { id: 'links', label: t('todos.linked.top'), icon: 'link' }),
+      ...when(this.phone() && !!this.top(), {
+        id: 'links',
+        label: t('todos.linked.top'),
+        icon: 'link',
+      }),
       ...when(m.canManage, { id: 'settings', label: t('meetings.settings.title'), icon: 'edit' }),
       ...when(!this.phone() || noDock, {
         id: 'attendance',
@@ -466,7 +545,9 @@ export class MeetingPageComponent {
       }),
       ...when(this.phone() && keeper, {
         id: 'keeper',
-        label: t(m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant'),
+        label: t(
+          m.status === 'live' ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant',
+        ),
         icon: m.status === 'live' ? 'swap' : 'clipcheck',
       }),
       ...when(!this.wide() && m.status !== 'closed' && m.canManage, {
@@ -498,8 +579,14 @@ export class MeetingPageComponent {
     const p = this.protocol();
     // The items come from the page inputs, not from the child: the child gets its inputs only
     // after this menu is first read.
-    const protocol =
-      m.status === 'closed' && p ? protocolMenuItems(protocolActions(m, p, true), p, this.phone(), t) : [];
+    const filed = this.paperlessUrl();
+    const protocol: readonly RowMenuItem[] =
+      m.status === 'closed' && p
+        ? [
+            ...protocolMenuItems(protocolActions(m, p, true), p, this.phone(), (key) => this.kitIntl.translate(key)),
+            ...when(!!filed, { id: PAPERLESS_ITEM, label: t('paperless.open'), icon: 'link' }),
+          ]
+        : [];
     return [
       ...(protocol.length ? [{ label: t('meetings.protocolMenu.caption'), items: protocol }] : []),
       { items: main },
@@ -589,23 +676,27 @@ export class MeetingPageComponent {
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
-    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading) return false;
+    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed' || t.planReading)
+      return false;
     return (
       !(t.applicationId || t.planVersionId) || this.votes().every((v) => v.status === 'cancelled')
     );
   });
 
   /** The add button of an application item: open the vote, or only prepare it. */
-  protected readonly addVoteKey = computed<'meetings.vote.openFor' | 'meetings.vote.prepareTitle'>(() =>
-    this.meeting().status === 'live' && !this.anyOpenVote()
-      ? 'meetings.vote.openFor'
-      : 'meetings.vote.prepareTitle',
+  protected readonly addVoteKey = computed<'meetings.vote.openFor' | 'meetings.vote.prepareTitle'>(
+    () =>
+      this.meeting().status === 'live' && !this.anyOpenVote()
+        ? 'meetings.vote.openFor'
+        : 'meetings.vote.prepareTitle',
   );
 
   /** The name of the add button in the head of the vote sheet (spec 001802). */
   protected readonly addVoteLabel = computed(() => {
     const t = this.top();
-    return t?.applicationId || t?.planVersionId ? this.addVoteKey() : ('meetings.vote.addQuestion' as const);
+    return t?.applicationId || t?.planVersionId
+      ? this.addVoteKey()
+      : ('meetings.vote.addQuestion' as const);
   });
 
   /**
@@ -626,9 +717,13 @@ export class MeetingPageComponent {
       (this.dockVotes() === null || this.meeting().status === 'closed'),
   );
   /** The edge tab of the linked rows: above the phone width, while an item is open (spec 001800). */
-  protected readonly showLinkTab = computed(() => !this.phone() && !!this.top() && !this.linksOpen());
+  protected readonly showLinkTab = computed(
+    () => !this.phone() && !!this.top() && !this.linksOpen(),
+  );
   /** The edge tab of the attendance sheet: above the phone width, beside the dock chip (spec 001801). */
-  protected readonly showAttendanceTab = computed(() => !this.phone() && this.panel() !== 'attendance');
+  protected readonly showAttendanceTab = computed(
+    () => !this.phone() && this.panel() !== 'attendance',
+  );
 
   /** The own ballot of the open vote, for the dock. */
   protected readonly myVote = computed<string | null>(() => {
@@ -703,6 +798,7 @@ export class MeetingPageComponent {
   }
 
   protected onMenu(item: RowMenuItem): void {
+    if (item.id === PAPERLESS_ITEM) return openInPaperless(this.paperlessUrl() ?? '');
     if (this.protocolBar()?.select(item.id)) return;
     switch (item.id as SessionAction) {
       case 'todos':

@@ -33,6 +33,7 @@ import { FileOpenService } from '@shared/viewer/file-open.service';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService, type ApplicationChange } from './applications-page.service';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -834,7 +835,7 @@ describe('ApplicationsDetailComponent — header', () => {
 
   it('reports a failed archive', async () => {
     const { http, cmp, toast } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     cmp.toggleArchived();
     cmp.toggleArchived();
     http.expectOne((r) => r.url.endsWith('/archive')).flush({}, { status: 500, statusText: 'x' });

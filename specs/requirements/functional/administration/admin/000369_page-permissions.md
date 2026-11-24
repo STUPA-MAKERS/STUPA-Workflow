@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/shared/permissions.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/deps.py
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin

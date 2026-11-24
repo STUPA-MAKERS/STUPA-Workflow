@@ -2488,3 +2488,55 @@ def test_the_seeded_magic_link_subject_names_the_platform_by_the_branding(
         assert subject == {"de": seed["de"], "en": "Own subject"}
         conn.execute(text("DELETE FROM mail_template WHERE key = 'magic_link'"))
     command.upgrade(alembic_cfg, "head")
+
+
+def test_the_tickets_get_random_numbers(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration c7a94e12d5b3: each ticket gets eight random characters as its number.
+
+    The status event of a duplicate names the new number of the first ticket. A number
+    of the old form finds no ticket. The downgrade numbers the tickets by their creation.
+    """
+    command.downgrade(alembic_cfg, "b4b30d8dba4d")
+    first, second = uuid.uuid4(), uuid.uuid4()
+    with engine.begin() as conn:
+        for ticket_id, at in ((first, "2026-01-01"), (second, "2026-01-02")):
+            conn.execute(
+                text(
+                    "INSERT INTO ticket (id, kind, title, body, reporter_email, created_at) "
+                    "VALUES (:id, 'bug', 't', 'b', 'a@example.org', :at)"
+                ),
+                {"id": ticket_id, "at": at},
+            )
+        old = dict(conn.execute(text("SELECT id, number FROM ticket")).all())
+        conn.execute(
+            text(
+                "INSERT INTO ticket_event (ticket_id, kind, payload) "
+                "VALUES (:t, 'status', CAST(:p AS jsonb))"
+            ),
+            {"t": second, "p": json.dumps({"duplicateOf": f"T-{old[first]:04d}"})},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        new = dict(conn.execute(text("SELECT id, number FROM ticket")).all())
+        assert all(
+            len(n) == 8 and set(n) <= set("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
+            for n in new.values()
+        )
+        assert new[first] != new[second]
+        assert conn.execute(
+            text("SELECT payload ->> 'duplicateOf' FROM ticket_event WHERE ticket_id = :t"),
+            {"t": second},
+        ).scalar_one() == f"T-{new[first]}"
+        assert conn.execute(
+            text("SELECT count(*) FROM pg_class WHERE relname = 'ticket_number_seq'")
+        ).scalar_one() == 0
+
+    command.downgrade(alembic_cfg, "b4b30d8dba4d")
+    with engine.begin() as conn:
+        assert dict(conn.execute(text("SELECT id, number FROM ticket")).all()) == {
+            first: 1,
+            second: 2,
+        }
+        conn.execute(text("DELETE FROM ticket"))
+    command.upgrade(alembic_cfg, "head")

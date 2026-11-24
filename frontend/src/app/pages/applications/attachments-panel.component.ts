@@ -17,13 +17,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Attachment, ScanState, Uuid } from '@core/api/models';
-import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DropOverlayComponent, EmptyStateComponent, FileDropDirective, FileViewerComponent, type FileViewerItem, IconComponent, LongPressDirective, matchesMedia, MEDIA, MetaLineComponent, SectionComponent, SelectionBarComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, CheckboxComponent, ConfirmDialogComponent, DropOverlayComponent, EmptyStateComponent, FileDropDirective, FileViewerComponent, type FileViewerItem, IconComponent, ImageThumbComponent, inlineUrl, isThumbImage, LongPressDirective, matchesMedia, MEDIA, MetaLineComponent, SectionComponent, SelectionBarComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
-import {
-  ImageThumbComponent,
-  inlineUrl,
-  isThumbImage,
-} from '@shared/ui/image-thumb/image-thumb.component';
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { withEntry } from '@shared/util/immutable';
 import { formatBytes } from './applications.util';
@@ -98,6 +93,8 @@ export class AttachmentsPanelComponent {
   readonly deleteAllowed = computed(() => this.canDelete() ?? this.canUpload());
   /** The panel is the drop target. False: the page around it takes the drop. */
   readonly dropTarget = input(true);
+  /** The panel is the whole content of a tab: the empty state centres in its free area (002650). */
+  readonly fill = input(false);
   /** The number of attachments, after the first load and after each change. */
   readonly countChange = output<number>();
 
@@ -217,12 +214,14 @@ export class AttachmentsPanelComponent {
         },
         error: (err: { status?: number }) => {
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
-          this.toast.error(this.i18n.translate(this.uploadErrorKey(err.status)));
+          if (ok > 0)
+            this.toast.show(this.i18n.translate('applications.attachments.added'), 'success');
+          this.toast.show(this.i18n.translate(this.uploadErrorKey(err.status)), 'error');
         },
         complete: () => {
           this.uploading.set(false);
-          if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
+          if (ok > 0)
+            this.toast.show(this.i18n.translate('applications.attachments.added'), 'success');
         },
       });
   }
@@ -279,13 +278,13 @@ export class AttachmentsPanelComponent {
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
-          this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
+          this.toast.show(this.i18n.translate('applications.attachments.deleteError'), 'error');
         },
         complete: () => {
           this.bulkDeleting.set(false);
           this.confirming.set(null);
           this.refreshAfterBulk(ids);
-          this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+          this.toast.show(this.i18n.translate('applications.attachments.deleted'), 'success');
         },
       });
   }
@@ -433,11 +432,11 @@ export class AttachmentsPanelComponent {
       this.attachments.update((list) =>
         list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
       );
-      this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
+      this.toast.show(this.i18n.translate('applications.attachments.download.conflict'), 'error');
     } else if (status === 410) {
-      this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
+      this.toast.show(this.i18n.translate('applications.attachments.download.gone'), 'error');
     } else {
-      this.toast.error(this.i18n.translate('applications.attachments.download.error'));
+      this.toast.show(this.i18n.translate('applications.attachments.download.error'), 'error');
     }
   }
 
@@ -449,12 +448,12 @@ export class AttachmentsPanelComponent {
         this.attachments.update((list) => list.filter((a) => a.id !== att.id));
         this.removingId.set(null);
         this.confirming.set(null);
-        this.toast.success(this.i18n.translate('applications.attachments.deleted'));
+        this.toast.show(this.i18n.translate('applications.attachments.deleted'), 'success');
       },
       error: () => {
         this.removingId.set(null);
         this.confirming.set(null);
-        this.toast.error(this.i18n.translate('applications.attachments.deleteError'));
+        this.toast.show(this.i18n.translate('applications.attachments.deleteError'), 'error');
       },
     });
   }

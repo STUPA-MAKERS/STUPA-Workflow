@@ -20,11 +20,11 @@ specs/
       applications/    applications, dashboard, flow, forms
       collaboration/   activity, committees, graph, links, notifications, search, tickets, todos
       finance/         budget, invoices
-      integrations/    external, mcp, webhooks
+      integrations/    external, mcp, paperless, ticket-mail, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
       public/          public-pages
     non-functional/
-      accessibility/  conformance, documents, interaction, language, perception, settings, statement
+      accessibility/  documents, interaction, language, perception, statement
       compatibility/  deploy, links, pwa
       performance/    loading, rendering
       privacy/        personal-data
@@ -74,7 +74,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/000162](requirements/functional/administration/admin/000162_cd-variant-delete.md) | A CD variant in use is not deleted | approved |
 | [F/administration/admin/000163](requirements/functional/administration/admin/000163_audit-revert.md) | The audit revert reverses effects, never entries | approved |
 | [F/administration/admin/000164](requirements/functional/administration/admin/000164_translations.md) | Admins edit UI texts and add languages | replaced |
-| [F/administration/admin/000165](requirements/functional/administration/admin/000165_admin-start.md) | Verwaltung keeps its frame widths | approved |
 | [F/administration/admin/000166](requirements/functional/administration/admin/000166_dsgvo-delete.md) | A privacy erasure starts from Benutzer | approved |
 | [F/administration/admin/000368](requirements/functional/administration/admin/000368_role-keys.md) | Role keys are fixed lower case | approved |
 | [F/administration/admin/000369](requirements/functional/administration/admin/000369_page-permissions.md) | Each admin page has its own permission | approved |
@@ -103,6 +102,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/001093](requirements/functional/administration/admin/001093_branding-description.md) | The branding holds the description of the platform | approved |
 | [F/administration/admin/001230](requirements/functional/administration/admin/001230_platform-name-from-branding.md) | Every visible name of the platform comes from the branding | approved |
 | [F/administration/admin/001231](requirements/functional/administration/admin/001231_seeded-mail-subject-branding.md) | The seeded subject of the access link mail names the branding | approved |
+| [F/administration/admin/002601](requirements/functional/administration/admin/002601_gremien-page-opens-asked-row.md) | The Gremien page opens and shows the Gremium of the link | approved |
+| [F/administration/admin/002620](requirements/functional/administration/admin/002620_users-no-group-mapping-link.md) | Benutzer and Gremien have no link to the Gruppen-Zuordnung | approved |
+| [F/administration/admin/002691](requirements/functional/administration/admin/002691_admin-list-search.md) | The search of a Verwaltung list finds the text of a row | approved |
+| [F/administration/admin/002693](requirements/functional/administration/admin/002693_audit-log-search.md) | The Audit-Log searches on the server | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -120,9 +123,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/files/000341](requirements/functional/administration/files/000341_file-access.md) | File access follows the access to the Antrag | approved |
 | [F/administration/files/000342](requirements/functional/administration/files/000342_drafts.md) | Wizard uploads are drafts | approved |
 | [F/administration/files/000464](requirements/functional/administration/files/000464_draft-caps.md) | Wizard drafts are capped and expire | approved |
-| [F/administration/files/001080](requirements/functional/administration/files/001080_download-opens-viewer.md) | A download of a viewable file opens the file viewer | approved |
 | [F/administration/privacy/000457](requirements/functional/administration/privacy/000457_erasure-request.md) | An applicant can request the erasure of an Antrag | approved |
 | [F/administration/privacy/000458](requirements/functional/administration/privacy/000458_data-export.md) | The data export is an audited XLSX | approved |
+| [F/administration/privacy/002532](requirements/functional/administration/privacy/002532_erasure-lists-paperless.md) | An erasure names the filed Paperless documents | approved |
+| [F/administration/privacy/002533](requirements/functional/administration/privacy/002533_export-names-paperless.md) | The data export names the filed Paperless documents | approved |
+| [F/administration/privacy/002747](requirements/functional/administration/privacy/002747_erasure-lists-ticket-mails.md) | An erasure names the mails that stay on the mail server | approved |
+| [F/administration/privacy/002748](requirements/functional/administration/privacy/002748_export-holds-mail-tickets.md) | The data export holds the mail tickets of the addresses of the person | approved |
 | [F/administration/translations/000136](requirements/functional/administration/translations/000136_all-languages-editable.md) | Every i18n text is editable in English too | approved |
 | [F/administration/translations/000336](requirements/functional/administration/translations/000336_catalog-source.md) | The frontend catalog is the source of UI texts | approved |
 | [F/administration/translations/000337](requirements/functional/administration/translations/000337_language-lifecycle.md) | A new language starts inactive | approved |
@@ -137,7 +143,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/000128](requirements/functional/applications/applications/000128_timeline-vote-link.md) | The timeline links the deciding vote | approved |
 | [F/applications/applications/000129](requirements/functional/applications/applications/000129_keep-open-after-transition.md) | An Antrag stays open after a transition in Aufgaben | approved |
 | [F/applications/applications/000130](requirements/functional/applications/applications/000130_pii-fields.md) | PII fields need application.read | approved |
-| [F/applications/applications/000131](requirements/functional/applications/applications/000131_comments-button.md) | Comments open from a header button | approved |
 | [F/applications/applications/000132](requirements/functional/applications/applications/000132_approval-with-deviation.md) | An approval can deviate | approved |
 | [F/applications/applications/000374](requirements/functional/applications/applications/000374_pinned-validation.md) | Antrag data is checked against its pinned form | approved |
 | [F/applications/applications/000375](requirements/functional/applications/applications/000375_versioned-edit.md) | An edit is versioned and audited without values | approved |
@@ -170,7 +175,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001182](requirements/functional/applications/applications/001182_apply-ungrouped-types.md) | Antragsarten without a group stand last under Weitere Anträge | approved |
 | [F/applications/applications/001183](requirements/functional/applications/applications/001183_type-group-order.md) | Admins set the order of the groups and of the Antragsarten | approved |
 | [F/applications/applications/001184](requirements/functional/applications/applications/001184_no-general-apply-text.md) | Step 1 has no general text, only the group texts | approved |
-| [F/applications/applications/001185](requirements/functional/applications/applications/001185_apply-step-spacing.md) | The blocks of step 1 have one even spacing | approved |
 | [F/applications/applications/001610](requirements/functional/applications/applications/001610_approval-asks-amount.md) | Every approval asks for the approved amount | approved |
 | [F/applications/applications/001611](requirements/functional/applications/applications/001611_vote-stores-amount.md) | A vote that approves stores the approved amount | approved |
 | [F/applications/applications/001612](requirements/functional/applications/applications/001612_both-amounts-shown.md) | List, detail and export show the requested and the approved amount | approved |
@@ -188,7 +192,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001700](requirements/functional/applications/applications/001700_list-multi-select.md) | The Antrag list has a multiple selection | approved |
 | [F/applications/applications/001701](requirements/functional/applications/applications/001701_bulk-transition.md) | A bulk status change uses only transitions allowed for each selected Antrag | approved |
 | [F/applications/applications/001702](requirements/functional/applications/applications/001702_bulk-message.md) | A bulk message adds one public comment to each Antrag | approved |
-| [F/applications/applications/001703](requirements/functional/applications/applications/001703_bulk-result.md) | The bulk result shows success or error per Antrag | approved |
 | [F/applications/applications/001704](requirements/functional/applications/applications/001704_bulk-set-status.md) | The bulk action of the Antrag list sets a status and skips the Anträge that cannot take it | approved |
 | [F/applications/applications/001710](requirements/functional/applications/applications/001710_draft-not-submitted.md) | A draft says that it is not submitted | approved |
 | [F/applications/applications/001711](requirements/functional/applications/applications/001711_draft-reminder-mail.md) | A draft without a change for 7 days gets one reminder mail | approved |
@@ -201,7 +204,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |
 | [F/applications/dashboard/000750](requirements/functional/applications/dashboard/000750_start-tab-line-buttons-same-size.md) | The two buttons in the tab line of the start page have the same size | replaced |
-| [F/applications/flow/000137](requirements/functional/applications/flow/000137_flow-auto-layout.md) | The flow editor lays out automatically | approved |
 | [F/applications/flow/000227](requirements/functional/applications/flow/000227_one-active-flow.md) | There is one active flow | approved |
 | [F/applications/flow/000228](requirements/functional/applications/flow/000228_state-kinds.md) | A state is normal or a vote state | approved |
 | [F/applications/flow/000229](requirements/functional/applications/flow/000229_guard-whitelist.md) | Guards and actions come from a whitelist | approved |
@@ -238,7 +240,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000280](requirements/functional/applications/forms/000280_pin-not-mutate.md) | A form version is never changed | approved |
 | [F/applications/forms/000281](requirements/functional/applications/forms/000281_inactive-type.md) | A type without an active form is closed | approved |
 | [F/applications/forms/000282](requirements/functional/applications/forms/000282_system-title.md) | Every form has a title field | approved |
-| [F/applications/forms/000283](requirements/functional/applications/forms/000283_sections.md) | Section fields make wizard steps | approved |
 | [F/applications/forms/000284](requirements/functional/applications/forms/000284_definition-check.md) | A form definition is checked at save time | approved |
 | [F/applications/forms/000285](requirements/functional/applications/forms/000285_jsonlogic-whitelist.md) | JsonLogic uses a whitelist | approved |
 | [F/applications/forms/000286](requirements/functional/applications/forms/000286_all-errors.md) | Answer validation reports all errors | approved |
@@ -258,6 +259,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/001730](requirements/functional/applications/forms/001730_position-files.md) | A position takes files in the form | approved |
 | [F/applications/forms/001731](requirements/functional/applications/forms/001731_submit-without-file-warning.md) | A submit without a file asks for a confirmation | approved |
 | [F/applications/forms/001732](requirements/functional/applications/forms/001732_type-requires-file.md) | An Antragsart can require a file | approved |
+| [F/applications/forms/002840](requirements/functional/applications/forms/002840_computed-amount.md) | The server computes a computed amount | approved |
+| [F/applications/forms/002841](requirements/functional/applications/forms/002841_computed-amount-cents.md) | A computed amount is a whole number of cents | approved |
+| [F/applications/forms/002842](requirements/functional/applications/forms/002842_computed-amount-display.md) | A computed amount shows as money | approved |
+| [F/applications/forms/002843](requirements/functional/applications/forms/002843_computed-amount-toggle.md) | The form builder makes a computed field the amount | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
@@ -265,10 +270,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/activity/001274](requirements/functional/collaboration/activity/001274_kind-filter.md) | The activity page filters by the kind of item | approved |
 | [F/collaboration/activity/001275](requirements/functional/collaboration/activity/001275_new-since-last-visit.md) | New events since the last visit are marked | approved |
 | [F/collaboration/activity/001276](requirements/functional/collaboration/activity/001276_paging.md) | The activity page loads 50 events per step without a time limit | approved |
-| [F/collaboration/activity/001277](requirements/functional/collaboration/activity/001277_activity-row.md) | An activity row names the item, the actor, the change and the time | approved |
 | [F/collaboration/activity/001300](requirements/functional/collaboration/activity/001300_activity-is-the-start-page.md) | The activity page is the start page | approved |
-| [F/collaboration/activity/001301](requirements/functional/collaboration/activity/001301_apply-button-in-activity-header.md) | Antrag stellen stands in the header of the activity page | approved |
+| [F/collaboration/activity/001301](requirements/functional/collaboration/activity/001301_apply-button-in-activity-header.md) | Antrag stellen stands in the header of the activity page | replaced |
 | [F/collaboration/activity/001302](requirements/functional/collaboration/activity/001302_live-meeting-on-activity.md) | The activity page shows a running meeting above the list | approved |
+| [F/collaboration/activity/001307](requirements/functional/collaboration/activity/001307_no-system-archive.md) | The automatic archive of a to-do card is not an activity | approved |
 | [F/collaboration/committees/001010](requirements/functional/collaboration/committees/001010_info-tab.md) | A Gremium has an Info tab | approved |
 | [F/collaboration/committees/001011](requirements/functional/collaboration/committees/001011_info-edit-permission.md) | Only info.write edits the Info of a Gremium | approved |
 | [F/collaboration/committees/001012](requirements/functional/collaboration/committees/001012_info-links.md) | An Info link has a label and a web address | approved |
@@ -280,21 +285,16 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001852](requirements/functional/collaboration/committees/001852_notify-recipients.md) | The message goes to the members and the substitute pool | approved |
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
+| [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
 | [F/collaboration/graph/001423](requirements/functional/collaboration/graph/001423_graph-nodes.md) | The graph shows the elements that have a relation | approved |
 | [F/collaboration/graph/001424](requirements/functional/collaboration/graph/001424_graph-relations.md) | The graph shows links and the built-in relations | approved |
-| [F/collaboration/graph/001425](requirements/functional/collaboration/graph/001425_graph-filters.md) | The graph has filters above the drawing | approved |
-| [F/collaboration/graph/001426](requirements/functional/collaboration/graph/001426_graph-builds-up.md) | The graph builds up piece by piece | approved |
-| [F/collaboration/graph/001427](requirements/functional/collaboration/graph/001427_graph-reduced-motion.md) | The graph does not move with reduced motion | approved |
-| [F/collaboration/graph/001428](requirements/functional/collaboration/graph/001428_graph-text-alternative.md) | The drawing has a text alternative | approved |
-| [F/collaboration/graph/001429](requirements/functional/collaboration/graph/001429_graph-node-press.md) | A press on a node shows the element and its neighbours | approved |
-| [F/collaboration/graph/001430](requirements/functional/collaboration/graph/001430_graph-node-look.md) | A node shows the icon and the colour of its kind | approved |
 | [F/collaboration/graph/001431](requirements/functional/collaboration/graph/001431_graph-api.md) | The graph has its own API | approved |
 | [F/collaboration/graph/001432](requirements/functional/collaboration/graph/001432_graph-features.md) | A kind of a feature that is off does not show in the graph | approved |
-| [F/collaboration/graph/001433](requirements/functional/collaboration/graph/001433_graph-node-drag.md) | A drag moves a node of the graph | approved |
 | [F/collaboration/graph/001434](requirements/functional/collaboration/graph/001434_graph-neighbour-steps.md) | The graph shows the neighbours of the hits up to a count of steps | approved |
+| [F/collaboration/graph/002790](requirements/functional/collaboration/graph/002790_graph-load-more.md) | "Mehr laden" of the graph stands over the zoom buttons | approved |
 | [F/collaboration/links/001400](requirements/functional/collaboration/links/001400_any-to-any.md) | Any two elements can link to each other | approved |
 | [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | approved |
 | [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | approved |
@@ -322,18 +322,49 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/001002](requirements/functional/collaboration/notifications/001002_mail-footer-copyright.md) | The footer of a mail shows the copyright line | approved |
 | [F/collaboration/notifications/001003](requirements/functional/collaboration/notifications/001003_mail-footer-legal-links.md) | The footer of a mail shows the legal links | approved |
 | [F/collaboration/notifications/001004](requirements/functional/collaboration/notifications/001004_mail-dark-colours.md) | A mail has light and dark colours | approved |
+| [F/collaboration/notifications/002500](requirements/functional/collaboration/notifications/002500_push-per-device.md) | A person switches on push for one device | approved |
+| [F/collaboration/notifications/002501](requirements/functional/collaboration/notifications/002501_push-switch-per-kind.md) | Push has its own switch per kind | approved |
+| [F/collaboration/notifications/002502](requirements/functional/collaboration/notifications/002502_push-urgent-defaults.md) | Only urgent kinds push by default | approved |
+| [F/collaboration/notifications/002503](requirements/functional/collaboration/notifications/002503_push-content.md) | A push shows a title and one short line | approved |
+| [F/collaboration/notifications/002504](requirements/functional/collaboration/notifications/002504_push-feature-switch.md) | Push has a feature switch | approved |
+| [F/collaboration/notifications/002505](requirements/functional/collaboration/notifications/002505_push-vapid-key.md) | The platform makes its own push key | approved |
+| [F/collaboration/notifications/002506](requirements/functional/collaboration/notifications/002506_push-expired-devices.md) | An expired device subscription is removed | approved |
+| [F/collaboration/notifications/002507](requirements/functional/collaboration/notifications/002507_push-accounts-only.md) | Only accounts get push | approved |
+| [F/collaboration/notifications/002508](requirements/functional/collaboration/notifications/002508_push-jump-buttons.md) | A push can carry jump buttons | approved |
+| [F/collaboration/notifications/002509](requirements/functional/collaboration/notifications/002509_push-direct-actions.md) | A push can act without opening the app | approved |
+| [F/collaboration/notifications/002510](requirements/functional/collaboration/notifications/002510_push-endpoint-guard.md) | A push goes only to a known push service | approved |
+| [F/collaboration/notifications/002550](requirements/functional/collaboration/notifications/002550_push-bell-activity.md) | A bell in the head of Aktivität asks for push and opens the settings | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
 | [F/collaboration/tickets/000150](requirements/functional/collaboration/tickets/000150_public-report.md) | Anyone can report a help ticket | approved |
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
-| [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | approved |
+| [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | replaced |
 | [F/collaboration/tickets/000315](requirements/functional/collaboration/tickets/000315_sender-block.md) | A sender can be blocked | approved |
 | [F/collaboration/tickets/000316](requirements/functional/collaboration/tickets/000316_ticket-retention.md) | Closed tickets are anonymized after the retention time | approved |
 | [F/collaboration/tickets/000317](requirements/functional/collaboration/tickets/000317_context-url.md) | A ticket context keeps only platform pages | approved |
 | [F/collaboration/tickets/001096](requirements/functional/collaboration/tickets/001096_system-entry-name.md) | A system entry names the short name | approved |
+| [F/collaboration/tickets/002700](requirements/functional/collaboration/tickets/002700_ticket-bereich.md) | Each ticket belongs to one Bereich | approved |
+| [F/collaboration/tickets/002701](requirements/functional/collaboration/tickets/002701_bereich-plattform.md) | The Bereich Plattform takes the reports of the help menu | approved |
+| [F/collaboration/tickets/002702](requirements/functional/collaboration/tickets/002702_bereich-gremium.md) | A Bereich belongs to one Gremium or to no Gremium | approved |
+| [F/collaboration/tickets/002703](requirements/functional/collaboration/tickets/002703_work-right.md) | The work right in a Bereich comes from the Gremium | approved |
+| [F/collaboration/tickets/002704](requirements/functional/collaboration/tickets/002704_assignee-in-bereich.md) | Only a person with the work right in the Bereich is assignee or mentioned | approved |
+| [F/collaboration/tickets/002705](requirements/functional/collaboration/tickets/002705_bereich-settings.md) | The admin page Hilfe & Tickets holds the Bereiche | approved |
+| [F/collaboration/tickets/002706](requirements/functional/collaboration/tickets/002706_kategorien.md) | Each Bereich has its own Kategorien | approved |
+| [F/collaboration/tickets/002707](requirements/functional/collaboration/tickets/002707_move-ticket.md) | A ticket can move to a different Bereich | approved |
+| [F/collaboration/tickets/002708](requirements/functional/collaboration/tickets/002708_status-waiting.md) | A ticket has the status Wartet auf Antwort | approved |
+| [F/collaboration/tickets/002709](requirements/functional/collaboration/tickets/002709_answer-ends-waiting.md) | An answer of the sender ends Wartet auf Antwort | approved |
+| [F/collaboration/tickets/002710](requirements/functional/collaboration/tickets/002710_reopen-window.md) | An answer on a closed ticket opens it again for 14 days | approved |
+| [F/collaboration/tickets/002711](requirements/functional/collaboration/tickets/002711_ticket-source.md) | A ticket names its source | approved |
+| [F/collaboration/tickets/002712](requirements/functional/collaboration/tickets/002712_ticket-by-hand.md) | The team creates a ticket by hand | approved |
+| [F/collaboration/tickets/002713](requirements/functional/collaboration/tickets/002713_bereich-in-app.md) | A Bereich can take tickets from signed-in persons | approved |
+| [F/collaboration/tickets/002714](requirements/functional/collaboration/tickets/002714_random-ticket-number.md) | A new ticket gets a random number of eight characters | approved |
+| [F/collaboration/tickets/002715](requirements/functional/collaboration/tickets/002715_bereich-filter.md) | The ticket list shows the Bereiche of the person | approved |
+| [F/collaboration/tickets/002716](requirements/functional/collaboration/tickets/002716_anonymization-removes-mail-data.md) | The anonymization of a ticket removes its mail data | approved |
+| [F/collaboration/tickets/002717](requirements/functional/collaboration/tickets/002717_new-ticket-mail.md) | A new ticket is mailed to the team of its Bereich | approved |
+| [F/collaboration/tickets/002718](requirements/functional/collaboration/tickets/002718_assigned-mail.md) | The new assignee gets a mail | approved |
+| [F/collaboration/tickets/002719](requirements/functional/collaboration/tickets/002719_existing-tickets.md) | The tickets from before the Bereiche belong to Plattform | approved |
 | [F/collaboration/todos/000147](requirements/functional/collaboration/todos/000147_board-kinds.md) | Boards per Gremium, per person and per team | approved |
-| [F/collaboration/todos/000148](requirements/functional/collaboration/todos/000148_move-sheet.md) | One move sheet | approved |
 | [F/collaboration/todos/000149](requirements/functional/collaboration/todos/000149_no-status-sync.md) | No status sync between ticket and card | approved |
 | [F/collaboration/todos/000318](requirements/functional/collaboration/todos/000318_board-rights.md) | Board rights depend on the board kind | replaced |
 | [F/collaboration/todos/000319](requirements/functional/collaboration/todos/000319_unreadable-404.md) | An unreadable board is not found | approved |
@@ -385,13 +416,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001071](requirements/functional/collaboration/todos/001071_free-board-added-mail.md) | A person added to a free board by name gets a mail | approved |
 | [F/collaboration/todos/001072](requirements/functional/collaboration/todos/001072_gremium-boards-stay.md) | The board of a Gremium stays its own kind | approved |
 | [F/collaboration/todos/001073](requirements/functional/collaboration/todos/001073_team-board-stays.md) | The team board Plattform stays a team board | approved |
-| [F/collaboration/todos/001074](requirements/functional/collaboration/todos/001074_gremium-person-picker.md) | One search field picks Gremien and persons | approved |
 | [F/collaboration/todos/001075](requirements/functional/collaboration/todos/001075_free-board-transfer.md) | A card moves between a free board and other shared boards | approved |
 | [F/collaboration/todos/001076](requirements/functional/collaboration/todos/001076_free-board-api.md) | Free boards are created and managed through the API and MCP | approved |
 | [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
 | [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
-| [F/collaboration/todos/001380](requirements/functional/collaboration/todos/001380_move-sheet-select-rows.md) | The move sheet lists the columns as the select sheet does | approved |
-| [F/collaboration/todos/001967](requirements/functional/collaboration/todos/001967_column-menu-corner.md) | The menu of a board column stands in its top right corner | approved |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |
@@ -400,7 +428,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000143](requirements/functional/finance/budget/000143_transfer-kind.md) | A transfer is a kind in the Art filter | approved |
 | [F/finance/budget/000144](requirements/functional/finance/budget/000144_cost-centre-items.md) | The cost centre card lists Anträge and bookings | replaced |
 | [F/finance/budget/000145](requirements/functional/finance/budget/000145_revert-keeps-invoice.md) | A reverted booking keeps the invoice status | replaced |
-| [F/finance/budget/000146](requirements/functional/finance/budget/000146_legend.md) | The budget legend matches the drawing | approved |
 | [F/finance/budget/000246](requirements/functional/finance/budget/000246_path-key.md) | A cost centre has a stable path key | approved |
 | [F/finance/budget/000247](requirements/functional/finance/budget/000247_roll-up.md) | Allocation flows down, consumption flows up | approved |
 | [F/finance/budget/000248](requirements/functional/finance/budget/000248_available-formula.md) | The available amount can be negative | approved |
@@ -496,7 +523,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/000990](requirements/functional/finance/budget/000990_late-booking-in-past-year.md) | A past fiscal year that is not closed takes a booking with a date in the year | approved |
 | [F/finance/budget/000991](requirements/functional/finance/budget/000991_close-names-open-antraege.md) | The close of a fiscal year names what stays open, and an Antrag can leave a closed year | approved |
 | [F/finance/budget/000992](requirements/functional/finance/budget/000992_stichtag-keeps-closed-years.md) | A new Stichtag moves only the fiscal years that are not closed | approved |
-| [F/finance/budget/001020](requirements/functional/finance/budget/001020_plan-table-amounts-one-edge.md) | The amounts of a plan table end on one edge | approved |
 | [F/finance/budget/001021](requirements/functional/finance/budget/001021_plan-change-needs-comparison.md) | A plan shows the Änderung only against an Ansatz | approved |
 | [F/finance/budget/001030](requirements/functional/finance/budget/001030_antrag-takes-expense-cost-centre.md) | An Antrag takes only a Kostenstelle on the expense side | approved |
 | [F/finance/budget/001031](requirements/functional/finance/budget/001031_antrag-takes-leaf-cost-centre.md) | An Antrag takes only a Kostenstelle without a Kostenstelle below it | approved |
@@ -516,7 +542,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001874](requirements/functional/finance/budget/001874_bookings-fiscal-year-filter.md) | The bookings list filters by Haushaltsjahr | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
-| [F/finance/invoices/000262](requirements/functional/finance/invoices/000262_invoice-segments.md) | The invoice list has four segments | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |
 | [F/finance/invoices/001290](requirements/functional/finance/invoices/001290_booking-pays-invoice.md) | A new booking sets its invoice to paid | approved |
 | [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | approved |
@@ -534,10 +559,79 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
+| [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
+| [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
+| [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
+| [F/integrations/paperless/002516](requirements/functional/integrations/paperless/002516_file-final-protocol.md) | A final protocol is filed in Paperless | approved |
+| [F/integrations/paperless/002517](requirements/functional/integrations/paperless/002517_file-decided-antrag.md) | The PDF of an Antrag is filed at each decision | approved |
+| [F/integrations/paperless/002518](requirements/functional/integrations/paperless/002518_file-plan-in-force.md) | A Haushaltsplan is filed when it comes into force | approved |
+| [F/integrations/paperless/002519](requirements/functional/integrations/paperless/002519_document-data.md) | A filed document carries type, date, Gremium and link | approved |
+| [F/integrations/paperless/002520](requirements/functional/integrations/paperless/002520_filed-once.md) | A file is filed only once | approved |
+| [F/integrations/paperless/002521](requirements/functional/integrations/paperless/002521_new-version.md) | A new version becomes a new document | approved |
+| [F/integrations/paperless/002522](requirements/functional/integrations/paperless/002522_no-delete.md) | The platform deletes no document in Paperless | approved |
+| [F/integrations/paperless/002523](requirements/functional/integrations/paperless/002523_filing-in-worker.md) | Filing runs in the worker and never blocks an action | approved |
+| [F/integrations/paperless/002524](requirements/functional/integrations/paperless/002524_permission-use.md) | One permission gives the use of Paperless | approved |
+| [F/integrations/paperless/002525](requirements/functional/integrations/paperless/002525_open-in-paperless.md) | An element with a filed document links to Paperless | approved |
+| [F/integrations/paperless/002526](requirements/functional/integrations/paperless/002526_failed-filings.md) | The admin page lists the filings that failed | approved |
+| [F/integrations/paperless/002527](requirements/functional/integrations/paperless/002527_insert-slash-command.md) | The command Paperless opens the Paperless search in a protocol text | approved |
+| [F/integrations/paperless/002528](requirements/functional/integrations/paperless/002528_insert-copies.md) | An insert from Paperless copies the document as an embedded PDF | approved |
+| [F/integrations/paperless/002529](requirements/functional/integrations/paperless/002529_search-outage.md) | The Paperless search tells an outage and keeps the editor | approved |
+| [F/integrations/paperless/002530](requirements/functional/integrations/paperless/002530_backfill.md) | An admin can file the final documents that exist | approved |
+| [F/integrations/paperless/002531](requirements/functional/integrations/paperless/002531_audit.md) | Each filing and each insert has an audit entry | approved |
+| [F/integrations/paperless/002534](requirements/functional/integrations/paperless/002534_search-like-global-search.md) | The Paperless search looks like the global search | approved |
+| [F/integrations/paperless/002535](requirements/functional/integrations/paperless/002535_file-antrag-attachments.md) | The attachments of an Antrag are filed with its PDF | approved |
+| [F/integrations/paperless/002762](requirements/functional/integrations/paperless/002762_feature-switch.md) | Paperless has a feature switch | approved |
+| [F/integrations/paperless/002763](requirements/functional/integrations/paperless/002763_link-kind.md) | A Paperless document is a kind of link end | approved |
+| [F/integrations/paperless/002764](requirements/functional/integrations/paperless/002764_link-permission.md) | A Paperless link needs the Paperless permission | approved |
+| [F/integrations/paperless/002765](requirements/functional/integrations/paperless/002765_link-title-stored.md) | A Paperless link keeps the title from the moment of the link | approved |
+| [F/integrations/paperless/002766](requirements/functional/integrations/paperless/002766_link-search.md) | The link search finds Paperless documents | approved |
+| [F/integrations/paperless/002767](requirements/functional/integrations/paperless/002767_link-switch.md) | The links to Paperless have their own switch | approved |
+| [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
+| [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | approved |
+| [F/integrations/paperless/002844](requirements/functional/integrations/paperless/002844_links-name-public-address.md) | A link to Paperless names the address for links | approved |
+| [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
+| [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
+| [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
+| [F/integrations/ticket-mail/002723](requirements/functional/integrations/ticket-mail/002723_fetch-in-worker.md) | The worker fetches the mails each minute | approved |
+| [F/integrations/ticket-mail/002724](requirements/functional/integrations/ticket-mail/002724_mail-imported-once.md) | A mail is imported one time | approved |
+| [F/integrations/ticket-mail/002725](requirements/functional/integrations/ticket-mail/002725_mail-becomes-ticket.md) | A new mail becomes a ticket | approved |
+| [F/integrations/ticket-mail/002726](requirements/functional/integrations/ticket-mail/002726_thread-by-headers.md) | An answer joins its ticket through the mail headers | approved |
+| [F/integrations/ticket-mail/002727](requirements/functional/integrations/ticket-mail/002727_thread-by-number.md) | The number in the subject joins only a mail of a participant | approved |
+| [F/integrations/ticket-mail/002728](requirements/functional/integrations/ticket-mail/002728_mail-as-text.md) | A mail shows as text only | approved |
+| [F/integrations/ticket-mail/002729](requirements/functional/integrations/ticket-mail/002729_mail-source-kept.md) | The platform keeps the source of each mail | approved |
+| [F/integrations/ticket-mail/002730](requirements/functional/integrations/ticket-mail/002730_mail-attachments.md) | The attachments of a mail become files of the message | approved |
+| [F/integrations/ticket-mail/002731](requirements/functional/integrations/ticket-mail/002731_mail-stays-in-postfach.md) | An imported mail moves to a folder and is never deleted | approved |
+| [F/integrations/ticket-mail/002732](requirements/functional/integrations/ticket-mail/002732_automatic-mails.md) | An automatic mail opens no ticket | approved |
+| [F/integrations/ticket-mail/002733](requirements/functional/integrations/ticket-mail/002733_answer-as-mail.md) | A public message on a mail ticket goes out as a mail | approved |
+| [F/integrations/ticket-mail/002734](requirements/functional/integrations/ticket-mail/002734_answer-headers.md) | A sent mail carries the thread headers and the number | approved |
+| [F/integrations/ticket-mail/002735](requirements/functional/integrations/ticket-mail/002735_answer-recipients.md) | An answer goes to the sender and to the Cc addresses of the thread | approved |
+| [F/integrations/ticket-mail/002736](requirements/functional/integrations/ticket-mail/002736_answer-sender.md) | A sent mail comes from the address of the Postfach | approved |
+| [F/integrations/ticket-mail/002737](requirements/functional/integrations/ticket-mail/002737_send-in-worker.md) | The worker sends a mail and shows a failure on the message | approved |
+| [F/integrations/ticket-mail/002738](requirements/functional/integrations/ticket-mail/002738_confirmation-mail.md) | A new mail ticket gets a confirmation | approved |
+| [F/integrations/ticket-mail/002739](requirements/functional/integrations/ticket-mail/002739_mail-sender-is-address.md) | The sender of a mail ticket is the address, not an account | approved |
+| [F/integrations/ticket-mail/002740](requirements/functional/integrations/ticket-mail/002740_blocked-mail-sender.md) | The mail of a blocked sender becomes no ticket | approved |
+| [F/integrations/ticket-mail/002741](requirements/functional/integrations/ticket-mail/002741_mail-rate-limit.md) | One address opens at most 20 tickets an hour by mail | approved |
+| [F/integrations/ticket-mail/002742](requirements/functional/integrations/ticket-mail/002742_file-to-paperless.md) | The team files an attachment of a ticket in Paperless | approved |
+| [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
+| [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | approved |
+| [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | approved |
+| [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | approved |
+| [F/integrations/ticket-mail/002816](requirements/functional/integrations/ticket-mail/002816_unchecked-sender-marked.md) | A mail message of an unchecked sender is marked | approved |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
-| [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | approved |
+| [F/integrations/webhooks/000402](requirements/functional/integrations/webhooks/000402_flow-action-only.md) | A webhook fires only through a flow action | replaced |
 | [F/integrations/webhooks/000403](requirements/functional/integrations/webhooks/000403_delete-webhook.md) | A webhook can be deleted | approved |
+| [F/integrations/webhooks/002410](requirements/functional/integrations/webhooks/002410_event-subscriptions.md) | A webhook subscribes to events | approved |
+| [F/integrations/webhooks/002411](requirements/functional/integrations/webhooks/002411_event-catalog.md) | The webhook events come from a fixed catalog | approved |
+| [F/integrations/webhooks/002412](requirements/functional/integrations/webhooks/002412_payload-fields.md) | A webhook chooses the payload fields per event | approved |
+| [F/integrations/webhooks/002413](requirements/functional/integrations/webhooks/002413_personal-fields.md) | A personal payload field is marked and off by default | approved |
+| [F/integrations/webhooks/002414](requirements/functional/integrations/webhooks/002414_filters.md) | A webhook filters by Gremium, Antragsart and target status | approved |
+| [F/integrations/webhooks/002415](requirements/functional/integrations/webhooks/002415_payload-preview.md) | The webhook dialog shows a payload preview | approved |
+| [F/integrations/webhooks/002416](requirements/functional/integrations/webhooks/002416_test-delivery.md) | A webhook can send a test delivery | approved |
+| [F/integrations/webhooks/002417](requirements/functional/integrations/webhooks/002417_payload-at-event-time.md) | The payload is built when the event occurs | approved |
+| [F/integrations/webhooks/002749](requirements/functional/integrations/webhooks/002749_ticket-event-bereich.md) | The ticket event names the Bereich and follows the Gremium filter | approved |
+| [F/integrations/webhooks/002750](requirements/functional/integrations/webhooks/002750_ticket-message-event.md) | A message of the sender is a webhook event | approved |
+| [F/integrations/webhooks/002751](requirements/functional/integrations/webhooks/002751_ticket-status-event.md) | A status change of a ticket is a webhook event | approved |
 | [F/meetings/calendar/000331](requirements/functional/meetings/calendar/000331_feed.md) | Each person has a calendar feed | approved |
 | [F/meetings/calendar/000332](requirements/functional/meetings/calendar/000332_feed-404.md) | A wrong feed token is not found | approved |
 | [F/meetings/calendar/000333](requirements/functional/meetings/calendar/000333_event-defaults.md) | A calendar event has a reminder | approved |
@@ -557,9 +651,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000723](requirements/functional/meetings/calendar/000723_external-entries.md) | External entries are plain and read-only | approved |
 | [F/meetings/calendar/000724](requirements/functional/meetings/calendar/000724_feed-termine-external.md) | The personal feed holds Termine and external entries | approved |
 | [F/meetings/calendar/000725](requirements/functional/meetings/calendar/000725_termin-privacy.md) | Termine are part of the privacy export and erasure | approved |
-| [F/meetings/calendar/000726](requirements/functional/meetings/calendar/000726_calendar-phone.md) | The Kalender on the phone is a list of days | approved |
 | [F/meetings/calendar/000727](requirements/functional/meetings/calendar/000727_calendar-search.md) | The Kalender search jumps to the hit | approved |
-| [F/meetings/calendar/000728](requirements/functional/meetings/calendar/000728_calendar-week-view.md) | The desktop Kalender has a week and a month view | approved |
 | [F/meetings/calendar/000729](requirements/functional/meetings/calendar/000729_external-calendars-admin-page.md) | The admin page Kalender lists and edits the external calendars | approved |
 | [F/meetings/calendar/000730](requirements/functional/meetings/calendar/000730_public-termin.md) | A Termin can be public | approved |
 | [F/meetings/calendar/000731](requirements/functional/meetings/calendar/000731_public-calendar-page.md) | The public calendar page shows the public entries | approved |
@@ -569,13 +661,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
 | [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
 | [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
-| [F/meetings/calendar/000742](requirements/functional/meetings/calendar/000742_termin-invite-search-rows.md) | The invitation search of a Termin shows its hits as rows with an avatar | replaced |
-| [F/meetings/calendar/000744](requirements/functional/meetings/calendar/000744_week-span-blocks.md) | A timed entry over several days is a block on each of its days in the week view | approved |
-| [F/meetings/calendar/000746](requirements/functional/meetings/calendar/000746_week-whole-day.md) | The week view shows the whole day from 00:00 to 24:00 | approved |
 | [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |
 | [F/meetings/calendar/000974](requirements/functional/meetings/calendar/000974_feed-read-time-limit.md) | The read of an external feed has a time limit | approved |
 | [F/meetings/calendar/001094](requirements/functional/meetings/calendar/001094_feed-name.md) | A calendar feed is named by the short name | approved |
-| [F/meetings/calendar/001771](requirements/functional/meetings/calendar/001771_termin-button-in-tools-row.md) | The desktop Kalender has no visible title and its buttons end the tools row | approved |
 | [F/meetings/delegations/000110](requirements/functional/meetings/delegations/000110_per-gremium.md) | Vote delegation is a Gremium setting | approved |
 | [F/meetings/delegations/000111](requirements/functional/meetings/delegations/000111_delegation-blocks-presence.md) | A member with an active delegation is not present | approved |
 | [F/meetings/delegations/000112](requirements/functional/meetings/delegations/000112_one-pool.md) | The substitute pool is the only substitute rule | approved |
@@ -595,6 +683,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000909](requirements/functional/meetings/delegations/000909_delegate-limit.md) | A delegate holds a limited number of delegations | approved |
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
 | [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
+| [F/meetings/delegations/002692](requirements/functional/meetings/delegations/002692_substitutes-page-per-gremium.md) | The Stellvertretungen of a Gremium have their own page | approved |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -603,8 +692,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000097](requirements/functional/meetings/meetings/000097_delete-removes-votes.md) | A meeting delete removes its votes | approved |
 | [F/meetings/meetings/000098](requirements/functional/meetings/meetings/000098_agenda-changes.md) | Agenda changes only while planned or live | approved |
 | [F/meetings/meetings/000099](requirements/functional/meetings/meetings/000099_top-text-editable.md) | A TOP text is editable until the protocol is final | approved |
-| [F/meetings/meetings/000100](requirements/functional/meetings/meetings/000100_agenda-subtitle.md) | An agenda row has a subtitle only for an Antrag | approved |
-| [F/meetings/meetings/000101](requirements/functional/meetings/meetings/000101_application-top-row.md) | A TOP with an Antrag shows the Antrag as its first row | approved |
 | [F/meetings/meetings/000102](requirements/functional/meetings/meetings/000102_top-attachments-internal.md) | TOP attachments are internal | approved |
 | [F/meetings/meetings/000103](requirements/functional/meetings/meetings/000103_attendance.md) | Lead-set attendance wins | approved |
 | [F/meetings/meetings/000104](requirements/functional/meetings/meetings/000104_qr-only-without-quorum.md) | Public participation only without quorum | replaced |
@@ -626,9 +713,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/000449](requirements/functional/meetings/meetings/000449_delete-vote-count.md) | A meeting delete names the vote count | approved |
 | [F/meetings/meetings/000450](requirements/functional/meetings/meetings/000450_no-global-meeting-key.md) | No global key manages meetings | approved |
 | [F/meetings/meetings/000574](requirements/functional/meetings/meetings/000574_live-viewers-avatar.md) | A live viewer shows with the own avatar | approved |
-| [F/meetings/meetings/000607](requirements/functional/meetings/meetings/000607_agenda-row-no-drag-handle.md) | An agenda row shows no drag handle | approved |
-| [F/meetings/meetings/000610](requirements/functional/meetings/meetings/000610_attendance-month-without-meeting.md) | A month without a meeting is a narrow column with a dash | approved |
-| [F/meetings/meetings/000611](requirements/functional/meetings/meetings/000611_attendance-cell-badges.md) | An attendance cell holds its badges | approved |
 | [F/meetings/meetings/000861](requirements/functional/meetings/meetings/000861_freetext-top-description.md) | A free-text TOP takes a description that opens its text as a quote | approved |
 | [F/meetings/meetings/000903](requirements/functional/meetings/meetings/000903_meeting-kind.md) | A meeting has a kind | approved |
 | [F/meetings/meetings/000904](requirements/functional/meetings/meetings/000904_guests-may-vote.md) | Guest ballots are a Gremium setting | approved |
@@ -655,14 +739,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001310](requirements/functional/meetings/meetings/001310_attendance-pool-rows.md) | The attendance matrix shows the pool substitutes | approved |
 | [F/meetings/meetings/001311](requirements/functional/meetings/meetings/001311_attendance-pool-cell.md) | A pool cell counts the pool seats | approved |
 | [F/meetings/meetings/001312](requirements/functional/meetings/meetings/001312_attendance-average-pool-seats.md) | The attendance average counts the pool seats | approved |
-| [F/meetings/meetings/001460](requirements/functional/meetings/meetings/001460_votes-in-side-sheet.md) | The vote cards of an item are in a side sheet | approved |
-| [F/meetings/meetings/001461](requirements/functional/meetings/meetings/001461_phone-open-vote-replaces-text.md) | On a phone an open vote takes the place of the text | approved |
 | [F/meetings/meetings/001462](requirements/functional/meetings/meetings/001462_sheet-opens-for-voters.md) | The vote sheet opens by itself for a voter | approved |
 | [F/meetings/meetings/001738](requirements/functional/meetings/meetings/001738_live-channel-reconnects.md) | The meeting page opens a dropped live channel again | approved |
 | [F/meetings/meetings/001739](requirements/functional/meetings/meetings/001739_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
-| [F/meetings/meetings/001800](requirements/functional/meetings/meetings/001800_linked-items-in-side-sheet.md) | The linked rows of an item are in a side sheet | approved |
-| [F/meetings/meetings/001801](requirements/functional/meetings/meetings/001801_attendance-edge-tab.md) | A tab at the end edge opens the attendance | approved |
-| [F/meetings/meetings/001802](requirements/functional/meetings/meetings/001802_vote-sheet-head-add.md) | The vote sheet has its add button in the head and an empty state | approved |
 | [F/meetings/meetings/001804](requirements/functional/meetings/meetings/001804_vote-tab-final-protocol.md) | A closed meeting keeps the vote tab | approved |
 | [F/meetings/meetings/001871](requirements/functional/meetings/meetings/001871_meetings-committee-param.md) | The meeting list reads the Gremium filter from the URL | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
@@ -681,11 +760,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000361](requirements/functional/meetings/protocols/000361_image-budget.md) | A protocol shows at most 48 images | approved |
 | [F/meetings/protocols/000685](requirements/functional/meetings/protocols/000685_blackout-syntax.md) | Protocol text marks a segment for blackout | approved |
 | [F/meetings/protocols/000686](requirements/functional/meetings/protocols/000686_blackout-unclosed.md) | An open blackout marker stops the finalize | approved |
-| [F/meetings/protocols/000689](requirements/functional/meetings/protocols/000689_blackout-internal.md) | Internal views show a marked segment as marked | approved |
-| [F/meetings/protocols/000690](requirements/functional/meetings/protocols/000690_blackout-format-bar.md) | The format bar marks a segment for blackout | approved |
 | [F/meetings/protocols/000691](requirements/functional/meetings/protocols/000691_blackout-mail.md) | A marked segment sends the public PDF to the mailing list | approved |
 | [F/meetings/protocols/000862](requirements/functional/meetings/protocols/000862_pdf-embed.md) | A protocol text embeds a PDF | approved |
-| [F/meetings/protocols/000863](requirements/functional/meetings/protocols/000863_pdf-file-badge.md) | An embedded PDF shows as a file badge | approved |
 | [F/meetings/protocols/000864](requirements/functional/meetings/protocols/000864_pdf-appendix.md) | The protocol PDF appends each embedded PDF as an Anlage | approved |
 | [F/meetings/protocols/000865](requirements/functional/meetings/protocols/000865_pdf-watermark.md) | Each page of an Anlage has a watermark | approved |
 | [F/meetings/protocols/000866](requirements/functional/meetings/protocols/000866_pdf-reference-link.md) | The place of an embedded PDF links to its Anlage | approved |
@@ -694,7 +770,6 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000870](requirements/functional/meetings/protocols/000870_top-time-recorded.md) | The move to a TOP records its time | approved |
 | [F/meetings/protocols/000871](requirements/functional/meetings/protocols/000871_top-time-in-pdf.md) | The protocol PDF shows the time above each TOP | approved |
 | [F/meetings/protocols/000872](requirements/functional/meetings/protocols/000872_time-note-syntax.md) | A protocol text marks a time note | approved |
-| [F/meetings/protocols/000873](requirements/functional/meetings/protocols/000873_time-note-tool.md) | A toolbar tool inserts a time note | approved |
 | [F/meetings/protocols/000884](requirements/functional/meetings/protocols/000884_application-appendix.md) | An Antrag on the agenda is an Anlage of the protocol | approved |
 | [F/meetings/protocols/000885](requirements/functional/meetings/protocols/000885_application-snapshot.md) | The Anlage holds the Antrag as the Sitzung treated it | approved |
 | [F/meetings/protocols/000886](requirements/functional/meetings/protocols/000886_application-public-redaction.md) | The public Anlage blacks out the personal data | approved |
@@ -708,11 +783,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/000952](requirements/functional/meetings/protocols/000952_finalize-asks-first.md) | The finalize of a protocol asks first | approved |
 | [F/meetings/protocols/000965](requirements/functional/meetings/protocols/000965_blackout-block.md) | Protocol text marks a block for blackout | approved |
 | [F/meetings/protocols/000966](requirements/functional/meetings/protocols/000966_blackout-block-attachments.md) | An attachment in a blackout block stays out of the public protocol | approved |
-| [F/meetings/protocols/000969](requirements/functional/meetings/protocols/000969_blackout-known-names.md) | The editor blacks out a known name after it is typed | approved |
 | [F/meetings/protocols/000970](requirements/functional/meetings/protocols/000970_known-names.md) | The known names are the persons of the platform | approved |
 | [F/meetings/protocols/000983](requirements/functional/meetings/protocols/000983_final-protocol-back-to-draft.md) | A final protocol goes back to draft until it is approved | approved |
 | [F/meetings/protocols/000997](requirements/functional/meetings/protocols/000997_sent-only-with-mail.md) | A protocol counts as sent only when its mail went out | approved |
-| [F/meetings/protocols/001304](requirements/functional/meetings/protocols/001304_protocol-in-meeting-head.md) | The protocol state and its actions sit in the meeting head | approved |
+| [F/meetings/protocols/002780](requirements/functional/meetings/protocols/002780_selection-format-bar.md) | A text selection shows a format bar | approved |
+| [F/meetings/protocols/002781](requirements/functional/meetings/protocols/002781_selection-bar-formats.md) | The format bar holds the inline formats | approved |
+| [F/meetings/protocols/002782](requirements/functional/meetings/protocols/002782_selection-bar-place.md) | The format bar shows below the selection | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |
@@ -751,78 +827,28 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/voting/000994](requirements/functional/meetings/voting/000994_one-open-vote.md) | A meeting has one open vote at a time | approved |
 | [F/meetings/voting/000995](requirements/functional/meetings/voting/000995_cancelled-vote-frees-item.md) | A cancelled vote does not block the vote of an application item | approved |
 | [F/meetings/voting/000996](requirements/functional/meetings/voting/000996_round-and-repeat-lock.md) | The next Wahlgang and the repeat of an election lock each other | approved |
-| [F/meetings/voting/001006](requirements/functional/meetings/voting/001006_vote-card-states-result-once.md) | The vote card states the result once | approved |
-| [F/meetings/voting/001007](requirements/functional/meetings/voting/001007_vote-card-one-action.md) | The vote card has one main action and a menu | approved |
-| [F/meetings/voting/002070](requirements/functional/meetings/voting/002070_vote-card-opaque-on-glass.md) | A vote card on a glass sheet is opaque in the light theme | approved |
 | [F/public/public-pages/000170](requirements/functional/public/public-pages/000170_no-public-meetings.md) | Meetings are never public | replaced |
 | [F/public/public-pages/000171](requirements/functional/public/public-pages/000171_public-protocols.md) | Only final protocols of public Gremien are public | approved |
 | [F/public/public-pages/000172](requirements/functional/public/public-pages/000172_public-protocol-content.md) | A public protocol has no names and no non-public TOPs | approved |
 | [F/public/public-pages/000173](requirements/functional/public/public-pages/000173_noindex.md) | Public pages are not indexed | approved |
 | [F/public/public-pages/000589](requirements/functional/public/public-pages/000589_login-choice.md) | Anmelden offers the account login and the e-mail link | approved |
 | [F/public/public-pages/000687](requirements/functional/public/public-pages/000687_blackout-public.md) | The public variants black out a marked segment | approved |
-| [F/public/public-pages/000688](requirements/functional/public/public-pages/000688_blackout-bar-width.md) | A black bar has one fixed width and the text colour | approved |
 | [F/public/public-pages/000887](requirements/functional/public/public-pages/000887_blackout-bar-baseline.md) | A black bar in the PDF sits on the baseline of its line | approved |
 | [F/public/public-pages/000926](requirements/functional/public/public-pages/000926_public-decisions.md) | The decisions of a public Gremium are public | approved |
 | [F/public/public-pages/000945](requirements/functional/public/public-pages/000945_public-decisions-last-result.md) | The public decisions show the last result of a TOP | approved |
 | [F/public/public-pages/000967](requirements/functional/public/public-pages/000967_blackout-block-public.md) | The public variants show a blackout block as one bar | approved |
 | [F/public/public-pages/001303](requirements/functional/public/public-pages/001303_public-pages-in-navigation.md) | The navigation leads a signed-in person to the public pages | approved |
-| [NF/accessibility/conformance/000490](requirements/non-functional/accessibility/conformance/000490_wcag-22-aa.md) | Every view meets WCAG 2.2 level AA | approved |
-| [NF/accessibility/conformance/000491](requirements/non-functional/accessibility/conformance/000491_axe-every-route.md) | Every route passes an axe check in both themes | approved |
-| [NF/accessibility/conformance/000492](requirements/non-functional/accessibility/conformance/000492_template-lint.md) | The template lint has the accessibility rules | approved |
-| [NF/accessibility/conformance/000493](requirements/non-functional/accessibility/conformance/000493_axe-unit-per-component.md) | Every shared component has a jest-axe test | approved |
+| [F/public/public-pages/002400](requirements/functional/public/public-pages/002400_protocols-per-gremium.md) | The public protocols have one page per Gremium | approved |
+| [F/public/public-pages/002401](requirements/functional/public/public-pages/002401_decisions-per-gremium.md) | The public decisions have one page per Gremium | approved |
+| [F/public/public-pages/002402](requirements/functional/public/public-pages/002402_gremium-pages-link-each-other.md) | The two public pages of a Gremium link each other | approved |
+| [F/public/public-pages/002403](requirements/functional/public/public-pages/002403_unknown-gremium-page.md) | An unknown Gremium page shows that it has no protocols | approved |
+| [F/public/public-pages/002404](requirements/functional/public/public-pages/002404_committee-query-redirect.md) | An old Gremium filter link opens the page of the Gremium | approved |
 | [NF/accessibility/documents/000524](requirements/non-functional/accessibility/documents/000524_protocol-pdf-ua.md) | The protocol PDF is tagged as PDF/UA-1 | approved |
 | [NF/accessibility/documents/000525](requirements/non-functional/accessibility/documents/000525_mail-plain-text.md) | Each mail has a plain text part | approved |
-| [NF/accessibility/interaction/000217](requirements/non-functional/accessibility/interaction/000217_keyboard-and-labels.md) | Controls are reachable by keyboard and named | approved |
-| [NF/accessibility/interaction/000218](requirements/non-functional/accessibility/interaction/000218_themes.md) | Light and dark themes are both supported | approved |
-| [NF/accessibility/interaction/000219](requirements/non-functional/accessibility/interaction/000219_reduced-motion.md) | Motion follows the reduced motion setting | approved |
-| [NF/accessibility/interaction/000508](requirements/non-functional/accessibility/interaction/000508_focus-ring.md) | The focus ring is 2 px and has a contrast of 3:1 | approved |
-| [NF/accessibility/interaction/000509](requirements/non-functional/accessibility/interaction/000509_focus-not-hidden.md) | Sticky bars do not hide the focus | approved |
-| [NF/accessibility/interaction/000510](requirements/non-functional/accessibility/interaction/000510_skip-link.md) | A skip link goes to the main content | approved |
-| [NF/accessibility/interaction/000511](requirements/non-functional/accessibility/interaction/000511_page-title.md) | Each page has its own title | approved |
-| [NF/accessibility/interaction/000512](requirements/non-functional/accessibility/interaction/000512_focus-after-navigation.md) | Focus goes to the heading after navigation | approved |
-| [NF/accessibility/interaction/000513](requirements/non-functional/accessibility/interaction/000513_dialog-focus.md) | A dialog keeps the focus inside | approved |
-| [NF/accessibility/interaction/000514](requirements/non-functional/accessibility/interaction/000514_gesture-alternative.md) | Each gesture has a single tap alternative | approved |
-| [NF/accessibility/interaction/000515](requirements/non-functional/accessibility/interaction/000515_drag-alternative.md) | Each drag has an alternative without a drag | approved |
-| [NF/accessibility/interaction/000516](requirements/non-functional/accessibility/interaction/000516_target-size.md) | A target is at least 24 by 24 px | approved |
-| [NF/accessibility/interaction/000517](requirements/non-functional/accessibility/interaction/000517_status-announced.md) | A status message is announced | approved |
-| [NF/accessibility/interaction/000518](requirements/non-functional/accessibility/interaction/000518_live-vote-announced.md) | The live vote announces its changes | approved |
-| [NF/accessibility/interaction/000519](requirements/non-functional/accessibility/interaction/000519_form-errors.md) | A form error is a text next to the field | approved |
-| [NF/accessibility/interaction/000520](requirements/non-functional/accessibility/interaction/000520_landmarks-headings.md) | Each page has landmarks and one h1 | approved |
 | [NF/accessibility/interaction/000521](requirements/non-functional/accessibility/interaction/000521_no-cognitive-test.md) | The login and the captcha need no cognitive test | approved |
+| [NF/accessibility/interaction/002783](requirements/non-functional/accessibility/interaction/002783_selection-bar-keyboard.md) | The format bar works with the keyboard | approved |
 | [NF/accessibility/language/000216](requirements/non-functional/accessibility/language/000216_i18n-parity.md) | German and English texts are complete | replaced |
-| [NF/accessibility/language/000522](requirements/non-functional/accessibility/language/000522_page-language.md) | The page language follows the UI language | approved |
-| [NF/accessibility/language/000523](requirements/non-functional/accessibility/language/000523_content-language.md) | Content in a different language has its lang | approved |
-| [NF/accessibility/perception/000499](requirements/non-functional/accessibility/perception/000499_text-contrast.md) | Text has a contrast of 4.5:1 | approved |
-| [NF/accessibility/perception/000500](requirements/non-functional/accessibility/perception/000500_non-text-contrast.md) | Control edges and icons have a contrast of 3:1 | approved |
 | [NF/accessibility/perception/000501](requirements/non-functional/accessibility/perception/000501_accent-contrast.md) | An admin accent colour keeps the contrast | approved |
-| [NF/accessibility/perception/000502](requirements/non-functional/accessibility/perception/000502_colour-not-alone.md) | Colour is not the only sign of a state | approved |
-| [NF/accessibility/perception/000503](requirements/non-functional/accessibility/perception/000503_reflow-320.md) | Every view works at a width of 320 px | approved |
-| [NF/accessibility/perception/000504](requirements/non-functional/accessibility/perception/000504_text-spacing.md) | User text spacing does not cut text | approved |
-| [NF/accessibility/perception/000506](requirements/non-functional/accessibility/perception/000506_image-alt.md) | A Markdown image has an alternative text | approved |
-| [NF/accessibility/perception/000507](requirements/non-functional/accessibility/perception/000507_chart-text.md) | A chart has a text alternative | approved |
-| [NF/accessibility/settings/000593](requirements/non-functional/accessibility/settings/000593_display-settings-in-accessibility-menu.md) | The accessibility menu holds the display settings | approved |
-| [NF/accessibility/settings/000594](requirements/non-functional/accessibility/settings/000594_setting-overrides-system.md) | A display setting overrides the system setting | approved |
-| [NF/accessibility/settings/000595](requirements/non-functional/accessibility/settings/000595_more-contrast.md) | More contrast raises the contrast of text and borders | approved |
-| [NF/accessibility/settings/000596](requirements/non-functional/accessibility/settings/000596_less-transparency.md) | Less transparency makes the glass surfaces opaque | approved |
-| [NF/accessibility/settings/000598](requirements/non-functional/accessibility/settings/000598_highlight-fields.md) | Very high contrast highlights the fields black on yellow | approved |
-| [NF/accessibility/settings/000605](requirements/non-functional/accessibility/settings/000605_very-high-contrast.md) | Very high contrast shows the app in four colours | approved |
-| [NF/accessibility/settings/000606](requirements/non-functional/accessibility/settings/000606_very-high-contrast-includes-settings.md) | Very high contrast includes the other display settings | approved |
-| [NF/accessibility/settings/000608](requirements/non-functional/accessibility/settings/000608_display-reset-in-head-row.md) | The display reset lines up with the heading and the switches | approved |
-| [NF/accessibility/settings/000612](requirements/non-functional/accessibility/settings/000612_attendance-matrix-very-high-contrast.md) | The attendance matrix follows very high contrast | approved |
-| [NF/accessibility/settings/000614](requirements/non-functional/accessibility/settings/000614_yellow-means-press.md) | In very high contrast, yellow shows what a person can press | approved |
-| [NF/accessibility/settings/000615](requirements/non-functional/accessibility/settings/000615_chosen-is-yellow-fill.md) | In very high contrast, the chosen control of a choice is yellow filled | approved |
-| [NF/accessibility/settings/000616](requirements/non-functional/accessibility/settings/000616_navigation-yellow-text.md) | In very high contrast, the navigation has yellow text and yellow icons | approved |
-| [NF/accessibility/settings/000617](requirements/non-functional/accessibility/settings/000617_menus-black-yellow-rows.md) | In very high contrast, every menu is black with yellow rows | approved |
-| [NF/accessibility/settings/000618](requirements/non-functional/accessibility/settings/000618_choice-cards-keep-circle.md) | In very high contrast, a choice card has a yellow edge and a yellow circle | approved |
-| [NF/accessibility/settings/000619](requirements/non-functional/accessibility/settings/000619_row-title-yellow.md) | In very high contrast, a row that opens something has a yellow title | approved |
-| [NF/accessibility/settings/000620](requirements/non-functional/accessibility/settings/000620_switch-off-edge-on-fill.md) | In very high contrast, a switch, a checkbox and a radio button are filled only when on | approved |
-| [NF/accessibility/settings/000621](requirements/non-functional/accessibility/settings/000621_black-on-yellow-fill.md) | In very high contrast, everything on a yellow fill is black | approved |
-| [NF/accessibility/settings/000622](requirements/non-functional/accessibility/settings/000622_no-ring-on-script-focus.md) | A heading that a script focuses shows no focus ring | approved |
-| [NF/accessibility/settings/000623](requirements/non-functional/accessibility/settings/000623_scripts-read-motion-setting.md) | A script reads the motion setting, not the system | approved |
-| [NF/accessibility/settings/000647](requirements/non-functional/accessibility/settings/000647_accessibility-menu.md) | Accessibility has its own menu | approved |
-| [NF/accessibility/settings/000739](requirements/non-functional/accessibility/settings/000739_copy-box-yellow-fill.md) | In very high contrast, a box with a text to copy is a yellow fill | approved |
-| [NF/accessibility/settings/001352](requirements/non-functional/accessibility/settings/001352_very-high-contrast-button-group.md) | In very high contrast, a head group is yellow with black gaps | approved |
-| [NF/accessibility/settings/001980](requirements/non-functional/accessibility/settings/001980_very-high-contrast-tab-bar.md) | In very high contrast, a tab bar is one group with a yellow bar under the open tab | approved |
 | [NF/accessibility/statement/000495](requirements/non-functional/accessibility/statement/000495_statement-page.md) | A public page holds the accessibility statement | approved |
 | [NF/accessibility/statement/000496](requirements/non-functional/accessibility/statement/000496_statement-link.md) | Every page links to the accessibility statement | approved |
 | [NF/accessibility/statement/000497](requirements/non-functional/accessibility/statement/000497_barrier-report.md) | A user can report a barrier as a ticket | approved |
@@ -833,27 +859,21 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/compatibility/deploy/000978](requirements/non-functional/compatibility/deploy/000978_build-downloads.md) | An image build fetches no signing key and repeats a download | approved |
 | [NF/compatibility/deploy/000981](requirements/non-functional/compatibility/deploy/000981_pinned-digests.md) | Images and CI actions are pinned by digest | approved |
 | [NF/compatibility/links/000592](requirements/non-functional/compatibility/links/000592_old-german-urls.md) | An old German URL redirects to its English URL | approved |
-| [NF/compatibility/pwa/000220](requirements/non-functional/compatibility/pwa/000220_zoom.md) | Zoom is blocked only in the installed app | approved |
-| [NF/compatibility/pwa/000221](requirements/non-functional/compatibility/pwa/000221_android-nav-bar.md) | The Android navigation bar has the manifest colour | approved |
-| [NF/compatibility/pwa/000222](requirements/non-functional/compatibility/pwa/000222_update-offline.md) | The app shows update and offline bars | replaced |
-| [NF/compatibility/pwa/000411](requirements/non-functional/compatibility/pwa/000411_status-bar-theme.md) | The status bar follows the theme | approved |
-| [NF/compatibility/pwa/000578](requirements/non-functional/compatibility/pwa/000578_server-unreachable-bar.md) | The offline bar shows when the server is unreachable | approved |
-| [NF/compatibility/pwa/000579](requirements/non-functional/compatibility/pwa/000579_reload-after-unreachable.md) | An unreachable server shows no error toast, and the page loads again | approved |
 | [NF/compatibility/pwa/002150](requirements/non-functional/compatibility/pwa/002150_app-version-header.md) | Every answer of the server carries the app version | approved |
-| [NF/compatibility/pwa/002151](requirements/non-functional/compatibility/pwa/002151_reload-on-new-version.md) | A new app version reloads the app at once | approved |
-| [NF/compatibility/pwa/002152](requirements/non-functional/compatibility/pwa/002152_reload-loop-guard.md) | The app reloads only once for the same server version | approved |
-| [NF/compatibility/pwa/002153](requirements/non-functional/compatibility/pwa/002153_offline-bar.md) | The app shows the offline bar | approved |
-| [NF/performance/loading/000189](requirements/non-functional/performance/loading/000189_load-bar.md) | The load bar shows only for slow foreground reads | approved |
+| [NF/compatibility/pwa/002340](requirements/non-functional/compatibility/pwa/002340_reload-loads-page-from-network.md) | The reload to a new app version loads the page from the network | approved |
+| [NF/compatibility/pwa/002341](requirements/non-functional/compatibility/pwa/002341_version-check-on-return.md) | The app checks the version when the page comes back | approved |
 | [NF/performance/loading/000190](requirements/non-functional/performance/loading/000190_batch-reads.md) | A list reads its rows in one request | approved |
-| [NF/performance/loading/000191](requirements/non-functional/performance/loading/000191_search-as-you-type.md) | Search runs as you type | approved |
 | [NF/performance/loading/000847](requirements/non-functional/performance/loading/000847_read-after-write-is-fresh.md) | A read after a write does not stand on a read from before it | approved |
-| [NF/performance/loading/000893](requirements/non-functional/performance/loading/000893_skeleton-shape.md) | A skeleton has the shape of the loaded page | approved |
 | [NF/performance/loading/001280](requirements/non-functional/performance/loading/001280_skeleton-until-logos.md) | The Gremien list shows its skeleton until the logos have loaded | approved |
 | [NF/performance/loading/002000](requirements/non-functional/performance/loading/002000_read-ahead-on-intent.md) | A list reads the details of a row ahead only on a sign of intent | approved |
 | [NF/performance/loading/002001](requirements/non-functional/performance/loading/002001_navigation-marks-one-read.md) | The marks of the navigation come in one read, not on every page change | approved |
 | [NF/performance/loading/002003](requirements/non-functional/performance/loading/002003_lazy-editor-and-texts.md) | The Markdown editor and the DE texts load in chunks of their own | approved |
 | [NF/performance/loading/002004](requirements/non-functional/performance/loading/002004_api-workers.md) | The API serves requests in four processes | approved |
 | [NF/performance/rendering/002002](requirements/non-functional/performance/rendering/002002_zoneless.md) | The app runs its change detection without zone.js | approved |
+| [NF/performance/rendering/002160](requirements/non-functional/performance/rendering/002160_scroll-without-check.md) | A scroll event runs no change detection | approved |
+| [NF/performance/rendering/002161](requirements/non-functional/performance/rendering/002161_reads-before-writes.md) | Layout reads wait for the render and come before the writes of a frame | approved |
+| [NF/performance/rendering/002406](requirements/non-functional/performance/rendering/002406_no-root-has-on-scroll.md) | No :has() at the page root | approved |
+| [NF/performance/rendering/002407](requirements/non-functional/performance/rendering/002407_fab-fold-without-layout.md) | The FAB fold runs between two measured sizes and ends in the folded layout | approved |
 | [NF/privacy/personal-data/000185](requirements/non-functional/privacy/personal-data/000185_no-raw-ids.md) | The UI shows no raw IDs | approved |
 | [NF/privacy/personal-data/000186](requirements/non-functional/privacy/personal-data/000186_no-plain-ip.md) | The login audit has no plain IP address | approved |
 | [NF/privacy/personal-data/000187](requirements/non-functional/privacy/personal-data/000187_guest-pseudonyms.md) | Guests get pseudonyms | replaced |
@@ -900,6 +920,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/integrity/000296](requirements/non-functional/security/integrity/000296_secret-hidden.md) | A webhook secret is never shown | approved |
 | [NF/security/integrity/000297](requirements/non-functional/security/integrity/000297_signature.md) | A webhook request is signed with a timestamp | approved |
 | [NF/security/integrity/000393](requirements/non-functional/security/integrity/000393_db-roles.md) | Database roles are separated | approved |
+| [NF/security/integrity/002810](requirements/non-functional/security/integrity/002810_secrets-sealed.md) | A secret of an integration is sealed in the database | approved |
+| [NF/security/integrity/002811](requirements/non-functional/security/integrity/002811_secrets-key.md) | The key of the sealed secrets comes from the deploy | approved |
 | [NF/security/network/000182](requirements/non-functional/security/network/000182_webhook-ssrf.md) | The webhook SSRF guard runs at send time | approved |
 | [NF/security/network/000335](requirements/non-functional/security/network/000335_avatar-fetch.md) | The avatar fetch is fixed and limited | approved |
 | [NF/security/network/000389](requirements/non-functional/security/network/000389_typst-isolated.md) | The render service has no network egress | approved |
@@ -907,170 +929,31 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/000392](requirements/non-functional/security/network/000392_forwarded-ips.md) | Forwarded headers come only from the proxy | approved |
 | [NF/security/network/000454](requirements/non-functional/security/network/000454_api-security-headers.md) | The API sends strict security headers and no CORS | approved |
 | [NF/security/network/000466](requirements/non-functional/security/network/000466_webhook-host-allowlist.md) | Webhook targets can be limited to a host list | approved |
-| [NF/usability/controls/000203](requirements/non-functional/usability/controls/000203_app-popover.md) | Every dropdown uses the app popover | approved |
-| [NF/usability/controls/000204](requirements/non-functional/usability/controls/000204_whole-control.md) | The whole control is clickable | approved |
-| [NF/usability/controls/000205](requirements/non-functional/usability/controls/000205_empty-state.md) | Empty states use one component | approved |
-| [NF/usability/controls/000206](requirements/non-functional/usability/controls/000206_no-helper-texts.md) | The UI has no helper texts | approved |
-| [NF/usability/controls/000207](requirements/non-functional/usability/controls/000207_no-title-counters.md) | Titles show no counters | replaced |
-| [NF/usability/controls/000208](requirements/non-functional/usability/controls/000208_separators.md) | A separator stands only between two items | approved |
-| [NF/usability/controls/000209](requirements/non-functional/usability/controls/000209_no-cut-urls.md) | URLs, IBANs and e-mail addresses are never cut | approved |
-| [NF/usability/controls/000210](requirements/non-functional/usability/controls/000210_press-feedback.md) | A press gives feedback | replaced |
-| [NF/usability/controls/000211](requirements/non-functional/usability/controls/000211_swipe-and-select.md) | A swipe never deletes | approved |
-| [NF/usability/controls/000212](requirements/non-functional/usability/controls/000212_tooltips.md) | A tooltip shows only for cut text | approved |
-| [NF/usability/controls/000213](requirements/non-functional/usability/controls/000213_segments.md) | Segments have equal width | approved |
-| [NF/usability/controls/000214](requirements/non-functional/usability/controls/000214_pill-icon.md) | A leading icon is centred on the end cap | approved |
-| [NF/usability/controls/000399](requirements/non-functional/usability/controls/000399_design-basics.md) | The design has one accent and plain status text | approved |
-| [NF/usability/controls/000400](requirements/non-functional/usability/controls/000400_danger-button.md) | A destructive action is an outlined red button | approved |
-| [NF/usability/controls/000401](requirements/non-functional/usability/controls/000401_error-toast.md) | Errors show as a toast | approved |
-| [NF/usability/controls/000410](requirements/non-functional/usability/controls/000410_tap-tint.md) | A tap tints the whole tile | approved |
-| [NF/usability/controls/000412](requirements/non-functional/usability/controls/000412_ghost-rows-for-lists.md) | Ghost rows are only for lists | replaced |
-| [NF/usability/controls/000416](requirements/non-functional/usability/controls/000416_empty-chart.md) | An empty chart is a grey skeleton | approved |
-| [NF/usability/controls/000528](requirements/non-functional/usability/controls/000528_segment-press.md) | A pressed segment shrinks its whole control | replaced |
-| [NF/usability/controls/000529](requirements/non-functional/usability/controls/000529_menu-row-tile.md) | A menu row is an inset rounded tile | approved |
-| [NF/usability/controls/000560](requirements/non-functional/usability/controls/000560_no-counts-in-headings-and-selectors.md) | Headings and selectors show no counts | approved |
-| [NF/usability/controls/000561](requirements/non-functional/usability/controls/000561_segment-pill.md) | A segmented control is a pill track | approved |
-| [NF/usability/controls/000562](requirements/non-functional/usability/controls/000562_phone-toast-top.md) | A toast shows at the top of a phone and at the bottom end of a wide screen | approved |
-| [NF/usability/controls/000563](requirements/non-functional/usability/controls/000563_phone-one-toast.md) | A phone shows one toast at a time | replaced |
-| [NF/usability/controls/000564](requirements/non-functional/usability/controls/000564_phone-toast-close.md) | A toast closes by a swipe, by its close button or by its time | approved |
-| [NF/usability/controls/000565](requirements/non-functional/usability/controls/000565_phone-toast-card.md) | A toast is a tinted glass card | approved |
-| [NF/usability/controls/000566](requirements/non-functional/usability/controls/000566_phone-toast-icon-action.md) | A phone toast action is an icon button | replaced |
-| [NF/usability/controls/000568](requirements/non-functional/usability/controls/000568_wide-toast-card.md) | A wide-screen toast is the same glass card | replaced |
-| [NF/usability/controls/000570](requirements/non-functional/usability/controls/000570_avatar-stack-cover.md) | An avatar in a stack covers the one before it | approved |
-| [NF/usability/controls/000576](requirements/non-functional/usability/controls/000576_load-error-toast.md) | A load error shows as a toast with a retry action | approved |
-| [NF/usability/controls/000577](requirements/non-functional/usability/controls/000577_load-error-toast-stays.md) | A load error toast stays until it is closed | replaced |
-| [NF/usability/controls/000581](requirements/non-functional/usability/controls/000581_card-add-buttons-dashed.md) | The add buttons of a card look like its chips with a dashed border | approved |
-| [NF/usability/controls/000582](requirements/non-functional/usability/controls/000582_empty-linked-section.md) | An empty "Verknüpft" section shows an empty state | approved |
-| [NF/usability/controls/000597](requirements/non-functional/usability/controls/000597_one-ghost-row-in-sections.md) | A section in a detail and a small tile show one ghost row | replaced |
-| [NF/usability/controls/000603](requirements/non-functional/usability/controls/000603_one-centre-line-in-controls.md) | Text, icons and counts of a control share one centre line | approved |
-| [NF/usability/controls/000604](requirements/non-functional/usability/controls/000604_count-plate-in-button.md) | A count in a button is the count plate of the kit button | approved |
-| [NF/usability/controls/000613](requirements/non-functional/usability/controls/000613_one-ghost-row-holds-message.md) | One ghost row holds the message and shows no bars | replaced |
-| [NF/usability/controls/000631](requirements/non-functional/usability/controls/000631_settings-row.md) | A settings row is a row of a row group, 56 px high | approved |
-| [NF/usability/controls/000633](requirements/non-functional/usability/controls/000633_note-is-data-state.md) | A note shows a state of the data, not a failed request | approved |
-| [NF/usability/controls/000661](requirements/non-functional/usability/controls/000661_list-search-names-the-count.md) | The search field of a list names the count | approved |
-| [NF/usability/controls/000662](requirements/non-functional/usability/controls/000662_no-shown-of-total-counter.md) | A list shows no "X von Y" counter | approved |
-| [NF/usability/controls/000663](requirements/non-functional/usability/controls/000663_filter-chip-label.md) | A filter chip shows its name, then name and value | approved |
-| [NF/usability/controls/000665](requirements/non-functional/usability/controls/000665_empty-detail-pane-text.md) | The empty detail pane says "Kein … geöffnet" | approved |
-| [NF/usability/controls/000666](requirements/non-functional/usability/controls/000666_create-wording.md) | A create form has the name of its button | approved |
-| [NF/usability/controls/000667](requirements/non-functional/usability/controls/000667_status-filter-is-a-chip.md) | A list filters the status with a chip | approved |
+| [NF/security/network/002514](requirements/non-functional/security/network/002514_paperless-host-allowlist.md) | The Paperless address needs a host from the deploy settings | approved |
+| [NF/security/network/002515](requirements/non-functional/security/network/002515_paperless-token-secret.md) | The Paperless token never leaves the server | approved |
+| [NF/security/network/002744](requirements/non-functional/security/network/002744_ticket-mail-host-allowlist.md) | The hosts of a Postfach need the deploy settings | approved |
+| [NF/security/network/002745](requirements/non-functional/security/network/002745_ticket-mail-tls.md) | The platform talks to a mail server only through TLS | approved |
+| [NF/security/network/002746](requirements/non-functional/security/network/002746_ticket-mail-password.md) | No read returns the password of a Postfach | approved |
+| [NF/security/network/002817](requirements/non-functional/security/network/002817_push-token-not-logged.md) | An access log holds no token of a path | approved |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
-| [NF/usability/controls/000669](requirements/non-functional/usability/controls/000669_linked-section-icon-actions.md) | The actions of a "Verknüpft" section are icon buttons | approved |
-| [NF/usability/controls/000671](requirements/non-functional/usability/controls/000671_one-place-per-action.md) | A view shows an action in one place | approved |
-| [NF/usability/controls/000675](requirements/non-functional/usability/controls/000675_phone-row-end.md) | A phone list row ends with a menu or with nothing | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
-| [NF/usability/controls/000678](requirements/non-functional/usability/controls/000678_live-connection-lost-toast.md) | A lost live connection shows as a toast | approved |
-| [NF/usability/controls/000700](requirements/non-functional/usability/controls/000700_date-field-relative-shortcut.md) | A date field takes a shortcut relative to today | approved |
-| [NF/usability/controls/000701](requirements/non-functional/usability/controls/000701_date-shortcut-resolves-on-commit.md) | A date shortcut becomes the date when the field commits | approved |
-| [NF/usability/controls/000702](requirements/non-functional/usability/controls/000702_date-shortcut-month-end.md) | A month or year shortcut stops at the end of the month | approved |
-| [NF/usability/controls/000741](requirements/non-functional/usability/controls/000741_load-more-button.md) | A button that loads more rows of a list is centred with a chevron | approved |
-| [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | Back closes the dialogs of the Haushalt | approved |
-| [NF/usability/controls/001082](requirements/non-functional/usability/controls/001082_open-label.md) | A button that opens a file says Öffnen | approved |
-| [NF/usability/controls/001305](requirements/non-functional/usability/controls/001305_head-status-chip.md) | The status in the head of a page is a chip | approved |
-| [NF/usability/controls/001306](requirements/non-functional/usability/controls/001306_head-meta-chips.md) | The meta line in the head of a detail is a list of chips | approved |
-| [NF/usability/controls/001314](requirements/non-functional/usability/controls/001314_press-ripple.md) | A press shows a ripple | approved |
-| [NF/usability/controls/001315](requirements/non-functional/usability/controls/001315_segment-ripple.md) | A pressed segment ripples only inside its segment | approved |
-| [NF/usability/controls/001330](requirements/non-functional/usability/controls/001330_search-palette-concentric-corner.md) | The search window has a corner concentric with its search bar | approved |
-| [NF/usability/controls/001350](requirements/non-functional/usability/controls/001350_head-actions-button-group.md) | The buttons of a head form one connected button group | approved |
-| [NF/usability/controls/001351](requirements/non-functional/usability/controls/001351_selected-group-button.md) | A selected button of a group is filled and fully round | approved |
-| [NF/usability/controls/001353](requirements/non-functional/usability/controls/001353_confirm-row-button-group.md) | The buttons of a dialog footer form a button group with a filled main action | approved |
-| [NF/usability/controls/001354](requirements/non-functional/usability/controls/001354_every-button-in-a-group.md) | Every button of the app stands in a button group | approved |
-| [NF/usability/controls/001355](requirements/non-functional/usability/controls/001355_selection-bar-grey-inset.md) | The selection bar in a list is a grey surface with an inset around its actions | approved |
-| [NF/usability/controls/001356](requirements/non-functional/usability/controls/001356_public-header-button-group.md) | The buttons of the public header are one button group | approved |
-| [NF/usability/controls/001360](requirements/non-functional/usability/controls/001360_empty-list-face.md) | An empty list shows a face in a ring of dots | approved |
-| [NF/usability/controls/001361](requirements/non-functional/usability/controls/001361_empty-state-face-motion.md) | The face of an empty state moves until motion is reduced | approved |
-| [NF/usability/controls/001362](requirements/non-functional/usability/controls/001362_empty-state-face-very-high-contrast.md) | The face of an empty state is white in very high contrast | approved |
-| [NF/usability/controls/001363](requirements/non-functional/usability/controls/001363_empty-state-no-reset.md) | An empty state has no reset button | approved |
-| [NF/usability/controls/001364](requirements/non-functional/usability/controls/001364_empty-state-icon-by-context.md) | The icon of an empty state names what is missing | approved |
-| [NF/usability/controls/001790](requirements/non-functional/usability/controls/001790_pick-dialog-select-rows.md) | A pick dialog lists its choices as the select sheet does | approved |
-| [NF/usability/controls/001791](requirements/non-functional/usability/controls/001791_pick-dialog-empty-centred.md) | The empty state of a pick dialog is centred in the list area | approved |
-| [NF/usability/controls/001803](requirements/non-functional/usability/controls/001803_empty-state-face-room-above.md) | The empty-state face has room above and below | approved |
-| [NF/usability/controls/001810](requirements/non-functional/usability/controls/001810_long-press-selects-in-every-list.md) | A long press selects in every list with a multiple selection | approved |
-| [NF/usability/controls/001811](requirements/non-functional/usability/controls/001811_every-multi-select-list-works-the-same.md) | Every list with a multiple selection works the same | approved |
-| [NF/usability/controls/001812](requirements/non-functional/usability/controls/001812_list-head-order-and-more-menu.md) | A list head has one order and the export in the ⋮ menu | approved |
-| [NF/usability/controls/001870](requirements/non-functional/usability/controls/001870_open-in-link-filters.md) | A link to a list page opens the list filtered to its source | approved |
-| [NF/usability/controls/001875](requirements/non-functional/usability/controls/001875_open-in-link-text-button.md) | An open-in link is a text button | approved |
-| [NF/usability/controls/001892](requirements/non-functional/usability/controls/001892_one-filter-chip-size.md) | Every filter chip has the one chip look | approved |
-| [NF/usability/controls/001910](requirements/non-functional/usability/controls/001910_field-button-same-height.md) | A button beside a field is as high as the field | approved |
-| [NF/usability/controls/001911](requirements/non-functional/usability/controls/001911_dialog-no-footer-close.md) | A dialog has no footer button that only closes it | approved |
-| [NF/usability/controls/001920](requirements/non-functional/usability/controls/001920_row-menu-on-hover.md) | The ⋮ of a list row shows only for the row in use | approved |
-| [NF/usability/controls/001960](requirements/non-functional/usability/controls/001960_confirm-row-one-height.md) | Every button of a confirm row is as high as a control | approved |
-| [NF/usability/controls/001961](requirements/non-functional/usability/controls/001961_meta-line-component.md) | A meta line draws its dots from the kit | approved |
-| [NF/usability/controls/001962](requirements/non-functional/usability/controls/001962_row-chevron-component.md) | Every row arrow is app-row-chevron | approved |
-| [NF/usability/controls/001963](requirements/non-functional/usability/controls/001963_error-text-component.md) | An error text in a dialog or a form comes from the kit | approved |
-| [NF/usability/controls/001964](requirements/non-functional/usability/controls/001964_no-uppercase-text.md) | No uppercase captions or subheadings | approved |
-| [NF/usability/controls/001965](requirements/non-functional/usability/controls/001965_fact-list-component.md) | A list of facts comes from one kit component | approved |
-| [NF/usability/controls/001977](requirements/non-functional/usability/controls/001977_link-picker-like-global-search.md) | The link picker looks like the global search | approved |
-| [NF/usability/controls/001981](requirements/non-functional/usability/controls/001981_no-open-in-row-menu.md) | The ⋮ of a list row has no "Öffnen" | approved |
-| [NF/usability/controls/002012](requirements/non-functional/usability/controls/002012_round-back-button.md) | Every back button of a head is a round tonal button | approved |
-| [NF/usability/layout/000192](requirements/non-functional/usability/layout/000192_one-geometry.md) | All list and detail pages share one geometry | approved |
-| [NF/usability/layout/000193](requirements/non-functional/usability/layout/000193_scroll-edges.md) | A scroll area cuts at the edge of a surface | approved |
-| [NF/usability/layout/000194](requirements/non-functional/usability/layout/000194_phone-breakpoint.md) | The phone layout starts below 768 px | approved |
-| [NF/usability/layout/000195](requirements/non-functional/usability/layout/000195_bottom-bar.md) | The phone bottom bar is fixed | approved |
-| [NF/usability/layout/000196](requirements/non-functional/usability/layout/000196_phone-sheets.md) | The phone opens pickers as bottom sheets | approved |
-| [NF/usability/layout/000197](requirements/non-functional/usability/layout/000197_header-actions.md) | A header has a title, at most one action and a menu | approved |
-| [NF/usability/layout/000198](requirements/non-functional/usability/layout/000198_floating-actions.md) | Neu and Speichern float at the bottom | approved |
+| [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
+| [NF/usability/controls/002163](requirements/non-functional/usability/controls/002163_bar-pill-at-press.md) | The pill of the navigation bar moves at the press | approved |
+| [NF/usability/controls/002164](requirements/non-functional/usability/controls/002164_ripple-in-surface.md) | The ripple is the ripple of Angular Material inside the pressed surface | approved |
+| [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | approved |
+| [NF/usability/controls/002581](requirements/non-functional/usability/controls/002581_select-in-form-fills-row.md) | A multiple choice in a form fills its row and names its values | approved |
+| [NF/usability/controls/002582](requirements/non-functional/usability/controls/002582_webhook-needs-name.md) | The webhook dialog saves only with a name and a valid URL | approved |
 | [NF/usability/layout/000199](requirements/non-functional/usability/layout/000199_footer.md) | The footer shows only on start and public pages | approved |
-| [NF/usability/layout/000200](requirements/non-functional/usability/layout/000200_surfaces.md) | Surfaces step up | approved |
-| [NF/usability/layout/000201](requirements/non-functional/usability/layout/000201_fill-or-centre.md) | Content fills its width or is centred | approved |
-| [NF/usability/layout/000202](requirements/non-functional/usability/layout/000202_top-layer.md) | Dialogs and toasts are on the top layer | approved |
-| [NF/usability/layout/000215](requirements/non-functional/usability/layout/000215_comments-beside.md) | Comments sit beside the fields | approved |
-| [NF/usability/layout/000406](requirements/non-functional/usability/layout/000406_desktop-unchanged.md) | The phone layout does not change the desktop | approved |
-| [NF/usability/layout/000407](requirements/non-functional/usability/layout/000407_mehr-and-search.md) | Mehr and Suche are always in reach | approved |
-| [NF/usability/layout/000408](requirements/non-functional/usability/layout/000408_bottom-inset.md) | Fixed bottom elements sit above the bottom bar | approved |
-| [NF/usability/layout/000409](requirements/non-functional/usability/layout/000409_phone-panes.md) | The phone shows tables as cards | approved |
-| [NF/usability/layout/000413](requirements/non-functional/usability/layout/000413_card-mode.md) | A table in card mode keeps its controls in the card head | approved |
-| [NF/usability/layout/000414](requirements/non-functional/usability/layout/000414_admin-heading.md) | Admin pages share one heading | approved |
-| [NF/usability/layout/000415](requirements/non-functional/usability/layout/000415_balanced-bars.md) | Bars and headers are vertically balanced | approved |
-| [NF/usability/layout/000417](requirements/non-functional/usability/layout/000417_antraege-pattern.md) | Work lists follow the Anträge pattern | approved |
-| [NF/usability/layout/000451](requirements/non-functional/usability/layout/000451_phone-one-pane.md) | The phone shows one pane at a time | approved |
-| [NF/usability/layout/000452](requirements/non-functional/usability/layout/000452_phone-dialog-sheet.md) | A phone dialog is a near-fullscreen sheet | approved |
-| [NF/usability/layout/000527](requirements/non-functional/usability/layout/000527_glass-list-head.md) | A list head is solid on a wide screen and glass on a phone | replaced |
 | [NF/usability/layout/000530](requirements/non-functional/usability/layout/000530_phone-start-search-pinned.md) | The search bar of the start page stays at the top on the phone | replaced |
-| [NF/usability/layout/000531](requirements/non-functional/usability/layout/000531_head-under-sheet.md) | The page head stays in view under an open sheet | approved |
-| [NF/usability/layout/000532](requirements/non-functional/usability/layout/000532_stacked-glass.md) | A sheet over a sheet is as opaque as the first one | approved |
-| [NF/usability/layout/000567](requirements/non-functional/usability/layout/000567_phone-fab-folds.md) | A phone FAB folds to its icon on scroll | approved |
-| [NF/usability/layout/000575](requirements/non-functional/usability/layout/000575_card-sheet-cut-at-edge.md) | The details of a card cut at the lower screen edge | replaced |
-| [NF/usability/layout/000580](requirements/non-functional/usability/layout/000580_card-end-clears-bottom-bar.md) | The end of a card keeps room above the bottom bar | approved |
-| [NF/usability/layout/000599](requirements/non-functional/usability/layout/000599_glass-head-top-fade.md) | A glass list head fades into the page colour at the top screen edge | replaced |
-| [NF/usability/layout/000601](requirements/non-functional/usability/layout/000601_scrollbar-below-glass-head.md) | The scroll bar of a list column starts below its head | approved |
-| [NF/usability/layout/000602](requirements/non-functional/usability/layout/000602_composer-bottom-gap.md) | The comment input has the same gap below as at its side | approved |
-| [NF/usability/layout/000609](requirements/non-functional/usability/layout/000609_attendance-matrix-row-group.md) | The attendance matrix looks like a row group | approved |
 | [NF/usability/layout/000624](requirements/non-functional/usability/layout/000624_start-work-list-sticky-head.md) | The work list on Start keeps its column header and cuts at the window edge | replaced |
-| [NF/usability/layout/000634](requirements/non-functional/usability/layout/000634_admin-record-row.md) | A record row in Verwaltung has one anatomy | approved |
-| [NF/usability/layout/000635](requirements/non-functional/usability/layout/000635_discard-with-save.md) | A page with Speichern offers Verwerfen in its header | approved |
-| [NF/usability/layout/000660](requirements/non-functional/usability/layout/000660_nav-rail-shows-active-item.md) | The navigation rail shows the active item | approved |
-| [NF/usability/layout/000664](requirements/non-functional/usability/layout/000664_list-opens-no-item-by-itself.md) | A list page opens no item by itself | approved |
-| [NF/usability/layout/000670](requirements/non-functional/usability/layout/000670_detail-head-icons-and-menu.md) | A detail head has icon buttons and a menu | approved |
-| [NF/usability/layout/000672](requirements/non-functional/usability/layout/000672_content-language-in-page-head.md) | The language of a content editor stands in the page head | approved |
-| [NF/usability/layout/000673](requirements/non-functional/usability/layout/000673_phone-detail-tabs-packed.md) | The tabs of a phone detail are packed at the start | approved |
-| [NF/usability/layout/000674](requirements/non-functional/usability/layout/000674_phone-vote-detail-bar.md) | The phone vote detail uses the bar of the other details | approved |
-| [NF/usability/layout/000677](requirements/non-functional/usability/layout/000677_public-page-title-size.md) | A public page has a title of 28 px | approved |
-| [NF/usability/layout/000743](requirements/non-functional/usability/layout/000743_week-day-lines-on-pull.md) | The day lines of the week grid stay when the hours are pulled | approved |
-| [NF/usability/layout/000745](requirements/non-functional/usability/layout/000745_week-blocks-overlap.md) | A later entry lies on an earlier one in the week view | approved |
-| [NF/usability/layout/001016](requirements/non-functional/usability/layout/001016_no-sticky-bar-in-tab-pager.md) | A search bar in a paged tab does not stick | approved |
-| [NF/usability/layout/001079](requirements/non-functional/usability/layout/001079_file-viewer-above-everything.md) | The file viewer lies above everything | approved |
-| [NF/usability/layout/001081](requirements/non-functional/usability/layout/001081_phone-pdf-system-viewer.md) | A PDF on a phone opens in the system viewer | approved |
-| [NF/usability/layout/001084](requirements/non-functional/usability/layout/001084_file-viewer-glass-bar.md) | The file viewer is dark frosted glass | approved |
 | [NF/usability/layout/001313](requirements/non-functional/usability/layout/001313_attendance-pool-row-group.md) | The pool substitutes are an own row group | approved |
-| [NF/usability/layout/001340](requirements/non-functional/usability/layout/001340_detail-head-equal-inset.md) | A detail head is as far from the top as from the side | approved |
-| [NF/usability/layout/001341](requirements/non-functional/usability/layout/001341_dialog-head-equal-inset.md) | A dialog or sheet head is as far from the top as from the side | approved |
-| [NF/usability/layout/001440](requirements/non-functional/usability/layout/001440_agenda-pane-split-head.md) | The agenda beside the protocol is a split head over its list | approved |
-| [NF/usability/layout/001441](requirements/non-functional/usability/layout/001441_rail-scroll-surface.md) | The scroll part of the navigation rail is a surface | approved |
-| [NF/usability/layout/001442](requirements/non-functional/usability/layout/001442_board-own-surface.md) | Each board lies on a surface of its own | approved |
-| [NF/usability/layout/001443](requirements/non-functional/usability/layout/001443_agenda-items-split-boxes.md) | The TOPs beside the protocol are split boxes like the agenda head | approved |
 | [NF/usability/layout/001480](requirements/non-functional/usability/layout/001480_admin-list-detail.md) | Verwaltung and Konto are ordinary list/detail pages | approved |
-| [NF/usability/layout/001481](requirements/non-functional/usability/layout/001481_admin-list-rows.md) | A row of the Verwaltung list is an ordinary list row | approved |
 | [NF/usability/layout/001482](requirements/non-functional/usability/layout/001482_admin-editors-full-width.md) | The form editor and the flow editor open without the list | approved |
-| [NF/usability/layout/001500](requirements/non-functional/usability/layout/001500_list-title-on-search-edge.md) | A wide list column has no visible title and puts its buttons beside the search | approved |
-| [NF/usability/layout/001770](requirements/non-functional/usability/layout/001770_calendar-day-row-group.md) | The entries of the picked day are a row group without a frame | approved |
-| [NF/usability/layout/001780](requirements/non-functional/usability/layout/001780_calendar-month-segments.md) | Each day of the month grid is a segment of its own | approved |
-| [NF/usability/layout/001890](requirements/non-functional/usability/layout/001890_form-head-bar.md) | A form in place of a detail has the head bar of "Antrag bearbeiten" | approved |
-| [NF/usability/layout/001891](requirements/non-functional/usability/layout/001891_form-head-cancel-inset.md) | The label of "Abbrechen" in a form head ends at the side inset | approved |
-| [NF/usability/layout/001895](requirements/non-functional/usability/layout/001895_scroll-lock-any-close-order.md) | The page scrolls again when the last overlay closes, in any order | approved |
-| [NF/usability/layout/001930](requirements/non-functional/usability/layout/001930_pane-page-rail-stays.md) | A pane page scrolls inside itself, so the rail stays in place | approved |
-| [NF/usability/layout/001931](requirements/non-functional/usability/layout/001931_wide-list-head-solid.md) | The head of a wide list column stays solid, also on a fast scroll | replaced |
-| [NF/usability/layout/001946](requirements/non-functional/usability/layout/001946_calendar-chips-below-search.md) | The Kalender filter chips stand in a row of their own below the search | approved |
-| [NF/usability/layout/002010](requirements/non-functional/usability/layout/002010_solid-bars.md) | Bars and heads are solid, and only floating boxes are glass | approved |
-| [NF/usability/layout/002011](requirements/non-functional/usability/layout/002011_bar-edge-visible.md) | No resting surface at the edge of a bar has the bar colour | approved |
+| [NF/usability/layout/002162](requirements/non-functional/usability/layout/002162_section-switch-at-once.md) | A switch between sections shows the new section at once | approved |
+| [NF/usability/layout/002590](requirements/non-functional/usability/layout/002590_role-matrix-one-line-per-role.md) | Each role of the role matrix is one line | approved |
+| [NF/usability/layout/002610](requirements/non-functional/usability/layout/002610_settings-no-change-date.md) | A settings screen of Verwaltung shows no change date | approved |
+| [NF/usability/layout/002690](requirements/non-functional/usability/layout/002690_admin-lists-like-users.md) | Every list page of Verwaltung looks like Benutzer | approved |
+| [NF/usability/layout/002800](requirements/non-functional/usability/layout/002800_phone-dock-sheets-full-screen.md) | A sheet from the phone dock of a meeting opens over the whole screen | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |
@@ -1100,22 +983,18 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/backend/python/000649](style/backend/python/000649_auth-audit-no-upward-import.md) | The modules auth and audit import no higher module | approved |
 | [S/backend/python/000651](style/backend/python/000651_no-import-exception.md) | The import contract has no exception | approved |
 | [S/backend/python/000652](style/backend/python/000652_meeting-core-module.md) | The meeting core is in the module meetings | approved |
+| [S/backend/python/002818](style/backend/python/002818_one-host-allowlist.md) | A host allowlist has one check | approved |
 | [S/frontend/angular/000073](style/frontend/angular/000073_i18n-parity.md) | Every UI text is in both catalogs | approved |
 | [S/frontend/angular/000074](style/frontend/angular/000074_production-build.md) | Run the production build after style changes | approved |
 | [S/frontend/angular/000075](style/frontend/angular/000075_narrow-with-as.md) | A template narrows a signal with as | approved |
 | [S/frontend/angular/000076](style/frontend/angular/000076_tailwind-borders.md) | A Tailwind border has a style | approved |
-| [S/frontend/angular/000077](style/frontend/angular/000077_load-bar.md) | Only foreground reads show the load bar | replaced |
 | [S/frontend/angular/000078](style/frontend/angular/000078_after-next-render.md) | Wait for a render with afterNextRender | approved |
 | [S/frontend/angular/000079](style/frontend/angular/000079_ui-kit-parts.md) | Shared UI parts live in the ui-kit | approved |
 | [S/frontend/angular/000080](style/frontend/angular/000080_standalone-components.md) | Components are standalone with own files | approved |
-| [S/frontend/angular/000395](style/frontend/angular/000395_semantic-tokens.md) | Components use semantic colour tokens | approved |
 | [S/frontend/angular/000396](style/frontend/angular/000396_route-guards.md) | A route guard is only for the UX | approved |
 | [S/frontend/angular/000397](style/frontend/angular/000397_gremium-checks.md) | Gremium rights come from the Gremium API | approved |
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | approved |
 | [S/frontend/angular/000526](style/frontend/angular/000526_use-shared-parts.md) | A view uses the shared components | approved |
-| [S/frontend/angular/000632](style/frontend/angular/000632_admin-load-state.md) | An admin page shows its load states through app-load-state | approved |
-| [S/frontend/angular/000636](style/frontend/angular/000636_no-unused-class.md) | A component stylesheet has no class without a use | approved |
-| [S/frontend/angular/000637](style/frontend/angular/000637_admin-container-widths.md) | Container queries in Verwaltung use three named widths | approved |
 | [S/frontend/angular/000639](style/frontend/angular/000639_admin-folder-is-route.md) | The folder of an admin page has the name of its route | approved |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | approved |
 | [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | approved |

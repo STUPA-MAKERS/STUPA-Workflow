@@ -21,6 +21,7 @@ from app.modules.voting.schemas import (
     VoteCreateInternal,
     VoteOut,
 )
+from app.modules.voting.webhook_fields import emit_vote_event
 from app.shared.config_schemas import PollConfig, VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 
@@ -422,6 +423,7 @@ class VoteCreateOps(VotePlanOps, VoteAccessOps):
             target_id=str(vote.id),
             data=data,
         )
+        await emit_vote_event(self.session, "vote.opened", vote)
         await self.session.flush()
         await self.session.commit()
         empty = dict.fromkeys(config.options, 0)

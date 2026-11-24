@@ -11,11 +11,12 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ButtonGroupComponent, ConfigDiffComponent, ConfirmDialogComponent, EmptyStateComponent, IconComponent, MetaLineComponent, SectionComponent, SkeletonComponent, StatusTextComponent, ToastService, TruncatedDirective } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ButtonGroupComponent, ConfigDiffComponent, ConfirmDialogComponent, IconComponent, MetaLineComponent, SkeletonComponent, StatusTextComponent, ToastService, TruncatedDirective, type ListRow, type LoadState as ListState } from '@stupa-makers/ui-kit';
+import { RecordSectionComponent, ScreenRecordDirective } from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import type { LoadState } from '@shared/forms/settings-form';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -33,8 +34,8 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
   imports: [
     MetaLineComponent,
     LoadStateComponent,
-    SectionComponent,
-    EmptyStateComponent,
+    RecordSectionComponent,
+    ScreenRecordDirective,
     TruncatedDirective,
     SkeletonComponent,
     StatusTextComponent,
@@ -66,9 +67,17 @@ export class VersionHistoryComponent {
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
   protected readonly loading = signal(false);
-  /** The read of the versions failed (§ 000576). */
+  /** The read of the versions failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The versions as the list state of the record section (002258). */
+  protected readonly rows = computed<ListState<readonly ListRow[]>>(() => {
+    const t = (k: 'admin.config.history.loadFailed' | 'admin.config.history.empty'): string => this.i18n.translate(k);
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError()) return { state: 'error', message: t('admin.config.history.loadFailed'), retry: () => this.reload() };
+    const rows = this.revisions().map((r) => ({ id: r.id, title: String(r.version) }));
+    return rows.length ? { state: 'ready', data: rows } : { state: 'empty', icon: 'history', heading: t('admin.config.history.empty') };
+  });
+  private readonly byId = computed(() => new Map(this.revisions().map((r) => [r.id, r])));
   /** The read of the open diff failed. */
   protected readonly diffFailed = signal(false);
   protected readonly diffState = computed<LoadState>(() => (this.diff() ? 'ok' : this.diffFailed() ? 'error' : 'loading'));
@@ -108,6 +117,11 @@ export class VersionHistoryComponent {
     });
   }
 
+  /** The version of a record row. */
+  protected revOf(id: string): ConfigRevision {
+    return this.byId().get(id) as ConfigRevision;
+  }
+
   protected toggleDiff(rev: ConfigRevision): void {
     if (this.openDiffId() === rev.id) {
       this.openDiffId.set(null);
@@ -139,15 +153,16 @@ export class VersionHistoryComponent {
     this.api.restoreConfigRevision(rev.id).subscribe({
       next: () => {
         this.restoring.set(false);
-        this.toast.success(
+        this.toast.show(
           this.i18n.translate('admin.config.restore.success', { version: rev.version }),
+          'success',
         );
         this.reload();
         this.restored.emit();
       },
       error: () => {
         this.restoring.set(false);
-        this.toast.error(this.i18n.translate('admin.config.restore.error'));
+        this.toast.show(this.i18n.translate('admin.config.restore.error'), 'error');
       },
     });
   }

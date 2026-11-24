@@ -130,9 +130,10 @@ describe('UserMergeComponent', () => {
     expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
   });
 
-  it('a failed search shows an empty list', async () => {
+  it('a failed search shows the face with the error text, not an empty list', async () => {
     await setup(makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) }));
-    expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
+    expect(document.querySelector('app-empty-state')).not.toBeNull();
+    expect(screen.queryByText('Keine Benutzer gefunden.')).toBeNull();
   });
 
   /** An area without rows does not show. */
@@ -406,5 +407,10 @@ describe('UserMergeComponent', () => {
       'Das alte Konto hat Rechte, die das bleibende Konto und du nicht habt.',
     );
     expect(api.previewPrincipalMerge).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the account list as loading until the search answers', async () => {
+    const { fixture } = await setup(makeApi(), null);
+    expect(fixture.componentInstance['pickState']()).toBe('loading');
   });
 });

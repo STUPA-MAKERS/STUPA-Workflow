@@ -11,7 +11,7 @@ tests:
   - "typst/tests/test_markdown.py:test_time_note_without_text_and_a_bad_time"
 implementation:
   - backend/app/modules/protocol/markdown.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
   - typst/template/protocol.typ
 scope:
   - backend/app/modules/protocol

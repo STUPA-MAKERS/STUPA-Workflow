@@ -468,6 +468,18 @@ async def update_webhook(webhook_id: str, patch: S.WebhookUpdate) -> dict:
 
 
 @group.tool
+async def get_webhook_catalog() -> list:
+    """List the webhook events with their ID keys and fields (personal ones marked)."""
+    return await api().get("/admin/webhooks/catalog")
+
+
+@group.tool
+async def send_webhook_test(webhook_id: str) -> dict:
+    """Queue a test delivery with example values. Requires webhook.manage."""
+    return await api().post(f"/admin/webhooks/{webhook_id}/test")
+
+
+@group.tool
 async def delete_webhook(webhook_id: str) -> dict:
     """Delete a webhook and its delivery history. Requires webhook.manage."""
     return await api().delete(f"/admin/webhooks/{webhook_id}")
@@ -553,6 +565,40 @@ async def set_notification_preferences(preferences: list[dict[str, Any]]) -> dic
     return await api().put(
         "/notifications/preferences", json={"preferences": preferences}
     )
+
+
+@group.tool
+async def list_push_devices() -> dict:
+    """List the devices of the logged-in user that get push notifications, newest first.
+
+    A device is added only in the browser, because the browser makes the subscription.
+    """
+    return await api().get("/push/devices")
+
+
+@group.tool
+async def remove_push_device(device_id: str) -> dict:
+    """Remove one push device of the logged-in user. It gets no push after that."""
+    return await api().delete(f"/push/devices/{device_id}")
+
+
+@group.tool
+async def get_push_preferences() -> dict:
+    """Get the push switch of every notification kind of the logged-in user.
+
+    The push switches are separate from the mail switches of
+    `get_notification_preferences`.
+    """
+    return await api().get("/push/preferences")
+
+
+@group.tool
+async def set_push_preferences(preferences: list[dict[str, Any]]) -> dict:
+    """Set the push switches of the logged-in user; the server returns all of them.
+
+    Use the same shape that `get_push_preferences` returns.
+    """
+    return await api().put("/push/preferences", json={"preferences": preferences})
 
 
 @group.tool
@@ -653,17 +699,20 @@ async def list_audit(
     until: str | None = None,
     before: int | None = None,
     limit: int | None = None,
+    q: str | None = None,
 ) -> dict:
     """Read the audit log.
 
     The log is keyset-paged. Pass the smallest id you have seen as `before` to get
-    the next page. Give `since` and `until` as ISO datetimes. Requires audit.read.
+    the next page. Give `since` and `until` as ISO datetimes. `q` searches: each word
+    must occur in the action key, the actor (sub, name or e-mail), the target or the
+    data of an entry. Requires audit.read.
     """
     return await api().get(
         "/admin/audit",
         params=params(
             action=action, actor=actor, since=since, until=until,
-            before=before, limit=limit,
+            before=before, limit=limit, q=q,
         ),
     )
 

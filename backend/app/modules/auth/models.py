@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime
 from typing import Any
@@ -19,9 +20,10 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.shared.sealed import Sealed
 
 #: The client kind of a principal session. `pwa` is the installed app (display mode
 #: standalone), `web` every browser tab. Each kind has its own lifetime.
@@ -34,6 +36,11 @@ DEFAULT_PWA_SESSION_DAYS = 180
 #: Upper bound of both lifetimes. Browsers cap a cookie at 400 days (RFC 6265bis), so a
 #: longer value would end at the browser anyway.
 MAX_SESSION_DAYS = 400
+
+
+def calendar_token_hash(token: str) -> str:
+    """The lookup value of a feed token: the hex sha256 of the token."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 class Principal(UUIDPkMixin, Base):
@@ -57,9 +64,15 @@ class Principal(UUIDPkMixin, Base):
     #: Deactivated principals must not log in.
     active: Mapped[bool] = mapped_column(Boolean, server_default="true", default=True)
     #: Personal iCal feed token that the user can rotate. The subscription URL carries it
-    #: in plaintext. The sensitivity is low: it exposes only the titles and times of the
-    #: meetings of the own Gremien. A rotation revokes the old URL.
-    calendar_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: in plaintext. It exposes the titles and times of the meetings of the own Gremien,
+    #: and a rotation revokes the old URL. The column rests sealed
+    #: (§NF/security/integrity/002810), so the feed finds the person by
+    #: `calendar_token_hash`, the sha256 of the token, which `_hash_calendar_token` keeps
+    #: in step with each write.
+    calendar_token: Mapped[str | None] = mapped_column(
+        Sealed("principal.calendar_token"), nullable=True
+    )
+    calendar_token_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Account merge: an admin merged this (old) principal into another one. The row
     #: stays as a locked reference: it cannot log in, and every display of its `sub`
     #: or id shows the name of `merged_into`. The audit log keeps the old `sub`.
@@ -70,11 +83,17 @@ class Principal(UUIDPkMixin, Base):
     merged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        Index("uq_principal_calendar_token", "calendar_token", unique=True),
+        Index("uq_principal_calendar_token_hash", "calendar_token_hash", unique=True),
         Index("ix_principal_merged_into", "merged_into"),
         CheckConstraint("merged_into IS NULL OR merged_into <> id", name="not_self_merged"),
         CheckConstraint("(merged_into IS NULL) = (merged_at IS NULL)", name="merged_at_set"),
     )
+
+    @validates("calendar_token")
+    def _hash_calendar_token(self, _key: str, token: str | None) -> str | None:
+        """Set `calendar_token_hash` with each write of the token."""
+        self.calendar_token_hash = calendar_token_hash(token) if token else None
+        return token
 
 
 class Role(UUIDPkMixin, Base):

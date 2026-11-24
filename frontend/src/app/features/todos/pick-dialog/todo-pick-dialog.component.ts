@@ -10,6 +10,7 @@ import {
   ScrollFadeDirective,
   SearchPillComponent,
   SkeletonComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** One choice of the pick dialog. */
@@ -29,6 +30,7 @@ export interface PickRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     TranslatePipe,
     ButtonComponent,
     DialogComponent,

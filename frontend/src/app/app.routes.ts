@@ -1,7 +1,9 @@
-import type { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import type { CanMatchFn, Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
+import { FeatureService } from '@core/features/feature.service';
 import { ShellComponent } from './layout/shell.component';
 import {
   ADMIN_AREA_PERMISSIONS,
@@ -33,7 +35,17 @@ import {
  * its answers and files. `apply/confirmation` comes first, or `:type` would match it.
  * A route of a feature with a switch has `featureMatch`: while the feature is off, the route
  * does not match and the catch-all route shows "Seite nicht gefunden".
+ * `/protocols/:id` matches only an id (`idAt(1)`), so `/protocols/<slug>` is the page of a
+ * Gremium (spec 002400) and the links to one protocol keep working.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Match only when the URL segment at `index` is an id. */
+const idAt =
+  (index: number): CanMatchFn =>
+  (_route, segments) =>
+    UUID.test(segments[index]?.path ?? '');
+
 export const routes: Routes = [
   {
     path: '',
@@ -104,7 +116,16 @@ export const routes: Routes = [
       },
       {
         path: 'decisions',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public')],
+        data: { title: 'publicDecisions.title', footer: true, kind: 'decisions' },
+        loadComponent: () =>
+          import('./features/public-protocols/public-gremien.component').then(
+            (m) => m.PublicGremienComponent,
+          ),
+      },
+      {
+        path: 'decisions/:committee',
+        canMatch: [featureMatch('meetings', 'public')],
         data: { title: 'publicDecisions.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-decisions.component').then(
@@ -113,16 +134,16 @@ export const routes: Routes = [
       },
       {
         path: 'protocols',
-        canMatch: [featureMatch('meetings')],
-        data: { title: 'publicProtocols.title', footer: true },
+        canMatch: [featureMatch('meetings', 'public')],
+        data: { title: 'publicProtocols.title', footer: true, kind: 'protocols' },
         loadComponent: () =>
-          import('./features/public-protocols/public-protocols.component').then(
-            (m) => m.PublicProtocolsComponent,
+          import('./features/public-protocols/public-gremien.component').then(
+            (m) => m.PublicGremienComponent,
           ),
       },
       {
         path: 'protocols/:id',
-        canMatch: [featureMatch('meetings')],
+        canMatch: [featureMatch('meetings', 'public'), idAt(1)],
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
           import('./features/public-protocols/public-protocol-detail.component').then(
@@ -130,8 +151,17 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'protocols/:committee',
+        canMatch: [featureMatch('meetings', 'public')],
+        data: { title: 'publicProtocols.title', footer: true },
+        loadComponent: () =>
+          import('./features/public-protocols/public-protocols.component').then(
+            (m) => m.PublicProtocolsComponent,
+          ),
+      },
+      {
         path: 'public-calendar',
-        canMatch: [featureMatch('calendar')],
+        canMatch: [featureMatch('calendar', 'public')],
         data: { title: 'calendar.public.title', footer: true, wide: true, public: true },
         loadComponent: () =>
           import('./features/calendar/calendar.component').then((m) => m.CalendarComponent),
@@ -154,10 +184,10 @@ export const routes: Routes = [
           ),
       },
       {
-        /** The old start page; the activity is the start page now (spec 001300). */
+        /** The old start page; the start page is the activity now (specs 001300, 000758). */
         path: 'dashboard',
         pathMatch: 'full',
-        redirectTo: 'activity',
+        redirectTo: () => inject(FeatureService).home(),
       },
       {
         path: 'applications',
@@ -388,6 +418,7 @@ export const routes: Routes = [
       },
       {
         path: 'activity',
+        canMatch: [featureMatch('activity')],
         data: { title: 'nav.activity', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -396,6 +427,7 @@ export const routes: Routes = [
       {
         /** The graph of the elements and their relations (spec 001420), behind `graph.view` (001421). */
         path: 'graph',
+        canMatch: [featureMatch('graph')],
         data: { title: 'nav.graph', permission: 'graph.view', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/graph/graph.component').then((m) => m.GraphComponent),
@@ -566,6 +598,16 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'committees/:id/substitutes',
+            canMatch: [featureMatch('meetings')],
+            data: { title: 'admin.substitutes.title', permission: 'admin.delegations', parent: ['admin', 'admin/committees'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/committees/substitute-pool.component').then(
+                (m) => m.SubstitutePoolComponent,
+              ),
+          },
+          {
             path: 'branding',
             data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'], section: 'branding' },
             canActivate: [authGuard],
@@ -625,6 +667,16 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./pages/admin/features/features.component').then(
                 (m) => m.FeaturesComponent,
+              ),
+          },
+          {
+            path: 'paperless',
+            canMatch: [featureMatch('paperless')],
+            data: { title: 'admin.paperless.title', permission: ['admin.paperless'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/paperless/paperless.component').then(
+                (m) => m.PaperlessComponent,
               ),
           },
           {

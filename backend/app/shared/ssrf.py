@@ -103,6 +103,19 @@ def _target_ips(
     return tuple(ipaddress.ip_address(a) for a in addrs)
 
 
+def host_allowed(host: str, port: int | None, allowlist: Iterable[str]) -> bool:
+    """Tell whether a host, or the host with its port, is in a host allowlist.
+
+    This is the one check of a host against an allowlist of the deploy configuration
+    (§S/backend/python/002818). An entry names a host, or a host with its port, and the
+    compare ignores case and blanks around an entry. An empty list allows no host, so a
+    caller whose empty list means "no limit" asks only while its list is set.
+    """
+    allowed = frozenset(entry.strip().lower() for entry in allowlist if entry.strip())
+    name = host.strip().lower()
+    return name in allowed or (port is not None and f"{name}:{port}" in allowed)
+
+
 def assert_allowed_url(
     url: str,
     *,
@@ -127,8 +140,8 @@ def assert_allowed_url(
     if not host:
         raise SsrfError("missing host")
 
-    allow = {h.lower() for h in allowlist}
-    if allow and host.lower() not in allow:
+    entries = tuple(allowlist)
+    if entries and not host_allowed(host, parsed.port, entries):
         raise SsrfError(f"host not in allowlist: {host!r}")
 
     ips = _target_ips(host, resolver)

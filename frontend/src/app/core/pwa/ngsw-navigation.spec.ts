@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 interface NgswConfig {
   navigationUrls: string[];
+  navigationRequestStrategy?: string;
 }
 
 /** Paths the SERVER answers with its own HTML. None may reach the Angular router. */
@@ -30,5 +31,10 @@ describe('service worker navigation URLs', () => {
 
   it('still claims everything else, so a deep link into the app works offline', () => {
     expect(config().navigationUrls).toContain('/**');
+  });
+
+  /** §002340: a page load asks the network first, so a reload shows a new version at once. */
+  it('loads a page from the network first', () => {
+    expect(config().navigationRequestStrategy).toBe('freshness');
   });
 });

@@ -91,7 +91,7 @@ async def _ticket(
 
 async def _by_number(maker: async_sessionmaker[AsyncSession], number: str) -> Ticket | None:
     async with maker() as session:
-        return await session.scalar(select(Ticket).where(Ticket.number == int(number[2:])))
+        return await session.scalar(select(Ticket).where(Ticket.number == number[2:]))
 
 
 async def test_a_note_binds_its_files_and_a_manager_downloads_them(
@@ -263,8 +263,7 @@ async def test_a_blocked_account_reports_into_the_void(
     """Hold back the reports of a blocked account.
 
     A second block changes nothing. A signed-out report with the account address in another
-    case is held back too. The held-back reports used numbers, so the next real one follows
-    them.
+    case is held back too. Each held-back report answers a number of its own.
     """
     await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
     pid = await add_principal(maker, sub=PLAIN.sub, email="Pia@Example.org", name="Pia")
@@ -301,8 +300,8 @@ async def test_a_blocked_account_reports_into_the_void(
         api.login(PLAIN)
         third = client.post("/api/tickets", json=_REPORT)
         assert third.status_code == 201
-    numbers = [int(r.json()["number"][2:]) for r in (first, second, third)]
-    assert numbers == sorted(numbers) and len(set(numbers)) == 3
+    numbers = [r.json()["number"] for r in (first, second, third)]
+    assert len(set(numbers)) == 3
     stored = await _by_number(maker, third.json()["number"])
     assert stored is not None and stored.reporter_principal_id == pid
     assert len(api.mails.calls) == 1

@@ -1,4 +1,8 @@
 {
   "backend/app/modules/tickets/schemas.py": 2,
-  "backend/app/modules/tickets/service.py": 18
+  "backend/app/modules/tickets/service/anonymize.py": 1,
+  "backend/app/modules/tickets/service/base.py": 5,
+  "backend/app/modules/tickets/service/changes.py": 3,
+  "backend/app/modules/tickets/service/notes.py": 5,
+  "backend/app/modules/tickets/service/reporter.py": 2
 }

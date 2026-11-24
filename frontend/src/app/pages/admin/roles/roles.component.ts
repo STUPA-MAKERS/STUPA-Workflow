@@ -7,34 +7,39 @@ import type { I18nMap } from '@core/api/models';
 import { i18nLabel, sameI18n, trimI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  FabComponent,
-  ButtonComponent,
+  type Action,
   ButtonGroupComponent,
   CapitalizePipe,
   CheckboxComponent,
   ConfirmDialogComponent,
+  ContentLangState,
+  ContentLangSwitchComponent,
+  DialogBodyDirective,
   DialogComponent,
-  EmptyStateComponent,
+  I18nInputComponent,
   InputComponent,
   keyParts,
+  type ListRow,
+  type LoadState,
   NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
-  SkeletonComponent,
+  SectionComponent,
   StatusTextComponent,
   ToastService,
-  PageHeaderComponent,
-  SectionComponent,
+  SearchPillComponent,
 } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
+import {
+  RecordsScreenComponent,
+  ScreenHeadToolsDirective,
+  ScreenRecordDirective,
+  ScreenSearchDirective,
+} from '@stupa-makers/ui-kit/screens';
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { expandSet } from '@shared/expand-set';
-import { ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
-import { ContentLangState } from '@shared/ui/content-lang-switch/content-lang.state';
-import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
+import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -66,28 +71,27 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ContentLangState],
   imports: [
-    LoadStateComponent,
+    SearchPillComponent,
+    ScreenSearchDirective,
+    DialogBodyDirective,
     SectionComponent,
     ContentLangSwitchComponent,
     ExpandRowComponent,
     I18nInputComponent,
-    FabComponent,
     ConfirmDialogComponent,
-    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     CapitalizePipe,
-    ButtonComponent,
     ButtonGroupComponent,
     CheckboxComponent,
     DialogComponent,
     InputComponent,
     NoteComponent,
-    PageHeaderComponent,
-    BreadcrumbsComponent,
     RowMenuComponent,
-    SkeletonComponent,
     StatusTextComponent,
+    RecordsScreenComponent,
+    ScreenHeadToolsDirective,
+    ScreenRecordDirective,
   ],
   templateUrl: './roles.component.html',
   styleUrl: './roles.component.scss',
@@ -124,9 +128,69 @@ export class AdminRolesComponent {
   /** True until the first answer, so the table does not claim there are no roles. */
   protected readonly loading = signal(true);
 
-  /** The read of the roles failed (§ 000576). */
+  /** The read of the roles failed (§ui-kit:000576). */
   protected readonly loadError = signal(false);
-  protected readonly loadState = loadStateOf(this.loading, this.loadError);
+  /** The search of the list (§002690, §002691). */
+  protected readonly search = listSearch();
+  /** The hits of the search for the pill. */
+  protected readonly hits = computed(() => hitCount(this.rows(), this.search));
+
+  /** The rows of the records screen (§ui-kit:002257). */
+  protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
+    if (this.loading()) return { state: 'loading' };
+    if (this.loadError())
+      return {
+        state: 'error',
+        message: this.i18n.translate('admin.roles.error'),
+        retry: () => this.load(),
+      };
+    const rows = this.search
+      .filter(this.roles(), (r) => [this.roleLabel(r), r.key])
+      .map((r) => ({ id: r.id, title: r.key }));
+    return searchedRows(
+      rows.length
+        ? { state: 'ready', data: rows }
+        : { state: 'empty', icon: 'shield', heading: this.i18n.translate('admin.roles.empty') },
+      this.search,
+      this.i18n.translate('admin.list.noHits'),
+    );
+  });
+  /**
+   * With unsaved changes: "Verwerfen" in the head and "Speichern" as the FAB; else "Rolle
+   * anlegen" as the FAB.
+   */
+  protected readonly actions = computed<readonly Action[]>(() =>
+    this.rolesDirty()
+      ? [
+          {
+            key: 'discard',
+            label: this.i18n.translate('action.discard'),
+            priority: 'head',
+            disabled: this.savingRoles(),
+          },
+          {
+            key: 'save',
+            label: this.i18n.translate('action.save'),
+            icon: 'check',
+            priority: 'fab',
+            busy: this.savingRoles(),
+            disabled: !this.permissions().length,
+          },
+        ]
+      : [{ key: 'add', label: this.i18n.translate('fab.role'), priority: 'fab' }],
+  );
+
+  /** The role of a row of the records screen. */
+  protected roleOf(id: string): Role {
+    return this.roles().find((r) => r.id === id)!;
+  }
+
+  /** The head and FAB actions of the records screen. */
+  protected onAction(key: string): void {
+    if (key === 'discard') this.discardRoles();
+    else if (key === 'save') this.saveRoles();
+    else this.openAdd();
+  }
 
   constructor() {
     this.load();
@@ -201,9 +265,9 @@ export class AdminRolesComponent {
     this.api.deleteRole(role.id).subscribe({
       next: () => {
         this.roles.update((list) => list.filter((r) => r.id !== role.id));
-        this.toast.success(this.i18n.translate('admin.roles.deleted'));
+        this.toast.show(this.i18n.translate('admin.roles.deleted'), 'success');
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -243,7 +307,7 @@ export class AdminRolesComponent {
   );
   protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
 
-  /** "Verwerfen": every role goes back to its stored name and rights (§ 000635). */
+  /** "Verwerfen": every role goes back to its stored name and rights (§ui-kit:000635). */
   protected discardRoles(): void {
     const saved = this.savedRoles();
     this.roles.update((list) => list.map((r) => saved.get(r.id) ?? r));
@@ -285,11 +349,11 @@ export class AdminRolesComponent {
         this.nameDrafts.update((m) =>
           Object.fromEntries(Object.entries(m).filter(([id]) => !savedIds.has(id))),
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.savingRoles.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -325,7 +389,7 @@ export class AdminRolesComponent {
         this.keepSaved([role]);
         this.expanded.open(role.id);
         this.addOpen.set(false);
-        this.toast.success(this.i18n.translate('admin.roles.created'));
+        this.toast.show(this.i18n.translate('admin.roles.created'), 'success');
       },
       error: (err: { status?: number }) => {
         this.creating.set(false);
@@ -334,7 +398,7 @@ export class AdminRolesComponent {
         } else if (err?.status === 409) {
           this.serverKeyError.set(this.i18n.translate('admin.roles.keyTaken'));
         } else {
-          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         }
       },
     });

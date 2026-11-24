@@ -33,6 +33,7 @@ import {
   StatusTextComponent,
   ToastService,
   PageHeaderComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
@@ -97,6 +98,7 @@ interface TypeBlock {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadStateComponent,
     FabComponent,
     ConfirmDialogComponent,
@@ -346,7 +348,7 @@ export class FormsListComponent {
   protected moveType(t: ApplicationTypeFull, by: -1 | 1): void {
     this.api.moveApplicationType(t.id, by).subscribe({
       next: (list) => this.types.set(list),
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -354,7 +356,7 @@ export class FormsListComponent {
   protected moveGroup(g: ApplicationTypeGroupFull, by: -1 | 1): void {
     this.api.moveApplicationTypeGroup(g.id, by).subscribe({
       next: (list) => this.groups.set(list),
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error'),
     });
   }
 
@@ -372,12 +374,12 @@ export class FormsListComponent {
       next: () => {
         this.saving.set(false);
         this.regroup.set(null);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.reload();
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -408,8 +410,7 @@ export class FormsListComponent {
   }
 
   /** Create or change the group of the dialog. Empty languages are not sent. */
-  protected saveGroup(event: Event): void {
-    event.preventDefault();
+  protected saveGroup(): void {
     const target = this.groupDialog();
     const f = this.groupForm();
     const nameDe = f.nameDe.trim();
@@ -431,11 +432,11 @@ export class FormsListComponent {
         this.groups.update((list) =>
           target === 'new' ? [...list, saved] : list.map((g) => (g.id === saved.id ? saved : g)),
         );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -449,12 +450,12 @@ export class FormsListComponent {
       next: () => {
         this.deleting.set(false);
         this.confirmGroupDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
         this.reload();
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+        this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
       },
     });
   }
@@ -495,11 +496,11 @@ export class FormsListComponent {
         this.deleting.set(false);
         this.confirmDelete.set(null);
         this.types.update((rows) => rows.filter((r) => r.id !== t.id));
-        this.toast.success(this.i18n.translate('admin.common.saved'));
+        this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('admin.forms.deleteFailed'));
+        this.toast.show(this.i18n.translate('admin.forms.deleteFailed'), 'error');
       },
     });
   }
@@ -508,8 +509,7 @@ export class FormsListComponent {
     this.dialogOpen.set(false);
   }
 
-  protected submit(event: Event): void {
-    event.preventDefault();
+  protected submit(): void {
     const f = this.form();
     const nameDe = f.nameDe.trim();
     if (!nameDe || this.saving()) return;
@@ -526,12 +526,12 @@ export class FormsListComponent {
         next: (created) => {
           this.saving.set(false);
           this.dialogOpen.set(false);
-          this.toast.success(this.i18n.translate('admin.common.saved'));
+          this.toast.show(this.i18n.translate('admin.common.saved'), 'success');
           this.router.navigate(['/admin/forms', created.id]);
         },
         error: () => {
           this.saving.set(false);
-          this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+          this.toast.show(this.i18n.translate('admin.common.saveFailed'), 'error');
         },
       });
   }

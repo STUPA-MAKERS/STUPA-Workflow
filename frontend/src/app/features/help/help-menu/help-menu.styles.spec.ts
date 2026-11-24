@@ -1,5 +1,5 @@
 /**
- * Style contract of the head of the group "Darstellung" (§000608). jsdom does no layout, so
+ * Style contract of the head of the group "Darstellung" (§ui-kit:000608). jsdom does no layout, so
  * this spec reads the styles: the head row has the inline padding of the switch rows, so the
  * reset ends where the switch tracks end, and the caption has no padding of its own, so its
  * text and the reset share one centre line.
@@ -18,7 +18,7 @@ function rule(selector: string): string {
 }
 
 describe('HelpMenuStyles', () => {
-  /** §000608 the reset lines up with the switches and the caption, in the popover and the sheet. */
+  /** §ui-kit:000608 the reset lines up with the switches and the caption, in the popover and the sheet. */
   it('aligns the reset with the switch column and the caption', () => {
     expect(rule('.hm__toggle')).toMatch(/padding: 6px var\(--space-4\);/);
     const head = rule('.hm__groupHead');

@@ -25,7 +25,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.audit.actions import AuditAction
@@ -36,6 +36,7 @@ from app.modules.auth.oauth_models import OAuthToken
 from app.shared.errors import NotFoundError, ProblemDetail
 from app.shared.paging import Page, PageParams
 from app.shared.schemas import FrozenCamelModel
+from app.shared.search import escape_like
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -51,7 +52,10 @@ UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 
 
 class GrantListQuery(PageParams, frozen=True):
-    """Query parameters of the grant list: paging plus a filter by principal.
+    """Query parameters of the grant list: paging, a filter by principal and a search.
+
+    `q` finds a grant whose owner name, owner e-mail, client or scope holds each word of
+    the search, without regard to case (spec 002691).
 
     `extra="forbid"` answers 422 on an unknown parameter instead of ignoring it.
     """
@@ -59,6 +63,7 @@ class GrantListQuery(PageParams, frozen=True):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     principal_id: UUID | None = Field(default=None, alias="principalId")
+    q: str | None = Field(default=None, max_length=200)
 
 
 class OAuthGrantAdminOut(FrozenCamelModel, frozen=True):
@@ -110,17 +115,36 @@ async def list_oauth_grants_admin(
 
     The list holds the grants that are not revoked. A revoked grant is dead already and
     the audit log keeps its record. The filter `principalId` narrows the list to one
-    owner.
+    owner, and `q` to the grants that hold each word of the search.
     """
     live = (
         select(OAuthToken, PrincipalRow)
         .join(PrincipalRow, PrincipalRow.id == OAuthToken.principal_id)
         .where(OAuthToken.revoked_at.is_(None))
     )
-    stmt = (
+    owned = (
         live
         if query.principal_id is None
         else live.where(OAuthToken.principal_id == query.principal_id)
+    )
+    columns = (
+        PrincipalRow.display_name,
+        PrincipalRow.email,
+        OAuthToken.client_id,
+        OAuthToken.scope,
+    )
+    words = (query.q or "").split()
+    stmt = (
+        owned.where(
+            and_(
+                *(
+                    or_(*(col.ilike(f"%{escape_like(w)}%", escape="\\") for col in columns))
+                    for w in words
+                )
+            )
+        )
+        if words
+        else owned
     )
     total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = (

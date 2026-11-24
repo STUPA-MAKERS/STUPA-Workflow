@@ -3,7 +3,7 @@
 § 001704 the options are the targets that at least one selected Antrag reaches, each
 with the Anträge that reach it; an Antrag that the person cannot read reaches none, an
 agenda transition is never offered, and an approving target lists the requested amounts
-of the Anträge that reach it; the label is the name of the target state. § 001703 each
+of the Anträge that reach it; the label is the name of the target state. §ui-kit:001703 each
 Antrag runs on its own: an error rolls back that Antrag and names the code, the others
 go on.
 """

@@ -9,7 +9,7 @@ import type { GremiumRole } from '../admin.models';
 import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
-const ALL = ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize', 'info.write', 'members.notify'];
+const ALL = ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize', 'info.write', 'members.notify', 'ticket.work'];
 const ROLES: GremiumRole[] = [
   {
     id: 'gr-p',
@@ -111,10 +111,19 @@ describe('GremiumRoleMatrixComponent', () => {
       'Protokoll finalisieren & senden',
       'Info bearbeiten',
       'Mitglieder benachrichtigen',
+      'Tickets bearbeiten',
       'Aktionen',
     ]);
     const keys = [...document.querySelectorAll('.rm__colKey')].map((k) => k.textContent);
     expect(keys).toEqual(ALL);
+  });
+
+  /** A grid with fewer columns than rights wraps every row into a second line (002590). */
+  it('oneColumnPerRight: gives every role one cell per right, so it stays on one line', async () => {
+    await setup();
+    for (const row of screen.getAllByRole('row').slice(1)) {
+      expect(within(row).getAllByRole('cell')).toHaveLength(ALL.length + 1);
+    }
   });
 
   /** The member role names the groups that give the membership. */

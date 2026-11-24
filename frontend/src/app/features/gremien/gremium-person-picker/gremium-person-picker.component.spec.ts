@@ -21,7 +21,7 @@ async function setup(taken: readonly string[] = []) {
 describe('GremiumPersonPickerComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  /** § 001074: the Gremien by name in place, a logo in place of the avatar, no hit twice. */
+  /** §ui-kit:001074: the Gremien by name in place, a logo in place of the avatar, no hit twice. */
   it('lists the Gremien on Arrow Down, moves in the list and picks with a click', async () => {
     const view = await setup(['g-2']);
     fireEvent.keyDown(view.field, { key: 'ArrowDown' });

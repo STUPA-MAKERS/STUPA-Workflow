@@ -16,7 +16,13 @@ import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, DialogComponent, TextareaComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  TextareaComponent,
+  ToastService,
+  DialogBodyDirective,
+} from '@stupa-makers/ui-kit';
 
 /** The longest reason that the server accepts (`ATTENDANCE_NOTE_MAX`). */
 export const LATE_EXCUSE_NOTE_MAX = 500;
@@ -40,7 +46,14 @@ const FINAL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
   selector: 'app-late-excuse-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, DialogComponent, ButtonComponent, TextareaComponent],
+  imports: [
+    DialogBodyDirective,
+    FormsModule,
+    TranslatePipe,
+    DialogComponent,
+    ButtonComponent,
+    TextareaComponent,
+  ],
   templateUrl: './late-excuse-dialog.component.html',
 })
 export class LateExcuseDialogComponent {
@@ -83,14 +96,14 @@ export class LateExcuseDialogComponent {
     this.api.excuseLate(id, this.note().trim()).subscribe({
       next: (roster) => {
         this.saving.set(false);
-        this.toast.success(this.i18n.translate('meetings.lateExcuse.saved'));
+        this.toast.show(this.i18n.translate('meetings.lateExcuse.saved'), 'success');
         this.excused.emit(roster);
       },
       error: (err: unknown) => {
         this.saving.set(false);
         const code = problemCode(err);
         const final = FINAL_REFUSALS[code ?? ''];
-        this.toast.error(this.i18n.translate(final ?? 'meetings.toast.actionFailed'));
+        this.toast.show(this.i18n.translate(final ?? 'meetings.toast.actionFailed'), 'error');
         if (final) this.closed.emit();
       },
     });

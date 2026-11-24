@@ -43,6 +43,7 @@ import {
   SwitchComponent,
   ToastService,
   SectionComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
 import type { PickerHit } from '../../../features/gremien/gremium-person-picker/gremium-person-picker.component';
@@ -75,6 +76,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     SectionComponent,
     CdkDrag,
     CdkDragHandle,
@@ -234,8 +236,12 @@ export class TodoBoardSettingsComponent {
 
   private fail(err: unknown): void {
     this.busy.set(false);
-    const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
-    this.toast.error(this.i18n.translate((code && ERROR_TEXT[code]) || 'todos.settings.error.save'));
+    const code =
+      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    this.toast.show(
+      this.i18n.translate((code && ERROR_TEXT[code]) || 'todos.settings.error.save'),
+      'error',
+    );
   }
 
   saveName(): void {
@@ -255,7 +261,7 @@ export class TodoBoardSettingsComponent {
     const n = Math.round(Number(this.days()));
     if (!Number.isFinite(n) || n < 1 || n > 365) {
       this.days.set(this.board().archiveAfterDays ?? DEFAULT_ARCHIVE_DAYS);
-      this.toast.error(this.i18n.translate('todos.settings.daysRange'));
+      this.toast.show(this.i18n.translate('todos.settings.daysRange'), 'error');
       return;
     }
     if (n === this.board().archiveAfterDays) return;

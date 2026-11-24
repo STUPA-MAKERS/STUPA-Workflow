@@ -140,7 +140,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();
   });
 
-  /** § 000576 and § S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
+  /** §ui-kit:000576 and §ui-kit:S/frontend/angular/000632: a failed read is a toast with a retry, not a note. */
   it('names a failed list request in a toast with a retry, over the empty state', async () => {
     const api = makeApi({ listCdVariants: jest.fn(() => httpError(500)) });
     const { c, container } = await setup(api);
@@ -273,7 +273,7 @@ describe('AdminCdVariantsComponent', () => {
   it('submit is a no-op while it cannot save', async () => {
     const { api, c } = await setup();
     c.openCreate();
-    c.submit(new Event('submit'));
+    c.submit();
     expect(api.createCdVariant).not.toHaveBeenCalled();
   });
 
@@ -286,7 +286,7 @@ describe('AdminCdVariantsComponent', () => {
     fixture.detectChanges();
     expect(screen.getByLabelText(/^Schlüssel/)).toBeDisabled();
     c.patch('name', 'StuPa 2026');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(api.updateCdVariant).toHaveBeenCalledWith('cd-1', { name: 'StuPa 2026' });
     expect(c.variants()[0].name).toBe('StuPa 2026');
   });
@@ -296,7 +296,7 @@ describe('AdminCdVariantsComponent', () => {
     const { c, toast } = await setup(makeApi({ createCdVariant: jest.fn(() => httpError(409)) }));
     c.openCreate();
     c.patchName('StuPa');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(c.formError()).toBe('admin.cdVariants.keyExists');
     expect(c.saving()).toBe(false);
     expect(c.dialogOpen()).toBe(true);
@@ -310,7 +310,7 @@ describe('AdminCdVariantsComponent', () => {
     );
     c.openCreate();
     c.patchName('StuPa');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(c.formError()).toBeNull();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
@@ -709,7 +709,7 @@ describe('AdminCdVariantsComponent', () => {
 
     c.openEdit(VARIANT);
     c.patch('name', 'StuPa 2026');
-    c.submit(new Event('submit'));
+    c.submit();
     expect(c.variants()[0]).toEqual(other);
 
     c.openLogoDialog(VARIANT, 'footer');

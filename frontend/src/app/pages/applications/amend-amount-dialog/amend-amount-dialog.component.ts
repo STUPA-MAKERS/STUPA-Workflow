@@ -28,6 +28,7 @@ import {
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The shortest reason of a change (spec 001620, as the server). */
@@ -63,6 +64,7 @@ function toNumber(value: string | null | undefined): number | null {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     FormsModule,
     TranslatePipe,
@@ -198,7 +200,7 @@ export class AmendAmountDialogComponent {
         next: () => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.success(this.i18n.translate('amendAmount.saved'));
+          this.toast.show(this.i18n.translate('amendAmount.saved'), 'success');
           this.done.emit();
         },
         error: (err: { status?: number; error?: ProblemDetail | null }) => {
@@ -209,15 +211,18 @@ export class AmendAmountDialogComponent {
             return;
           }
           if (err.status === 409) {
-            this.toast.error(this.i18n.translate('amendAmount.error.state'));
+            this.toast.show(this.i18n.translate('amendAmount.error.state'), 'error');
             this.open.set(false);
             this.done.emit();
             return;
           }
-          this.toast.error(
+          this.toast.show(
             this.i18n.translate(
-              err.status === 403 ? 'applications.transitions.forbidden' : 'applications.actions.error',
+              err.status === 403
+                ? 'applications.transitions.forbidden'
+                : 'applications.actions.error',
             ),
+            'error',
           );
         },
       });

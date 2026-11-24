@@ -8,6 +8,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { DraftUpload } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { ChatViewComponent } from '@stupa-makers/ui-kit/views/chat';
 import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
 import { ChatDrafts } from './chat-drafts';
@@ -16,6 +17,7 @@ import { TestBed } from '@angular/core/testing';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { ChatEvent, ChatMessage, ChatVisibility, ChatVisibilityGuard } from './chat.models';
 import type { ChatPerson } from './chat-mentions';
+import { toastMock } from '../../../../testing/toast';
 
 /** The text of `el` with a space between the parts of each meta line (the dots are CSS). */
 function spaced(el: Element | null | undefined): string {
@@ -107,7 +109,7 @@ async function setup(opts: SetupOpts = {}) {
     ),
     deleteDraftAttachment: jest.fn((): Observable<void> => of(undefined)),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(ChatComponent, {
     inputs: {
       messages: opts.messages ?? [],
@@ -136,8 +138,12 @@ async function setup(opts: SetupOpts = {}) {
   const log = () => screen.getByRole('log');
   const input = () =>
     screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
+  /** The kit chat view inside the adapter: the tests drive its internals. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cmp = view.fixture.componentInstance as any;
+  const cmp = view.fixture.debugElement.query(By.directive(ChatViewComponent)).componentInstance as any;
+  /** The adapter itself: it holds the drafts of the app. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const outer = view.fixture.componentInstance as any;
   /** Pick files with the hidden input and let the uploads finish. */
   const pick = async (...files: File[]) => {
     const box = view.container.querySelector('.chat__fileInput') as HTMLInputElement;
@@ -161,6 +167,7 @@ async function setup(opts: SetupOpts = {}) {
     log,
     input,
     cmp,
+    outer,
     api,
     toast,
     pick,
@@ -692,7 +699,7 @@ describe('ChatComponent', () => {
         }
       });
 
-      it('frames a public draft and keeps an internal one plain', async () => {
+      it('keeps the field plain for a public and an internal draft', async () => {
         const { user, view } = await setup({
           visibilityOptions: ['internal', 'public'],
           visibilityGuard: GUARD,
@@ -701,7 +708,7 @@ describe('ChatComponent', () => {
         expect(view.container.querySelector('.chat__box--public')).toBeNull();
         await user.click(screen.getByRole('radio', { name: PUB }));
         expect(screen.getByRole('radio', { name: PUB })).toBeChecked();
-        expect(view.container.querySelector('.chat__box--public')).not.toBeNull();
+        expect(view.container.querySelector('.chat__box--public')).toBeNull();
       });
 
       it('starts the next message with the first choice again', async () => {
@@ -1251,7 +1258,7 @@ describe('ChatComponent', () => {
 
     /** A confirm without a message does nothing. */
     it('deletes after a confirmation', async () => {
-      const { del, view } = await setup({ messages: own() });
+      const { del, cmp } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
       const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen?' });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
@@ -1263,7 +1270,7 @@ describe('ChatComponent', () => {
         }),
       );
       expect(del).toHaveBeenCalledWith({ id: 'm' });
-      (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
+      cmp.confirmDelete();
       expect(del).toHaveBeenCalledTimes(1);
     });
   });
@@ -1755,9 +1762,9 @@ describe('ChatComponent', () => {
     });
 
     it('maps the reasons of the draft service to the chat texts', () => {
-      expect(chatUploadError('apply.files.error.type')).toBe('chat.error.fileType');
-      expect(chatUploadError('apply.files.error.tooLarge')).toBe('chat.error.fileTooLarge');
-      expect(chatUploadError('apply.files.error.rateLimit')).toBe('chat.error.upload');
+      expect(chatUploadError('apply.files.error.type')).toBe('type');
+      expect(chatUploadError('apply.files.error.tooLarge')).toBe('tooLarge');
+      expect(chatUploadError('apply.files.error.rateLimit')).toBe('other');
     });
 
     it('ignores an empty pick', async () => {
@@ -1985,7 +1992,7 @@ describe('ChatComponent', () => {
           { provide: ApiClient, useValue: api },
           { provide: AuthService, useValue: { isAuthenticated: signal(true) } },
           { provide: AltchaService, useValue: { solve: jest.fn(async () => 'sol') } },
-          { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+          { provide: ToastService, useValue: toastMock() },
         ],
       });
       const settle = async () => {
@@ -1994,7 +2001,7 @@ describe('ChatComponent', () => {
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chat = (cls: string): any =>
-        fixture.debugElement.query(By.css(`app-chat.${cls}`)).componentInstance;
+        fixture.debugElement.query(By.css(`app-chat.${cls} app-chat-view`)).componentInstance;
       const pick = async (cls: string, file: File) => {
         const box = fixture.nativeElement.querySelector(
           `app-chat.${cls} .chat__fileInput`,
@@ -2285,9 +2292,9 @@ describe('ChatComponent', () => {
     });
 
     it('marks a lost file in the composer', async () => {
-      const { pick, cmp, view } = await setup({ canAttach: true });
+      const { pick, outer, view } = await setup({ canAttach: true });
       await pick(pdf());
-      cmp.drafts.markFailed({
+      outer.drafts.markFailed({
         code: 'draft_attachments_missing',
         errors: [{ field: 'attachmentIds.d1' }],
       });

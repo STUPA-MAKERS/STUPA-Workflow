@@ -45,6 +45,7 @@ import {
   TextareaComponent,
   ToastService,
   ErrorTextComponent,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
@@ -92,6 +93,7 @@ export interface TodoCardCopy {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     ErrorTextComponent,
     TextareaComponent,
     ChipComponent,
@@ -351,7 +353,7 @@ export class TodoNewDialogComponent {
         },
         error: (err: { error?: { code?: string } }) => {
           this.saving.set(false);
-          this.toast.error(this.i18n.translate(this.errorKey(err?.error?.code)));
+          this.toast.show(this.i18n.translate(this.errorKey(err?.error?.code)), 'error');
         },
       });
       return;
@@ -387,12 +389,12 @@ export class TodoNewDialogComponent {
         next: (card) => {
           this.saving.set(false);
           this.open.set(false);
-          this.toast.success(this.i18n.translate('todos.new.created'));
+          this.toast.show(this.i18n.translate('todos.new.created'), 'success');
           this.created.emit(card);
         },
         error: (err: { error?: { code?: string } }) => {
           this.saving.set(false);
-          this.toast.error(this.i18n.translate(this.errorKey(err?.error?.code)));
+          this.toast.show(this.i18n.translate(this.errorKey(err?.error?.code)), 'error');
         },
       });
   }

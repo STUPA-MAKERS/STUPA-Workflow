@@ -106,6 +106,18 @@ Keys that need a note:
 - `graph.view`: open the page "Graph", which draws the elements of every area and their
   relations at once. It opens the page only and gives no read access: each node keeps
   the read rule of its kind. No seeded role but the admin holds it.
+- `admin.paperless`: set the connection to Paperless, its switches and the actions of
+  the page /admin/paperless. The holder gives the server an address to call and a token,
+  so the key is separate from `admin.site`. No OAuth scope carries it, so an agent token
+  never changes the connection.
+- `admin.ticket_mail`: set the Postfach of a Bereich (/admin/help-tickets): its address,
+  the IMAP and the SMTP account, and its switch. The holder gives the server two hosts to
+  call and the password of a mail account, so the key is separate from `admin.site`
+  (§F/integrations/ticket-mail/002721). No OAuth scope carries it, so an agent token never
+  changes a Postfach.
+- `paperless.use`: open the filed document of an element in Paperless and insert a
+  document from Paperless. The holder reads what the account of the platform reads in
+  Paperless, so no seeded role but the admin holds it and no OAuth scope carries it.
 """
 
 from __future__ import annotations
@@ -165,4 +177,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.calendars",
     "admin.features",
     "graph.view",
+    "admin.paperless",
+    "admin.ticket_mail",
+    "paperless.use",
 )

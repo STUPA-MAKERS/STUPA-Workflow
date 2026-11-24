@@ -13,7 +13,7 @@ implementation:
   - backend/app/modules/voting/service
   - backend/app/modules/delegations/service.py
   - backend/app/modules/livevote/service/votes.py
-  - frontend/src/app/features/voting/ballot/ballot.component.ts
+  - frontend/vendor/ui-kit/views/voting/src/ballot-view.component.ts
 scope:
   - backend/app/modules/voting
   - backend/app/modules/delegations

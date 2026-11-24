@@ -18,7 +18,8 @@ stale entry of the list.
 Groups of ``OBJECT_CHECK_ROUTES`` that authorize no object:
 
 - Self: the route reads or writes only the data of the caller (``/auth/me``, the
-  own grants, preferences, calendar feed and avatar, the OAuth consent).
+  own grants, preferences, push devices and push switches, calendar feed and avatar, the
+  OAuth consent). The public push key is the same for every account.
 - Master data: ``GET /api/committees`` serves id, name and variant to any member, and
   the avatar of a principal is the same Gravatar image that the person list shows.
   ``GET /api/calendar/people`` serves id and name of the active accounts to any session
@@ -46,6 +47,10 @@ _TODO_READ = "BoardAccess.can_read"
 _TODO_WRITE = "BoardAccess.can_write"
 _TODO_CONFIGURE = "BoardAccess.can_configure"
 _TODO_SCOPE = "BoardAccess.scope"
+_TICKET_WORK = (
+    "tickets.router.require_worker (access.area_scope: ticket.manage, or ticket.work in "
+    "the Gremium of the Bereich) + TicketService._get (the Bereich of the ticket)"
+)
 _REPORTER = "TicketService._reporter_ticket (own ticket)"
 _REPORTER_NOTE = "TicketService._reporter_note (own ticket, own note)"
 _GREMIUM_VIEW = "gremien.access.require_gremium (policy.can_view_gremium)"
@@ -68,11 +73,12 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         "VotingService.assert_can_manage_group (manages_votes_in_gremium)"
     ),
     ("GET", "/api/activity"): "ActivityService sources (resolve_app_read, BoardAccess.can_read, "
-    "ticket.manage or own report, MeetingRules.assert_can_read)",
+    "tickets.access.area_scope or own report, MeetingRules.assert_can_read)",
     ("GET", "/api/activity/status"): "ActivityService sources, as GET /api/activity",
     ("POST", "/api/activity/seen"): _SELF,
     ("GET", "/api/navigation/status"): "the gate of each mark: list_tasks, TodoService.mine, "
-    "ticket.manage, MeetingService.any_live (timeline visibility), ActivityService.has_new",
+    "tickets.access.area_scope, MeetingService.any_live (timeline visibility), "
+    "ActivityService.has_new",
     ("GET", "/api/auth/me"): _SELF,
     ("GET", "/api/auth/me/profile"): _SELF,
     ("GET", "/api/budget-plan-versions/{version_id}/plan"): _BUDGET_NODE,
@@ -168,6 +174,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
         "livevote.router._require_lead (PermissionOps.can_write)"
     ),
     ("POST", "/api/meetings/{meeting_id}/documents"): "ProtocolService.authorize_write_meeting",
+    ("POST", "/api/meetings/{meeting_id}/documents/paperless"): (
+        "ProtocolService.authorize_write_meeting (paperless.use in the route)"
+    ),
     ("GET", "/api/meetings/{meeting_id}/guests"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/admit-all"): _MEETING_MANAGE,
     ("POST", "/api/meetings/{meeting_id}/guests/{guest_id}/admit"): _MEETING_MANAGE,
@@ -192,6 +201,12 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PUT", "/api/meetings/{meeting_id}/votes/{vote_id}"): _MEETING_VOTES,
     ("GET", "/api/notifications/preferences"): _SELF,
     ("PUT", "/api/notifications/preferences"): _SELF,
+    ("GET", "/api/push/key"): _SELF,
+    ("GET", "/api/push/devices"): _SELF,
+    ("POST", "/api/push/devices"): _SELF,
+    ("DELETE", "/api/push/devices/{device_id}"): "PushService.remove (own device)",
+    ("GET", "/api/push/preferences"): _SELF,
+    ("PUT", "/api/push/preferences"): _SELF,
     ("GET", "/api/oauth/consent-request"): _SELF,
     ("POST", "/api/oauth/consent"): "self: oauth_router.consent (mcp.use after the deny path)",
     ("GET", "/api/oauth/finish"): _SELF,
@@ -213,6 +228,23 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/protocols/{protocol_id}/pdf"): _PROTOCOL_READ,
     ("GET", "/api/protocols/{protocol_id}/pdf/public"): _PROTOCOL_READ,
     ("POST", "/api/protocols/{protocol_id}/votes"): _PROTOCOL_WRITE,
+    ("GET", "/api/tickets"): _TICKET_WORK,
+    ("GET", "/api/tickets/counts"): _TICKET_WORK,
+    ("GET", "/api/tickets/assignees"): _TICKET_WORK,
+    ("GET", "/api/tickets/areas"): _TICKET_WORK,
+    ("GET", "/api/tickets/report-areas"): (
+        "TicketAreaService.choices (any session: Plattform and the Bereiche with in_app)"
+    ),
+    ("POST", "/api/tickets/manual"): (
+        "tickets.router.require_worker + TicketService.create_manual (works_in the Bereich)"
+    ),
+    ("GET", "/api/tickets/{ticket_id}"): _TICKET_WORK,
+    ("PATCH", "/api/tickets/{ticket_id}"): _TICKET_WORK,
+    ("POST", "/api/tickets/{ticket_id}/notes"): _TICKET_WORK,
+    ("PATCH", "/api/tickets/{ticket_id}/notes/{note_id}"): _TICKET_WORK,
+    ("DELETE", "/api/tickets/{ticket_id}/notes/{note_id}"): _TICKET_WORK,
+    ("GET", "/api/tickets/{ticket_id}/mails/{mail_id}/source"): _TICKET_WORK,
+    ("POST", "/api/tickets/{ticket_id}/mails/{mail_id}/resend"): _TICKET_WORK,
     ("GET", "/api/tickets/mine"): "TicketService.reporter_list (own tickets)",
     ("GET", "/api/tickets/mine/{ticket_id}"): _REPORTER,
     ("POST", "/api/tickets/mine/{ticket_id}/notes"): _REPORTER,

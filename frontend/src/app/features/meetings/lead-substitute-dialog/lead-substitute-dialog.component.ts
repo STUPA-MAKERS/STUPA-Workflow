@@ -29,6 +29,7 @@ import {
   SwitchComponent,
   ToastService,
   TruncatedDirective,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { personLabel } from '@shared/person-label.util';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
@@ -55,6 +56,7 @@ const SEARCH_ABOVE = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     LoadErrorComponent,
     EmptyStateComponent,
     SkeletonComponent,
@@ -181,12 +183,12 @@ export class LeadSubstituteDialogComponent {
       .subscribe({
         next: (d) => {
           this.busy.set(false);
-          this.toast.success(this.i18n.translate('meetings.leadSubstitute.created'));
+          this.toast.show(this.i18n.translate('meetings.leadSubstitute.created'), 'success');
           this.created.emit(d);
         },
         error: () => {
           this.busy.set(false);
-          this.toast.error(this.i18n.translate('meetings.leadSubstitute.failed'));
+          this.toast.show(this.i18n.translate('meetings.leadSubstitute.failed'), 'error');
         },
       });
   }

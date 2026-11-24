@@ -16,7 +16,6 @@ import pytest
 from app.modules.audit.actions import AuditAction
 from app.modules.files.storage import StorageError
 from app.modules.meetings.protocol_models import Protocol
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.public import PublicSnapshot, PublicTop
 from app.modules.protocol.service import (
     ProtocolService,
@@ -89,7 +88,8 @@ async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) ->
         in_body.id: _view("Schon im Text?"),
     }
     pub_item.body = "Text\n\n> [!abstimmung] **Schon im Text?**"
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(
         results=[
             result(pub_item, np_item, empty_item),
@@ -120,7 +120,8 @@ async def test_assemble_titles_application_items_by_their_application(
         SimpleNamespace(id=uuid4(), application_id=None, title="Frei", body="", non_public=False),
     ]
     _Voting.views = {}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(
         results=[
             result(*items),
@@ -197,7 +198,9 @@ async def test_set_public_withheld_audits_a_change_only(
     async def _record(_session: Any, **kw: Any) -> None:
         entries.append(kw)
 
-    monkeypatch.setattr(protocol_service_mod, "audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.base.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.finalize.audit_record", _record)
     proto = _protocol()
     session = FakeSession(results=[result(proto), result(proto)])
     svc = _service(session)
@@ -220,7 +223,9 @@ def _finalize_fakes(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
 
         async def pseudonymize(self, _mid: UUID) -> None: ...
 
-    monkeypatch.setattr(protocol_service_mod, "audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.base.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.finalize.audit_record", _record)
     monkeypatch.setattr("app.modules.livevote.guests.GuestService", _Guests)
     return entries
 
@@ -336,7 +341,7 @@ async def test_count_render_failure_warns_once_at_the_limit(
 
     warnings: list[object] = []
     monkeypatch.setattr(
-        protocol_service_mod.logger, "warning", lambda *a, **_kw: warnings.append(a)
+        "app.modules.protocol.service.backfill.logger.warning", lambda *a, **_kw: warnings.append(a)
     )
     proto = _protocol(public_render_failures=PUBLIC_RENDER_MAX_FAILURES - 2)
     session = FakeSession(store={PID: proto})
@@ -485,7 +490,8 @@ async def test_assemble_puts_the_time_of_a_reached_top_above_its_heading(
         SimpleNamespace(id=uuid4(), title="Rest", body="", non_public=False, started_at=None),
     ]
     _Voting.views = {}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(results=[result(*items), result(), result()])
     md = await _service(session)._assemble_from_agenda(MID, public=True)
     blocks = md.strip().split("\n\n")

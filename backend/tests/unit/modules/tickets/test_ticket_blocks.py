@@ -14,7 +14,6 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import MessageAttachmentOut
-from app.modules.tickets import service as svc_mod
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.tickets.schemas import TicketCreate
 from app.modules.tickets.service import (
@@ -40,7 +39,7 @@ def _svc(session: ScriptedSession, files: FakeFiles | None = None) -> TicketServ
 def _ticket(**kw: Any) -> Ticket:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
-        "number": 7,
+        "number": "AAAA0007",
         "kind": "bug",
         "title": "Fehler",
         "body": "Text",
@@ -102,9 +101,9 @@ async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing
     async def _check(_s: object, **_kw: Any) -> None:
         calls.append("check")
 
-    monkeypatch.setattr(svc_mod, "check_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.create.check_drafts", _check)
     block = uuid.uuid4()
-    session = ScriptedSession(scalar=[block, 99])
+    session = ScriptedSession(scalar=[block, None])
     payload = TicketCreate.model_validate(
         {
             "kind": "bug",
@@ -114,25 +113,17 @@ async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing
             "draftToken": "tok",
         }
     )
+    monkeypatch.setattr("app.modules.tickets.service.base.draw_number", lambda: "7K3QX9MD")
     out = await _svc(session).create(payload, reporter_id=None, email="a@x", pepper="p")
-    assert out == SwallowedReport(number=99)
+    assert out == SwallowedReport(number="7K3QX9MD")
     assert out.id is None
     assert calls == ["check"]
     assert session.added == []
-    from sqlalchemy.dialects import postgresql
-
-    seq = str(session.statements[1].compile(dialect=postgresql.dialect()))
-    assert "nextval('ticket_number_seq')" in seq
+    assert "ticket.number = '7K3QX9MD'" in _sql(session.statements[1])
     update = _sql(session.statements[2])
     assert update.startswith("UPDATE ticket_sender_block SET hit_count")
     assert str(block).replace("-", "") in update.replace("-", "")
     assert session.committed == 1
-
-
-async def test_a_swallowed_report_without_a_number_counts_zero() -> None:
-    session = ScriptedSession(scalar=[None])
-    out = await _svc(session)._swallow(uuid.uuid4())
-    assert out.number == 0
 
 
 def test_the_block_target_of_each_reporter() -> None:
@@ -276,7 +267,7 @@ async def test_blocked_senders_map_people_addresses_and_sources() -> None:
     )
     session = ScriptedSession(
         scalars=[[account, address, orphan]],
-        execute=[[(OTHER, "Otto", "otto@x"), (ME, "Ada", None)], [(source, 12)]],
+        execute=[[(OTHER, "Otto", "otto@x"), (ME, "Ada", None)], [(source, "AAAA0012")]],
     )
     first, second, third = await _svc(session).blocked_senders()
     assert first.kind == "principal"
@@ -286,7 +277,7 @@ async def test_blocked_senders_map_people_addresses_and_sources() -> None:
     assert first.blocked_by is not None
     assert first.blocked_by.display_name == "Ada"
     assert first.source_ticket is not None
-    assert first.source_ticket.number == "T-0012"
+    assert first.source_ticket.number == "T-AAAA0012"
     assert (first.hit_count, first.last_hit_at) == (3, NOW)
     assert second.kind == "email"
     assert (second.person, second.email, second.blocked_by) == (None, "x@y.org", None)

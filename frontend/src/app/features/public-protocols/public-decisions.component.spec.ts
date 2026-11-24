@@ -10,12 +10,13 @@ import type {
   PublicSemester,
 } from './public-protocols.models';
 import { PublicDecisionsComponent } from './public-decisions.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { PublicProtocolsService } from './public-protocols.service';
 import { decisionRowFixture } from './public-protocols.fixtures';
 
 const GREMIEN = [
-  { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa', protocolCount: 8 },
-  { id: 'g-2', name: 'AStA', slug: 'asta', protocolCount: 7 },
+  { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa', protocolCount: 8, latestDate: '2026-09-29' },
+  { id: 'g-2', name: 'AStA', slug: 'asta', protocolCount: 7, latestDate: '2026-07-14' },
 ];
 
 function page(items: readonly PublicDecisionRow[], total = items.length, offset = 0): PublicDecisionPage {
@@ -31,14 +32,32 @@ function makeApi(over: Record<string, jest.Mock> = {}) {
   };
 }
 
-async function setup(api = makeApi(), query: Record<string, string | string[]> = {}) {
+/** A stand-in of the toasts: the kit public screen shows a failed first read as a toast. */
+function makeToasts(): Record<string, jest.Mock> {
+  const fns: Record<string, jest.Mock> = {};
+  return new Proxy(fns, { get: (t, k: string) => (t[k] ??= jest.fn(() => 1)) });
+}
+let toasts = makeToasts();
+
+/** The row cards; the kit public screen is an `article` too. */
+const allCards = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('article.pp__card')];
+const oneCard = (): HTMLElement => {
+  const all = allCards();
+  if (all.length !== 1) throw new Error(`expected one card, found ${all.length}`);
+  return all[0];
+};
+
+async function setup(api = makeApi(), committee = 'stupa') {
   const view = await render(PublicDecisionsComponent, {
     providers: [
       provideRouter([]),
       { provide: PublicProtocolsService, useValue: api },
+      { provide: ToastService, useValue: toasts },
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { queryParamMap: convertToParamMap(query) } },
+        useValue: {
+          snapshot: { paramMap: convertToParamMap({ committee }), queryParamMap: convertToParamMap({}) },
+        },
       },
     ],
   });
@@ -48,18 +67,22 @@ async function setup(api = makeApi(), query: Record<string, string | string[]> =
 const MORE = 'Weitere Beschlüsse laden';
 
 describe('PublicDecisionsComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    toasts = makeToasts();
+  });
   afterEach(() => localStorage.clear());
 
   it('lists a motion with its meeting, its result and the sums of the votes', async () => {
     const { api } = await setup();
-    expect(api.decisions).toHaveBeenCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
-    expect(api.semesters).toHaveBeenCalledWith({ gremium: [] });
-    expect(screen.getByRole('heading', { level: 1, name: 'Beschlüsse' })).toBeInTheDocument();
+    expect(api.decisions).toHaveBeenCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
+    expect(api.semesters).toHaveBeenCalledWith({ gremium: ['g-1'] });
+    expect(screen.getByRole('heading', { level: 1, name: 'Studierendenparlament' })).toBeInTheDocument();
+    const crumbs = screen.getByRole('navigation', { name: 'Pfad' });
+    expect(within(crumbs).getByRole('link', { name: 'Beschlüsse' })).toHaveAttribute('href', '/decisions');
     expect(screen.getByRole('heading', { level: 2, name: 'Sommersemester 2026' })).toBeInTheDocument();
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByRole('heading', { level: 3, name: 'Zuschuss für das Sommerfest' })).toBeInTheDocument();
-    expect(within(card).getByText('Studierendenparlament')).toBeInTheDocument();
     expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
     expect(within(card).getByText('34. Sitzung des Studierendenparlaments')).toBeInTheDocument();
     expect(within(card).getByText('Angenommen')).toBeInTheDocument();
@@ -67,7 +90,7 @@ describe('PublicDecisionsComponent', () => {
     expect(within(card).getByText('Nein 1')).toBeInTheDocument();
     expect(within(card).getByText('Enthaltung 0')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: /Zum Protokoll/ })).toHaveAttribute('href', '/protocols/p-1');
-    expect(screen.getByRole('link', { name: 'Öffentliche Protokolle' })).toHaveAttribute('href', '/protocols');
+    expect(screen.getByRole('link', { name: 'Protokolle' })).toHaveAttribute('href', '/protocols/stupa');
     expect(document.body.textContent).not.toContain('g-1');
     expect(TestBed.inject(Meta).getTag('name="robots"')?.content).toBe('noindex');
   });
@@ -81,7 +104,7 @@ describe('PublicDecisionsComponent', () => {
       counts: {},
     });
     await setup(makeApi({ decisions: jest.fn(() => of(page([election]))) }));
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByRole('heading', { level: 3, name: 'Wahl des Vorsitzes' })).toBeInTheDocument();
     expect(within(card).getByText('Wahl')).toBeInTheDocument();
     expect(within(card).getByText('Di, 29.09.2026')).toBeInTheDocument();
@@ -98,7 +121,7 @@ describe('PublicDecisionsComponent', () => {
       date: '2026-10-20',
     });
     await setup(makeApi({ decisions: jest.fn(() => of(page([circular]))) }));
-    const card = screen.getByRole('article');
+    const card = oneCard();
     expect(within(card).getByText('Lastenanhänger beschaffen')).toBeInTheDocument();
     expect(within(card).getByText('Umlaufverfahren')).toBeInTheDocument();
     expect(within(card).getByText('Angenommen')).toBeInTheDocument();
@@ -111,7 +134,7 @@ describe('PublicDecisionsComponent', () => {
       decisionRowFixture({ question: null, result: null, counts: {}, semester: 'ws-2025' }),
     ];
     await setup(makeApi({ decisions: jest.fn(() => of(page(rows))) }));
-    const [first, second] = screen.getAllByRole('article');
+    const [first, second] = allCards();
     expect(within(first).getByText('Abgelehnt')).toHaveClass('pp__result--no');
     expect(within(first).getByText('vertagen 2')).toBeInTheDocument();
     expect(within(second).getByRole('heading', { level: 3, name: 'Beschluss ohne Frage' })).toBeInTheDocument();
@@ -130,31 +153,37 @@ describe('PublicDecisionsComponent', () => {
     expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'Sommerfest' }));
   });
 
-  it('filters by several gremien and a semester', async () => {
+  it('filters by a semester and has no gremium filter', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium' }));
-    await userEvent.click(screen.getByRole('option', { name: 'Studierendenparlament' }));
-    expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
-    expect(screen.getByRole('button', { name: 'Gremium: Studierendenparlament' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('option', { name: 'AStA' }));
-    expect(screen.getByRole('button', { name: 'Gremium: 2 Gremien' })).toBeInTheDocument();
-    await userEvent.keyboard('{Escape}');
-
+    expect(screen.queryByRole('button', { name: /^Gremium/ })).toBeNull();
     const semesterCalls = api.semesters.mock.calls.length;
     await userEvent.click(screen.getByRole('button', { name: 'Semester: Alle' }));
     await userEvent.click(screen.getByRole('option', { name: 'Sommersemester 2026' }));
-    expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ semester: 'ss-2026' }));
+    expect(api.decisions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ gremium: ['g-1'], semester: 'ss-2026' }),
+    );
     expect(api.semesters.mock.calls.length).toBe(semesterCalls);
     expect(screen.getByRole('button', { name: 'Semester: Sommersemester 2026' })).toBeInTheDocument();
   });
 
-  /** A link names a Gremium; a value that is no id or no public Gremium is dropped, with no error. */
-  it('takes the gremium from a link and drops an unknown one', async () => {
-    const unknown = '11111111-1111-4111-8111-111111111111';
-    const { api } = await setup(makeApi(), { committee: [unknown, 'g-x'] });
-    expect(api.decisions).not.toHaveBeenCalledWith(expect.objectContaining({ gremium: [unknown, 'g-x'] }));
-    expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ gremium: [] }));
-    expect(screen.queryByRole('alert')).toBeNull();
+  /** Spec 002403: a slug of no public Gremium reads no page and links the list of Gremien. */
+  it('shows the empty state for a slug of no public gremium', async () => {
+    const { api } = await setup(makeApi(), 'nope');
+    expect(api.decisions).not.toHaveBeenCalled();
+    expect(screen.getByText('Keine öffentlichen Protokolle')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Alle Gremien/ })).toHaveAttribute('href', '/decisions');
+    expect(screen.getByRole('heading', { level: 1, name: 'Beschlüsse' })).toBeInTheDocument();
+  });
+
+  it('reads the gremien again after a failed read', async () => {
+    const gremien = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValue(of(GREMIEN));
+    const { api } = await setup(makeApi({ gremien }));
+    expect(api.decisions).not.toHaveBeenCalled();
+    toasts['show'].mock.calls[0][0].closed('action');
+    expect(api.decisions).toHaveBeenCalledWith(expect.objectContaining({ gremium: ['g-1'] }));
   });
 
   it('loads the next page once while it runs', async () => {
@@ -178,7 +207,7 @@ describe('PublicDecisionsComponent', () => {
     const { api } = await setup(makeApi({ decisions }));
     await userEvent.click(screen.getByRole('button', { name: MORE }));
     expect(api.decisions).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(allCards()).toHaveLength(2);
     expect(screen.queryByRole('button', { name: MORE })).toBeNull();
   });
 
@@ -190,7 +219,7 @@ describe('PublicDecisionsComponent', () => {
     await setup(makeApi({ decisions }));
     await userEvent.click(screen.getByRole('button', { name: MORE }));
     expect(screen.getByRole('alert')).toHaveTextContent('nicht geladen');
-    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(allCards()).toHaveLength(1);
   });
 
   it('drops the answer of an older request', async () => {
@@ -220,10 +249,12 @@ describe('PublicDecisionsComponent', () => {
     const stale = new Subject<PublicDecisionPage>();
     const decisions = jest
       .fn()
+      .mockReturnValueOnce(of(page([decisionRowFixture()])))
       .mockReturnValueOnce(stale)
       .mockReturnValue(of(page([decisionRowFixture({ question: 'Neu' })])));
     const { fixture } = await setup(makeApi({ decisions }));
     await userEvent.type(screen.getByRole('searchbox'), 'x{enter}');
+    await userEvent.type(screen.getByRole('searchbox'), 'y{enter}');
     stale.next(page([decisionRowFixture({ question: 'Alt' })]));
     stale.error(new Error('late'));
     fixture.detectChanges();
@@ -247,13 +278,9 @@ describe('PublicDecisionsComponent', () => {
   });
 
   it('says that no decision is public yet and links to the protocols', async () => {
-    await setup(
-      makeApi({
-        decisions: jest.fn(() => of(page([]))),
-        gremien: jest.fn(() => throwError(() => new Error('down'))),
-      }),
-    );
+    await setup(makeApi({ decisions: jest.fn(() => of(page([]))) }));
     expect(screen.getByText('Noch keine öffentlichen Beschlüsse')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Protokolle/ })[1]).toHaveAttribute('href', '/protocols/stupa');
     expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
@@ -267,19 +294,23 @@ describe('PublicDecisionsComponent', () => {
     await userEvent.type(screen.getByRole('searchbox'), 'Haushalt{enter}');
     expect(screen.getByText('Keine Beschlüsse gefunden')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    expect(api.decisions).toHaveBeenLastCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
-    expect(screen.getByRole('article')).toBeInTheDocument();
+    expect(api.decisions).toHaveBeenLastCalledWith({ gremium: ['g-1'], semester: '', q: '', limit: 20 });
+    expect(oneCard()).toBeInTheDocument();
   });
 
   it('reports a failed list', async () => {
     await setup(makeApi({ decisions: jest.fn(() => throwError(() => new Error('down'))) }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Die Beschlüsse konnten nicht geladen werden.');
+    expect(toasts['show']).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Die Beschlüsse konnten nicht geladen werden.'),
+      }),
+    );
   });
 
   it('localizes to English', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup();
-    expect(screen.getByRole('heading', { level: 1, name: 'Decisions' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Decisions' })).toHaveAttribute('href', '/decisions');
     expect(screen.getByText('Passed')).toBeInTheDocument();
   });
 });

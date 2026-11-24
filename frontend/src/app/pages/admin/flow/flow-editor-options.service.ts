@@ -33,8 +33,6 @@ export class FlowEditorOptionsService {
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Global roles for roleIs/applicantRoleIs guards. */
   readonly globalRoleOptions = signal<SelectOption[]>([]);
-  /** Configured webhooks for the `webhook` action. */
-  readonly webhookOptions = signal<SelectOption[]>([]);
   /** Cost-center names (id maps to "name (key)") that resolve `budgetIs` guard values. */
   readonly budgetNameById = signal<ReadonlyMap<string, string>>(new Map());
   /** The cost-center tree (roots with children) for the cost-center pickers of actions. */
@@ -53,14 +51,6 @@ export class FlowEditorOptionsService {
           this.globalRoleOptions.set(
             roles.map((r) => ({ value: r.key, label: `${r.label['de'] ?? r.key} (${r.key})` })),
           ),
-        error: () => undefined,
-      });
-    this.api
-      .listWebhooks()
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (hooks) =>
-          this.webhookOptions.set(hooks.map((h) => ({ value: h.id, label: h.name || h.url }))),
         error: () => undefined,
       });
     this.budgetApi

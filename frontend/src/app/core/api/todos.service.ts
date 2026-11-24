@@ -32,7 +32,8 @@ export type TodoLinkKind =
   | 'expense'
   | 'budget'
   | 'ticket'
-  | 'todo';
+  | 'todo'
+  | 'paperless';
 export type TodoVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type TodoVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff' | 'no_majority';
 
@@ -72,7 +73,11 @@ export interface TodoLinkDetail {
   readonly meetingTitle?: string | null;
   readonly position?: number | null;
   readonly number?: string | null;
-  readonly status?: TicketStatus | null;
+  /**
+   * The state of a ticket. The board types of the kit name four states, so the type leaves
+   * out "waiting"; the value still arrives and the label map reads it as a string.
+   */
+  readonly status?: Exclude<TicketStatus, 'waiting'> | null;
   readonly boardName?: string | null;
   readonly columnName?: string | null;
   readonly isDone?: boolean | null;
@@ -91,6 +96,8 @@ export interface TodoLinkDetail {
   readonly startTime?: string | null;
   readonly endTime?: string | null;
   readonly place?: string | null;
+  /** The name of the document type of a Paperless document. */
+  readonly documentType?: string | null;
 }
 
 export interface TodoLink {
@@ -450,6 +457,12 @@ export interface TodoLinkedCard {
   /** Set for an Event; then `balance` is its balance. */
   readonly event: TodoEventBrief | null;
   readonly balance: string | null;
+}
+
+/** The hits of the link picker and whether Paperless answered. */
+export interface LinkSearch {
+  readonly hits: readonly TodoLinkTarget[];
+  readonly paperlessDown: boolean;
 }
 
 /** One end of a link: the kind and the id of an element (spec 001402). */
@@ -869,12 +882,34 @@ export class TodosApiService {
    * The link picker: what the caller may read, at most five per kind (spec 001408).
    * `exclude` leaves out an element and the elements that it links already.
    */
-  linkTargets(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<TodoLinkTarget[]> {
+  linkTargets(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<readonly TodoLinkTarget[]> {
+    return this.linkSearch(q, kind, exclude).pipe(map((found) => found.hits));
+  }
+
+  /**
+   * The link picker with the state of Paperless (§F/integrations/paperless/002766).
+   * `paperlessDown` tells that Paperless did not answer: the search over all kinds then has
+   * the hits of the other kinds, and the search of the kind `paperless` has none.
+   */
+  linkSearch(q: string, kind: TodoLinkKind | 'all', exclude?: LinkEnd | null): Observable<LinkSearch> {
     const params = httpParams({ q, kind, excludeKind: exclude?.kind, excludeId: exclude?.id });
-    return this.http.get<TodoLinkTarget[]>(`${this.base}/links/targets`, {
-      params,
-      context: skipLoading(),
-    });
+    return this.http
+      .get<TodoLinkTarget[]>(`${this.base}/links/targets`, {
+        params,
+        context: skipLoading(),
+        observe: 'response',
+      })
+      .pipe(
+        map((res) => ({
+          hits: res.body ?? [],
+          paperlessDown: res.headers.get('X-Paperless-Unavailable') === '1',
+        })),
+        catchError((err: unknown) =>
+          kind === 'paperless' && err instanceof HttpErrorResponse && err.status === 503
+            ? of({ hits: [], paperlessDown: true })
+            : throwError(() => err),
+        ),
+      );
   }
 
   /** The readable cards that link the element: a linked Event first, then the newest. */

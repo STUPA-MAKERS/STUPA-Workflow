@@ -13,11 +13,21 @@
 >
   @if (!wide()) {
     @if (phone()) {
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.dock.agenda' | t"
+        (click)="agendaOpen.set(true)"
+      >
         <app-icon name="list" />
       </app-button>
     } @else {
-      <app-button variant="tonal" size="sm" [title]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
+      <app-button
+        variant="tonal"
+        size="sm"
+        [title]="'meetings.dock.agenda' | t"
+        (click)="agendaOpen.set(true)"
+      >
         <app-icon name="list" />
         {{ 'meetings.agenda.title' | t }}
       </app-button>
@@ -26,10 +36,19 @@
 </header>
 
 @if (!wide()) {
-  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
-    @if (agendaOpen()) {
-      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
-    }
+  <app-side-sheet
+    [side]="phone() ? 'bottom' : 'start'"
+    [heading]="'meetings.agenda.title' | t"
+    [(open)]="agendaOpen"
+  >
+    <ng-template sheetBody>
+      @if (agendaOpen()) {
+        <ng-container
+          [ngTemplateOutlet]="agendaTpl"
+          [ngTemplateOutletContext]="{ inSheet: true }"
+        />
+      }
+    </ng-template>
   </app-side-sheet>
 }
 
@@ -37,7 +56,15 @@
   <div class="fv__phone">
     @if (top) {
       @if (topLeadRow(); as lead) {
-        <app-todo-linked-list class="fv__linked" kind="agenda_item" headingId="fv-todos" [showTitle]="false" [targetId]="top.id" [items]="[]" [lead]="lead" />
+        <app-todo-linked-list
+          class="fv__linked"
+          kind="agenda_item"
+          headingId="fv-todos"
+          [showTitle]="false"
+          [targetId]="top.id"
+          [items]="[]"
+          [lead]="lead"
+        />
       }
       <div class="fv__phoneTop">
         <span class="fv__kind">
@@ -49,7 +76,9 @@
         <h2 class="fv__phoneTitle">{{ top.title || ('meetings.agenda.untitled' | t) }}</h2>
         @if (nowElsewhere()) {
           <app-button-group>
-            <app-button class="fv__toNow" variant="tonal" size="sm" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+            <app-button class="fv__toNow" variant="tonal" size="sm" (click)="backToNow()">{{
+              'meetings.dock.backToNow' | t
+            }}</app-button>
           </app-button-group>
         }
       </div>
@@ -85,7 +114,12 @@
         }
         @if (fullText() || excerpt().cut) {
           <app-button-group>
-            <app-button class="fv__readAll" variant="text" size="sm" (click)="fullText.set(!fullText())">
+            <app-button
+              class="fv__readAll"
+              variant="text"
+              size="sm"
+              (click)="fullText.set(!fullText())"
+            >
               {{ (fullText() ? 'participant.top.readLess' : 'participant.top.readAll') | t }}
             </app-button>
           </app-button-group>
@@ -107,7 +141,10 @@
     } @else {
       <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
     }
-    <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
+    <ng-container
+      [ngTemplateOutlet]="delegationTpl"
+      [ngTemplateOutletContext]="{ variant: 'box' }"
+    />
   </div>
 } @else {
   @if (!wide() && votes.vote()) {
@@ -115,7 +152,11 @@
   }
   <div class="fv__body fv__fade" [class.fv__body--wide]="wide()" appScrollFade="y">
     @if (wide()) {
-      <section class="fv__agenda fv__fade" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
+      <section
+        class="fv__agenda fv__fade"
+        appScrollFade="y"
+        [attr.aria-label]="'meetings.agenda.title' | t"
+      >
         <ng-container [ngTemplateOutlet]="agendaTpl" />
       </section>
     }
@@ -123,7 +164,15 @@
     <div class="fv__main">
       @if (top) {
         @if (topLeadRow(); as lead) {
-          <app-todo-linked-list class="fv__linked" kind="agenda_item" headingId="fv-todos" [showTitle]="false" [targetId]="top.id" [items]="[]" [lead]="lead" />
+          <app-todo-linked-list
+            class="fv__linked"
+            kind="agenda_item"
+            headingId="fv-todos"
+            [showTitle]="false"
+            [targetId]="top.id"
+            [items]="[]"
+            [lead]="lead"
+          />
         }
         <app-top-sheet
           class="fv__sheet"
@@ -166,32 +215,51 @@
       }
       <ng-container [ngTemplateOutlet]="votesTpl" />
       @if (wide() || m.status === 'planned') {
-        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
+        <ng-container
+          [ngTemplateOutlet]="delegationTpl"
+          [ngTemplateOutletContext]="{ variant: 'box' }"
+        />
       }
     </aside>
   </div>
 
   @if (m.status !== 'planned') {
-    <footer class="fv__dock" [class.fv__dock--narrow]="!wide()" [attr.aria-label]="'participant.dock.label' | t">
+    <footer
+      class="fv__dock"
+      [class.fv__dock--narrow]="!wide()"
+      [attr.aria-label]="'participant.dock.label' | t"
+    >
       @if (!wide()) {
-        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'inline' }" />
+        <ng-container
+          [ngTemplateOutlet]="delegationTpl"
+          [ngTemplateOutletContext]="{ variant: 'inline' }"
+        />
       }
       @if (m.status === 'closed') {
         <span class="fv__dockState">
           <span class="fv__muted">{{ closedLine() }}</span>
-          <strong>{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</strong>
+          <strong>{{
+            agenda().length === 1
+              ? ('meetings.dock.topsOne' | t)
+              : ('meetings.dock.tops' | t: { n: agenda().length })
+          }}</strong>
         </span>
       } @else if (nowElsewhere(); as now) {
-        <span class="fv__dockNow ell" [title]="now">{{ 'meetings.dock.nowRunning' | t: { top: now } }}</span>
+        <span class="fv__dockNow ell" [title]="now">{{
+          'meetings.dock.nowRunning' | t: { top: now }
+        }}</span>
         <app-button-group>
-          <app-button size="sm" variant="tonal" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+          <app-button size="sm" variant="tonal" (click)="backToNow()">{{
+            'meetings.dock.backToNow' | t
+          }}</app-button>
         </app-button-group>
       } @else if (top && (wide() || !dockDelegation())) {
         <span class="fv__dockTop">
           <app-icon name="list" [size]="18" />
           <span class="ell" [title]="top.title ?? ''">
             <strong>{{ 'meetings.agenda.top' | t: { n: shownIndex() + 1 } }}</strong>
-            {{ 'participant.dock.of' | t: { m: agenda().length } }} · {{ top.title || ('meetings.agenda.untitled' | t) }}
+            {{ 'participant.dock.of' | t: { m: agenda().length } }} ·
+            {{ top.title || ('meetings.agenda.untitled' | t) }}
           </span>
         </span>
       }
@@ -201,7 +269,9 @@
       @if (wide() && ownBallot(); as own) {
         <span class="fv__dockItem" [attr.data-kind]="own.kind">
           <app-icon name="vote" [size]="18" />
-          <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ own.text }}</strong></span>
+          <span
+            >{{ 'meetings.dock.yourVote' | t }}: <strong>{{ own.text }}</strong></span
+          >
         </span>
         <span class="fv__vr" aria-hidden="true"></span>
       }
@@ -213,7 +283,12 @@
         <span class="fv__vr" aria-hidden="true"></span>
       }
       @if (me()) {
-        <button type="button" class="fv__chip" [attr.aria-label]="('participant.attendance.title' | t) + ': ' + (attendanceChip() | t)" (click)="attendanceOpen.set(true)">
+        <button
+          type="button"
+          class="fv__chip"
+          [attr.aria-label]="('participant.attendance.title' | t) + ': ' + (attendanceChip() | t)"
+          (click)="attendanceOpen.set(true)"
+        >
           @if (me()?.status === 'present') {
             <app-icon name="check" [size]="15" />
           }
@@ -222,28 +297,40 @@
       }
     </footer>
 
-    <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
-      @if (attendanceOpen() && me(); as row) {
-        <div class="fv__sheetStack">
-          <app-participant-attendance
-            [member]="row"
-            [meetingStatus]="m.status"
-            [saving]="savingAttendance()"
-            [delegated]="delegated()"
-            (change)="reportAttendance($event)"
-            (lateExcuse)="lateExcuseOpen.set(true)"
-          />
-          <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
-        </div>
-      }
+    <app-side-sheet
+      [side]="phone() ? 'bottom' : 'end'"
+      [heading]="'participant.attendance.title' | t"
+      [(open)]="attendanceOpen"
+    >
+      <ng-template sheetBody>
+        @if (attendanceOpen() && me(); as row) {
+          <div class="fv__sheetStack">
+            <app-participant-attendance
+              [member]="row"
+              [meetingStatus]="m.status"
+              [saving]="savingAttendance()"
+              [delegated]="delegated()"
+              (change)="reportAttendance($event)"
+              (lateExcuse)="lateExcuseOpen.set(true)"
+            />
+            <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+          </div>
+        }
+      </ng-template>
     </app-side-sheet>
   }
 }
 
-<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.roster.all' | t" [(open)]="rosterOpen">
-  @if (rosterOpen()) {
-    <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
-  }
+<app-side-sheet
+  [side]="phone() ? 'bottom' : 'end'"
+  [heading]="'participant.roster.all' | t"
+  [(open)]="rosterOpen"
+>
+  <ng-template sheetBody>
+    @if (rosterOpen()) {
+      <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+    }
+  </ng-template>
 </app-side-sheet>
 
 <ng-template #rosterButtonTpl>
@@ -262,7 +349,7 @@
     <section class="fv__votes" [attr.aria-label]="'participant.votes.more' | t">
       <h2 class="fv__cap cap">{{ 'participant.votes.more' | t }}</h2>
       @for (v of moreVotes(); track v.id) {
-        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+        <app-vote-card-view [vote]="v" [meetingStatus]="m.status" />
       }
     </section>
   }
@@ -270,7 +357,7 @@
     <section class="fv__votes" [attr.aria-label]="'participant.votes.loose' | t">
       <h2 class="fv__cap cap">{{ 'participant.votes.loose' | t }}</h2>
       @for (v of looseVotes(); track v.id) {
-        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+        <app-vote-card-view [vote]="v" [meetingStatus]="m.status" />
       }
     </section>
   }
@@ -296,7 +383,9 @@
   @if (m.status === 'live') {
     <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
     <h2 class="fv__startTitle">{{ 'participant.wait.live' | t }}</h2>
-    <p class="fv__muted">{{ (agenda().length ? 'participant.wait.liveLead' : 'participant.wait.liveEmpty') | t }}</p>
+    <p class="fv__muted">
+      {{ (agenda().length ? 'participant.wait.liveLead' : 'participant.wait.liveEmpty') | t }}
+    </p>
     @if (!wide() && agenda().length) {
       <app-button-group>
         <app-button variant="tonal" size="sm" (click)="agendaOpen.set(true)">
@@ -306,7 +395,13 @@
       </app-button-group>
     }
   } @else {
-    <app-empty-state plain icon="list" class="fv__empty" level="2" [heading]="'participant.wait.closedEmpty' | t" />
+    <app-empty-state
+      plain
+      icon="list"
+      class="fv__empty"
+      level="2"
+      [heading]="'participant.wait.closedEmpty' | t"
+    />
   }
 </ng-template>
 

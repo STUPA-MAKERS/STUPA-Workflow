@@ -30,6 +30,7 @@ import {
   showInTopLayer,
   type DisplayChoice,
   type IconName,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { HelpService } from '../help.service';
 
@@ -101,7 +102,15 @@ let nextId = 0;
   selector: 'app-help-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SideSheetComponent, SwitchComponent],
+  imports: [
+    SheetBodyDirective,
+    NgTemplateOutlet,
+    RouterLink,
+    TranslatePipe,
+    IconComponent,
+    SideSheetComponent,
+    SwitchComponent,
+  ],
   templateUrl: './help-menu.component.html',
   styleUrl: './help-menu.component.scss',
   host: { '[class.btn-grp__seg]': "variant() === 'header'" },

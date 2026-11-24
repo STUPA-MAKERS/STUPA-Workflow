@@ -6,6 +6,11 @@
 @use 'very-high' as vh;
 
 @include d.on(veryHigh) {
+  // The link to the manual in the report dialog is a box on the chosen tint, whose text
+  // takes the same yellow, so it has the form of the other state of a choice.
+  .rd__wiki {
+    @include vh.edge;
+  }
   // A segment for blackout has a solid edge instead of the dashed one (000689).
   .mdv .md-blackout,
   .mdv .md-blackout-block,
@@ -15,18 +20,20 @@
     background: none;
   }
   // A surface has the white edge (000605), because no shade sets it apart from the black
-  // page: on a wide screen the pane "Heute" of the start page, and the week of the
-  // calendar. The day column of the calendar is a plain row group without a surface (001770),
+  // page: the chain check of the Audit-Log, on a wide screen the pane "Heute" of the start page,
+  // the sheet of the apply wizard, the pane of the graph, the report box of the accessibility
+  // statement, the canvas, the inspector and the JSON of the flow editor, the columns of the
+  // to-do row view, the cards of Backups and Datenschutz, the week of the calendar. The day column of the calendar is a plain row group without a surface (001770),
   // and each day of the month is a segment with its own edge, so the month has no frame.
   // The edge is a border, so content that scrolls inside the box does not paint over it.
-  .dash--wide .dash__today {
+  .dash--wide .dash__today, .al__verify, .bk__card, .pv__card, .wz__sheet, .gr__pane, .as__report, .fe__sheet, .fe__panel, .fe__json pre, .br__col, .br__list {
     border: var(--vh-edge) !important;
   }
   // The columns of the week paint over an outline, so its edge is a layer on top.
-  app-calendar-week.cal__grid {
+  app-calendar-week-view.cal__grid {
     position: relative;
   }
-  app-calendar-week.cal__grid::after {
+  app-calendar-week-view.cal__grid::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -37,28 +44,9 @@
   }
   // A card of a board is a surface, so it has the white edge too. A column of a board is a
   // surface that holds the cards, so it has the edge as well.
-  app-todo-card-tile,
+  app-todo-card-tile-view,
   .bv__col {
     border: var(--vh-edge) !important;
-  }
-
-  // The comment log: on a wide screen a surface with the edge on every side; on the phone it
-  // fills a sheet, so it only ends in the line of a scroll area. Every message has the edge,
-  // also an internal one, whose tinted ring has no colour of its own in the mode.
-  app-chat:not(.chat--phone) .chat__log {
-    border: var(--vh-edge) !important;
-  }
-  .chat__bubble,
-  .chat__row .chat__bubble--internal {
-    border: var(--vh-edge);
-    box-shadow: none !important;
-  }
-  // A public draft of the guarded switch (001692): the yellow field gets a white ring outside
-  // its edge, because the black ring that every field draws inside its edge looks the same
-  // for both choices.
-  app-chat .chat__box.chat__box--public {
-    outline: 2px solid var(--vh-fg) !important;
-    outline-offset: 3px !important;
   }
 
   // The work list of the start page scrolls inside its panel, and the column header sticks

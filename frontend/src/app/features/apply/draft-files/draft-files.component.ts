@@ -108,14 +108,14 @@ export class DraftFilesComponent {
       positionId: this.positionId(),
     });
     for (const f of failed) {
-      this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
+      this.toast.show(`${f.filename}: ${this.i18n.translate(f.reason)}`, 'error');
     }
     this.emit();
   }
 
   protected onRejected(files: File[]): void {
     for (const f of files) {
-      this.toast.error(`${f.name}: ${this.i18n.translate('apply.files.error.type')}`);
+      this.toast.show(`${f.name}: ${this.i18n.translate('apply.files.error.type')}`, 'error');
     }
   }
 
@@ -128,7 +128,7 @@ export class DraftFilesComponent {
 
   protected async remove(file: DraftFile): Promise<void> {
     const ok = await this.drafts.remove(file.id);
-    if (!ok) this.toast.error(this.i18n.translate('apply.files.error.delete'));
+    if (!ok) this.toast.show(this.i18n.translate('apply.files.error.delete'), 'error');
     this.emit();
   }
 

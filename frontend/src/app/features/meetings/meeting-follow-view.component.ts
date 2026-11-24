@@ -16,10 +16,7 @@ import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/a
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  type StatusView,
-  meetingStatus,
-} from '@shared/status-kind.util';
+import { type StatusView, meetingStatus } from '@shared/status-kind.util';
 import {
   ButtonComponent,
   ButtonGroupComponent,
@@ -30,13 +27,11 @@ import {
   ScrollFadeDirective,
   SideSheetComponent,
   type StatusKind,
+  SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
-import {
-  meetingLine,
-  voteOptionLabel,
-} from './meetings-display.util';
+import { meetingLine, voteOptionLabel } from './meetings-display.util';
 import {
   type OwnAttendanceChange,
   ParticipantAttendanceComponent,
@@ -46,13 +41,14 @@ import { ParticipantRosterComponent } from './participant-roster/participant-ros
 import { ParticipantVoteComponent } from './participant-vote/participant-vote.component';
 import { ParticipantVoteService } from './participant-vote/participant-vote.service';
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
-import { VoteCardComponent } from './vote-card/vote-card.component';
+import { VoteCardViewComponent } from '@stupa-makers/ui-kit/views/voting';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
-import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
+import { MeetingHeadViewComponent } from '@stupa-makers/ui-kit/views/meeting';
 import { firstMeetingLink } from './meeting-kind.util';
 import { topLead } from './top-application-lead.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
+import { provideVotingApi } from '../voting/voting-api.provider';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -85,9 +81,10 @@ const EXCERPT_LENGTH = 160;
   selector: 'app-meeting-follow-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [ParticipantVoteService],
+  providers: [provideVotingApi(), ParticipantVoteService],
   imports: [
-    MeetingHeadComponent,
+    SheetBodyDirective,
+    MeetingHeadViewComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
@@ -103,7 +100,7 @@ const EXCERPT_LENGTH = 160;
     ParticipantAttendanceComponent,
     ParticipantVoteComponent,
     ParticipantRosterComponent,
-    VoteCardComponent,
+    VoteCardViewComponent,
     MeetingDelegationCardComponent,
     CalendarSubscribeComponent,
   ],
@@ -176,7 +173,10 @@ export class MeetingFollowViewComponent {
     const m = this.meeting();
     if (m.status === 'live') return this.nowIndex();
     if (m.status === 'planned' || !this.agenda().length) return -1;
-    return Math.max(0, this.agenda().findIndex((a) => a.id === m.currentAgendaItemId));
+    return Math.max(
+      0,
+      this.agenda().findIndex((a) => a.id === m.currentAgendaItemId),
+    );
   });
   protected readonly shownTop = computed<AgendaItem | null>(
     () => this.agenda()[this.shownIndex()] ?? null,
@@ -336,13 +336,15 @@ export class MeetingFollowViewComponent {
   });
 
   /** The represented ballot for the dock: "Vertretung: noch offen" or "abgegeben". */
-  protected readonly proxyBallot = computed<{ kind: StatusKind; key: TranslationKey } | null>(() => {
-    const vote = this.votes.vote();
-    if (vote?.status !== 'open' || !this.votes.proxyName()) return null;
-    return this.votes.proxyCast()
-      ? { kind: 'accent', key: 'participant.dock.proxyCast' }
-      : { kind: 'warn', key: 'participant.dock.proxyOpen' };
-  });
+  protected readonly proxyBallot = computed<{ kind: StatusKind; key: TranslationKey } | null>(
+    () => {
+      const vote = this.votes.vote();
+      if (vote?.status !== 'open' || !this.votes.proxyName()) return null;
+      return this.votes.proxyCast()
+        ? { kind: 'accent', key: 'participant.dock.proxyCast' }
+        : { kind: 'warn', key: 'participant.dock.proxyOpen' };
+    },
+  );
 
   /** The own attendance as the dock chip shows it. */
   protected readonly attendanceChip = computed<TranslationKey>(() => {

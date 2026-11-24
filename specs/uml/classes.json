@@ -786,6 +786,20 @@
     },
     {
       "column": "principal_id",
+      "from": "PushPreference",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
+      "from": "PushSubscription",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "principal_id",
       "from": "RoleAssignment",
       "multiplicity": "*",
       "onDelete": "CASCADE",
@@ -918,6 +932,41 @@
       "to": "Ticket"
     },
     {
+      "column": "follow_up_of_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Ticket"
+    },
+    {
+      "column": "area_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "NO ACTION",
+      "to": "TicketArea"
+    },
+    {
+      "column": "category_id",
+      "from": "Ticket",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketCategory"
+    },
+    {
+      "column": "gremium_id",
+      "from": "TicketArea",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Gremium"
+    },
+    {
+      "column": "area_id",
+      "from": "TicketCategory",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "TicketArea"
+    },
+    {
       "column": "actor_id",
       "from": "TicketEvent",
       "multiplicity": "*",
@@ -930,6 +979,34 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Ticket"
+    },
+    {
+      "column": "ticket_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Ticket"
+    },
+    {
+      "column": "mailbox_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketMailbox"
+    },
+    {
+      "column": "note_id",
+      "from": "TicketMail",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TicketNote"
+    },
+    {
+      "column": "area_id",
+      "from": "TicketMailbox",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "TicketArea"
     },
     {
       "column": "author_id",
@@ -4250,7 +4327,8 @@
             "expense",
             "budget",
             "ticket",
-            "todo"
+            "todo",
+            "paperless"
           ]
         },
         {
@@ -4275,7 +4353,8 @@
             "expense",
             "budget",
             "ticket",
-            "todo"
+            "todo",
+            "paperless"
           ]
         },
         {
@@ -4481,6 +4560,12 @@
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "paperless_document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
         },
         {
           "name": "created_at",
@@ -5353,6 +5438,275 @@
     {
       "attributes": [
         {
+          "name": "document_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "document_type",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "stored_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "PaperlessDocument",
+      "module": "paperless",
+      "name": "PaperlessDocument",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_document"
+    },
+    {
+      "attributes": [
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "protocol",
+            "protocol_public",
+            "application",
+            "attachment",
+            "plan",
+            "ticket_file"
+          ]
+        },
+        {
+          "name": "element_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "link",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "pending",
+            "uploaded",
+            "filed",
+            "failed"
+          ]
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "due_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "failed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "task_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "uploaded_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "document_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "filed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "replaced_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PaperlessFiling",
+      "module": "paperless",
+      "name": "PaperlessFiling",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_filing"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "base_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "file_protocols",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "protocols_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "file_applications",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "applications_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "file_plans",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "plans_since",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "insert_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "link_enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "PaperlessSettings",
+      "module": "paperless",
+      "name": "PaperlessSettings",
+      "path": "backend/app/modules/paperless/models.py",
+      "table": "paperless_settings"
+    },
+    {
+      "attributes": [
+        {
           "name": "slot",
           "nullable": false,
           "primaryKey": false,
@@ -5457,6 +5811,12 @@
         },
         {
           "name": "calendar_token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "calendar_token_hash",
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
@@ -5736,6 +6096,123 @@
       "name": "ProtocolVoteRef",
       "path": "backend/app/modules/meetings/protocol_models.py",
       "table": "protocol_vote_ref"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "PushPreference",
+      "module": "notifications",
+      "name": "PushPreference",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_preference"
+    },
+    {
+      "attributes": [
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "endpoint",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "p256dh",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "auth",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "label",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "last_success_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PushSubscription",
+      "module": "notifications",
+      "name": "PushSubscription",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_subscription"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "private_pem",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "public_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PushVapidKey",
+      "module": "notifications",
+      "name": "PushVapidKey",
+      "path": "backend/app/modules/notifications/push_models.py",
+      "table": "push_vapid_key"
     },
     {
       "attributes": [
@@ -6164,11 +6641,23 @@
           "name": "number",
           "nullable": false,
           "primaryKey": false,
-          "type": "INTEGER"
+          "type": "TEXT"
+        },
+        {
+          "name": "area_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "category_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
         },
         {
           "name": "kind",
-          "nullable": false,
+          "nullable": true,
           "primaryKey": false,
           "type": "TEXT",
           "values": [
@@ -6198,6 +6687,7 @@
           "values": [
             "new",
             "in_progress",
+            "waiting",
             "done",
             "rejected"
           ]
@@ -6215,6 +6705,12 @@
           "type": "CITEXT"
         },
         {
+          "name": "reporter_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "assignee_id",
           "nullable": true,
           "primaryKey": false,
@@ -6225,6 +6721,23 @@
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "follow_up_of_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "source",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "help",
+            "mail",
+            "team"
+          ]
         },
         {
           "name": "context",
@@ -6272,6 +6785,96 @@
     {
       "attributes": [
         {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "platform",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "notify_new",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "in_app",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TicketArea",
+      "module": "tickets",
+      "name": "TicketArea",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_area"
+    },
+    {
+      "attributes": [
+        {
+          "name": "area_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketCategory",
+      "module": "tickets",
+      "name": "TicketCategory",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_category"
+    },
+    {
+      "attributes": [
+        {
           "name": "ticket_id",
           "nullable": false,
           "primaryKey": false,
@@ -6293,7 +6896,10 @@
             "status",
             "assignee",
             "kind",
-            "todo_done"
+            "todo_done",
+            "category",
+            "area",
+            "mail_auto"
           ]
         },
         {
@@ -6320,6 +6926,292 @@
       "name": "TicketEvent",
       "path": "backend/app/modules/tickets/models.py",
       "table": "ticket_event"
+    },
+    {
+      "attributes": [
+        {
+          "name": "mailbox_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "ticket_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "note_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "direction",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "in",
+            "out"
+          ]
+        },
+        {
+          "name": "message_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "from_address",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "from_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "cc",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "subject",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source_key",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source_size",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "source_scan",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "skipped",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "automatic",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "sender_checked",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "to_addresses",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "state",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "attempts",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "send_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "next_try_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TicketMail",
+      "module": "tickets",
+      "name": "TicketMail",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_mail"
+    },
+    {
+      "attributes": [
+        {
+          "name": "area_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "address",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CITEXT"
+        },
+        {
+          "name": "imap_host",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "imap_port",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "imap_user",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "imap_password",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_host",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_port",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "smtp_user",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "smtp_password",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "done_folder",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "enabled",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "uid_validity",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "last_uid",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BIGINT"
+        },
+        {
+          "name": "failures",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "last_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "fetched_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "signature",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "confirm",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "TicketMailbox",
+      "module": "tickets",
+      "name": "TicketMailbox",
+      "path": "backend/app/modules/tickets/models.py",
+      "table": "ticket_mailbox"
     },
     {
       "attributes": [
@@ -7451,13 +8343,37 @@
           "name": "secret",
           "nullable": true,
           "primaryKey": false,
-          "type": "BLOB"
+          "type": "TEXT"
         },
         {
           "name": "active",
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"
+        },
+        {
+          "name": "subscriptions",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "gremium_ids",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "type_ids",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "state_keys",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
         },
         {
           "name": "id",
@@ -7539,6 +8455,12 @@
           "nullable": false,
           "primaryKey": true,
           "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
         }
       ],
       "id": "WebhookDelivery",

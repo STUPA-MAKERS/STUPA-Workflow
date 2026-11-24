@@ -1,0 +1,11 @@
+<app-search-window
+  [(open)]="open"
+  [label]="'paperless.search.label' | t"
+  [empty]="'paperless.search.none' | t"
+  [query]="search.text()"
+  (queryChange)="onQuery($event)"
+  [rows]="rows()"
+  [loading]="search.pending() || copying()"
+  [error]="failed() ? ('paperless.search.unavailable' | t) : null"
+  (picked)="pick($event)"
+/>

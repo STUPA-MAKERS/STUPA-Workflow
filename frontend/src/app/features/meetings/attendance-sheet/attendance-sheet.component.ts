@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   computed,
   effect,
   inject,
@@ -12,32 +11,16 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
-import type { Attendance, AttendanceStatus, Meeting, Uuid } from '@core/api/models';
+import type { Attendance, Meeting, Uuid } from '@core/api/models';
+import { DelegationsApiService } from '@core/api/delegations.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import type { LiveViewer } from '@core/ws/ws-messages';
 import {
-  AvatarComponent,
-  ButtonComponent,
-  ButtonGroupComponent,
-  EmptyStateComponent,
-  IconComponent,
-  MEDIA,
-  mediaQuery,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  ScrollFadeDirective,
-  SearchPillComponent,
-  SideSheetComponent,
-  type StatusKind,
-  StatusTextComponent,
-  ToastService,
-  TruncatedDirective,
-  ErrorTextComponent,
-} from '@stupa-makers/ui-kit';
+  type AttendanceChange,
+  AttendanceSheetViewComponent,
+  MEETING_API,
+  type MeetingApi,
+} from '@stupa-makers/ui-kit/views/meeting';
 import {
   type DelegationCardChange,
   MeetingDelegationCardComponent,
@@ -48,125 +31,42 @@ import { MeetingGuestsService } from '../meeting-guests.service';
 import { GuestListComponent } from '../guests/guest-list.component';
 import { GuestRequestsComponent } from '../guests/guest-requests.component';
 import { JoinLinkComponent } from '../public-join/join-link.component';
-import { eligibleCount, presentCount } from '@shared/present-count.util';
-import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
-import { personLabel } from '@shared/person-label.util';
 
-/** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
-export interface AttendanceChange {
-  readonly member: Attendance;
-  readonly status: AttendanceStatus;
-  readonly note?: string | null;
+export type { AttendanceChange } from '@stupa-makers/ui-kit/views/meeting';
+
+/** The meeting port of the kit views over the delegation routes of the app. */
+function meetingApi(delegations: DelegationsApiService): MeetingApi {
+  return {
+    listDelegations: (meetingId) => delegations.list(meetingId),
+    revokeDelegation: (id) => delegations.revoke(id),
+  };
 }
-
-/** A choice of the attendance control. `open` resets the record (lead only). */
-type Choice = AttendanceStatus | 'open';
-
-/** One option of the control of a row. */
-interface ChoiceOption {
-  readonly value: Choice;
-  readonly label: TranslationKey;
-  /** Why the option is not possible now, or `null`. */
-  readonly blocked: TranslationKey | null;
-}
-
-/** A row of the sheet: the record, its sub line and its control. */
-interface Row {
-  readonly a: Attendance;
-  readonly name: string;
-  readonly sub: string;
-  /** The options of the control, or `null` for a read-only row. */
-  readonly options: readonly ChoiceOption[] | null;
-  /** The chosen option. */
-  readonly value: Choice;
-  /** The read-only status text. */
-  readonly readOnly: { readonly kind: StatusKind; readonly key: TranslationKey };
-  readonly menu: readonly RowMenuSection[];
-  /** The server refused "present" for this member; the delegation is in the way. */
-  readonly conflict: Delegation | 'unknown' | null;
-}
-
-const LEAD_CHOICES: readonly { readonly value: Choice; readonly label: TranslationKey }[] = [
-  { value: 'present', label: 'meetings.attendance.present' },
-  { value: 'excused', label: 'meetings.attendance.excused' },
-  { value: 'absent', label: 'meetings.attendance.absent' },
-  { value: 'open', label: 'meetings.attendance.unknown' },
-];
-
-/** A member reports the own record as present or absent ("Abwesend" means excused). */
-const SELF_CHOICES: readonly { readonly value: Choice; readonly label: TranslationKey }[] = [
-  { value: 'present', label: 'meetings.attendance.selfPresent' },
-  { value: 'excused', label: 'meetings.attendance.selfExcused' },
-];
 
 /**
- * The attendance sheet of a meeting.
- *
- * A side sheet from the end edge (a bottom sheet on a phone) with the counts, a member
- * search and one row per member: avatar, name, a sub line (the reason, "durch
- * Sitzungsleitung", "vertreten durch …") and the control.
- *
- * - The meeting lead (`canControl`) sets every row to "Anwesend / Entschuldigt /
- *   Unentschuldigt" and resets it to "Offen" (DELETE). The lead's record wins.
- * - A member reports only the own row, as "Anwesend / Abwesend", while the lead
- *   did not set it. Every other row is read-only.
- * - A member with an active delegation cannot be present. The option is disabled
- *   and says why; a 409 from the server marks the row and offers the revoke. A revoke
- *   of that delegation (here or in the own-delegation card) clears the mark.
- * - The arrow keys move the focus between the options only; Enter, Space or a click
- *   sets the state. So the keyboard sends no change for each step.
- * - The reason of an excuse shows only to the member and the lead (the server sends it
- *   to them only); the row menu edits it.
- * - A closed meeting freezes the attendance: every row is read-only.
- * - The row of the minute-taker says so in the sub line.
- * - While the meeting is live, the meeting lead (`canManage`) enters a substitute
- *   from the pool for a missing member (open, excused or absent, without a delegation):
- *   the row menu item "Vertretung eintragen" opens the picker. The row then says
- *   "vertreten durch …".
- * - A member who does not lead reads "abwesend" for an excuse and an absence, in the
- *   rows and in the counts.
- *
- * Below the members: the delegations of the meeting (the lead revokes one while the
- * meeting is live), the own delegation card and the people who have the meeting open.
- *
- * The delegation picker sits outside the side sheet, so that Escape in the picker does not close
- * the sheet.
+ * The Anwesenheit sheet: the kit view `app-attendance-sheet-view` (S/framework/views/002275)
+ * with the parts of the app. It gives the view the delegation routes, the guests of a public
+ * meeting (join link, requests, list), the own delegation and the lead substitute dialog.
  */
 @Component({
   selector: 'app-attendance-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [
+    { provide: MEETING_API, useFactory: () => meetingApi(inject(DelegationsApiService)) },
+  ],
   imports: [
-    ErrorTextComponent,
-    EmptyStateComponent,
-    TruncatedDirective,
-    SearchPillComponent,
-    TranslatePipe,
-    ButtonComponent,
-    ButtonGroupComponent,
-    IconComponent,
-    AvatarComponent,
-    RowMenuComponent,
-    SideSheetComponent,
-    StatusTextComponent,
-    ScrollFadeDirective,
+    AttendanceSheetViewComponent,
     MeetingDelegationCardComponent,
     LeadSubstituteDialogComponent,
     GuestListComponent,
     GuestRequestsComponent,
     JoinLinkComponent,
-    SegmentedComponent,
   ],
   templateUrl: './attendance-sheet.component.html',
   styleUrl: './attendance-sheet.component.scss',
 })
 export class AttendanceSheetComponent {
   private readonly i18n = inject(I18nService);
-  private readonly delegationsApi = inject(DelegationsApiService);
-  private readonly toast = inject(ToastService);
-
-  /** A phone opens the sheet from the bottom. */
-  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly open = model(false);
   /** The protocol of the meeting is final or in its render. */
@@ -180,350 +80,49 @@ export class AttendanceSheetComponent {
   readonly conflictId = input<Uuid | null>(null);
 
   readonly statusChange = output<AttendanceChange>();
-  /**
-   * The lead resets a row to "open". The name is not `reset`: a native `reset` event of a
-   * form in the sheet would bubble to the host and reach a `(reset)` binding.
-   */
   readonly statusReset = output<Attendance>();
-  /** The delegation of this member (the `conflictId`) was revoked; clear the mark. */
   readonly conflictResolved = output<Uuid>();
   /** "Groß zeigen": the page shows the large QR code. */
   readonly showQr = output<void>();
 
   /** The join requests and the guests; the lead of a public meeting has them loaded. */
   protected readonly guests = inject(MeetingGuestsService, { optional: true });
-  /** The tab of the lead: the members or the guests. */
-  protected readonly tab = signal<'members' | 'guests'>('members');
-
-  protected readonly query = signal('');
-  /** The delegations of the meeting: all of them for the lead, else the own ones. */
-  protected readonly delegations = signal<Delegation[]>([]);
-  /** The row whose reason is being edited. */
-  protected readonly editingNote = signal<Uuid | null>(null);
-  protected readonly revoking = signal<Uuid | null>(null);
+  /** The admitted guests of the loaded list, or `null` when the lead has none loaded. */
+  protected readonly guestCount = computed(() =>
+    this.guests && this.guests.meetingId() === this.meeting().id
+      ? this.guests.admittedCount()
+      : null,
+  );
+  protected readonly meetingLine = computed(() =>
+    meetingLine(this.meeting(), this.i18n.formatLocale()),
+  );
   /** The missing member for whom the lead picks a substitute, or `null`. */
   protected readonly substituteFor = signal<Attendance | null>(null);
-  /** The option that has the keyboard focus in a row (roving tab stop), or `null`. */
-  private readonly focused = signal<{ id: Uuid; value: Choice } | null>(null);
-  /** The reason field of the row in edit; it takes the focus when it appears. */
-  private readonly noteInput = viewChild<ElementRef<HTMLInputElement>>('note');
-  /** The own-delegation section; a revoke in the sheet loads it again. */
+
+  private readonly view = viewChild.required(AttendanceSheetViewComponent);
   private readonly ownCard = viewChild(MeetingDelegationCardComponent);
 
   constructor() {
     effect(() => {
-      const open = this.open();
-      const id = this.meeting().id;
-      this.conflictId();
-      if (open) untracked(() => this.loadDelegations(id));
-    });
-    effect(() => {
-      if (!this.open()) {
-        untracked(() => {
-          this.query.set('');
-          this.editingNote.set(null);
-          this.substituteFor.set(null);
-        });
-      }
-    });
-    effect(() => this.noteInput()?.nativeElement.focus());
-  }
-
-  /**
-   * The lead sets every row. A closed meeting freezes the own report; the lead still
-   * corrects a row until the protocol is final (§ 000951).
-   */
-  protected readonly lead = computed(() => this.meeting().canControl);
-  protected readonly locked = computed(
-    () => this.meeting().status === 'closed' && (!this.lead() || this.protocolLocked()),
-  );
-  /** The line below the title of the delegation dialog. */
-  protected readonly meetingLine = computed(() =>
-    meetingLine(this.meeting(), this.i18n.formatLocale()),
-  );
-
-  /** The guest part shows: the lead of a public meeting, with the list loaded. */
-  protected readonly guestsActive = computed(
-    () => !!this.guests && this.guests.meetingId() === this.meeting().id,
-  );
-  /** The admitted guests: the loaded list of the lead, else the count of the meeting. */
-  private readonly admittedGuests = computed(() =>
-    this.guestsActive() ? this.guests!.admittedCount() : this.meeting().admittedGuests,
-  );
-  /** "26 anwesend: 19 Mitglieder + 7 Gäste", or `null` without guests in the meeting. */
-  protected readonly guestSummary = computed(() => {
-    const m = this.meeting();
-    if (!m.publicJoin && !this.admittedGuests()) return null;
-    const members = presentCount(m, this.attendance());
-    const guests = this.admittedGuests();
-    return { total: members + guests, members, guests };
-  });
-  /** The tabs "Mitglieder 19 / 23" and "Gäste 7" (watch mode: "Gäste (zuschauend) 7"). */
-  protected readonly tabs = computed<SegmentedOption[]>(() => {
-    const present = presentCount(this.meeting(), this.attendance());
-    const eligible = eligibleCount(this.meeting(), this.attendance());
-    const watch = this.meeting().guestsMode === 'watch';
-    return [
-      {
-        value: 'members',
-        label: this.i18n.translate('guests.tab.members', { n: present, m: eligible }),
-      },
-      {
-        value: 'guests',
-        label: this.i18n.translate(watch ? 'guests.tab.guestsWatching' : 'guests.tab.guests', {
-          n: this.admittedGuests(),
-        }),
-      },
-    ];
-  });
-
-  setTab(value: string | null): void {
-    if (value === 'members' || value === 'guests') this.tab.set(value);
-  }
-
-  /** The delegation of a member for this meeting, as the delegator. */
-  private delegationOf(principalId: Uuid): Delegation | null {
-    return this.delegations().find((d) => d.delegatorId === principalId) ?? null;
-  }
-
-  /** The delegations the lead manages: every delegation of the meeting. */
-  protected readonly meetingDelegations = computed(() =>
-    this.meeting().canManage ? this.delegations() : [],
-  );
-
-  protected readonly rows = computed<Row[]>(() => {
-    const q = this.query().trim().toLowerCase();
-    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
-      this.i18n.translate(key, params);
-    return this.attendance()
-      .filter((a) => !q || [a.displayName, a.email].some((v) => v?.toLowerCase().includes(q)))
-      .map((a) => this.row(a, t));
-  });
-
-  /**
-   * Some row has a row menu. Only then do the other rows keep a gap at the end, so that
-   * all controls line up. Without a menu the control ends at the right inset of the row.
-   */
-  protected readonly anyMenu = computed(() => this.rows().some((r) => r.menu.length > 0));
-
-  private row(
-    a: Attendance,
-    t: (key: TranslationKey, params?: Record<string, string | number>) => string,
-  ): Row {
-    const delegation = this.delegationOf(a.principalId);
-    const sub = [
-      ...(a.note ? [t('meetings.attendanceSheet.reason', { note: a.note })] : []),
-      ...(delegation
-        ? [t('meetings.attendanceSheet.representedBy', { name: delegation.delegateName ?? '—' })]
-        : []),
-      ...(delegation?.delegateVoting ? [t('meetings.attendanceSheet.withVote')] : []),
-      ...(a.source === 'lead' ? [t('meetings.attendance.bySession')] : []),
-      ...(a.principalId === this.meeting().protokollantId ? [t('meetings.keeper.keeps')] : []),
-    ];
-
-    const blocked: TranslationKey | null = delegation ? 'meetings.attendanceSheet.revokeFirst' : null;
-    const choices = this.locked()
-      ? null
-      : this.lead()
-        ? LEAD_CHOICES
-        : a.isSelf && a.source !== 'lead'
-          ? SELF_CHOICES
-          : null;
-    const options: readonly ChoiceOption[] | null =
-      choices?.map((c) => ({ ...c, blocked: c.value === 'present' ? blocked : null })) ?? null;
-
-    const conflict =
-      this.conflictId() === a.principalId && a.status !== 'present' ? (delegation ?? 'unknown') : null;
-    return {
-      a,
-      name: personLabel(a, this.i18n, { fallbackText: '—' }),
-      sub: sub.join(' · '),
-      options,
-      value: a.status ?? 'open',
-      readOnly: this.readOnly(a.status),
-      menu: this.menuOf(a),
-      conflict,
-    };
-  }
-
-  /** The status text of a read-only row. A member reads "Abwesend" for an excuse. */
-  private readOnly(status: AttendanceStatus | null): { kind: StatusKind; key: TranslationKey } {
-    if (status === 'present') return { kind: 'accent', key: 'meetings.attendance.present' };
-    if (status === null) return { kind: 'muted', key: 'meetings.attendance.unknown' };
-    if (!this.lead()) return { kind: 'neutral', key: 'meetings.attendance.selfExcused' };
-    return { kind: status === 'absent' ? 'warn' : 'neutral', key: `meetings.attendance.${status}` };
-  }
-
-  /**
-   * The reason is editable on an excused row: by the member on the own row while the
-   * lead did not set it; by the lead on a row the lead set and on the own row. A save
-   * from the lead takes the record over, so a member's own reason stays the
-   * member's.
-   */
-  private noteEditable(a: Attendance): boolean {
-    if (this.locked() || a.status !== 'excused') return false;
-    if (this.lead()) return a.source === 'lead' || a.isSelf;
-    return a.isSelf && a.source !== 'lead';
-  }
-
-  /**
-   * The lead enters a substitute for a missing member while the meeting is live. A
-   * member who is present, or who already has a delegation, needs none. The server
-   * refuses a member without an own vote and a member who already substitutes another
-   * member in this meeting (no chains), so the action is not offered for them.
-   */
-  private substitutable(a: Attendance): boolean {
-    const m = this.meeting();
-    return (
-      m.status === 'live' &&
-      m.canManage &&
-      !a.isSelf &&
-      a.status !== 'present' &&
-      a.canVote !== false &&
-      this.delegationOf(a.principalId) === null &&
-      !this.delegations().some((d) => d.delegateId === a.principalId)
-    );
-  }
-
-  private menuOf(a: Attendance): readonly RowMenuSection[] {
-    const substitute: RowMenuItem = {
-      id: 'substitute',
-      label: this.i18n.translate('meetings.leadSubstitute.action'),
-      icon: 'repeat',
-    };
-    const note: RowMenuItem = {
-      id: 'note',
-      label: this.i18n.translate(
-        a.note ? 'meetings.attendanceSheet.editReason' : 'meetings.attendanceSheet.addReason',
-      ),
-      icon: 'edit',
-    };
-    const items = [
-      ...(this.substitutable(a) ? [substitute] : []),
-      ...(this.noteEditable(a) ? [note] : []),
-    ];
-    return items.length ? [{ items }] : [];
-  }
-
-  protected choose(row: Row, option: ChoiceOption): void {
-    if (option.blocked || this.saving() || option.value === row.value) return;
-    if (option.value === 'open') {
-      this.statusReset.emit(row.a);
-      return;
-    }
-    this.statusChange.emit({ member: row.a, status: option.value });
-  }
-
-  /**
-   * The arrow keys move the focus to the next option; a blocked option is skipped. They
-   * do not set the state: each step would send a change (and a reset on "Offen"), and a
-   * lead's change takes a member's own report over. Enter, Space or a click sets it.
-   */
-  protected onKey(event: KeyboardEvent, row: Row, index: number): void {
-    const options = row.options;
-    if (!options) return;
-    const dir = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
-      : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
-    if (!dir) return;
-    event.preventDefault();
-    const steps = Array.from({ length: options.length }, (_, i) => i + 1);
-    const next = steps
-      .map((i) => (index + dir * i + options.length) % options.length)
-      .find((k) => !options[k].blocked);
-    if (next === undefined) return;
-    const group = (event.currentTarget as HTMLElement).parentElement;
-    this.focused.set({ id: row.a.principalId, value: options[next].value });
-    group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
-  }
-
-  /**
-   * The tab stop of a row: the option the arrow keys moved to, else the chosen one. So
-   * Tab leaves the row from where the focus is, and comes back to the chosen option.
-   * When no option has that value (the own row of a member is "open", and the member
-   * has no "Offen" option), the first option that is not blocked is the tab stop. So
-   * the control always has one tab stop.
-   */
-  protected tabStop(row: Row, option: ChoiceOption): 0 | -1 {
-    const options = row.options ?? [];
-    const f = this.focused();
-    const value = f?.id === row.a.principalId ? f.value : row.value;
-    const stop =
-      options.find((o) => o.value === value) ?? options.find((o) => !o.blocked) ?? options[0];
-    return option === stop ? 0 : -1;
-  }
-
-  /** The focus left the control of a row: its tab stop is the chosen option again. */
-  protected onFocusOut(event: FocusEvent, row: Row): void {
-    const group = event.currentTarget as HTMLElement;
-    if (group.contains(event.relatedTarget as Node | null)) return;
-    if (this.focused()?.id === row.a.principalId) this.focused.set(null);
-  }
-
-  protected onMenu(row: Row, item: RowMenuItem): void {
-    if (item.id === 'note') this.editingNote.set(row.a.principalId);
-    else if (item.id === 'substitute') this.substituteFor.set(row.a);
-  }
-
-  /** The lead entered a substitute; the row shows "vertreten durch …". */
-  protected onSubstituted(): void {
-    this.substituteFor.set(null);
-    this.loadDelegations(this.meeting().id);
-  }
-
-  /** Save a changed reason. An empty field removes it. */
-  protected saveNote(a: Attendance, value: string): void {
-    if (this.editingNote() !== a.principalId) return;
-    this.editingNote.set(null);
-    const note = value.trim() || null;
-    if (note === a.note) return;
-    this.statusChange.emit({ member: a, status: 'excused', note });
-  }
-
-  protected cancelNote(event: Event): void {
-    event.stopPropagation();
-    this.editingNote.set(null);
-  }
-
-  /** Revoke a delegation of the meeting (the lead while live, or the delegator). */
-  protected revoke(d: Delegation): void {
-    if (this.revoking()) return;
-    this.revoking.set(d.id);
-    this.delegationsApi.revoke(d.id).subscribe({
-      next: () => {
-        this.revoking.set(null);
-        this.toast.success(this.i18n.translate('delegation.toast.revoked'));
-        this.loadDelegations(this.meeting().id);
-        this.ownCard()?.reload();
-        this.resolveConflict(d.delegatorId);
-      },
-      error: () => {
-        this.revoking.set(null);
-        this.toast.error(this.i18n.translate('delegation.toast.revokeFailed'));
-      },
+      if (!this.open()) untracked(() => this.substituteFor.set(null));
     });
   }
 
   /** The own delegation changed in the card: the rows load the delegations again. */
   protected onOwnChange(change: DelegationCardChange): void {
-    this.loadDelegations(this.meeting().id);
-    if (change.kind === 'revoked') this.resolveConflict(change.delegation.delegatorId);
-  }
-
-  /** A revoked delegation of the refused member ends the delegation conflict of the row. */
-  private resolveConflict(delegatorId: Uuid): void {
-    if (this.conflictId() === delegatorId) this.conflictResolved.emit(delegatorId);
-  }
-
-  protected delegationLine(d: Delegation): string {
-    return `${d.delegatorName ?? '—'} → ${d.delegateName ?? '—'}`;
-  }
-
-  private loadDelegations(meetingId: Uuid): void {
-    this.delegationsApi.list(meetingId).subscribe({
-      next: (rows) => {
-        if (this.meeting().id === meetingId) this.delegations.set(rows.filter((d) => d.meetingId === meetingId));
-      },
-      error: () => this.delegations.set([]),
+    this.view().delegationChanged({
+      kind: change.kind,
+      delegatorId: change.kind === 'revoked' ? change.delegation.delegatorId : '',
     });
+  }
+
+  /** The lead entered a substitute; the row shows "vertreten durch …". */
+  protected onSubstituted(): void {
+    this.substituteFor.set(null);
+    this.view().substituted();
+  }
+
+  protected reloadOwn(): void {
+    this.ownCard()?.reload();
   }
 }

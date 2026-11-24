@@ -1,196 +1,44 @@
-@let m = meeting();
-
-<app-side-sheet
-  [side]="phone() ? 'bottom' : 'end'"
-  [heading]="'meetings.attendance.title' | t"
-  [contentScrolls]="true"
+<app-attendance-sheet-view
   [(open)]="open"
->
-  @if (open()) {
-    <div class="as">
-      <div class="as__top">
-        @if (guestSummary(); as gs) {
-          <p class="as__total">
-            <strong class="num">{{ gs.total }}</strong> {{ 'guests.sheet.present' | t }}
-            <strong class="num">{{ gs.members }}</strong> {{ 'guests.sheet.members' | t }} +
-            <strong class="num">{{ gs.guests }}</strong> {{ 'guests.sheet.guests' | t }}
-          </p>
-        }
-        <app-search-pill
-          class="as__search"
-          size="md"
-          [clearable]="true"
-          [placeholder]="'meetings.dock.searchMember' | t"
-          [value]="query()"
-          (valueChange)="query.set($event)"
-        />
-      </div>
+  [protocolLocked]="protocolLocked()"
+  [meeting]="meeting()"
+  [attendance]="attendance()"
+  [saving]="saving()"
+  [viewers]="viewers()"
+  [conflictId]="conflictId()"
+  [guestCount]="guestCount()"
+  [guestsHead]="guestsHead"
+  [guestList]="guestList"
+  [ownDelegation]="ownDelegation"
+  (statusChange)="statusChange.emit($event)"
+  (statusReset)="statusReset.emit($event)"
+  (conflictResolved)="conflictResolved.emit($event)"
+  (substitute)="substituteFor.set($event)"
+  (ownReload)="reloadOwn()"
+/>
 
-      <div class="as__scroll" appScrollFade="y">
-        @if (guestsActive()) {
-          <div class="as__guests">
-            @if (guests!.joinLink(); as link) {
-              <app-join-link variant="sheet" [link]="link" (showLarge)="showQr.emit()" />
-            }
-            <app-guest-requests [meeting]="m" />
-            <app-segmented
-              class="as__tabs"
-              width="fill"
-              [ariaLabel]="'meetings.attendance.title' | t"
-              [options]="tabs()"
-              [value]="tab()"
-              (valueChange)="setTab($event)"
-            />
-          </div>
-        }
-        @if (guestsActive() && tab() === 'guests') {
-          <app-guest-list [meeting]="m" [query]="query()" />
-        } @else if (rows().length) {
-        <ul class="as__rows rowgroup rowgroup--bg3">
-          @for (row of rows(); track row.a.principalId) {
-            <li class="as__row" [class.as__row--conflict]="row.conflict">
-              <div class="as__who">
-                <app-avatar [name]="row.name" [principalId]="row.a.principalId" size="sm" [decorative]="true" />
-                <div class="as__names">
-                  <span class="as__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">
-                    {{ row.name }}
-                    @if (row.a.isSelf) {
-                      <span class="as__muted">{{ 'meetings.attendance.you' | t }}</span>
-                    }
-                  </span>
-                  @if (editingNote() === row.a.principalId) {
-                    <input
-                      #note
-                      class="as__note"
-                      type="text"
-                      maxlength="500"
-                      [value]="row.a.note ?? ''"
-                      [attr.aria-label]="'meetings.attendance.note' | t"
-                      [placeholder]="'meetings.attendance.notePlaceholder' | t"
-                      [disabled]="saving()"
-                      (keydown.enter)="note.blur()"
-                      (keydown.escape)="cancelNote($event)"
-                      (blur)="saveNote(row.a, note.value)"
-                    />
-                  } @else if (row.sub) {
-                    <span class="as__sub ell" [appTruncated]="row.sub" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.sub : null">{{ row.sub }}</span>
-                  }
-                </div>
-              </div>
-
-              <div class="as__ctl" [class.as__ctl--seg]="!!row.options">
-                @if (row.options; as options) {
-                  <div
-                    class="seg as__seg"
-                    role="radiogroup"
-                    [attr.aria-label]="'meetings.attendanceSheet.statusOf' | t: { name: row.name }"
-                    (focusout)="onFocusOut($event, row)"
-                  >
-                    @for (o of options; track o.value; let i = $index) {
-                      <button
-                        type="button"
-                        role="radio"
-                        class="seg__opt as__opt"
-                        [class.seg__opt--on]="o.value === row.value"
-                        [class.as__opt--on]="o.value === row.value"
-                        [attr.aria-checked]="o.value === row.value"
-                        [attr.aria-disabled]="o.blocked || saving() ? 'true' : null"
-                        [attr.tabindex]="tabStop(row, o)"
-                        [attr.title]="o.blocked ? (o.blocked | t) : null"
-                        (click)="choose(row, o)"
-                        (keydown)="onKey($event, row, i)"
-                      >{{ o.label | t }}</button>
-                    }
-                  </div>
-                } @else {
-                  <app-status-text [kind]="row.readOnly.kind">{{ row.readOnly.key | t }}</app-status-text>
-                }
-                @if (row.menu.length) {
-                  <app-button-group>
-                    <app-row-menu
-                      class="as__menu"
-                      [sections]="row.menu"
-                      [label]="'meetings.attendanceSheet.rowMenu' | t: { name: row.name }"
-                      (selected)="onMenu(row, $event)"
-                    />
-                  </app-button-group>
-                } @else if (anyMenu()) {
-                  <span class="as__menuGap" aria-hidden="true"></span>
-                }
-              </div>
-
-              @if (row.conflict; as c) {
-                <app-error-text class="as__conflict">
-                  <app-icon name="alert" [size]="16" />
-                  <span>{{ 'meetings.attendanceSheet.delegationActive' | t }}</span>
-                  @if (c !== 'unknown' && c.revocable) {
-                    <app-button-group>
-                      <app-button variant="text" size="sm" [loading]="revoking() === c.id" (click)="revoke(c)">
-                        {{ 'meetings.attendanceSheet.revokeDelegation' | t }}
-                      </app-button>
-                    </app-button-group>
-                  }
-                </app-error-text>
-              }
-            </li>
-          }
-        </ul>
-        } @else {
-          <app-empty-state [icon]="query() ? 'searchOff' : 'users'" shape="person" rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
-        }
-
-        @if (meetingDelegations().length) {
-          <section class="as__sec" [attr.aria-label]="'meetings.attendanceSheet.delegationsTitle' | t">
-            <h3 class="as__cap cap">{{ 'meetings.attendanceSheet.delegationsTitle' | t }}</h3>
-            <ul class="as__list rowgroup rowgroup--bg3">
-              @for (d of meetingDelegations(); track d.id) {
-                <li class="as__item">
-                  <app-avatar [name]="d.delegatorName ?? '—'" [principalId]="d.delegatorId" size="sm" [decorative]="true" />
-                  <span class="as__itemText ell" [appTruncated]="delegationLine(d)" #cut3="appTruncated" [attr.title]="cut3.truncated() ? delegationLine(d) : null">{{ delegationLine(d) }}</span>
-                  @if (d.delegateVoting) {
-                    <span class="as__muted as__nowrap">{{ 'meetings.attendanceSheet.withVote' | t }}</span>
-                  }
-                  @if (d.revocable) {
-                    <app-button-group>
-                      <app-button variant="danger" size="sm" [loading]="revoking() === d.id" (click)="revoke(d)">
-                        {{ 'meetings.attendanceSheet.revoke' | t }}
-                      </app-button>
-                    </app-button-group>
-                  }
-                </li>
-              }
-            </ul>
-          </section>
-        }
-
-        <app-meeting-delegation-card class="as__own" [meetingId]="m.id" [subtitle]="meetingLine()" (changed)="onOwnChange($event)" />
-
-        @if (m.canWrite && m.status === 'live') {
-          <section class="as__sec" [attr.aria-label]="'meetings.viewers.title' | t">
-            <h3 class="as__cap cap">{{ 'meetings.viewers.title' | t }}</h3>
-            <div aria-live="polite">
-              @if (viewers().length) {
-                <ul class="as__list rowgroup rowgroup--bg3">
-                  @for (v of viewers(); track v.id ?? v.name) {
-                    <li class="as__item">
-                      <app-avatar [name]="v.name" [principalId]="v.id" size="sm" [decorative]="true" />
-                      <span class="as__itemText ell" [appTruncated]="v.name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? v.name : null">{{ v.name }}</span>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <app-empty-state icon="eye" shape="person" rows="2" [heading]="'meetings.viewers.empty' | t" />
-              }
-            </div>
-          </section>
-        }
-      </div>
-    </div>
+<ng-template #guestsHead let-m>
+  @if (guests?.joinLink(); as link) {
+    <app-join-link variant="sheet" [link]="link" (showLarge)="showQr.emit()" />
   }
-</app-side-sheet>
+  <app-guest-requests [meeting]="m" />
+</ng-template>
+
+<ng-template #guestList let-m let-query="query">
+  <app-guest-list [meeting]="m" [query]="query" />
+</ng-template>
+
+<ng-template #ownDelegation let-m>
+  <app-meeting-delegation-card
+    class="as__own"
+    [meetingId]="m.id"
+    [subtitle]="meetingLine()"
+    (changed)="onOwnChange($event)"
+  />
+</ng-template>
 
 <app-lead-substitute-dialog
-  [meetingId]="m.id"
+  [meetingId]="meeting().id"
   [member]="substituteFor()"
   (closed)="substituteFor.set(null)"
   (created)="onSubstituted()"

@@ -1,49 +1,69 @@
-<app-dialog [open]="open()" [title]="titleKey() | t" [closeLabel]="'action.close' | t" (closed)="closed.emit()">
-  <form id="cc-create-form" class="ccc" (submit)="submit($event)">
-    <app-cost-centre-select
-      [nodes]="parentNodes()"
-      [value]="parentId()"
-      [label]="'budget.cc.parent' | t"
-      [required]="true"
-      (picked)="pickParent($event)"
-    />
-    <div class="ccc__pair">
-      <app-input
-        class="ccc__key"
-        name="ccKey"
-        [label]="'budget.tree.key' | t"
+<app-dialog
+  [open]="open()"
+  [heading]="titleKey() | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closed.emit()"
+  [actions]="[
+    { key: 'closed', label: ('action.cancel' | t) },
+    {
+      key: 'submit',
+      label: ('budget.tree.create' | t),
+      kind: 'main',
+      disabled: !valid() || busy(),
+      busy: busy(),
+    },
+  ]"
+  (action)="$event.key === 'closed' ? closed.emit() : $event.key === 'submit' ? submit() : null"
+>
+  <ng-template dialogBody>
+    <form id="cc-create-form" class="ccc" (submit)="$event.preventDefault(); submit()">
+      <app-cost-centre-select
+        [nodes]="parentNodes()"
+        [value]="parentId()"
+        [label]="'budget.cc.parent' | t"
         [required]="true"
-        [error]="keyError()"
-        [ngModel]="key()"
-        (ngModelChange)="key.set($event)"
+        (picked)="pickParent($event)"
       />
-      <app-input
-        name="ccName"
-        [label]="'budget.tree.name' | t"
-        [required]="true"
-        [error]="nameError()"
-        [ngModel]="name()"
-        (ngModelChange)="name.set($event)"
-      />
-    </div>
-    @if (sided()) {
-      <app-select
-        name="ccSide"
-        [label]="'budget.cc.side' | t"
-        [required]="true"
-        [clearable]="false"
-        [options]="sides()"
-        [ngModel]="side()"
-        (ngModelChange)="side.set($event || null)"
-      />
-    }
-    @if (versionId()) {
-      <app-currency-input name="ccAmount" [label]="amountLabel()" [ngModel]="amount()" [error]="amountError()" (ngModelChange)="setAmount($event)" />
-    }
-    <button type="submit" hidden></button>
-  </form>
-  <div dialog-footer>
-    <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="submit($event)" [disabled]="!valid() || busy()" [loading]="busy()">{{ 'budget.tree.create' | t }}</app-button>
-  </div>
+      <div class="ccc__pair">
+        <app-input
+          class="ccc__key"
+          name="ccKey"
+          [label]="'budget.tree.key' | t"
+          [required]="true"
+          [error]="keyError()"
+          [ngModel]="key()"
+          (ngModelChange)="key.set($event)"
+        />
+        <app-input
+          name="ccName"
+          [label]="'budget.tree.name' | t"
+          [required]="true"
+          [error]="nameError()"
+          [ngModel]="name()"
+          (ngModelChange)="name.set($event)"
+        />
+      </div>
+      @if (sided()) {
+        <app-select
+          name="ccSide"
+          [label]="'budget.cc.side' | t"
+          [required]="true"
+          [clearable]="false"
+          [options]="sides()"
+          [ngModel]="side()"
+          (ngModelChange)="side.set($event || null)"
+        />
+      }
+      @if (versionId()) {
+        <app-currency-input
+          name="ccAmount"
+          [label]="amountLabel()"
+          [ngModel]="amount()"
+          [error]="amountError()"
+          (ngModelChange)="setAmount($event)"
+        />
+      }
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
 </app-dialog>

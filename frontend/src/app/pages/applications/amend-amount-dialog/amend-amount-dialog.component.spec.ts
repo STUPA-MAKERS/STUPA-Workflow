@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AmendAmountDialogComponent } from './amend-amount-dialog.component';
+import { kindSpies } from '../../../../testing/toast';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -13,16 +14,18 @@ import { AmendAmountDialogComponent } from './amend-amount-dialog.component';
   template: `
     <app-amend-amount-dialog
       [applicationId]="'app-1'"
-      [requested]="'250.00'"
+      [requested]="requested()"
       [approved]="approved()"
-      [gremiumId]="'g1'"
+      [gremiumId]="gremiumId()"
       [(open)]="open"
       (done)="done = done + 1"
     />
   `,
 })
 class Host {
+  readonly requested = signal<string | null>('250.00');
   readonly approved = signal<string | null>('200.00');
+  readonly gremiumId = signal<string | null>('g1');
   readonly open = signal(false);
   done = 0;
 }
@@ -93,7 +96,7 @@ describe('AmendAmountDialogComponent', () => {
   /** Spec 001622: an amount above the request is allowed, with a warning. */
   it('warns about an amount above the requested one and sends it', async () => {
     const { http, host, cmp, toast, openIt, fill, detectChanges } = await setup();
-    const success = jest.spyOn(toast, 'success');
+    const success = jest.spyOn(kindSpies(toast), 'success');
     openIt();
     fill();
     cmp.amount.set('300.00');
@@ -130,7 +133,7 @@ describe('AmendAmountDialogComponent', () => {
     [500, false, null],
   ])('reports a %s answer', async (status, closes, body) => {
     const { http, host, cmp, toast, openIt, fill } = await setup();
-    const error = jest.spyOn(toast, 'error');
+    const error = jest.spyOn(kindSpies(toast), 'error');
     openIt();
     fill();
     cmp.submit();
@@ -147,5 +150,19 @@ describe('AmendAmountDialogComponent', () => {
     detectChanges();
     http.expectOne('/api/committees').flush({}, { status: 500, statusText: 'x' });
     expect(cmp.gremiumOptions()).toEqual([]);
+  });
+
+  it('starts empty without any amount or Gremium and refuses a non-number', async () => {
+    const { host, cmp, openIt } = await setup();
+    host.requested.set(null);
+    host.approved.set(null);
+    host.gremiumId.set(null);
+    openIt();
+    expect(cmp.amount()).toBe('');
+    expect(cmp.gremium()).toBe('');
+    cmp.amount.set('12.00');
+    expect(cmp.amountError()).toBe('');
+    cmp.amount.set('1e');
+    expect(cmp.amountError()).toBe('Der Förderbetrag darf nicht negativ sein und höchstens zwei Nachkommastellen haben.');
   });
 });

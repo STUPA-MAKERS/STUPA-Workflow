@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, of, switchMap } from 'rxjs';
 import { NgTemplateOutlet } from '@angular/common';
@@ -17,7 +17,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
-import { LINK_ICON, LINK_KIND_LABEL, eventDays, linkSub, linkTitle, splitUrl } from '../todos.util';
+import { LinkToDirective } from '../../../shared/link-to.directive';
+import { LINK_ICON, LINK_KIND_LABEL, eventDays, linkSub, linkTitle } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
@@ -93,6 +94,7 @@ const cardRow = (card: TodoLinkedCard): LinkRow => ({
     NgTemplateOutlet,
     SectionComponent,
     RouterLink,
+    LinkToDirective,
     TranslatePipe,
     AvatarStackComponent,
     ButtonComponent,
@@ -146,6 +148,8 @@ export class TodoLinkedListComponent {
   readonly linkLabel = input('');
   /** Shown when nothing links the element; empty: the list shows nothing then. */
   readonly emptyHeading = input('');
+  /** The list is the whole content of a side pane: the empty state centres in its free area (002650). */
+  readonly fill = input(false, { transform: booleanAttribute });
   readonly size = input<'md' | 'lg'>('md');
 
   readonly newOpen = signal(false);
@@ -243,7 +247,7 @@ export class TodoLinkedListComponent {
         this.loaded.set(out);
         this.touch(hit.kind, hit.targetId);
       },
-      error: () => this.toast.error(this.t('links.error.add')),
+      error: () => this.toast.show(this.t('links.error.add'), 'error'),
     });
   }
 
@@ -254,7 +258,7 @@ export class TodoLinkedListComponent {
         this.loaded.update((out) => out && { ...out, links: out.links.filter((l) => l.id !== row.id) });
         this.touch(row.kind, row.targetId);
       },
-      error: () => this.toast.error(this.t('links.error.remove')),
+      error: () => this.toast.show(this.t('links.error.remove'), 'error'),
     });
   }
 
@@ -275,9 +279,6 @@ export class TodoLinkedListComponent {
     return linkSub(row, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
   }
 
-  route(url: string) {
-    return splitUrl(url);
-  }
 
   /** "Veranstaltung · 20.11.–21.11.2026 · AStA": the server puts a linked Event first. */
   eventSub(card: TodoLinkedCard): string {

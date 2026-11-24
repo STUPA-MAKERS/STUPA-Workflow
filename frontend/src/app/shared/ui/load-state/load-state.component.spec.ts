@@ -41,7 +41,7 @@ describe('LoadStateComponent', () => {
     expect(screen.queryByText('Inhalt')).toBeNull();
   });
 
-  /** § 000576: a failed read shows a toast with a retry, and no note in the page. */
+  /** §ui-kit:000576: a failed read shows a toast with a retry, and no note in the page. */
   it('names a failed read in an error toast with a retry, not in a note', async () => {
     const retry = jest.fn();
     const { container } = await render(
@@ -50,6 +50,7 @@ describe('LoadStateComponent', () => {
     );
     expect(loadErrorToast()).toBe('Laden fehlgeschlagen.');
     expect(container.querySelector('app-note')).toBeNull();
+    expect(container.querySelector('app-empty-state')?.textContent).toContain('Laden fehlgeschlagen.');
     retryLoadError();
     expect(retry).toHaveBeenCalledTimes(1);
   });
@@ -73,7 +74,7 @@ describe('LoadStateComponent', () => {
     expect(container.querySelector('app-load-state')?.textContent?.trim()).toBe('');
   });
 
-  /** § 000576: a list keeps its content, or its empty state, under the error toast. */
+  /** §ui-kit:000576: a list keeps its rows under the error toast. */
   it('keeps the content in the error state when the page asks for it', async () => {
     await render(
       `<app-load-state state="error" errorText="Laden fehlgeschlagen." [keepContent]="true">
@@ -83,6 +84,19 @@ describe('LoadStateComponent', () => {
     );
     expect(loadErrorToast()).toBe('Laden fehlgeschlagen.');
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
+    expect(document.querySelector('app-empty-state')).toBeNull();
+  });
+
+  /** §ui-kit:002405: without rows to keep, the face says the error, not the empty list. */
+  it('shows the face with the error text instead of the content without rows', async () => {
+    await render(
+      `<app-load-state state="error" errorText="Laden fehlgeschlagen." [keepContent]="true" [hasContent]="false">
+         <ng-template #content><p>Keine Einträge</p></ng-template>
+       </app-load-state>`,
+      { imports: [LoadStateComponent] },
+    );
+    expect(document.querySelector('app-empty-state')?.textContent).toContain('Laden fehlgeschlagen.');
+    expect(screen.queryByText('Keine Einträge')).toBeNull();
   });
 
   it('derives the state of a list from its loading and its error signal', () => {

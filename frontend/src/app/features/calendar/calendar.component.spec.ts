@@ -174,7 +174,7 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.container.querySelectorAll('.cal__more')).toHaveLength(1);
   });
 
-  /** § 000726: an entry over several days is one bar across its days. */
+  /** §ui-kit:000726: an entry over several days is one bar across its days. */
   it('draws a three-day Termin as one bar across its days', async () => {
     const view = await setup();
     load(view);
@@ -344,6 +344,7 @@ describe('CalendarComponent (desktop)', () => {
     await press('a');
     expect(view.cmp.selectedDay()).toBe('2026-11-15');
     view.cmp.selectedDay.set('no day');
+    view.fixture.detectChanges();
     await press('ArrowLeft');
     expect(view.cmp.selectedDay()).toBe('no day');
     expect(view.http.match(() => true).length).toBe(0);
@@ -411,7 +412,7 @@ describe('CalendarComponent (desktop)', () => {
     expect(screen.getByRole('button', { name: /Art/ })).toBeInTheDocument();
   });
 
-  /** § 000728: the week view, kept per browser. */
+  /** §ui-kit:000728: the week view, kept per browser. */
   it('switches to the week view, keeps it and reads the week', async () => {
     const view = await setup();
     load(view);
@@ -421,7 +422,7 @@ describe('CalendarComponent (desktop)', () => {
     expect(req.request.params.get('from')).toBe('2026-11-09');
     expect(req.request.params.get('to')).toBe('2026-11-15');
     expect(screen.getByRole('heading', { name: '09.11. – 15.11.2026' })).toBeInTheDocument();
-    const week = view.container.querySelector('app-calendar-week') as HTMLElement;
+    const week = view.container.querySelector('app-calendar-week-view') as HTMLElement;
     const columns = week.querySelectorAll<HTMLElement>('.cw__col');
     expect(within(columns[2]).getByRole('button', { name: '14:00 – 15:30 Jour fixe' })).toBeInTheDocument();
     const allDay = week.querySelectorAll<HTMLElement>('.cw__cell');
@@ -678,7 +679,7 @@ describe('CalendarComponent (search)', () => {
 });
 
 describe('CalendarComponent (phone)', () => {
-  /** § 000726: the days with entries from today on, an entry over days at each of its days. */
+  /** §ui-kit:000726: the days with entries from today on, an entry over days at each of its days. */
   it('lists the days with entries from today on, a three-day Termin at each of its days', async () => {
     const view = await setup({ media: [MEDIA.phone], view: 'week' });
     expect(view.container.querySelector('app-skeleton')).not.toBeNull();

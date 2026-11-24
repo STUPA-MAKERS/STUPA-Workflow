@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
   - backend/app/modules/calendar/public.py
-  - frontend/src/app/features/calendar/public-entry/public-entry.component.html
+  - frontend/vendor/ui-kit/views/calendar/src/public-entry-view.component.html
 scope:
   - backend/app/modules/calendar
   - backend/app/modules/meetings

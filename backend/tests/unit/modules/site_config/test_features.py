@@ -45,9 +45,7 @@ def test_invoices_are_off_while_budget_is_off_and_keep_their_switch() -> None:
 
 
 def test_the_public_branding_leaves_the_stored_switches_out() -> None:
-    dumped = PublicBranding.model_validate({"features": {"todos": False}}).model_dump(
-        by_alias=True
-    )
+    dumped = PublicBranding.model_validate({"features": {"todos": False}}).model_dump(by_alias=True)
     assert "features" not in dumped
 
 
@@ -120,14 +118,24 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/todos/boards/{board_id}", {Feature.TODOS}),
         ("/api/ws/todos", {Feature.TODOS}),
         ("/api/calendar/{token}.ics", {Feature.CALENDAR}),
+        ("/api/push/actions/{token}", {Feature.PUSH}),
+        ("/api/paperless/documents/{kind}/{element_id}", {Feature.PAPERLESS}),
+        ("/api/admin/paperless/failed-filings", {Feature.PAPERLESS}),
+        (
+            "/api/meetings/{meeting_id}/documents/paperless",
+            {Feature.MEETINGS, Feature.PAPERLESS},
+        ),
         ("/api/admin/calendars", {Feature.CALENDAR}),
-        ("/api/public/calendar.ics", {Feature.CALENDAR}),
+        ("/api/public/calendar.ics", {Feature.CALENDAR, Feature.PUBLIC}),
         ("/api/meetings", {Feature.MEETINGS}),
         ("/api/ws/meetings/{meeting_id}/projector", {Feature.MEETINGS}),
         ("/api/public/meetings/{code}", {Feature.MEETINGS}),
-        ("/api/public/protocols/{protocol_id}/images/{image_id}", {Feature.MEETINGS}),
-        ("/api/public/committees", {Feature.MEETINGS}),
-        ("/api/public/decisions", {Feature.MEETINGS}),
+        (
+            "/api/public/protocols/{protocol_id}/images/{image_id}",
+            {Feature.MEETINGS, Feature.PUBLIC},
+        ),
+        ("/api/public/committees", {Feature.MEETINGS, Feature.PUBLIC}),
+        ("/api/public/decisions", {Feature.MEETINGS, Feature.PUBLIC}),
         ("/api/delegations/substitutes", {Feature.MEETINGS}),
         ("/api/admin/meeting-settings", {Feature.MEETINGS}),
         ("/api/committees/{gremium_id}/meeting-defaults", {Feature.MEETINGS}),
@@ -151,6 +159,10 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/applications/{application_id}/assign-budget", {Feature.BUDGET}),
         ("/api/invoices/{invoice_id}/file", {Feature.INVOICES}),
         ("/api/tickets/mine", {Feature.TICKETS}),
+        ("/api/activity", {Feature.ACTIVITY}),
+        ("/api/activity/seen", {Feature.ACTIVITY}),
+        ("/api/navigation/status", set()),
+        ("/api/graph", {Feature.GRAPH}),
         ("/api/media/documents/{document_id}", {Feature.MEETINGS}),
         ("/api/media/documents/{document_id}/info", {Feature.MEETINGS}),
         ("/api/media/images/{image_id}", set()),
@@ -189,6 +201,18 @@ def test_every_route_of_the_app_is_in_the_expected_feature() -> None:
     assert all(by_feature.values())
     assert all(p.startswith("/api/invoices") for p in by_feature[Feature.INVOICES])
     assert all(p.startswith("/api/tickets") for p in by_feature[Feature.TICKETS])
+    assert all(p.startswith("/api/activity") for p in by_feature[Feature.ACTIVITY])
+    assert all(p.startswith("/api/graph") for p in by_feature[Feature.GRAPH])
+    assert by_feature[Feature.PAPERLESS]
     assert all(
-        p.startswith(("/api/todos", "/api/ws/todos")) for p in by_feature[Feature.TODOS]
+        p.startswith(("/api/paperless", "/api/admin/paperless"))
+        or p
+        in (
+            "/api/meetings/{meeting_id}/documents/paperless",
+            "/api/tickets/{ticket_id}/files/{attachment_id}/paperless",
+        )
+        for p in by_feature[Feature.PAPERLESS]
     )
+    assert all(p.startswith("/api/public/") for p in by_feature[Feature.PUBLIC])
+    assert not any(p.startswith("/api/public/meetings") for p in by_feature[Feature.PUBLIC])
+    assert all(p.startswith(("/api/todos", "/api/ws/todos")) for p in by_feature[Feature.TODOS])

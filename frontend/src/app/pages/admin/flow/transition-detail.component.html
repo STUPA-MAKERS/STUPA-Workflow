@@ -2,7 +2,7 @@
 
 <section class="td__block" aria-labelledby="td-guard">
   <h3 class="cap ins__cap" id="td-guard">{{ 'admin.flow.guard' | t }}</h3>
-  <app-guard-editor
+  <app-guard-editor-view
     [guard]="transition().guard ?? null"
     [roleOptions]="roleOptions()"
     [gremiumOptions]="gremiumOptions()"
@@ -27,15 +27,6 @@
             </app-button-group>
           </div>
           @switch (act.type) {
-            @case ('webhook') {
-              <app-select
-                [label]="'admin.flow.actWebhook' | t"
-                [placeholder]="'admin.flow.actWebhookPh' | t"
-                [options]="webhookOptions()"
-                [ngModel]="actionParam(act, 'webhookId')"
-                (ngModelChange)="actionParamChange.emit({ ai, key: 'webhookId', value: $event })"
-              />
-            }
             @case ('addToNextSession') {
               <app-select
                 [label]="'admin.flow.cfgGremium' | t"

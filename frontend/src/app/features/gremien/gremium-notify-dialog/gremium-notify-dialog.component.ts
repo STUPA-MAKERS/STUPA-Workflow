@@ -21,6 +21,7 @@ import {
   InputComponent,
   TextareaComponent,
   ToastService,
+  DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
 
 /** The limits of the server (spec 001854). */
@@ -50,6 +51,7 @@ export function messageError(message: string): TranslationKey | null {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DialogBodyDirective,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -108,16 +110,17 @@ export class GremiumNotifyDialogComponent {
     this.api.notify(this.gremiumId(), body).subscribe({
       next: ({ recipients }) => {
         this.sending.set(false);
-        this.toast.success(
+        this.toast.show(
           recipients === 1
             ? this.i18n.translate('gremien.notify.sent1')
             : this.i18n.translate('gremien.notify.sent', { n: recipients }),
+          'success',
         );
         this.closed.emit();
       },
       error: () => {
         this.sending.set(false);
-        this.toast.error(this.i18n.translate('gremien.notify.error'));
+        this.toast.show(this.i18n.translate('gremien.notify.error'), 'error');
       },
     });
   }

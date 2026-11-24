@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import type { TodoCardTile } from '@core/api/todos.service';
 import { TODAY, board, link, tile } from '../../../../testing/todo-fixtures';
-import { TodoCardTileComponent } from './todo-card-tile.component';
+import { TodoCardTileViewComponent } from '@stupa-makers/ui-kit/views/board';
 
 const LABELS = new Map([
   ...board().labels.map((l) => [l.id, l] as const),
@@ -10,14 +10,14 @@ const LABELS = new Map([
 
 async function setup(card: TodoCardTile, extra: { done?: boolean; lifted?: boolean; column?: string | null } = {}) {
   const open = jest.fn();
-  const view = await render(TodoCardTileComponent, {
+  const view = await render(TodoCardTileViewComponent, {
     inputs: { card, labels: LABELS, today: TODAY, ...extra },
     on: { open },
   });
   return { ...view, open };
 }
 
-describe('TodoCardTileComponent', () => {
+describe('TodoCardTileViewComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows at most two labels, the title, the link, the due date and the counts', async () => {

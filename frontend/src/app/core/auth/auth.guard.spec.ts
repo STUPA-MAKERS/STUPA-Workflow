@@ -21,6 +21,7 @@ import {
   provideLocationMock,
   type LocationMock,
 } from '../../../testing/location-mock';
+import { kindSpies } from '../../../testing/toast';
 
 const MEMBER: Principal = {
   sub: '1',
@@ -134,7 +135,7 @@ describe('authGuard', () => {
 
   it('redirects to the forbidden page and toasts when the permission is missing', () => {
     const toast = TestBed.inject(ToastService);
-    const toastSpy = jest.spyOn(toast, 'error');
+    const toastSpy = jest.spyOn(kindSpies(toast), 'error');
     const result = run({ permission: 'admin.config' }, MEMBER);
     expect(result).toBeInstanceOf(UrlTree);
     expect((result as UrlTree).toString()).toBe('/forbidden');

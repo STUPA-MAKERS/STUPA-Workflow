@@ -7,7 +7,7 @@
   permission.
 * the erasure request queue with the list and the ``?status`` filter. Execute and
   reject answer 409 on a request that is no longer open.
-* the direct erasure of a principal. It answers 204 and nulls the PII.
+* the direct erasure of a principal. It nulls the PII.
 * the settings with GET and PUT. A value under the ``ge=1`` bound gives 422.
 * the Art. 15 data export as XLSX. The test also proves that the ``pii_export`` audit
   entry carries **no** raw PII such as the email address.
@@ -354,6 +354,8 @@ async def test_erase_email_anonymizes_the_applications_and_the_reports(
         "applications": 1,
         "tickets": 1,
         "principalId": str(principal.id),
+        "paperlessDocuments": [],
+        "ticketMails": [],
     }
 
     applicant = (
@@ -389,6 +391,8 @@ async def test_erase_email_anonymizes_the_applications_and_the_reports(
         "applications": 0,
         "tickets": 0,
         "principalId": str(principal.id),
+        "paperlessDocuments": [],
+        "ticketMails": [],
     }
 
 
@@ -398,7 +402,13 @@ async def test_erase_email_without_matches_reports_zero(
     _as_dpo(app)
     r = client.post("/api/admin/privacy/erase-email", json={"email": "niemand@example.org"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"applications": 0, "tickets": 0, "principalId": None}
+    assert r.json() == {
+        "applications": 0,
+        "tickets": 0,
+        "principalId": None,
+        "paperlessDocuments": [],
+        "ticketMails": [],
+    }
 
 
 async def test_execute_unknown_request_404(app: FastAPI, client: TestClient) -> None:
@@ -444,7 +454,7 @@ async def test_reject_then_double_reject_409(
     assert again.status_code == 409
 
 
-async def test_erase_principal_endpoint_nulls_pii_204(
+async def test_erase_principal_endpoint_nulls_pii(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
     """Null the PII of a principal and keep its pseudonym sub."""
@@ -455,8 +465,8 @@ async def test_erase_principal_endpoint_nulls_pii_204(
 
     _as_dpo(app)
     r = client.post(f"/api/admin/privacy/principals/{pid}/erase")
-    assert r.status_code == 204
-    assert r.content == b""
+    assert r.status_code == 200
+    assert r.json() == {"paperlessDocuments": [], "ticketMails": []}
 
     await session.refresh(principal)
     assert principal.email is None

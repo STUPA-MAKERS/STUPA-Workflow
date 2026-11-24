@@ -6,6 +6,7 @@
  * path, which is not part of the API spec.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { searchWords, textsMatch } from './list-search';
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { Injectable, inject, signal } from '@angular/core';
 import { type Observable, map, of, throwError } from 'rxjs';
@@ -45,6 +46,10 @@ import {
   type MeetingSettings,
   type FeatureSwitches,
   type HelpTicketsSettings,
+  type PaperlessConnection,
+  type PaperlessConnectionIn,
+  type PaperlessFailedFiling,
+  type PaperlessTestResult,
   type LoginSettings,
   type AuditPage,
   type Branding,
@@ -69,6 +74,7 @@ import {
   type GremiumRoleMapping,
   type GremiumRoleMappingBody,
   type ErasureRequest,
+  type PrincipalErasure,
   type ErasureStatus,
   type PrivacySettings,
   type GremiumRole,
@@ -83,6 +89,7 @@ import {
   type OAuthGrantQuery,
   type Role,
   type SiteConfig,
+  type WebhookCatalogEvent,
   type WebhookConfig,
   type WebhookDeliveryStatus,
 } from './admin.models';
@@ -122,6 +129,8 @@ import {
   MOCK_MEETING_SETTINGS,
   MOCK_FEATURES,
   MOCK_HELP_TICKETS,
+  MOCK_PAPERLESS,
+  MOCK_PAPERLESS_FAILED,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
@@ -129,6 +138,7 @@ import {
   mockMergePreview,
   MOCK_ROLES,
   MOCK_SITE_REVISIONS,
+  MOCK_WEBHOOK_CATALOG,
   MOCK_WEBHOOK_STATUS,
   MOCK_WEBHOOKS,
   type MockRow,
@@ -834,9 +844,15 @@ export class AdminApiService {
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
     if (this.mock) {
-      const all = this.store.oauthGrants.filter(
-        (g) => !query.principalId || g.principalId === query.principalId,
-      );
+      const words = (query.q ?? '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const all = this.store.oauthGrants.filter((g) => {
+        if (query.principalId && g.principalId !== query.principalId) return false;
+        const hay = [g.principalName, g.principalEmail, g.clientId, g.scope]
+          .filter(Boolean)
+          .join('\n')
+          .toLocaleLowerCase();
+        return words.every((w) => hay.includes(w));
+      });
       return of({
         items: structuredCopy(all.slice(offset, offset + limit)),
         total: all.length,
@@ -846,7 +862,10 @@ export class AdminApiService {
     }
     const params = withParams(
       new HttpParams().set('limit', String(limit)).set('offset', String(offset)),
-      [['principalId', query.principalId || null]],
+      [
+        ['principalId', query.principalId || null],
+        ['q', query.q?.trim() || null],
+      ],
     );
     return this.http.get<Page<OAuthGrantAdmin>>(`${this.base}/admin/oauth-grants`, {
       params,
@@ -1119,6 +1138,18 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
+  /** The webhook event catalog with the fields of each event. Needs P(`webhook.manage`). */
+  getWebhookCatalog(): Observable<WebhookCatalogEvent[]> {
+    if (this.mock) return of(mockTable(MOCK_WEBHOOK_CATALOG));
+    return this.http.get<WebhookCatalogEvent[]>(`${this.base}/admin/webhooks/catalog`);
+  }
+
+  /** Queue a test delivery with example values (§F/integrations/webhooks/002416). */
+  sendWebhookTest(id: Uuid): Observable<{ deliveryId: Uuid }> {
+    if (this.mock) return of({ deliveryId: `test-${id}` });
+    return this.http.post<{ deliveryId: Uuid }>(`${this.base}/admin/webhooks/${id}/test`, {});
+  }
+
   /** Delete a webhook and its delivery history. Needs P(`webhook.manage`). */
   deleteWebhook(id: Uuid): Observable<void> {
     if (this.mock) {
@@ -1210,15 +1241,30 @@ export class AdminApiService {
       actor?: string;
       since?: string;
       until?: string;
+      /** The search of the page (§002693): each word in the action, actor, target or data. */
+      q?: string;
+      /** The action keys whose shown label holds the search; they match as well. */
+      labelActions?: readonly string[];
     } = {},
   ): Observable<AuditPage> {
     const limit = opts.limit ?? 50;
     if (this.mock) {
+      const words = searchWords(opts.q ?? '');
       const items = this.store.audit.filter(
         (e) =>
           (!opts.action || e.action === opts.action) &&
           (!opts.actor || e.actor === opts.actor) &&
-          (opts.before == null || e.id < opts.before),
+          (opts.before == null || e.id < opts.before) &&
+          (!words.length ||
+            (opts.labelActions ?? []).includes(e.action) ||
+            textsMatch(words, [
+              e.action,
+              e.actor,
+              e.actorName,
+              e.targetType,
+              e.targetId,
+              JSON.stringify(e.data ?? {}),
+            ])),
       );
       const page = items.slice(0, limit);
       const hasMore = items.length > limit;
@@ -1234,9 +1280,13 @@ export class AdminApiService {
       ['actor', opts.actor || null],
       ['since', opts.since || null],
       ['until', opts.until || null],
+      ['q', opts.q?.trim() || null],
     ]);
+    const search = opts.q?.trim()
+      ? (opts.labelActions ?? []).reduce((p, a) => p.append('labelAction', a), params)
+      : params;
     return this.http.get<AuditPage>(`${this.base}/admin/audit`, {
-      params,
+      params: search,
       context: skipLoading(),
     });
   }
@@ -1513,6 +1563,60 @@ export class AdminApiService {
     return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
   }
 
+  /** The Paperless connection and the failed filings of the mock mode. */
+  private readonly mockPaperless = signal<PaperlessConnection>({ ...MOCK_PAPERLESS });
+  private readonly mockPaperlessFailed = signal<readonly PaperlessFailedFiling[]>(MOCK_PAPERLESS_FAILED);
+
+  /**
+   * GET /admin/paperless — the Paperless connection and the switch of each part, without
+   * the token. Every route of the page needs P(admin.paperless).
+   */
+  getPaperless(): Observable<PaperlessConnection> {
+    if (this.mock) return of(this.mockPaperless());
+    return this.http.get<PaperlessConnection>(`${this.base}/admin/paperless`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/paperless — 422 `paperless_host_not_allowed` for a host the deploy does not allow. */
+  putPaperless(body: PaperlessConnectionIn): Observable<PaperlessConnection> {
+    if (this.mock) {
+      const { token, ...rest } = body;
+      this.mockPaperless.update((stored) => ({ ...stored, ...rest, tokenSet: stored.tokenSet || !!token }));
+      return of(this.mockPaperless());
+    }
+    return this.http.put<PaperlessConnection>(`${this.base}/admin/paperless`, body);
+  }
+
+  /** POST /admin/paperless/test — calls Paperless with the stored connection. */
+  testPaperless(): Observable<PaperlessTestResult> {
+    if (this.mock) return of({ ok: true, error: null });
+    return this.http.post<PaperlessTestResult>(`${this.base}/admin/paperless/test`, {});
+  }
+
+  /** GET /admin/paperless/failed-filings — the filings whose job failed for the last time. */
+  listPaperlessFailed(): Observable<PaperlessFailedFiling[]> {
+    if (this.mock) return of([...this.mockPaperlessFailed()]);
+    return this.http.get<PaperlessFailedFiling[]>(`${this.base}/admin/paperless/failed-filings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /admin/paperless/failed-filings/{id}/retry — starts the job again. */
+  retryPaperlessFiling(id: string): Observable<void> {
+    if (this.mock) {
+      this.mockPaperlessFailed.update((list) => list.filter((f) => f.id !== id));
+      return of(undefined);
+    }
+    return this.http.post<void>(`${this.base}/admin/paperless/failed-filings/${id}/retry`, {});
+  }
+
+  /** POST /admin/paperless/backfill — starts a job for each final document without one. */
+  backfillPaperless(): Observable<{ readonly started: number }> {
+    if (this.mock) return of({ started: 3 });
+    return this.http.post<{ readonly started: number }>(`${this.base}/admin/paperless/backfill`, {});
+  }
+
   /** The feature switches of the mock mode. */
   private readonly mockFeatures = signal<FeatureSwitches>({ ...MOCK_FEATURES });
 
@@ -1587,9 +1691,10 @@ export class AdminApiService {
     );
   }
 
-  erasePrincipal(id: Uuid): Observable<void> {
-    if (this.mock) return of(void 0);
-    return this.http.post<void>(`${this.base}/admin/privacy/principals/${id}/erase`, {});
+  /** Erase an account. The answer names the Paperless documents that stay (002532). */
+  erasePrincipal(id: Uuid): Observable<PrincipalErasure> {
+    if (this.mock) return of({ paperlessDocuments: [] });
+    return this.http.post<PrincipalErasure>(`${this.base}/admin/privacy/principals/${id}/erase`, {});
   }
 
   getPrivacySettings(): Observable<PrivacySettings> {

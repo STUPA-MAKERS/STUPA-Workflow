@@ -25,6 +25,7 @@ from app.modules.applications.service.service_base import (
     _amount_currency,
     _whitelist,
 )
+from app.modules.applications.webhook_fields import emit_application_event
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.form_options import budget_field_options
@@ -33,7 +34,7 @@ from app.modules.files.service import ATTACHMENT_REQUIRED
 from app.modules.flow.models import FlowVersion, State
 from app.modules.flow.vote_gremium import resolve_vote_gremium
 from app.modules.forms.service import FormsService
-from app.modules.forms.validation import AnswerValidationError, validate_answers
+from app.modules.forms.validation import AnswerValidationError, validate_answers, with_computed
 from app.settings import get_settings
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError, ValidationProblem
@@ -191,14 +192,15 @@ class CreateOps(ApplicationsServiceBase):
                 self.session, type_id=payload.type_id, predecessor_id=payload.predecessor_id
             )
         context = {"has_budget": app_type.has_budget}
+        answers = with_computed(fields, payload.data, context)
         try:
-            validate_answers(fields, payload.data, context)
+            validate_answers(fields, answers, context)
         except AnswerValidationError as exc:
             errors = _blocking(exc, new_version)
             if errors:
                 raise ValidationProblem("Invalid application data.", errors=errors) from exc
 
-        check_form_rules(effective, payload.data)
+        check_form_rules(effective, answers)
         if app_type.attachment_required and not payload.attachment_ids:
             raise ValidationProblem(
                 "This Antragsart needs a file.",
@@ -208,7 +210,7 @@ class CreateOps(ApplicationsServiceBase):
 
         confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
-        clean = _whitelist(fields, payload.data)
+        clean = _whitelist(fields, answers)
         amount, currency = _amount_currency(fields, clean)
         pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
@@ -306,6 +308,8 @@ class CreateOps(ApplicationsServiceBase):
                     "matchedByEmail": capture.matched_by_email,
                 },
             )
+        await self.session.flush()
+        await emit_application_event(self.session, "application.created", app)
         await self.session.commit()
 
         if app.email_confirmed_at is not None:

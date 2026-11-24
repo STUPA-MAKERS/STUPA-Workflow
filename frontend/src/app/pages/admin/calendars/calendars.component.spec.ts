@@ -11,6 +11,7 @@ import { runAxe } from '../../../../testing/a11y';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
 import { AdminOptionsService } from '../admin-options.service';
 import { AdminCalendarsComponent, fetchState } from './calendars.component';
+import { toastMock } from '../../../../testing/toast';
 
 function calendar(id: string, over: Partial<ExternalCalendar> = {}): ExternalCalendar {
   return {
@@ -72,7 +73,7 @@ async function setup(seed: readonly ExternalCalendar[] = [UNI, SENAT, RAUM], opt
           ]),
     ),
   };
-  const toast = { success: jest.fn(), error: jest.fn() };
+  const toast = toastMock();
   const view = await render(AdminCalendarsComponent, {
     providers: [
       { provide: ExternalCalendarsApiService, useValue: api },

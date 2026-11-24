@@ -97,6 +97,7 @@ LINK_KINDS: tuple[str, ...] = (
     "budget",
     "ticket",
     "todo",
+    "paperless",
 )
 #: The table of each link kind; a trigger on it deletes the links of a deleted row.
 LINK_TABLES: dict[str, str] = {
@@ -111,6 +112,7 @@ LINK_TABLES: dict[str, str] = {
     "budget": "budget",
     "ticket": "ticket",
     "todo": "todo_card",
+    "paperless": "paperless_document",
 }
 #: The columns of a new board, by position; the last one is the done column.
 DEFAULT_COLUMNS: tuple[str, ...] = ("Offen", "In Arbeit", "Wartet", "Erledigt")
@@ -437,6 +439,9 @@ class Link(UUIDPkMixin, Base):
         CheckConstraint(f"a_kind IN ({_in(LINK_KINDS)})", name="a_kind"),
         CheckConstraint(f"b_kind IN ({_in(LINK_KINDS)})", name="b_kind"),
         CheckConstraint("NOT (a_kind = b_kind AND a_id = b_id)", name="not_self"),
+        CheckConstraint(
+            "NOT (a_kind = 'paperless' AND b_kind = 'paperless')", name="one_paperless"
+        ),
         Index("uq_link_ends", "a_kind", "a_id", "b_kind", "b_id", unique=True),
         Index("ix_link_b", "b_kind", "b_id"),
     )

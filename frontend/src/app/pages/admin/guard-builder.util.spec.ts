@@ -135,7 +135,6 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
 
 describe('validateAction (mirror of backend validate_action)', () => {
   it('accepts the four action types with their required fields', () => {
-    expect(() => validateAction({ type: 'webhook', webhookId: 'w1' })).not.toThrow();
     expect(() =>
       validateAction({ type: 'notify', recipients: [{ kind: 'applicant' }] }),
     ).not.toThrow();
@@ -146,9 +145,6 @@ describe('validateAction (mirror of backend validate_action)', () => {
 
   /** The gremium of addToNextSession is optional; a present but empty one is wrong. */
   it('rejects missing required fields', () => {
-    expect(reason(() => validateAction({ type: 'webhook' })).key).toBe(
-      'admin.flow.err.actionWebhook',
-    );
     expect(reason(() => validateAction({ type: 'notify', recipients: [] })).key).toBe(
       'admin.flow.err.notifyRecipients',
     );
