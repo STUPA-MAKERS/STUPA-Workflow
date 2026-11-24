@@ -2,7 +2,7 @@
 id: "001692"
 title: The chosen visibility shows before sending
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
