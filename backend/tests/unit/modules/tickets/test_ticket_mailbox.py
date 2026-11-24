@@ -152,7 +152,7 @@ async def test_a_host_outside_the_allowlist_is_422(kw: dict[str, Any], field: st
         await _svc(session).create(AREA, _create(**kw), "adm")
     assert exc.value.code == "mail_host_not_allowed"
     assert exc.value.errors is not None
-    assert [e.field for e in exc.value.errors] == [field]
+    assert [e.field for e in exc.value.errors or ()] == [field]
     assert session.added == []
 
 
@@ -204,7 +204,11 @@ async def test_a_new_inbox_starts_the_fetch_from_its_first_mail(
 ) -> None:
     row = _row()
     session = ScriptedSession(scalar=[row])
-    await _svc(session).patch(AREA, MailboxPatch.model_validate({"imapUser": "office"}), "adm")
+    await _svc(session).patch(
+        AREA,
+        MailboxPatch.model_validate({"imapUser": "office", "imapPassword": SECRETS[0]}),
+        "adm",
+    )
     assert (row.uid_validity, row.last_uid) == (None, 0)
     assert audits[0]["data"]["fields"] == ["imapUser"]
 
@@ -222,9 +226,45 @@ async def test_a_patch_without_a_change_writes_no_audit_entry(
 async def test_a_patch_checks_the_hosts_and_needs_a_postfach() -> None:
     session = ScriptedSession(scalar=[_row()])
     with pytest.raises(ValidationProblem):
-        await _svc(session).patch(AREA, MailboxPatch.model_validate({"smtpHost": "x.local"}), "adm")
+        await _svc(session).patch(
+            AREA, MailboxPatch.model_validate({"smtpHost": "x.local", "smtpPassword": "s"}), "adm"
+        )
     with pytest.raises(NotFoundError):
         await _svc(ScriptedSession()).patch(AREA, MailboxPatch(), "adm")
+
+
+@pytest.mark.parametrize(
+    ("body", "field"),
+    [
+        ({"imapHost": "mail.example.org", "imapPort": 143}, "imapPassword"),
+        ({"imapUser": "office"}, "imapPassword"),
+        ({"smtpHost": "smtp.example.org", "smtpPort": 587, "smtpUser": "x"}, "smtpPassword"),
+        ({"imapUser": "office", "smtpPassword": "new"}, "imapPassword"),
+    ],
+)
+async def test_an_account_change_without_its_password_is_422(
+    body: dict[str, Any], field: str, audits: list[dict[str, Any]]
+) -> None:
+    """§F/integrations/ticket-mail/002812: a stored password does not follow a change."""
+    row = _row()
+    session = ScriptedSession(scalar=[row])
+    with pytest.raises(ValidationProblem) as exc:
+        await _svc(session).patch(AREA, MailboxPatch.model_validate(body), "adm")
+    assert exc.value.code == "password_required"
+    assert [e.field for e in exc.value.errors or ()] == [field]
+    assert (row.imap_user, row.imap_port, row.smtp_user) == ("buero", 993, "buero")
+    assert audits == []
+
+
+async def test_an_account_change_with_its_password_is_saved(
+    audits: list[dict[str, Any]],
+) -> None:
+    row = _row()
+    session = ScriptedSession(scalar=[row])
+    body = {"imapHost": "mail.example.org", "imapPort": 143, "imapPassword": "new"}
+    await _svc(session).patch(AREA, MailboxPatch.model_validate(body), "adm")
+    assert (row.imap_port, row.imap_password) == (143, "new")
+    assert audits[0]["data"]["fields"] == ["imapPassword", "imapPort"]
 
 
 async def test_delete_removes_the_postfach_with_an_audit_entry(

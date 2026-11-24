@@ -40,6 +40,8 @@ Part = Literal["protocols", "applications", "plans"]
 
 #: The time limit of the connection test, so the admin page gets its answer soon.
 TEST_TIMEOUT_SECONDS = 5.0
+#: The problem code of an address change that keeps the stored token.
+TOKEN_REQUIRED = "token_required"
 
 ClientFactory = Callable[[str, str, tuple[str, ...]], PaperlessClient]
 
@@ -99,7 +101,9 @@ class ConnectionService:
 
         Raises:
             ValidationProblem: The host of the address is not in the allowlist (422
-                `paperless_host_not_allowed`).
+                `paperless_host_not_allowed`), or the address changes without a new token
+                while a token is stored (422 `token_required`,
+                §F/integrations/paperless/002813).
         """
         base_url = (normalize_url(data.base_url) if data.base_url else "") or None
         if base_url is not None and not host_allowed(
@@ -112,6 +116,18 @@ class ConnectionService:
             )
         before = await self.row()
         old_token = before.token
+        if (
+            base_url is not None
+            and base_url != before.base_url
+            and old_token
+            and data.token is None
+            and not data.clear_token
+        ):
+            raise ValidationProblem(
+                "A change of the address needs the token again.",
+                code=TOKEN_REQUIRED,
+                errors=[{"field": "token", "msg": "token required"}],
+            )
         token = None if data.clear_token else (data.token or old_token)
         await self.session.execute(
             update(PaperlessSettings)

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -37,6 +37,12 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 #: The problem code of a second Postfach of one Bereich.
 MAILBOX_EXISTS = "ticket_mailbox_exists"
+#: The problem code of an account change without its password.
+PASSWORD_REQUIRED = "password_required"
+#: The columns of each account whose change needs the password of that account again.
+_LOGIN_FIELDS: Mapping[str, frozenset[str]] = {
+    kind: frozenset({f"{kind}_host", f"{kind}_port", f"{kind}_user"}) for kind in ("imap", "smtp")
+}
 #: The problem code of a host outside ``TICKET_MAIL_HOST_ALLOWLIST``.
 HOST_NOT_ALLOWED = "mail_host_not_allowed"
 #: The failed fetch runs in sequence after which the admin page shows the error.
@@ -71,6 +77,28 @@ def host_allowed(host: str, port: int, allowlist: Sequence[str]) -> bool:
     allowed = frozenset(entry.strip().lower() for entry in allowlist if entry.strip())
     name = host.strip().lower()
     return name in allowed or f"{name}:{port}" in allowed
+
+
+def _require_passwords(changed: Collection[str], sent: Collection[str]) -> None:
+    """Refuse a change of host, port or user of an account that leaves out its password.
+
+    A stored password must not follow a new host (§F/integrations/ticket-mail/002812).
+
+    Raises:
+        ValidationProblem: An account changes without its password (HTTP 422,
+            ``password_required``).
+    """
+    missing = tuple(
+        f"{kind}_password"
+        for kind, fields in _LOGIN_FIELDS.items()
+        if fields & set(changed) and f"{kind}_password" not in sent
+    )
+    if missing:
+        raise ValidationProblem(
+            "A change of host, port or user needs the password of that account again.",
+            code=PASSWORD_REQUIRED,
+            errors=[{"field": _WIRE[name], "msg": "password required"} for name in missing],
+        )
 
 
 def imap_account(row: TicketMailbox) -> MailAccount:
@@ -191,6 +219,7 @@ class TicketMailboxService:
         row = await self._get(area_id)
         sent = payload.model_dump(exclude_unset=True, exclude_none=True)
         changed = {name: value for name, value in sent.items() if getattr(row, name) != value}
+        _require_passwords(changed.keys(), sent.keys())
         if changed:
             self._check_hosts({name: changed.get(name, getattr(row, name)) for name in _WIRE})
         reset: dict[str, object] = (

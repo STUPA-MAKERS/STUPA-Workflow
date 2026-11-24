@@ -122,13 +122,24 @@ function isPort(text: string): boolean {
   return /^\d+$/.test(text.trim()) && n >= 1 && n <= 65535;
 }
 
+/** True when the host, the port or the user of one account differs from the stored one. */
+function loginChanged(draft: MailboxDraft, stored: MailboxDraft, side: Side): boolean {
+  return (
+    draft[side.host].trim().toLowerCase() !== stored[side.host].trim().toLowerCase() ||
+    Number(draft[side.port]) !== Number(stored[side.port]) ||
+    draft[side.user].trim() !== stored[side.user].trim()
+  );
+}
+
 /**
  * The fields that a person must still fill or correct, by field. A stored Postfach keeps
- * a password that the draft leaves empty.
+ * a password that the draft leaves empty, unless the host, the port or the user of that
+ * account changes: the password must then come again (§F/integrations/ticket-mail/002812).
+ * `stored` is the draft of the stored Postfach, or null for a new one.
  */
 export function draftErrors(
   draft: MailboxDraft,
-  stored: boolean,
+  stored: MailboxDraft | null,
 ): Readonly<Partial<Record<TextField, TranslationKey>>> {
   const required: readonly TextField[] = [
     'address',
@@ -139,6 +150,11 @@ export function draftErrors(
     'doneFolder',
     ...(stored ? [] : (['imapPassword', 'smtpPassword'] as const)),
   ];
+  const again = stored
+    ? SIDES.filter((side) => !draft[side.password] && loginChanged(draft, stored, side)).map(
+        (side) => [side.password, 'admin.helpTickets.mailbox.passwordAgain'] as const,
+      )
+    : [];
   const missing = required
     .filter((field) => !draft[field].trim())
     .map((field) => [field, 'admin.helpTickets.mailbox.required'] as const);
@@ -149,7 +165,7 @@ export function draftErrors(
   const ports = (['imapPort', 'smtpPort'] as const)
     .filter((field) => !isPort(draft[field]))
     .map((field) => [field, 'admin.helpTickets.mailbox.portInvalid'] as const);
-  return Object.fromEntries([...missing, ...address, ...ports]);
+  return Object.fromEntries([...missing, ...address, ...ports, ...again]);
 }
 
 /** The body of a save: every field, and a password only when the person typed one. */
@@ -238,7 +254,7 @@ export class TicketMailboxDialogComponent {
   );
 
   protected readonly errors = computed<Readonly<Partial<Record<TextField, string>>>>(() => {
-    const local = this.tried() ? draftErrors(this.draft(), this.mailbox() !== null) : {};
+    const local = this.tried() ? draftErrors(this.draft(), this.mailbox() ? this.start() : null) : {};
     const texts = Object.fromEntries(
       Object.entries(local).map(([field, key]) => [field, this.i18n.translate(key)]),
     );
@@ -345,7 +361,7 @@ export class TicketMailboxDialogComponent {
     const area = this.area();
     if (!area || this.saving()) return;
     this.tried.set(true);
-    if (Object.keys(draftErrors(this.draft(), this.mailbox() !== null)).length) return;
+    if (Object.keys(draftErrors(this.draft(), this.mailbox() ? this.start() : null)).length) return;
     const body = mailboxBody(this.draft());
     const req = this.mailbox()
       ? this.api.updateMailbox(area.id, body)
