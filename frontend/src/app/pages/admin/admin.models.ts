@@ -729,8 +729,6 @@ export interface ApplicationTypeFull {
   readonly name: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget: boolean;
-  /** The Antrag PDF ends with the signature section (spec 000888). */
-  readonly pdfSignatures?: boolean;
   /** The signature rows of the Antrag PDF, in order (spec 003005). */
   readonly signatureRows?: readonly SignatureRow[];
   /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
@@ -782,7 +780,6 @@ export interface ApplicationTypeUpdateBody {
   readonly name?: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
-  readonly pdfSignatures?: boolean;
   /** Replaces the signature rows of the Antrag PDF (spec 003005). */
   readonly signatureRows?: readonly SignatureRow[];
   readonly attachmentRequired?: boolean;

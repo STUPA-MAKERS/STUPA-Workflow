@@ -639,7 +639,6 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'admin.forms.help': 'admin.forms.help',
   'admin.forms.name': 'admin.forms.name',
   'admin.forms.overviewLoading': 'admin.forms.overviewLoading',
-  'admin.forms.pdfSignatures': 'admin.forms.pdfSignatures',
   'admin.forms.signatureRows': 'admin.forms.signatureRows',
   'admin.forms.signatureLabel': 'admin.forms.signatureLabel',
   'admin.forms.signatureSigner': 'admin.forms.signatureSigner',

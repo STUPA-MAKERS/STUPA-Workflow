@@ -261,14 +261,14 @@ async def test_a_vote_without_a_decision_row_still_gives_the_beschluss(
     assert "Stimmengleichheit" not in source
 
 
-async def test_the_switch_of_the_antragsart_adds_the_signature_section(
+async def test_the_rows_of_the_antragsart_add_the_signature_section(
     migrated: tuple[str, str],
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
     maker: async_sessionmaker[AsyncSession],
     seed: GuestSeed,
 ) -> None:
-    """§000888: no signature section without the switch, two rows with it."""
+    """§ 003009: no signature section with an empty list, the rows of the type with one."""
     app_id = await _create(maker, seed)
     typst = FakeTypst()
     reader = _client(migrated, settings, monkeypatch, typst, _READER)
@@ -279,7 +279,6 @@ async def test_the_switch_of_the_antragsart_adds_the_signature_section(
             update(ApplicationType)
             .where(ApplicationType.id == seed.type_id)
             .values(
-                pdf_signatures=True,
                 signature_rows=[
                     {"label": "Geprüft", "signer": "Kasse"},
                     {"label": "Frei", "signer": "Vorsitz"},

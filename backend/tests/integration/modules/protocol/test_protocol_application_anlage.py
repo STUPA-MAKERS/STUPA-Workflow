@@ -177,13 +177,13 @@ def _protocol_calls(typst: _Typst) -> list[tuple[str, Mapping[str, bytes]]]:
 async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top(
     maker: async_sessionmaker[AsyncSession], seed: GuestSeed
 ) -> None:
-    """§ 000884 + § 000885 + § 000886: reference, asset, frozen version, public black bar."""
+    """§ 000884 + § 000885 + § 000886 + § 003009: reference, frozen version, bar, signatures."""
     start = datetime.now(UTC) - timedelta(hours=2)
     async with maker() as session:
         await session.execute(
             update(ApplicationType)
             .where(ApplicationType.id == seed.type_id)
-            .values(pdf_signatures=True, signature_rows=[{"label": "A", "signer": "B"}])
+            .values(signature_rows=[{"label": "A", "signer": "B"}])
         )
         open_id = await _application(session, seed, zweck="alte Fassung")
         secret_id = await _application(session, seed, zweck="geheim")
@@ -220,7 +220,8 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
     assert "\n".join(field_row("Version", ["`1`"])) in internal_antrag
     assert _IBAN in internal_antrag and "Luis Meyer" in internal_antrag
     assert "[!feld] Status" not in internal_antrag and "# Beschluss" not in internal_antrag
-    assert "[!unterschrift]" not in internal_antrag  # § 000888
+    assert internal_antrag.count("[!unterschrift]") == 1  # § 003009
+    assert public_antrag.count("[!unterschrift]") == 1
     assert _IBAN not in public_antrag and "Luis Meyer" not in public_antrag
     assert "\n".join(field_row("IBAN", [BAR])) in public_antrag
     assert "\n".join(field_row("Antragsteller", [BAR])) in public_antrag

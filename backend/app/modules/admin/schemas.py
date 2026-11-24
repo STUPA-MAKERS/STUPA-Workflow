@@ -401,7 +401,6 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     key: str
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
-    pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
     signature_rows: list[SignatureRow] = Field(
         default_factory=list[SignatureRow], serialization_alias="signatureRows"
     )
@@ -425,7 +424,6 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap = Field(alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
-    pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
     signature_rows: list[SignatureRow] = Field(
         default_factory=list[SignatureRow], alias="signatureRows", max_length=MAX_SIGNATURE_ROWS
     )
@@ -441,7 +439,6 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
-    pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
     #: A sent list replaces the rows; an omitted field keeps them.
     signature_rows: list[SignatureRow] | None = Field(
         default=None, alias="signatureRows", max_length=MAX_SIGNATURE_ROWS

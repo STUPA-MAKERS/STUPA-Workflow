@@ -160,7 +160,6 @@ interface ApplicationTypeOutWire {
   readonly nameI18n?: Record<string, string> | null;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
-  readonly pdfSignatures?: boolean;
   readonly signatureRows?: readonly SignatureRow[];
   readonly attachmentRequired?: boolean;
   readonly retentionMonths?: number | null;
@@ -184,7 +183,6 @@ function mapTypeFull(t: ApplicationTypeOutWire): ApplicationTypeFull {
     name: (t.nameI18n ?? {}) as I18nMap,
     gremiumId: t.gremiumId ?? null,
     hasBudget: t.hasBudget ?? false,
-    pdfSignatures: t.pdfSignatures ?? false,
     signatureRows: t.signatureRows ?? [],
     attachmentRequired: t.attachmentRequired ?? false,
     retentionMonths: t.retentionMonths ?? null,
@@ -1036,7 +1034,6 @@ export class AdminApiService {
       ...(body.name ? { nameI18n: body.name } : {}),
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
-      ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
       ...(body.signatureRows !== undefined ? { signatureRows: body.signatureRows } : {}),
       ...(body.attachmentRequired !== undefined
         ? { attachmentRequired: body.attachmentRequired }

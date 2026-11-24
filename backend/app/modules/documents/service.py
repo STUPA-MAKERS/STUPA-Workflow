@@ -155,22 +155,18 @@ class ApplicationPdfService:
         return resolve_i18n(names, LANG) if isinstance(names, dict) else None
 
     async def _signs(self, type_id: uuid.UUID) -> tuple[tuple[str, str], ...]:
-        """Return the signature rows that end the Antrag PDF of the type (spec 003005).
+        """Return the signature rows that end the Antrag PDF of the type (specs 003005, 003009).
 
-        The rows are empty while the switch "Unterschriften im PDF" is off.
+        Every status and the Anlage of a protocol get the rows; an empty list gives none.
         """
-        row = (
-            await self.session.execute(
-                select(ApplicationType.pdf_signatures, ApplicationType.signature_rows).where(
-                    ApplicationType.id == type_id
-                )
-            )
-        ).first()
-        if row is None or not row.pdf_signatures or not isinstance(row.signature_rows, list):
+        rows = await self.session.scalar(
+            select(ApplicationType.signature_rows).where(ApplicationType.id == type_id)
+        )
+        if not isinstance(rows, list):
             return ()
         return tuple(
             (str(r["label"]), str(r["signer"]))
-            for r in row.signature_rows
+            for r in rows
             if isinstance(r, dict) and r.get("label") and r.get("signer")
         )
 
@@ -294,7 +290,8 @@ class ApplicationPdfService:
         """Build the document of one frozen version for the protocol Anlage.
 
         `version=None` takes the current version. The document has no status and no
-        decision. The public variant prints the ``isPII`` answers, the files of the
+        decision, and ends with the signature rows of its Antragsart (spec 003009). The
+        public variant prints the ``isPII`` answers, the files of the
         ``isPII`` fields and the applicant as a black bar.
 
         Returns:
@@ -347,6 +344,7 @@ class ApplicationPdfService:
             redacted_keys=pii,
             redact_applicant=public,
             files=await self._file_names(app.id, data, pii),
+            signatures=await self._signs(app.type_id),
         )
 
     async def frozen_version(self, item: MeetingAgendaItem) -> int | None:

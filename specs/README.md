@@ -201,6 +201,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001722](requirements/functional/applications/applications/001722_new-version-closes-old.md) | Submitting the new version closes the old Antrag | approved |
 | [F/applications/applications/001982](requirements/functional/applications/applications/001982_applications-list-two-fabs.md) | The Anträge list has the FABs Antrag stellen and Antrag erfassen | approved |
 | [F/applications/applications/003005](requirements/functional/applications/applications/003005_pdf-signature-rows.md) | The signature rows of the Antrag PDF are a setting of the Antragsart | approved |
+| [F/applications/applications/003009](requirements/functional/applications/applications/003009_signatures-always.md) | The Antrag PDF always ends with the signature rows of its Antragsart | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | replaced |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |
@@ -276,7 +277,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | approved |
 | [F/applications/forms/003004](requirements/functional/applications/forms/003004_funding-cap-switch.md) | The cap of the funding at the total cost is a setting | approved |
 | [F/applications/forms/003006](requirements/functional/applications/forms/003006_funding-no-auto-hint.md) | A funding field without help shows no hint | approved |
-| [F/applications/forms/003008](requirements/functional/applications/forms/003008_positions-sum-row.md) | The sum of the positions is a row below the positions | draft |
+| [F/applications/forms/003008](requirements/functional/applications/forms/003008_positions-sum-row.md) | The sum of the positions is a row below the positions | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |

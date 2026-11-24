@@ -25,13 +25,13 @@ scope:
 
 An Antragsart must hold a list of signature rows. Each row has a label and a signer, for example
 "Sachlich richtig" and "Finanzreferent:in". The signature section of 000888 must show exactly
-these rows, in this order. While the switch "Unterschriften im PDF" is on, the page of the
-Antragsart must show the list, and the person can add, edit, move and remove a row. The code must
+these rows, in this order. The page of the Antragsart must show the list, and the person can add,
+edit, move and remove a row. The code must
 not hold a label or a signer.
 
 The migration must give each existing Antragsart the two rows that the PDF shows today, so an
-existing PDF does not change. A new Antragsart starts with an empty list. With the switch on and
-an empty list the PDF has no signature section.
+existing PDF keeps its rows. A new Antragsart starts with an empty list. With an empty list the
+PDF has no signature section (003009).
 
 Reason: The labels and the signers depend on the finance rules of one student body. Another
 student body or a changed rule needs other rows.

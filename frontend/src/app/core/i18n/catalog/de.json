@@ -2811,7 +2811,6 @@
   "admin.forms.descPlaceholder": "Markdown wird unterstützt …",
   "admin.forms.help": "Hilfetext",
   "admin.forms.hasBudget": "Mit Budget",
-  "admin.forms.pdfSignatures": "Unterschriften im PDF",
   "admin.forms.signatureRows": "Unterschriftenzeilen",
   "admin.forms.signatureLabel": "Bezeichnung",
   "admin.forms.signatureSigner": "Unterzeichner:in",

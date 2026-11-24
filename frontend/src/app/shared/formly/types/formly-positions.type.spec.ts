@@ -889,7 +889,8 @@ describe('FormlyPositionsType — sum row (spec 003008)', () => {
     const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
     const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten } });
     const row = host.querySelector('.pos__total');
-    expect(row?.firstElementChild?.textContent?.trim()).toBe('Gesamt');
+    expect(row?.querySelector('app-icon')?.getAttribute('ng-reflect-name') ?? row?.firstElementChild?.tagName.toLowerCase()).toMatch(/sigma|app-icon/);
+    expect(row?.children[1]?.textContent?.trim()).toBe('Gesamt');
     expect(row?.lastElementChild?.textContent?.replace(/\s/g, ' ').trim()).toBe('1.200,00 €');
     const cards = host.querySelectorAll('.pos__card');
     expect(cards[cards.length - 1]?.nextElementSibling).toBe(row);

@@ -105,9 +105,7 @@ export class FormEditorComponent {
   protected readonly description = signal<I18nMap>({ de: '', en: '' });
   /** "With budget": the application may select a pot (application_type.has_budget). */
   protected readonly hasBudget = signal(false);
-  /** The Antrag PDF of this type ends with the signature section (spec 000888). */
-  protected readonly pdfSignatures = signal(false);
-  /** The signature rows of the Antrag PDF, in order (spec 003005). */
+  /** The signature rows of the Antrag PDF, in order; empty gives none (specs 003005, 003009). */
   protected readonly signatureRows = signal<readonly SignatureRow[]>([]);
   /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
   protected readonly attachmentRequired = signal(false);
@@ -166,7 +164,6 @@ export class FormEditorComponent {
   private readonly originalType = signal({
     title: { de: '', en: '' } as I18nMap,
     hasBudget: false,
-    pdfSignatures: false,
     signatureRows: '[]',
     attachmentRequired: false,
     cmpRequired: false,
@@ -184,7 +181,6 @@ export class FormEditorComponent {
     return (
       !sameI18n(this.title(), o.title) ||
       this.hasBudget() !== o.hasBudget ||
-      this.pdfSignatures() !== o.pdfSignatures ||
       JSON.stringify(this.signatureRows()) !== o.signatureRows ||
       this.attachmentRequired() !== o.attachmentRequired ||
       this.cmpRequired() !== o.cmpRequired ||
@@ -218,7 +214,6 @@ export class FormEditorComponent {
         if (t) {
           this.title.set({ de: '', en: '', ...t.name });
           this.hasBudget.set(t.hasBudget);
-          this.pdfSignatures.set(t.pdfSignatures ?? false);
           this.signatureRows.set(t.signatureRows ?? []);
           this.attachmentRequired.set(t.attachmentRequired ?? false);
           const co = t.comparisonOffers;
@@ -309,7 +304,6 @@ export class FormEditorComponent {
     this.originalType.set({
       title: { ...this.title() },
       hasBudget: this.hasBudget(),
-      pdfSignatures: this.pdfSignatures(),
       signatureRows: JSON.stringify(this.signatureRows()),
       attachmentRequired: this.attachmentRequired(),
       cmpRequired: this.cmpRequired(),
@@ -335,7 +329,6 @@ export class FormEditorComponent {
           .updateApplicationType(id, {
             name: { ...this.title() },
             hasBudget: this.hasBudget(),
-            pdfSignatures: this.pdfSignatures(),
             signatureRows: filledRows(this.signatureRows()),
             attachmentRequired: this.attachmentRequired(),
             comparisonOffers: {

@@ -1426,7 +1426,7 @@ describe('group serialize/deserialize round-trip', () => {
       ];
       const { c, v, fixture, updateApplicationType } = await setup(
         draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
-        { type: { ...TYPE, pdfSignatures: true, signatureRows: rows } },
+        { type: { ...TYPE, signatureRows: rows } },
       );
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toContain('Unterschriftenzeilen');
