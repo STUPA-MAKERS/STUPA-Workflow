@@ -34,6 +34,12 @@ from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
+def _set_protocol_signatures(row: Gremium, lines: list[str] | None) -> None:
+    """Replace the signature lines of the protocol (spec 003007); ``None`` keeps them."""
+    if lines is not None:
+        row.protocol_signatures = list(lines)
+
+
 def _gremium_out(row: Gremium) -> GremiumOut:
     return GremiumOut(
         id=row.id,
@@ -285,8 +291,7 @@ class GremiumOps(ConfigServiceBase):
         )
         if data is not None and publish is not None:
             row.protocols_public = publish
-        if payload.protocol_signatures is not None:
-            row.protocol_signatures = list(payload.protocol_signatures)
+        _set_protocol_signatures(row, payload.protocol_signatures)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id, data)
         await self.session.commit()
         return _gremium_out(row)

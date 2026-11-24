@@ -39,6 +39,12 @@ def _rows_json(rows: list[SignatureRow]) -> list[dict[str, str]]:
     return [{"label": r.label, "signer": r.signer} for r in rows]
 
 
+def _set_signature_rows(row: ApplicationType, rows: list[SignatureRow] | None) -> None:
+    """Replace the signature rows (spec 003005); ``None`` keeps them."""
+    if rows is not None:
+        row.signature_rows = _rows_json(rows)
+
+
 def _rows_out(raw: object) -> list[SignatureRow]:
     """Read the stored signature rows; a broken entry drops."""
     if not isinstance(raw, list):
@@ -190,8 +196,7 @@ class ApplicationTypeOps(ConfigServiceBase):
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
         _set_pdf_signatures(row, payload.pdf_signatures)
-        if payload.signature_rows is not None:
-            row.signature_rows = _rows_json(payload.signature_rows)
+        _set_signature_rows(row, payload.signature_rows)
         _set_attachment_required(row, payload.attachment_required)
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
