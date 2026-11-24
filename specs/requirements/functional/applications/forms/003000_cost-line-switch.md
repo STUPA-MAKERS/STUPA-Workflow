@@ -2,16 +2,10 @@
 id: "003000"
 title: The cost line is a setting of the positions field
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-24
-tests:
-  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:costLine"
-  - "backend/tests/unit/modules/forms/test_forms_validation.py:test_cost_line_setting"
-implementation:
-  - backend/app/shared/config_schemas.py
-  - frontend/src/app/shared/forms/formly-mapper.ts
-  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.html
+replaced_by: F/applications/forms/003010
 scope:
   - backend/app/modules/forms
   - frontend/src/app/shared/forms

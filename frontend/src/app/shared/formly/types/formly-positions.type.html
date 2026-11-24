@@ -168,6 +168,9 @@
               {{ t('apply.positions.addOffer') }}
             </button>
           } @else {
+            @if (hint('noOffers'); as text) {
+              <p class="pos__hint">{{ text }}</p>
+            }
             <label class="pf pf--area" [class.pf--invalid]="reasonInvalid(p)">
               <span class="pf__label">{{ t('apply.positions.noOffersReason') }}</span>
               <textarea
@@ -179,9 +182,6 @@
               ></textarea>
             </label>
           }
-          @if (positionFiles && p.id) {
-            <ng-container *ngComponentOutlet="positionFiles.component; inputs: filesInputs(p)" />
-          }
           @if (cardError(p, pi); as msg) {
             <app-error-text>{{ msg }}</app-error-text>
           }
@@ -190,22 +190,17 @@
     </div>
   }
 
+  <app-add-row (add)="addPosition()">{{ t('apply.positions.add') }}</app-add-row>
+
   <div class="pos__total" aria-live="polite">
     <app-icon name="sigma" [size]="18" />
     <span>{{ t('forms.positions.sum') }}</span>
     <span class="mono pos__sumValue">{{ fmt(total()) }}</span>
   </div>
 
-  @if (costLine(); as line) {
-    <p class="pos__line" aria-live="polite">{{ costLineText(line) }}</p>
+  @if (hint('below'); as text) {
+    <p class="pos__line" aria-live="polite">{{ text }}</p>
   }
-
-  <app-button-group>
-    <app-button class="pos__add" variant="tonal" (click)="addPosition()">
-      <app-icon name="plus" />
-      {{ t('apply.positions.add') }}
-    </app-button>
-  </app-button-group>
   @if (showError && positions.length < minPositions) {
     <app-error-text>{{ t('apply.positions.errMinPositions') }}</app-error-text>
   }

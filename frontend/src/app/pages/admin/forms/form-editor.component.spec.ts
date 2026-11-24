@@ -770,23 +770,27 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
   });
 
   /** Specs 003000-003004: the switches that are on by default store only false. */
-  it('setDefaultOn stores only false and shows the switches of positions and funding', async () => {
+  it('stores the hint texts of positions and only false for the funding cap (specs 003004, 003010)', async () => {
     const { c, v, fixture } = await setup(
       draft([
         { key: 'q', type: 'positions', label: { de: 'A', en: '' } },
         { key: 'f', type: 'funding', label: { de: 'F', en: '' } },
       ]),
     );
-    v.setDefaultOn({ gi: 0, qi: 0 }, 'costLine', false);
-    v.setDefaultOn({ gi: 0, qi: 0 }, 'fileReminder', false);
-    expect(c.groups()[0].fields[0].validation).toEqual({ costLine: false, fileReminder: false });
-    v.setDefaultOn({ gi: 0, qi: 0 }, 'costLine', true);
-    expect(c.groups()[0].fields[0].validation).toEqual({ fileReminder: false });
+    v.setHint({ gi: 0, qi: 0 }, 'below', { de: 'Summe {costTotal}', en: '' });
+    v.setHint({ gi: 0, qi: 0 }, 'noFileTitle', { de: 'Ohne Anhang?', en: '' });
+    expect(c.groups()[0].fields[0].validation).toEqual({
+      hints: { below: { de: 'Summe {costTotal}', en: '' }, noFileTitle: { de: 'Ohne Anhang?', en: '' } },
+    });
+    v.setHint({ gi: 0, qi: 0 }, 'below', { de: ' ', en: '' });
+    v.setHint({ gi: 0, qi: 0 }, 'noFileTitle', { de: '', en: '' });
+    expect(c.groups()[0].fields[0].validation).toEqual({});
     v.setDefaultOn({ gi: 0, qi: 1 }, 'capAtCost', false);
     expect(c.groups()[0].fields[1].validation).toEqual({ capAtCost: false });
     v.selectQuestion({ gi: 0, qi: 0 }, false);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Summenzeile anzeigen');
+    expect(fixture.nativeElement.textContent).toContain('Unter der Summe');
+    expect(fixture.nativeElement.textContent).not.toContain('Summenzeile anzeigen');
   });
 
   it('parses valid JsonLogic into the field and reflects the raw input', async () => {

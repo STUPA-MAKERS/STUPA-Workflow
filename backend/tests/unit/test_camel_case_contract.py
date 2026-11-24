@@ -22,8 +22,7 @@ from app.main import app
 #: that ``Principal`` in ``frontend/src/app/core/api/models.ts`` mirrors field for field;
 #: ``logout_url`` is mirrored the same way. RFC 6749 fixes the wire names of the token
 #: endpoint and of an OAuth error, so a camel name would break every standard client.
-#: ``field_key`` and ``position_id`` are the multipart fields that ``ApiClient.uploadAttachment``
-#: writes.
+#: ``field_key`` is the multipart field that ``ApiClient.uploadAttachment`` writes.
 #: ``application_id`` is the magic-link contract (``MagicLinkVerifyOut``).
 _ALLOWED: frozenset[str] = frozenset(
     {
@@ -42,7 +41,6 @@ _ALLOWED: frozenset[str] = frozenset(
         "refresh_token",
         "error_description",
         "field_key",
-        "position_id",
         "application_id",
     }
 )

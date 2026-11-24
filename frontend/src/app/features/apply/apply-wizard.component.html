@@ -138,7 +138,6 @@
               [data]="answers()"
               [context]="formContext()"
               [skipKeys]="[]"
-              [files]="drafts.usable()"
               [emptyText]="'apply.review.empty' | t"
             />
             <app-section class="wz__block" [heading]="'apply.review.applicant' | t">
@@ -234,8 +233,8 @@
 
 <app-confirm-dialog
   [open]="confirmNoFile()"
-  [title]="'apply.files.noneTitle' | t"
-  [body]="'apply.files.noneBody' | t"
+  [title]="noFileHint()?.title ?? ''"
+  [body]="noFileHint()?.body ?? ''"
   [confirmLabel]="'apply.files.noneConfirm' | t"
   (confirm)="submit(true)"
   (cancel)="confirmNoFile.set(false)"

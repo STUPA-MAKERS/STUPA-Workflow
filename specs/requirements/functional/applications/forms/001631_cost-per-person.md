@@ -2,15 +2,10 @@
 id: "001631"
 title: The cost line shows the amount per person
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - backend/app/modules/forms/validation.py
-  - frontend/src/app/shared/forms/form-rules.ts
-  - frontend/src/app/pages/admin/forms/form-editor.component.ts
-  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.ts
-  - frontend/vendor/ui-kit/views/form-editor/src/form-field.util.ts
+updated: 2026-11-24
+replaced_by: F/applications/forms/003010
 scope:
   - backend/app/modules/forms
   - frontend/src/app/features/apply

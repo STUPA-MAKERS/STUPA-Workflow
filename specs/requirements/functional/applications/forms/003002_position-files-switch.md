@@ -2,15 +2,9 @@
 id: "003002"
 title: The files per position are a setting of the positions field
 kind: functional
-status: approved
+status: removed
 owner: frederikbeimgraben
 updated: 2026-11-24
-tests:
-  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:positionFiles"
-implementation:
-  - backend/app/shared/config_schemas.py
-  - frontend/src/app/shared/formly/types/formly-positions.type.ts
-  - frontend/vendor/ui-kit/views/form-editor/src/form-editor-view.component.html
 scope:
   - backend/app/modules/forms
   - frontend/src/app/shared/forms

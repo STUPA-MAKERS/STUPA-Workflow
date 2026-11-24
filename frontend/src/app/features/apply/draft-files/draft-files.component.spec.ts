@@ -112,30 +112,12 @@ describe('DraftFilesComponent', () => {
     expect(screen.queryByText(/von 20 Dateien/)).toBeNull();
   });
 
-  it('shows and uploads the files of one position (spec 001730)', async () => {
-    const { drafts, container } = await setup(
-      { fieldKey: 'kosten', positionId: 'p-1' },
-      fakeDrafts([
-        draft('a', { fieldKey: 'kosten', positionId: 'p-1' }),
-        draft('b', { fieldKey: 'kosten', positionId: 'p-2' }),
-        draft('c', { fieldKey: 'kosten' }),
-      ]),
-    );
-    expect(screen.getByText('a.pdf')).toBeInTheDocument();
-    expect(screen.queryByText('b.pdf')).toBeNull();
-    expect(screen.queryByText('c.pdf')).toBeNull();
-    const input = container.querySelector('input[type=file]') as HTMLInputElement;
-    await userEvent.upload(input, new File(['x'], 'Angebot.pdf', { type: 'application/pdf' }));
-    await waitFor(() => expect(drafts.upload).toHaveBeenCalled());
-    expect(drafts.upload.mock.calls[0][1]).toEqual({ fieldKey: 'kosten', positionId: 'p-1' });
-  });
-
   it('uploads picked files with the field key', async () => {
     const { drafts, toast, changed, container } = await setup({});
     const input = container.querySelector('input[type=file]') as HTMLInputElement;
     await userEvent.upload(input, new File(['x'], 'Angebot.pdf', { type: 'application/pdf' }));
     await waitFor(() => expect(drafts.upload).toHaveBeenCalled());
-    expect(drafts.upload.mock.calls[0][1]).toEqual({ fieldKey: null, positionId: null });
+    expect(drafts.upload.mock.calls[0][1]).toEqual({ fieldKey: null });
     await waitFor(() => expect(changed).toHaveBeenCalledWith(['n0']));
     expect(toast.error).toHaveBeenCalledWith('bad.exe: Dieser Dateityp ist nicht erlaubt.');
   });

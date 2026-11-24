@@ -249,8 +249,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000288](requirements/functional/applications/forms/000288_finite-numbers.md) | Numbers are finite decimals | approved |
 | [F/applications/forms/000289](requirements/functional/applications/forms/000289_form-revision.md) | A form change is versioned and audited | approved |
 | [F/applications/forms/000471](requirements/functional/applications/forms/000471_type-retention.md) | Antrag types can keep their own retention | approved |
-| [F/applications/forms/001630](requirements/functional/applications/forms/001630_cost-total-line.md) | The Kostenaufstellung shows the total cost and the requested amount | approved |
-| [F/applications/forms/001631](requirements/functional/applications/forms/001631_cost-per-person.md) | The cost line shows the amount per person | approved |
+| [F/applications/forms/001630](requirements/functional/applications/forms/001630_cost-total-line.md) | The Kostenaufstellung shows the total cost and the requested amount | replaced |
+| [F/applications/forms/001631](requirements/functional/applications/forms/001631_cost-per-person.md) | The cost line shows the amount per person | replaced |
 | [F/applications/forms/001632](requirements/functional/applications/forms/001632_cost-line-in-detail.md) | The Antrag detail shows no cost line | approved |
 | [F/applications/forms/001640](requirements/functional/applications/forms/001640_placeholder-offer-warning.md) | The form warns about a placeholder offer | approved |
 | [F/applications/forms/001641](requirements/functional/applications/forms/001641_placeholder-warning-not-blocking.md) | A placeholder warning does not block the submit | approved |
@@ -258,7 +258,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/001671](requirements/functional/applications/forms/001671_form-rules-same-check.md) | Frontend and backend check the same form rules | approved |
 | [F/applications/forms/001680](requirements/functional/applications/forms/001680_cost-centre-field-subtree.md) | A Kostenstelle field can limit its picker to a subtree | approved |
 | [F/applications/forms/001681](requirements/functional/applications/forms/001681_cost-centre-outside-subtree.md) | The server refuses a Kostenstelle outside the subtree | approved |
-| [F/applications/forms/001730](requirements/functional/applications/forms/001730_position-files.md) | A position takes files in the form | approved |
+| [F/applications/forms/001730](requirements/functional/applications/forms/001730_position-files.md) | A position takes files in the form | removed |
 | [F/applications/forms/001731](requirements/functional/applications/forms/001731_submit-without-file-warning.md) | A submit without a file asks for a confirmation | approved |
 | [F/applications/forms/001732](requirements/functional/applications/forms/001732_type-requires-file.md) | An Antragsart can require a file | approved |
 | [F/applications/forms/002840](requirements/functional/applications/forms/002840_computed-amount.md) | The server computes a computed amount | approved |
@@ -271,13 +271,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | approved |
 | [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | approved |
 | [F/applications/forms/002990](requirements/functional/applications/forms/002990_funding-hint-own-help.md) | The funding hint is the help of the field | approved |
-| [F/applications/forms/003000](requirements/functional/applications/forms/003000_cost-line-switch.md) | The cost line is a setting of the positions field | approved |
-| [F/applications/forms/003001](requirements/functional/applications/forms/003001_placeholder-warning-switch.md) | The placeholder warning is a setting of the positions field | approved |
-| [F/applications/forms/003002](requirements/functional/applications/forms/003002_position-files-switch.md) | The files per position are a setting of the positions field | approved |
-| [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | approved |
+| [F/applications/forms/003000](requirements/functional/applications/forms/003000_cost-line-switch.md) | The cost line is a setting of the positions field | replaced |
+| [F/applications/forms/003001](requirements/functional/applications/forms/003001_placeholder-warning-switch.md) | The placeholder warning is a setting of the positions field | replaced |
+| [F/applications/forms/003002](requirements/functional/applications/forms/003002_position-files-switch.md) | The files per position are a setting of the positions field | removed |
+| [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | replaced |
 | [F/applications/forms/003004](requirements/functional/applications/forms/003004_funding-cap-switch.md) | The cap of the funding at the total cost is a setting | approved |
 | [F/applications/forms/003006](requirements/functional/applications/forms/003006_funding-no-auto-hint.md) | A funding field without help shows no hint | approved |
 | [F/applications/forms/003008](requirements/functional/applications/forms/003008_positions-sum-row.md) | The sum of the positions is a row below the positions | approved |
+| [F/applications/forms/003010](requirements/functional/applications/forms/003010_hints-from-config.md) | Every hint of a form comes from the form config | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |

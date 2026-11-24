@@ -345,31 +345,18 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['minPositions']).toBe(3);
   });
 
-  it('gives the cost line to the last positions field only (spec 001630)', () => {
+  it('passes the hint texts with the language and the fields of the form (spec 003010)', () => {
+    const hints = { below: { de: 'Summe {costTotal}' } };
     const fields: FormFieldDef[] = [
       { key: 'a', type: 'positions', label: { de: 'A' } },
-      { key: 'b', type: 'positions', label: { de: 'B' } },
+      { key: 'b', type: 'positions', label: { de: 'B' }, validation: { hints } },
     ];
-    const [first, last] = toFormlyFields(fields, 'de');
-    expect(first.props?.['costLine']).toBeUndefined();
-    expect(last.props?.['costLine']).toBe(true);
-    expect(last.props?.['costFields']).toBe(fields);
-  });
-
-  it('drops the cost line and passes the display settings when they are off (specs 003000-003002)', () => {
-    const fields: FormFieldDef[] = [
-      {
-        key: 'a',
-        type: 'positions',
-        label: { de: 'A' },
-        validation: { costLine: false, placeholderWarning: false, positionFiles: false },
-      },
-    ];
-    const [cfg] = toFormlyFields(fields, 'de');
-    expect(cfg.props?.['costLine']).toBeUndefined();
-    expect(cfg.props?.['costFields']).toBeUndefined();
-    expect(cfg.props?.['placeholderWarning']).toBe(false);
-    expect(cfg.props?.['positionFiles']).toBe(false);
+    const [plain, hinted] = toFormlyFields(fields, 'de');
+    expect(plain.props?.['hints']).toBeUndefined();
+    expect(plain.props?.['costLine']).toBeUndefined();
+    expect(hinted.props?.['hints']).toBe(hints);
+    expect(hinted.props?.['hintLang']).toBe('de');
+    expect(hinted.props?.['formFields']).toBe(fields);
   });
 
   it('omits positions min props when validation does not set them', () => {

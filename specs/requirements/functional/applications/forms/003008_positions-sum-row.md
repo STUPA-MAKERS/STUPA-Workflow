@@ -16,8 +16,9 @@ scope:
 
 # The sum of the positions is a row below the positions
 
-A `positions` field must show the sum of its positions as a row below the last position and
-above the line of 001630 and the add button. The row must have its own surface in the style of a
+A `positions` field must show the sum of its positions as a row below the add row of the
+positions and above the hint `below` of 003010. The add row is a dashed row in the shape of a
+position (`app-add-row` of the kit), directly below the last position. The row must have its own surface in the style of a
 collapsed position: the same background, corner radius, padding and height. The row must show
 the icon Σ (`sigma`) in the column of the chevron of a position, then the text `Gesamt` (`Total`)
 in the column of the name, and the sum at the end, in the column of the value of a position. The head of the field must not show a sum. The row must show also when the field has

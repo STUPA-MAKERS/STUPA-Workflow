@@ -251,22 +251,17 @@ function choiceProps(f: FormFieldDef, lang: Lang): Readonly<Record<string, unkno
 }
 
 /**
- * The `positions` limits and settings that the form sets. The last `positions` field of the
- * form also gets the fields of the form (`costFields`) and `costLine`, unless its setting
- * `costLine` is off: it shows the line with the total cost, the requested amount and the
- * amount per person (specs 001630, 001631, 003000). `placeholderWarning` and
- * `positionFiles` go to the field as they are (specs 003001, 003002).
+ * The `positions` limits that the form sets, and its hint texts (spec 003010) with the
+ * language of the form and the fields of the form, which the placeholders of a text read.
  */
 function positionsProps(
   f: FormFieldDef,
   all: readonly FormFieldDef[],
+  lang: Lang,
 ): Readonly<Record<string, unknown>> {
   const v = f.validation;
-  const last = all.filter((x) => x.type === 'positions').at(-1);
   return {
-    ...(last?.key === f.key && v?.costLine !== false ? { costLine: true, costFields: all } : {}),
-    ...(v?.placeholderWarning === false ? { placeholderWarning: false } : {}),
-    ...(v?.positionFiles === false ? { positionFiles: false } : {}),
+    ...(v?.hints ? { hints: v.hints, hintLang: lang, formFields: all } : {}),
     ...(v?.minOffers !== undefined ? { minOffers: v.minOffers } : {}),
     ...(v?.minPositions !== undefined ? { minPositions: v.minPositions } : {}),
     ...(v?.allowNoOffers !== undefined ? { allowNoOffers: v.allowNoOffers } : {}),
@@ -290,7 +285,7 @@ function displayProps(
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],
       };
     case 'positions':
-      return positionsProps(f, all);
+      return positionsProps(f, all, lang);
     default:
       return {};
   }

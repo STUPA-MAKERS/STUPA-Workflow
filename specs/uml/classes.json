@@ -2058,12 +2058,6 @@
           "type": "TEXT"
         },
         {
-          "name": "position_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TEXT"
-        },
-        {
           "name": "filename",
           "nullable": false,
           "primaryKey": false,

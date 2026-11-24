@@ -224,10 +224,6 @@
 .pos__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);
 }
-.pos__add {
-  align-self: flex-start;
-}
-
 /* A field of an offer and the placeholder warning under it (spec 001640). */
 .pos__cell {
   display: flex;

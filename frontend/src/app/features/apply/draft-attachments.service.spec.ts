@@ -476,20 +476,6 @@ describe('DraftAttachmentsService', () => {
     expect(svc.files()).toEqual([]);
   });
 
-  it('keeps the position of a file and drops the files of a removed position (spec 001730)', async () => {
-    const { svc, upload, remove } = setup({ loggedIn: true });
-    await svc.upload([file('a.pdf')], { fieldKey: 'kosten', positionId: 'p-1' });
-    await svc.upload([file('b.pdf')], { fieldKey: 'kosten', positionId: 'p-2' });
-    await svc.upload([file('c.pdf')], { positionId: 'p-3' });
-    expect(upload.mock.calls[0][1]).toMatchObject({ fieldKey: 'kosten', positionId: 'p-1' });
-    expect(upload.mock.calls[2][1]).toMatchObject({ fieldKey: null, positionId: null });
-    expect(svc.filesOfPosition('kosten', 'p-1').map((f) => f.filename)).toEqual(['a.pdf']);
-    expect(svc.files()[2].positionId).toBeUndefined();
-    await svc.dropPosition('kosten', 'p-1');
-    expect(remove).toHaveBeenCalledTimes(1);
-    expect(svc.files().map((f) => f.filename)).toEqual(['b.pdf', 'c.pdf']);
-  });
-
   it('maps every refusal to its text', () => {
     expect(uploadErrorKey(new Error('x'))).toBe('apply.files.error.upload');
     expect(uploadErrorKey(httpError(413, { code: 'draft_quota_exceeded' }))).toBe('apply.files.error.quota');

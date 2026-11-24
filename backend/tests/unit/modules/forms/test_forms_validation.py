@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from app.modules.forms.validation import (
     SYSTEM_TITLE_KEY,
@@ -369,18 +370,19 @@ def test_funding_cap_setting() -> None:
         validate_answers(_funding_form(validation={"capAtCost": True}), data)
 
 
-def test_cost_line_setting() -> None:
-    """Save the display settings of a positions field and read them back (spec 003000)."""
-    settings = {
-        "costLine": False,
-        "placeholderWarning": False,
-        "positionFiles": False,
-        "fileReminder": False,
+def test_field_hints() -> None:
+    """Save the hint texts of a positions field and read them back (spec 003010)."""
+    hints = {
+        "below": {"de": "Summe {costTotal}, beantragt {amount}"},
+        "placeholderValue": {"de": "Wie ein Platzhalter."},
+        "noFileTitle": {"de": "Ohne Anhang?"},
     }
-    field = _positions_field(validation={"minOffers": 1, **settings})
+    field = _positions_field(validation={"minOffers": 1, "hints": hints})
     validate_definition([field])
     dumped = field.model_dump(by_alias=True, exclude_none=True)["validation"]
-    assert {k: dumped[k] for k in settings} == settings
+    assert dumped["hints"] == hints
+    with pytest.raises(ValidationError):
+        _positions_field(validation={"hints": {"costLine": {"de": "x"}}})
 
 
 def test_funding_without_positions_answer_rejected() -> None:

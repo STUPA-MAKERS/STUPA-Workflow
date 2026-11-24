@@ -29,7 +29,6 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.form_options import budget_field_options
 from app.modules.budget.tree_models import Budget
 from app.modules.files.drafts import DraftAttachments
-from app.modules.files.models import Attachment
 from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
@@ -206,70 +205,6 @@ async def _require_file(maker: async_sessionmaker[AsyncSession], seed: GuestSeed
         assert app_type is not None
         app_type.attachment_required = True
         await session.commit()
-
-
-async def test_a_file_of_a_position_keeps_its_position(
-    maker: async_sessionmaker[AsyncSession], settings: Settings
-) -> None:
-    seed = await seed_guest_flow(maker)
-    await _form(
-        maker,
-        seed,
-        [
-            {
-                "key": "kosten",
-                "type": "positions",
-                "label": {"de": "K"},
-                "validation": {"minOffers": 1},
-            }
-        ],
-    )
-    async with maker() as session:
-        files = AttachmentService(session, storage=_MemoryStorage(), settings=settings)  # type: ignore[arg-type]
-        draft = await DraftAttachments(files).upload(
-            token=None,
-            filename="angebot.pdf",
-            data=_PDF,
-            by="applicant",
-            field_key="kosten",
-            position_id="p-1",
-        )
-    assert draft.fieldKey == "kosten"
-    assert draft.positionId == "p-1"
-    position = {
-        "id": "p-1",
-        "label": "Beamer",
-        "offers": [{"label": "A", "value": 10, "preferred": True}],
-    }
-    app_id = await _create(
-        maker,
-        settings,
-        _payload(
-            seed,
-            {"kosten": [position]},
-            attachmentIds=[str(draft.id)],
-            draftToken=draft.draftToken,
-        ),
-    )
-    async with maker() as session:
-        files = AttachmentService(session, storage=_MemoryStorage(), settings=settings)  # type: ignore[arg-type]
-        later = await files.upload(
-            app_id,
-            filename="beleg.pdf",
-            data=_PDF,
-            by="applicant",
-            field_key="kosten",
-            position_id="p-1",
-        )
-        loose = await files.upload(
-            app_id, filename="x.pdf", data=_PDF, by="applicant", position_id="p-1"
-        )
-        row = await session.get(Attachment, draft.id)
-    assert later.positionId == "p-1"
-    assert loose.positionId is None
-    assert row is not None
-    assert row.application_id == app_id
-    assert row.position_id == "p-1"
 
 
 async def test_an_antragsart_with_a_required_file(
