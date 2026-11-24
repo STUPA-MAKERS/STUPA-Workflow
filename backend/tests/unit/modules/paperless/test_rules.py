@@ -31,17 +31,26 @@ def _settings(**values: object) -> PaperlessSettings:
     return PaperlessSettings(**{**base, **values})
 
 
-def test_no_oauth_scope_carries_a_paperless_permission() -> None:
+def test_only_the_paperless_scope_carries_a_paperless_permission() -> None:
+    """§F/integrations/mcp/002920: `paperless:use` alone carries `paperless.use`."""
     assert {"admin.paperless", "paperless.use"} <= set(PERMISSION_CATALOGUE)
-    carried = {permission for scope in oauth.SCOPES.values() for permission in scope}
-    assert not carried & {"admin.paperless", "paperless.use"}
-    agent = Principal(
+    carriers = {
+        name for name, scope in oauth.SCOPES.items() if scope & {"admin.paperless", "paperless.use"}
+    }
+    assert carriers == {"paperless:use"}
+    default = Principal(
         sub="agent",
         roles=["admin"],
-        scope_permissions=frozenset(oauth.scope_permissions(list(oauth.SCOPES))),
+        scope_permissions=oauth.scope_permissions(oauth.parse_scope(None)),
     )
-    assert not agent.has("admin.paperless")
-    assert not agent.has("paperless.use")
+    everything = Principal(
+        sub="agent",
+        roles=["admin"],
+        scope_permissions=oauth.scope_permissions(list(oauth.SCOPES)),
+    )
+    assert not default.has("paperless.use")
+    assert not everything.has("admin.paperless")
+    assert everything.has("paperless.use")
 
 
 def test_the_wait_between_two_tries_doubles() -> None:

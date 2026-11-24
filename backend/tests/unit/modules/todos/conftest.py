@@ -42,3 +42,15 @@ def grants(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[uuid.UUID]]:
 
     monkeypatch.setattr(LinkResolver, "granted", _granted)
     return opened
+
+
+@pytest.fixture(autouse=True)
+def audit_entries(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """The link audit entries without the hash chain: a test reads the returned list."""
+    entries: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        entries.append(kw)
+
+    monkeypatch.setattr("app.modules.todos.link_audit.record", _record)
+    return entries
