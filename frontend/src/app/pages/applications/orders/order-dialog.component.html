@@ -12,8 +12,8 @@
     @if (canManage()) {
     <app-form [form]="form()" [value]="value()" [errors]="errors()" (valueChange)="onValue($event)" />
     <div class="od__buyer">
+      <span class="od__label">{{ 'orders.field.buyerAccount' | t }}</span>
       @if (buyer(); as chosen) {
-        <span class="od__label">{{ 'orders.field.buyer' | t }}</span>
         <app-chip
           [removable]="true"
           [removeLabel]="'orders.buyer.remove' | t: { name: chosen.name }"

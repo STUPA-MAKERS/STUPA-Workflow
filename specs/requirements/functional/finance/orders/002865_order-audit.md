@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/audit/actions.py
+  - backend/app/modules/config_revision/revert.py
+  - backend/app/modules/orders/service.py
 scope:
   - backend/app/modules/orders
   - backend/app/modules/audit

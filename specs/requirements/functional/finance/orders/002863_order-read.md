@@ -5,7 +5,8 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/orders/router.py
 scope:
   - backend/app/modules/orders
   - backend/app/modules/applications

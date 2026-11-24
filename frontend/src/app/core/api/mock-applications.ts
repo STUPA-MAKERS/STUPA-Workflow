@@ -806,13 +806,15 @@ export function demoForm(): EffectiveForm {
   return DEMO_FORM;
 }
 
-/** The cost positions of a demo amount: three positions, the last without offers. */
+/** The cost positions of a demo amount: three positions with the fixed id that the server
+ *  gives each one, the last without offers. */
 function positionsFor(amount: number): readonly Record<string, unknown>[] {
   const a = Math.round(amount * 45) / 100;
   const b = Math.round(amount * 35) / 100;
   const c = Math.round((amount - a - b) * 100) / 100;
   return [
     {
+      id: 'pos-1',
       label: 'Raummiete inkl. Reinigung',
       offers: [
         { label: 'Studierendenwerk', value: a, preferred: true },
@@ -821,6 +823,7 @@ function positionsFor(amount: number): readonly Record<string, unknown>[] {
       ],
     },
     {
+      id: 'pos-2',
       label: 'Verpflegung',
       offers: [
         { label: 'Mensa-Catering', value: b, preferred: true },
@@ -829,6 +832,7 @@ function positionsFor(amount: number): readonly Record<string, unknown>[] {
       ],
     },
     {
+      id: 'pos-3',
       label: 'Technik und Ton',
       noOffers: true,
       noOffersReason: 'Rahmenvertrag mit dem Technik-Team der Hochschule; andere Anbieter dürfen die Anlage nicht bedienen.',

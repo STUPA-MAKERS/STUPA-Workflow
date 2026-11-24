@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/orders/router.py
+  - mcp/antragsplattform_mcp/tools/orders.py
 scope:
   - backend/app/modules/orders
 ---

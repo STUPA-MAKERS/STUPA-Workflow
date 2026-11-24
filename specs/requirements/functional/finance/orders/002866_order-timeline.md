@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/applications/service/reads.py
+  - frontend/src/app/shared/decision/timeline-lines.ts
 scope:
   - backend/app/modules/applications
   - frontend/src/app/pages/applications

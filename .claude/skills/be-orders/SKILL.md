@@ -1,0 +1,95 @@
+---
+name: be-orders
+description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the statuses planned/ordered/delivered/cancelled, the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend section "Bestellungen" in the Antrag detail. Use when working on backend/app/modules/orders or frontend/src/app/pages/applications/orders.
+---
+
+# Bestellungen — `backend/app/modules/orders`
+
+**Does:** Tracks the purchases of an approved Antrag. A Bestellung moves no money: it holds a
+planned and a real price, and the bookings stay in `budget`. Only a person creates one, never
+a flow action or a status change. The rules are the specs in
+`specs/requirements/functional/finance/orders/`.
+
+**Nothing here names a flow state, a transition, a Gremium or an Antragsart.** "Approved" is
+the flag `is_approved` of the current state, "with money" is `has_budget` of the type.
+
+**Key files:**
+- `models.py` — `PurchaseOrder` (`application_id` CASCADE, `number`, `title`, `kind`,
+  `status`, `supplier`, `url`, `order_number`, `position_ids` JSONB, `planned_amount`,
+  `actual_amount`, `ordered_on`, `delivered_on`, `buyer_id`, `buyer_name`, `note`, `version`,
+  `created_by`) and `ApplicationOrderEvent` (`purchase_order_event`: the events that the
+  timeline of the Antrag shows; it outlives the Bestellung, so a delete stays in the story).
+- `rules.py` — pure rules: `url_valid` (http/https only), `buyer_missing` (an Auslage needs a
+  buyer), `status_dates` (a status sets its date when it is empty), `price` (real, else
+  planned), `orders_sum` (without cancelled), `over_by`.
+- `numbers.py` — the number `B-` plus eight random characters.
+- `service.py` — `OrderService`: list, create, update, set status, delete. It checks the
+  approved state and the type with money on create, the positions against the answers of the
+  Antrag (unknown id, id of another Bestellung that is not cancelled), the version, and
+  writes the audit entry and the timeline event. It does not commit. `buyer_names` gives the
+  display name of the buyer accounts.
+- `privacy.py` — `erase_buyer`, `clear_buyer_names`, `order_export`.
+- `router.py` — the routes; the commit; the files of a Bestellung.
+
+**API surface:**
+- `GET /api/applications/{id}/orders` — who reads the Antrag reads its Bestellungen (object
+  check, 404 else). Answers `items`, `total`, `approvedAmount`, `overBy`, `canManage`,
+  `canCreate`. The applicant view has the number, the Bezeichnung, the kind, the status and
+  the two dates only, and null sums.
+- `POST /api/applications/{id}/orders` (`order.manage`) — 409 `application_not_approved`,
+  422 `application_type_without_budget`, `order_url_invalid`, `order_buyer_required`,
+  `order_buyer_unknown`, `order_position_unknown`, 409 `order_position_taken`.
+- `GET /api/orders/{id}`, `PATCH /api/orders/{id}` (body with `version`, 409
+  `order_version_conflict`), `POST /api/orders/{id}/status`, `DELETE /api/orders/{id}`.
+- `GET|POST /api/orders/{id}/attachments`, `DELETE /api/orders/{id}/attachments/{file}` —
+  files of the Bestellung (`attachment.order_id`), no attachments of the Antrag. The
+  download is the common `/api/attachments/{id}` with the owner kind `order`
+  (`attachments/router.py`); an applicant session gets 404.
+
+**Around it:**
+- Position ids: `applications/position_ids.py` gives each position of a Kostenaufstellung a
+  fixed id on every write and keeps an id that the form sent. Migration `e7d870f703d5`
+  backfills the stored answers.
+- Audit: `order_create`, `order_update`, `order_status`, `order_delete`
+  (`audit/actions.py`), revert in `config_revision/revert.py`.
+- Timeline: `applications/service/reads.py` merges the events as entries of kind `order`
+  (no price, so the applicant reads the same entry).
+- OAuth scope: `budget:write` carries `order.manage`.
+- Account merge: `admin/principal_merge.py` lists `buyer_id`, `created_by` and the event
+  actor. Privacy: `privacy/service.py` calls the three functions of `privacy.py`.
+- MCP: `mcp/antragsplattform_mcp/tools/orders.py` (`order_list`, `order_get`,
+  `order_create`, `order_update`, `order_set_status`, `order_delete`, `order_attachments`,
+  `order_attachment_upload`, `order_attachment_delete`).
+
+**Frontend** (`frontend/src/app/pages/applications/orders/`, API in
+`core/api/orders.service.ts`):
+- `orders-section` — the section "Bestellungen" below the details of the Antrag detail:
+  rows (Bezeichnung, Händler, status, real price or planned price with "geplant", signed
+  difference), the sum line, the warning above the approved amount, the ⋮ menu of a row,
+  the delete confirmation. It shows for a type with money or when a Bestellung exists.
+  After a change the page reads the timeline again (`changed`).
+- `order-dialog` — the form (kit `app-form`). Picked positions fill the planned price (sum
+  of the preferred offers) and, with one position, the link (first address in the text of
+  the preferred offer); a typed value stays. A person without `order.manage` gets the
+  values as facts and the files, without the form.
+- `order-files` — list, upload, download and delete of the files.
+- `orders.util.ts` — the pure helpers; `orderPositions` finds the positions by their shape,
+  because the key of a positions field differs from form to form.
+- Timeline text: `shared/decision/timeline-lines.ts` `orderEventText`, used by the Antrag
+  detail and by the status page of the applicant.
+- Tests: `src/testing/order-fixtures.ts` (`order`, `NO_ORDERS` for a spec that renders the
+  Antrag detail).
+
+**Traps:**
+- The table has no check "Auslage needs a buyer": the erasure of an account empties the
+  buyer, so the rule lives in the service only.
+- A new `AuditAction` needs the frontend list `AUDIT_ACTIONS`, its spec copy and the de/en
+  labels.
+- A new route needs an MCP tool (route parity test) and, for an object check, an entry in
+  `OBJECT_CHECK_ROUTES`.
+
+**Not built yet:** invoice and booking of a Bestellung, the marks, the list page with the
+export, the offered transition of the Antrag, link kind, search, graph, webhooks.
+
+**Related:** `be-applications`, `be-files`, `be-budget`, `be-audit`, `be-privacy`, `mcp`,
+`frontend`.

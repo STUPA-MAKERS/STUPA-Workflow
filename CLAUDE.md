@@ -52,6 +52,8 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-delegations** — meeting-bound vote delegations + substitute pool
 - **be-budget** — cost-center tree, fiscal years, allocations, bookings/transfers, ZUGFeRD
   invoices *(critical)*
+- **be-orders** — Bestellungen of an approved Antrag: purchases with planned and real price,
+  status, positions, buyer, own files, right `order.manage`, the section in the Antrag detail
 - **be-notifications** — mail templates (Jinja2 sandboxed), rules, prefs, arq dispatch
 - **be-webhooks** — outgoing event webhooks, SSRF guard, HMAC signature *(critical)*
 - **be-audit** — append-only sha256 hash chain, DB trigger, chain verification *(critical)*
