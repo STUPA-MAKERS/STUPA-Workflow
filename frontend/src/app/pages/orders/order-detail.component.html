@@ -34,23 +34,7 @@
               </app-field-row>
             }
           }
-        </app-field-group>
-      </app-section>
-      @if (covered().length) {
-        <app-section [heading]="'orders.field.positions' | t">
-          <app-field-group>
-            @for (position of covered(); track position.id) {
-              <app-field-row data-testid="od-position" [label]="position.label" [value]="position.value" />
-            }
-          </app-field-group>
-        </app-section>
-      }
-      @if (sumLine()) {
-        <app-section [heading]="'orders.detail.sumTitle' | t">
-          @if (warning()) {
-            <app-note kind="warn" icon="alert" role="status">{{ warning() }}</app-note>
-          }
-          <app-field-group>
+          @if (sumLine()) {
             <app-field-pair>
               @if (approvedLine()) {
                 <app-field-row
@@ -62,6 +46,18 @@
               }
               <app-field-row data-testid="od-sum" [label]="'orders.section.sum' | t" [value]="sumLine()" [mono]="true" />
             </app-field-pair>
+          }
+        </app-field-group>
+        @if (warning()) {
+          <app-note kind="warn" icon="alert" role="status">{{ warning() }}</app-note>
+        }
+      </app-section>
+      @if (covered().length) {
+        <app-section [heading]="'orders.field.positions' | t">
+          <app-field-group>
+            @for (position of covered(); track position.id) {
+              <app-field-row data-testid="od-position" [label]="position.label" [value]="position.value" />
+            }
           </app-field-group>
         </app-section>
       }

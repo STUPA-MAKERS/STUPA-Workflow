@@ -129,7 +129,7 @@ describe('OrderFormComponent', () => {
         { value: 'p-2', label: 'Kabel' },
       ],
     });
-    expect(field('sum').text).toMatch(/^Alle Bestellungen zusammen 100,00\s€, genehmigt 200,00\s€$/);
+    expect(field('sum').text).toMatch(/^Alle Bestellungen des Antrags 100,00\s€, genehmigt 200,00\s€$/);
     cmp.save(cmp.value());
     expect(api.create).toHaveBeenCalledWith('a-1', expect.objectContaining({ title: 'Beamer', kind: 'order', buyerId: null }));
     expect(screen.getByRole('heading', { name: 'Bestellung anlegen' })).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('OrderFormComponent', () => {
 
   it('warns in the form when the sum is above the approved amount, and shows a sum without one', async () => {
     const over = await setup({ application: 'a-1', list: { ...LIST, total: '212.50', overBy: '12.50' } });
-    expect(over.field('sum').text).toMatch(/^Alle Bestellungen zusammen 212,50\s€, genehmigt 200,00\s€\. Alle Bestellungen zusammen liegen 12,50\s€ über dem genehmigten Betrag\.$/);
+    expect(over.field('sum').text).toMatch(/^Alle Bestellungen des Antrags 212,50\s€, genehmigt 200,00\s€\. Alle Bestellungen des Antrags liegen zusammen 12,50\s€ über dem genehmigten Betrag\.$/);
     expect(over.field('sum').visible).toBe(true);
   });
 

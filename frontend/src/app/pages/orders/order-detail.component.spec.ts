@@ -151,7 +151,7 @@ describe('OrderDetailComponent', () => {
     ]);
     expect(cmp.sumLine()).toMatch(/^212,50\s€$/);
     expect(cmp.approvedLine()).toMatch(/^200,00\s€$/);
-    expect(cmp.warning()).toMatch(/^Alle Bestellungen zusammen liegen 12,50\s€ über dem genehmigten Betrag\.$/);
+    expect(cmp.warning()).toMatch(/^Alle Bestellungen des Antrags liegen zusammen 12,50\s€ über dem genehmigten Betrag\.$/);
     expect(cmp.linked()).toEqual([
       { icon: 'file', title: 'Technik für den Sitzungssaal', sub: 'Antrag', link: ['/applications', 'a-1'] },
       { icon: 'receipt', title: 'Rechnung ohne Nummer', sub: 'Rechnung · Rechnung bezahlt', link: ['/invoices'], queryParams: { id: 'i-1' } },
