@@ -194,6 +194,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'paperless_filed',
   'paperless_inserted',
   'ticket_mailbox',
+  'link_add',
+  'link_remove',
   'pii_export',
   'anonymization',
   'erasure_requested',

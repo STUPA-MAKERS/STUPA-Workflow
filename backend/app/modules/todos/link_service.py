@@ -15,6 +15,8 @@ The routes of ``/api/links`` (spec 001409) use this service. A link has no direc
 * A link with a card end writes the card events ``linked`` and ``unlinked`` and touches
   the board, and an Event keeps its Antrag, Buchung or invoice to itself
   (``event_link_taken``).
+* Each added or removed link writes an audit entry with the grant of a token
+  (§F/collaboration/links/002923, ``link_audit``).
 
 The list shows a linked Event first, then the other links in the order of the kinds of
 ``LINK_KINDS``, and in each kind the newest link first (spec 001407).
@@ -28,8 +30,10 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.audit.actions import AuditAction
 from app.modules.auth.principal import Principal
 from app.modules.todos import link_store
+from app.modules.todos.link_audit import audit_link
 from app.modules.todos.link_rights import LinkRights
 from app.modules.todos.link_store import Edge
 from app.modules.todos.link_view import LinkViewer
@@ -238,7 +242,9 @@ class LinkService:
         actor = await self.todos.actor_of(principal)
         for end, card, _board in cards:
             await self.todos.check_new_link(card, other if end == one else one)
-        self.session.add(Link.between(one, other, actor))
+        link = Link.between(one, other, actor)
+        self.session.add(link)
+        await audit_link(self.session, AuditAction.LINK_ADD, link, principal)
         for end, card, board in cards:
             self.todos.note_link(card, board, other if end == one else one, actor, added=True)
 
@@ -258,6 +264,7 @@ class LinkService:
         await self._check_change(one, other, principal)
         actor = await self.todos.actor_of(principal)
         cards = await self._cards((one, other), principal)
+        await audit_link(self.session, AuditAction.LINK_REMOVE, link, principal)
         await self.session.delete(link)
         for end, card, board in cards:
             self.todos.note_link(card, board, link.other(end), actor, added=False)

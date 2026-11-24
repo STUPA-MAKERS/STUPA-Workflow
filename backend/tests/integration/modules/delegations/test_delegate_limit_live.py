@@ -70,7 +70,7 @@ async def _world(maker: async_sessionmaker[AsyncSession]) -> _World:
 
 def _delegate(client: TestClient, api: FastAPI, w: _World, name: str, to: str) -> Response:
     act(api, w.subs[name])
-    body = {"meetingId": str(w.meeting_id), "delegateId": str(w.ids[to]), "delegateVoting": True}
+    body = {"meetingId": str(w.meeting_id), "delegateId": str(w.ids[to])}
     return client.post("/api/delegations", json=body)
 
 
@@ -302,4 +302,3 @@ async def test_a_pool_substitute_of_the_lead_votes_in_an_election(
     assert cast.status_code == 200, cast.text
     assert cast.json()["ballots"] == 2
     assert await _voters(maker, election) == {w.subs["Dora"], w.subs["Anna"]}
-

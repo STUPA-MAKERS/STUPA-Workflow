@@ -918,7 +918,6 @@ class MeetingSettingsUpdate(WireModel, frozen=True):
 class DelegationCreate(WireModel, frozen=True):
     meetingId: str
     delegateId: str
-    delegateVoting: bool = False
     delegatorId: str | None = Field(
         default=None,
         description=(
@@ -960,9 +959,35 @@ class TodoLinkIn(WireModel, frozen=True):
     )
 
 
+#: The kinds of a link end of the link tools: the card kinds and a Paperless document
+#: (§F/integrations/mcp/002922).
+LinkKind = Literal[
+    "application",
+    "meeting",
+    "agenda_item",
+    "vote",
+    "appointment",
+    "gremium",
+    "invoice",
+    "expense",
+    "budget",
+    "ticket",
+    "todo",
+    "paperless",
+]
+
+#: The kinds of an element whose filed Paperless document has an address.
+PaperlessElementKind = Literal["protocol", "application", "plan"]
+
+
 class LinkEndIn(WireModel, frozen=True):
-    kind: TodoLinkKind
-    id: str = Field(description="The id of the element; the caller must be able to read it")
+    kind: LinkKind
+    id: str = Field(
+        description=(
+            "The id of the element; the caller must be able to read it. For the kind "
+            "`paperless` the number of the document in Paperless, for example `41`"
+        )
+    )
 
 
 TodoEntryRole = Literal["read", "edit", "manage"]

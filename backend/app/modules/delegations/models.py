@@ -2,8 +2,10 @@
 
 `MeetingDelegation` holds a meeting-bound delegation. Each (meeting, delegator)
 pair has exactly one outgoing delegation. The gremium of the row is the gremium
-of the meeting. `delegate_voting` also transfers the voting right. The transfer
-is exclusive and never a duplicate. The delegator cannot vote in that meeting.
+of the meeting. `delegate_voting` transfers the voting right. A new row always
+sets it (§F/meetings/delegations/002900), and a false value is the history of an
+older rule in a held meeting. The transfer is exclusive and never a duplicate.
+The delegator cannot vote in that meeting.
 
 The substitute pool of a gremium (`DelegationSubstitute`) is in `gremien.models`,
 because the pool belongs to a gremium and gives its read scope
@@ -27,7 +29,7 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Delegation for a single meeting with an optional transfer of the voting right.
+    """Delegation for a single meeting that transfers the voting right.
 
     A delegate can hold several delegations in one meeting, up to the limit of the Gremium
     (``delegation_max_per_delegate``). One cast of the delegate writes one ballot for each
@@ -46,7 +48,7 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
     delegate_principal_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE")
     )
-    delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="true")
     #: True when the substitute pool legitimizes the delegation. Create then
     #: applies no lead-time deadline.
     via_pool: Mapped[bool] = mapped_column(Boolean, server_default="false")

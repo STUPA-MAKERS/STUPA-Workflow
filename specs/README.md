@@ -306,6 +306,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/links/001408](requirements/functional/collaboration/links/001408_one-picker.md) | Verknüpfen searches every kind | approved |
 | [F/collaboration/links/001409](requirements/functional/collaboration/links/001409_links-api.md) | The links have their own API | approved |
 | [F/collaboration/links/001410](requirements/functional/collaboration/links/001410_cost-centre-needs-budget-write.md) | A cost centre link needs a budget write right | approved |
+| [F/collaboration/links/002923](requirements/functional/collaboration/links/002923_link-audit.md) | Each added or removed link has an audit entry | approved |
 | [F/collaboration/notifications/000151](requirements/functional/collaboration/notifications/000151_task-mail-recipients.md) | Task mails go only to who can act | approved |
 | [F/collaboration/notifications/000152](requirements/functional/collaboration/notifications/000152_team-mails-opt-in.md) | Team mails about Anträge are off by default | approved |
 | [F/collaboration/notifications/000153](requirements/functional/collaboration/notifications/000153_sandboxed-templates.md) | Mail placeholders use camelCase | approved |
@@ -602,6 +603,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
+| [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | approved |
+| [F/integrations/mcp/002921](requirements/functional/integrations/mcp/002921_no-paperless-copy-by-token.md) | A token does not copy documents into or out of Paperless | approved |
+| [F/integrations/mcp/002922](requirements/functional/integrations/mcp/002922_paperless-link-end-by-number.md) | An MCP link tool names a Paperless end by its document number | approved |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
 | [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
@@ -727,6 +731,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
 | [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
 | [F/meetings/delegations/002692](requirements/functional/meetings/delegations/002692_substitutes-page-per-gremium.md) | The Stellvertretungen of a Gremium have their own page | approved |
+| [F/meetings/delegations/002900](requirements/functional/meetings/delegations/002900_delegation-carries-the-vote.md) | A delegation always transfers the voting right | approved |
+| [F/meetings/delegations/002901](requirements/functional/meetings/delegations/002901_planned-delegations-get-the-vote.md) | Delegations of planned meetings get the voting right | approved |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -997,6 +1003,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/002610](requirements/non-functional/usability/layout/002610_settings-no-change-date.md) | A settings screen of Verwaltung shows no change date | approved |
 | [NF/usability/layout/002690](requirements/non-functional/usability/layout/002690_admin-lists-like-users.md) | Every list page of Verwaltung looks like Benutzer | approved |
 | [NF/usability/layout/002800](requirements/non-functional/usability/layout/002800_phone-dock-sheets-full-screen.md) | A sheet from the phone dock of a meeting opens over the whole screen | approved |
+| [NF/usability/layout/002902](requirements/non-functional/usability/layout/002902_delegation-search-pinned.md) | The delegation dialogs pin the search | approved |
+| [NF/usability/layout/002903](requirements/non-functional/usability/layout/002903_delegation-pick-rows.md) | The delegation dialogs use the pick rows | approved |
+| [NF/usability/layout/002904](requirements/non-functional/usability/layout/002904_delegation-vote-line.md) | The delegation dialog says that the vote moves | removed |
+| [NF/usability/layout/002905](requirements/non-functional/usability/layout/002905_pick-dialog-tight-body.md) | A dialog with a search or a list has a tight body | approved |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

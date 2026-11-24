@@ -106,8 +106,8 @@ def _delegate(sub: str = "other") -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-def _payload(delegate_id: Any, *, voting: bool = False) -> DelegationCreate:
-    return DelegationCreate(meetingId=MEETING_ID, delegateId=delegate_id, delegateVoting=voting)
+def _payload(delegate_id: Any) -> DelegationCreate:
+    return DelegationCreate(meetingId=MEETING_ID, delegateId=delegate_id)
 
 
 def _names(*rows: tuple[Any, str | None, str | None]):
@@ -224,7 +224,7 @@ async def test_create_persists_and_audits() -> None:
 
 async def test_create_voting_enabled_ok() -> None:
     db = _happy_db()
-    out = await _svc(db, voting=True).create(_payload(db._delegate.id, voting=True), _actor())
+    out = await _svc(db, voting=True).create(_payload(db._delegate.id), _actor())
     assert out.delegate_voting is True
 
 
@@ -401,7 +401,7 @@ async def test_create_over_the_limit_of_the_gremium_409() -> None:
         (uuid4(), delegate.id, False, True), (uuid4(), delegate.id, False, False)
     )
     with pytest.raises(ConflictError, match="holds the most"):
-        await _svc(db, voting=True).create(_payload(delegate.id, voting=True), _actor())
+        await _svc(db, voting=True).create(_payload(delegate.id), _actor())
 
 
 def test_counted_in_keeps_only_pool_seats_in_an_election() -> None:

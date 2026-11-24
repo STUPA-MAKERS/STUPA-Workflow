@@ -159,7 +159,6 @@ function context(
     meetingId,
     gremiumId: planned ? 'g0000000-0000-0000-0000-000000000002' : 'g0000000-0000-0000-0000-000000000001',
     allowVoteDelegation: true,
-    votingDelegationEnabled: true,
     delegationAllowExternal: false,
     deadline: planned ? at(3, 16, 30) : null,
     deadlinePassed: false,
@@ -203,12 +202,10 @@ export function memberDelegationCreate(
   const {
     meetingId = '',
     delegateId = '',
-    delegateVoting = false,
     delegatorId,
   } = (body ?? {}) as Partial<{
     meetingId: string;
     delegateId: string;
-    delegateVoting: boolean;
     delegatorId: string;
   }>;
   if (delegatorId) {
@@ -223,7 +220,7 @@ export function memberDelegationCreate(
       delegatorName: roster.find((a) => a.principalId === delegatorId)?.displayName ?? null,
       delegateId,
       delegateName: poolOf(delegatorId).find((r) => r.principalId === delegateId)?.displayName ?? null,
-      delegateVoting,
+      delegateVoting: true,
       viaPool: true,
       createdAt: new Date().toISOString(),
       revocable: true,
@@ -243,7 +240,7 @@ export function memberDelegationCreate(
     delegateId,
     delegateName:
       substitute?.displayName ?? roster.find((a) => a.principalId === delegateId)?.displayName ?? null,
-    delegateVoting,
+    delegateVoting: true,
     viaPool: !!substitute,
     createdAt: new Date().toISOString(),
     revocable: true,

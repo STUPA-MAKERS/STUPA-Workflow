@@ -1,6 +1,7 @@
 @let src = source();
 <app-dialog
   size="lg"
+  [body]="step() === 'pick' ? 'tight' : 'normal'"
   [open]="!!src"
   [heading]="'admin.users.merge.title' | t"
   [subtitle]="src ? ('admin.users.merge.subtitle' | t: { name: name(src) }) : ''"

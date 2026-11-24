@@ -2,14 +2,14 @@
 
 A delegation is meeting-bound and lives in `meeting_delegation`. Each (meeting,
 member) pair has exactly one outgoing delegation. The gremium of the delegation
-is the gremium of the meeting. A delegation can also carry the vote. That
-transfer is exclusive and never a duplicate.
+is the gremium of the meeting. Every delegation carries the vote
+(§F/meetings/delegations/002900). That transfer is exclusive and never a duplicate.
 
 The server enforces these invariants:
 
-* Feature gate. A meeting delegation, with or without the vote, needs the
-  gremium flag `allow_vote_delegation` (§F/meetings/delegations/000110). No
-  server setting switches the vote transfer.
+* Feature gate. A meeting delegation needs the gremium flag
+  `allow_vote_delegation` (§F/meetings/delegations/000110). The client cannot
+  choose a delegation without the vote.
 * Own vote only. The delegator must be a voting member of the meeting gremium.
   The right comes only from an active gremium membership whose gremium role
   holds `vote.cast`. A global role, a role assignment or an OIDC group mapping
@@ -542,7 +542,6 @@ class DelegationService:
             gremium,
             delegator=me,
             delegate=delegate,
-            delegate_voting=payload.delegate_voting,
             via_pool=via_pool,
             actor=actor,
             by_lead=False,
@@ -627,7 +626,6 @@ class DelegationService:
             gremium,
             delegator=delegator,
             delegate=delegate,
-            delegate_voting=payload.delegate_voting,
             via_pool=True,
             actor=actor,
             by_lead=True,
@@ -641,7 +639,6 @@ class DelegationService:
         *,
         delegator: PrincipalRow,
         delegate: PrincipalRow,
-        delegate_voting: bool,
         via_pool: bool,
         actor: Principal,
         by_lead: bool,
@@ -688,7 +685,7 @@ class DelegationService:
                     "Recipient has delegated their own vote for this meeting.",
                     errors=[{"field": "delegateId", "msg": "no re-delegation chains"}],
                 )
-        if via_pool and delegate_voting and any(voting for _, voting in mine):
+        if via_pool and any(voting for _, voting in mine):
             raise ConflictError(
                 "Recipient already carries a delegated vote for this meeting.",
                 code="delegate_already_voting",
@@ -705,7 +702,7 @@ class DelegationService:
             gremium_id=gremium.id,
             delegator_principal_id=delegator.id,
             delegate_principal_id=delegate.id,
-            delegate_voting=delegate_voting,
+            delegate_voting=True,
             via_pool=via_pool,
             created_by=actor.sub,
         )
@@ -715,7 +712,7 @@ class DelegationService:
             "meetingId": str(meeting.id),
             "gremiumId": str(gremium.id),
             "delegateId": str(delegate.id),
-            "delegateVoting": delegate_voting,
+            "delegateVoting": True,
             "viaPool": via_pool,
             **_lead_data(delegator.id, by_lead=by_lead),
         }
@@ -918,7 +915,6 @@ class DelegationService:
             meeting_id=meeting.id,
             gremium_id=gremium.id,
             allow_vote_delegation=gremium.allow_vote_delegation,
-            voting_delegation_enabled=gremium.allow_vote_delegation,
             delegation_allow_external=gremium.delegation_allow_external,
             deadline=deadline,
             deadline_passed=deadline is not None and now >= deadline,

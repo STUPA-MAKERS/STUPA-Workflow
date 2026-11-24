@@ -37,7 +37,14 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
-from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
+from app.deps import (
+    DbSession,
+    Principal,
+    SettingsDep,
+    get_current_principal,
+    refuse_agent_token,
+    require_principal,
+)
 from app.modules.auth.people import PersonRef
 from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -664,7 +671,7 @@ async def file_ticket_file_in_paperless(
     service: ServiceDep,
     db: DbSession,
     worker: Worker,
-    _user: PaperlessUser,
+    user: PaperlessUser,
 ) -> TicketPaperlessFile:
     """File one clean file of the ticket in Paperless ("In Paperless ablegen").
 
@@ -673,8 +680,11 @@ async def file_ticket_file_in_paperless(
     answer is the file with the state ``pending``; a second call for the same file adds
     no second document, and a call for a ``failed`` file starts its job again. While
     the Paperless connection is off the answer is 409 ``paperless_off``, and for a file
-    without a clean scan 409 ``file_not_clean``.
+    without a clean scan 409 ``file_not_clean``. An OAuth token gets 403
+    ``cookie_session_required``, also with the scope ``paperless:use``
+    (§F/integrations/mcp/002921).
     """
+    refuse_agent_token(user, "Agent tokens cannot file in Paperless.")
     out = await service.file_in_paperless(
         ticket_id, attachment_id, worker.principal, areas=worker.areas
     )

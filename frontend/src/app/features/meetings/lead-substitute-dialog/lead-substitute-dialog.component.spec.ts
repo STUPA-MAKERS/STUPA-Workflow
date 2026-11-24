@@ -25,7 +25,7 @@ function sub(id: string, name: string | null, isMember = false): DelegationRecip
   return { principalId: id, displayName: name, viaPool: true, isMember };
 }
 
-const CTX = { ...DELEGATION_CONTEXT, allowVoteDelegation: true, votingDelegationEnabled: true };
+const CTX = { ...DELEGATION_CONTEXT, allowVoteDelegation: true };
 
 const POOL = [sub('s-1', 'Paula Persönlich'), sub('s-2', 'Sven Stellvertreter', true)];
 
@@ -76,47 +76,37 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(group).getByText('Stellvertretung')).toBeInTheDocument();
     expect(within(group).getByText('Mitglied')).toBeInTheDocument();
     expect(within(dialog()).queryByRole('searchbox')).toBeNull();
-    expect(within(dialog()).getByText('Die Vertretung stimmt für Fritz Fehlend ab.')).toBeInTheDocument();
     expect(submit()).toBeDisabled();
     await userEvent.click(within(group).getByRole('radio', { name: /Paula Persönlich/ }));
     await userEvent.click(submit());
     const req = http.expectOne(`${BASE}/delegations`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
-      meetingId: 'm-1', delegatorId: 'pr-5', delegateId: 's-1', delegateVoting: true,
+      meetingId: 'm-1', delegatorId: 'pr-5', delegateId: 's-1',
     });
     req.flush({ id: 'd-9' });
     expect(toast.success).toHaveBeenCalledWith('Vertretung eingetragen.');
     expect(created).toHaveBeenCalledWith({ id: 'd-9' });
   });
 
-  /** A new opening starts again with the vote on; without a vote transfer there is no switch. */
-  it('sends no vote when the switch is off or the platform has no vote transfer', async () => {
+  /** 002900: the lead has no switch; every substitution carries the vote. */
+  it('has no switch and no line for the vote', async () => {
     const { dialog, submit, answer, http, fixture } = await setup();
     answer();
-    await userEvent.click(within(dialog()).getByRole('radio', { name: /Sven/ }));
-    await userEvent.click(within(dialog()).getByRole('switch', { name: 'Stimmrecht mit übertragen' }));
-    expect(within(dialog()).getByText('Die Vertretung nimmt teil, stimmt aber nicht ab.')).toBeInTheDocument();
-    await userEvent.click(submit());
-    const first = http.expectOne(`${BASE}/delegations`);
-    expect(first.request.body.delegateVoting).toBe(false);
-    first.flush({ id: 'd-1' });
-
+    expect(within(dialog()).queryByRole('switch')).toBeNull();
     fixture.componentRef.setInput('member', { ...FRITZ, principalId: 'pr-4', displayName: null, email: 'v@x.de' });
     fixture.detectChanges();
     http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-4`).flush(POOL);
-    http.expectOne(CONTEXT_URL).flush({ ...CTX, votingDelegationEnabled: false });
+    http.expectOne(CONTEXT_URL).flush(CTX);
     fixture.detectChanges();
     expect(within(dialog()).getByText('für v@x.de')).toBeInTheDocument();
-    expect(within(dialog()).queryByRole('switch')).toBeNull();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Paula/ }));
     await userEvent.click(submit());
-    expect(http.expectOne(`${BASE}/delegations`).request.body.delegateVoting).toBe(false);
+    expect(http.expectOne(`${BASE}/delegations`).request.body).not.toHaveProperty('delegateVoting');
   });
 
   /**
-   * Without the context the vote transfer counts as off. "Erneut versuchen" reads the pool of the
-   * member again.
+   * "Erneut versuchen" reads the pool of the member again.
    */
   it('says when the pool of the member is empty or does not load', async () => {
     const { dialog, answer, http, fixture } = await setup();
@@ -178,7 +168,6 @@ describe('LeadSubstituteDialogComponent', () => {
     context.flush(CTX);
     fixture.detectChanges();
     expect(within(dialog()).getAllByRole('radio')).toHaveLength(2);
-    expect(within(dialog()).getByText('Die Vertretung stimmt für Vera ab.')).toBeInTheDocument();
   });
 
   /**

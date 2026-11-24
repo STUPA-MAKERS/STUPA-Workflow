@@ -1,9 +1,59 @@
+@use 'breakpoints' as bp;
 @use 'field' as f;
+@use 'option-menu' as om;
+@use '../../../shared/ui/dialog-form' as df;
+@use '../../../shared/ui/pick-rows' as pr;
+
+// "Vertretung einrichten" and "Vertretung eintragen" (the second one uses this sheet too).
+// The search stays on top and only the list below it scrolls, in its own box (002902). The
+// rows are the rows of the pick dialogs, with the avatar before the name (002903).
+@include df.host;
+
 .dd {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
+  min-width: 0;
+  // One height for every state, so the dialog keeps its height while the search runs.
+  height: clamp(16rem, calc(78dvh - 19rem), 28rem);
 }
+@include bp.phone {
+  .dd {
+    height: auto;
+  }
+  .dd__list {
+    max-height: 22rem;
+  }
+}
+
+.dd__search {
+  flex: none;
+  --sp-bg: var(--color-surface-3);
+}
+
+.dd__slot {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.dd__slot > app-empty-state,
+.dd__slot > app-skeleton {
+  margin-block: auto;
+}
+
+.dd__list {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  overflow-y: auto;
+  // No fade at the ends: the box cuts the list hard at its rounded corners (002902).
+  border-radius: var(--radius-lg);
+}
+
 .dd__group {
   display: flex;
   flex-direction: column;
@@ -13,19 +63,19 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2);
 }
 .dd__cap {
   flex: 1 1 auto;
   margin: 0;
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2);
 }
 .dd__head .dd__cap {
   padding: 0;
 }
 .dd__note {
   margin: 0;
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2);
   font-size: var(--fs-small);
   line-height: 1.125rem;
   color: var(--color-text-muted);
@@ -35,104 +85,47 @@
   padding: 0;
 }
 
-.dd__search {
-  --sp-bg: var(--color-surface-3);
-}
-.dd__searchBox {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.dd__searchBox:disabled .dd__search {
-  opacity: 0.5;
-}
-
 .dd__rows {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
+  @include pr.list;
+  flex: none;
+  overflow: visible;
 }
 .dd__row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 60px;
-  padding: 10px 14px;
-  cursor: pointer;
+  @include pr.row;
 }
 @media (hover: hover) {
   .dd__row:hover:not(.dd__row--off) {
-    background: var(--color-surface-4);
+    @include pr.row-hover;
   }
 }
 .dd__row--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
   @include f.highlight-chosen;
 }
-@media (hover: hover) {
-  .dd__row--on:hover:not(.dd__row--off) {
-    background: var(--color-selected);
-    color: var(--color-on-selected);
-  }
+.dd__row:has(.dd__radio:focus-visible) {
+  @include pr.row-focus;
 }
 .dd__row--off {
   cursor: default;
   opacity: 0.5;
 }
-.dd__row:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
 .dd__radio {
-  flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  accent-color: var(--color-accent);
-  cursor: inherit;
+  @include pr.radio;
 }
-.dd__radio:focus-visible {
-  outline: none;
+.dd__avatar {
+  @include om.avatar;
 }
 .dd__text {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include pr.text;
 }
 .dd__name {
-  font-weight: var(--fw-medium);
+  @include pr.title;
+}
+.dd__row--on .dd__name {
+  @include pr.title-on;
 }
 .dd__sub {
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
+  @include pr.sub;
 }
-.dd__row--on .dd__sub {
-  color: inherit;
+.dd__check {
+  @include pr.check;
 }
-
-.dd__voting {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.dd__voting app-switch {
-  flex: none;
-}
-.dd__votingText {
-  display: flex;
-  cursor: pointer;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.dd__votingText .dd__note {
-  padding: 0;
-}
-.dd__votingLabel {
-  font-weight: var(--fw-medium);
-}
-

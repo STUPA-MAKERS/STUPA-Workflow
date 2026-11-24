@@ -80,13 +80,9 @@
 .fv__votes .fv__cap {
   padding: 0 var(--space-2);
 }
+// The pill of the button starts at the edge of the card text, as the button of the Vertretung card.
 .fv__roster {
   align-self: flex-start;
-  margin-inline-start: calc(-1 * var(--space-3));
-}
-.fv__side > .fv__roster,
-.fv__phone > .fv__roster {
-  margin-inline-start: 0;
 }
 .fv__sheetStack {
   display: flex;

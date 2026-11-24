@@ -11,7 +11,7 @@ import type {
   Quorum,
   SelfAttendanceStatus,
 } from '@core/api/models';
-import { clock, shortTime, weekdayDate } from '@shared/date-format';
+import { clock, shortTime } from '@shared/date-format';
 import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
 
@@ -96,13 +96,6 @@ export function assembleProtocolMarkdown(agenda: readonly AgendaItem[]): string 
       return `${heading}${ref}${body}`;
     })
     .join('\n\n');
-}
-
-/** "35. Sitzung des Studierendenparlaments · Di, 13.10.2026": the meeting below the
- *  title of a dialog. */
-export function meetingLine(m: Meeting, formatLocale: string): string {
-  const day = weekdayDate(m.date, formatLocale);
-  return day ? `${m.title} · ${day}` : m.title;
 }
 
 /** Placeholder vote for a live `vote_opened` that was not loaded yet (follower). */
