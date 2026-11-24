@@ -44,8 +44,7 @@ import {
  * - "Andere Mitglieder": the other members of the gremium, with a search. They need the
  *   lead time of the gremium: after the deadline the rows are off. When the gremium
  *   allows external substitutes, the search also asks the server for other persons.
- * - One line below the list says that the vote moves: every delegation carries the
- *   voting right (002900), so the dialog has no switch for it.
+ * Every delegation carries the voting right (002900), so the dialog has no switch for it.
  *
  * The search stays on top and filters both groups; only the list below it scrolls
  * (002902). The rows are the rows of the pick dialogs with the avatar (002903).

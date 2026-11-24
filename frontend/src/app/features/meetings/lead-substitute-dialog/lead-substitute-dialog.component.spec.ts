@@ -76,7 +76,6 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(group).getByText('Stellvertretung')).toBeInTheDocument();
     expect(within(group).getByText('Mitglied')).toBeInTheDocument();
     expect(within(dialog()).queryByRole('searchbox')).toBeNull();
-    expect(within(dialog()).getByText('Die Vertretung stimmt für Fritz Fehlend ab.')).toBeInTheDocument();
     expect(submit()).toBeDisabled();
     await userEvent.click(within(group).getByRole('radio', { name: /Paula Persönlich/ }));
     await userEvent.click(submit());
@@ -91,7 +90,7 @@ describe('LeadSubstituteDialogComponent', () => {
   });
 
   /** 002900: the lead has no switch; every substitution carries the vote. */
-  it('has no switch for the vote and keeps the line for another member', async () => {
+  it('has no switch and no line for the vote', async () => {
     const { dialog, submit, answer, http, fixture } = await setup();
     answer();
     expect(within(dialog()).queryByRole('switch')).toBeNull();
@@ -101,7 +100,6 @@ describe('LeadSubstituteDialogComponent', () => {
     http.expectOne(CONTEXT_URL).flush(CTX);
     fixture.detectChanges();
     expect(within(dialog()).getByText('für v@x.de')).toBeInTheDocument();
-    expect(within(dialog()).getByText('Die Vertretung stimmt für v@x.de ab.')).toBeInTheDocument();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Paula/ }));
     await userEvent.click(submit());
     expect(http.expectOne(`${BASE}/delegations`).request.body).not.toHaveProperty('delegateVoting');
@@ -170,7 +168,6 @@ describe('LeadSubstituteDialogComponent', () => {
     context.flush(CTX);
     fixture.detectChanges();
     expect(within(dialog()).getAllByRole('radio')).toHaveLength(2);
-    expect(within(dialog()).getByText('Die Vertretung stimmt für Vera ab.')).toBeInTheDocument();
   });
 
   /**

@@ -43,8 +43,7 @@ const SEARCH_ABOVE = 5;
  * personal entries for the member and the gremium-wide entries
  * (`GET /delegations/meetings/{id}/recipients?delegatorId=`). The server leaves out the
  * lead and the member. A pick plus "Vertretung eintragen" sends `POST /delegations` with
- * `delegatorId`. The vote always goes with it (002900), and one line below the list says
- * so. The search stays on top; only the list below it scrolls (002902).
+ * `delegatorId`. The vote always goes with it (002900). The search stays on top; only the list below it scrolls (002902).
  *
  * The ui-kit dialog is a centered dialog on a desktop and a bottom sheet on a phone. The
  * server checks every rule again (live, lead, missing, pool, no chains).

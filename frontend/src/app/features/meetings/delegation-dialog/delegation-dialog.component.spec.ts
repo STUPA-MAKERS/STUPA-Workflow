@@ -148,13 +148,13 @@ describe('DelegationDialogComponent', () => {
     }
   });
 
-  /** 002900 and 002904: no switch, one line says that the vote moves, the body has no choice. */
+  /** 002900: no switch, no line about the vote, the body has no choice. */
   it('always transfers the vote and says so', async () => {
     const { dialog, http, created } = await setup();
     const submit = () => within(dialog()).getByRole('button', { name: 'Vertretung einrichten' });
     expect(submit()).toBeDisabled();
     expect(within(dialog()).queryByRole('switch')).toBeNull();
-    expect(within(dialog()).getByText('Die Vertretung stimmt für dich ab.')).toBeInTheDocument();
+    expect(within(dialog()).queryByText(/Die Vertretung stimmt/)).toBeNull();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Emma Vogel/ }));
     await userEvent.click(submit());
     const req = http.expectOne(`${BASE}/delegations`);
