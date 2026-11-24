@@ -8,7 +8,7 @@ updated: 2026-11-09
 implementation:
   - backend/app/modules/calendar/ics.py
   - backend/app/modules/calendar/service.py
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/calendar_reads.py
 scope:
   - backend/app/modules/todos
   - backend/app/modules/calendar

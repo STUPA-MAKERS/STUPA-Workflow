@@ -43,7 +43,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.storage import ObjectStorage
 from app.modules.tickets import mail_client
 from app.modules.tickets.mail_client import MailAccount, MailError
-from app.modules.tickets.mailbox import host_allowed, smtp_account
+from app.modules.tickets.mailbox import smtp_account
 from app.modules.tickets.models import (
     PLATFORM_AREA_ID,
     Ticket,
@@ -55,6 +55,7 @@ from app.modules.tickets.models import (
 from app.modules.tickets.numbers import NUMBER_ALPHABET, NUMBER_LENGTH, format_number
 from app.settings import Settings
 from app.shared.errors import ConflictError, ValidationProblem
+from app.shared.ssrf import host_allowed
 
 logger = logging.getLogger("app.tickets")
 

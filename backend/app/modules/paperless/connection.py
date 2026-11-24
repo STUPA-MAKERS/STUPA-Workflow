@@ -27,7 +27,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.paperless.client import (
     PaperlessClient,
     PaperlessError,
-    host_allowed,
+    address_allowed,
     normalize_url,
 )
 from app.modules.paperless.models import PaperlessSettings
@@ -106,7 +106,7 @@ class ConnectionService:
                 §F/integrations/paperless/002813).
         """
         base_url = (normalize_url(data.base_url) if data.base_url else "") or None
-        if base_url is not None and not host_allowed(
+        if base_url is not None and not address_allowed(
             base_url, self.settings.paperless_host_allowlist
         ):
             raise ValidationProblem(

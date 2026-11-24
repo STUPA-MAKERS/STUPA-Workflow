@@ -4908,6 +4908,7 @@
   "activity.loading": "Aktivität wird geladen",
   "activity.loadMore": "Mehr laden",
   "activity.loadError": "Die Aktivität konnte nicht geladen werden.",
+  "activity.notifications": "Benachrichtigungen",
   "activity.empty": "Noch keine Aktivität",
   "activity.emptyBody": "Hier erscheint, was an deinen Anträgen, To-Dos, Tickets und Sitzungen passiert.",
   "activity.emptyFiltered": "Keine Aktivität für diese Auswahl",
