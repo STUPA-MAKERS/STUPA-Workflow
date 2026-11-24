@@ -13,7 +13,7 @@ tests:
   - "frontend/src/app/core/pwa/install-metadata.spec.ts:indexHtml"
 implementation:
   - backend/app/modules/admin/page_head.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/branding_router.py
   - deploy/web/nginx.conf
   - frontend/src/index.html
 scope:
