@@ -322,11 +322,11 @@ async def test_create_me_principal_missing_403() -> None:
         await _svc(db).create(DelegationCreate(meetingId=MEETING_ID, delegateId=uuid4()), _actor())
 
 
-async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -> None:
-    """Allow a non-voting delegation next to another non-voting row to the same person.
+async def test_create_next_to_an_old_nonvoting_row_does_not_conflict() -> None:
+    """Allow a delegation next to an old non-voting row of another delegator to the same person.
 
-    The existing row of another delegator gives no 409. The loop continues and the service
-    creates the new non-voting delegation.
+    The existing row gives no 409. The loop continues and the service creates the new
+    delegation, which carries the vote (002900).
     """
     me, delegate = _me(), _me("other")
     existing_row = (uuid4(), delegate.id, False, False)
@@ -342,7 +342,7 @@ async def test_create_nonvoting_existing_to_same_recipient_does_not_conflict() -
     out = await _svc(db).create(
         DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id), _actor()
     )
-    assert out.delegate_voting is False
+    assert out.delegate_voting is True
     assert db.committed == 1
 
 

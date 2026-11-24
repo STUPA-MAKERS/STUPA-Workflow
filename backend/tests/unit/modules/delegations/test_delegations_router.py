@@ -57,7 +57,7 @@ class _FakeService:
         return _out(
             meeting_id=payload.meeting_id,
             delegate_id=payload.delegate_id,
-            delegate_voting=payload.delegate_voting,
+            delegate_voting=True,
         )
 
     async def revoke(self, delegation_id, actor):
