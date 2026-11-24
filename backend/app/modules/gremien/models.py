@@ -86,6 +86,8 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     protocols_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
     #: Extra addresses that get the final protocol in addition to the members.
     protocol_recipients: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    #: The signature lines that end the protocol PDF, in order (spec 003007).
+    protocol_signatures: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
 
     __table_args__ = (
         CheckConstraint(

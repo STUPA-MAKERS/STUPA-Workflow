@@ -246,6 +246,15 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
         created.id, GremiumUpdate(name="AStA neu"), _ACTOR
     )
     assert updated.name == "AStA neu"
+    assert updated.protocol_signatures == []
+    signed = await svc.update_gremium(
+        created.id,
+        GremiumUpdate.model_validate({"protocolSignatures": [" Kasse ", "Vorsitz"]}),
+        _ACTOR,
+    )
+    assert signed.protocol_signatures == ["Kasse", "Vorsitz"]
+    kept = await svc.update_gremium(created.id, GremiumUpdate(name="AStA"), _ACTOR)
+    assert kept.protocol_signatures == ["Kasse", "Vorsitz"]
 
 
 async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:

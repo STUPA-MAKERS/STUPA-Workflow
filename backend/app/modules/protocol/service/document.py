@@ -114,6 +114,7 @@ class DocumentOps(ProtocolServiceBase):
                 absent=header.absent,
                 datalines=header.datalines,
                 quorate=await self._quorate(gremium, meeting, header.present_count),
+                signatures=tuple(getattr(gremium, "protocol_signatures", None) or ()),
                 markdown=assembled or free_text,
             )
         )

@@ -189,6 +189,7 @@ def gremium_row(**kw: Any) -> Any:
         "guests_may_vote": False,
         "term_start_month": 10,
         "protocols_public": False,
+        "protocol_signatures": [],
         "protocol_recipients": [],
     }
     base.update(kw)

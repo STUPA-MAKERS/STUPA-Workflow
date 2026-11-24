@@ -272,6 +272,10 @@ class GremiumCreate(WireModel, frozen=True):
             "protocols page (public version only)."
         ),
     )
+    protocolSignatures: list[str] = Field(
+        default_factory=list[str],
+        description="The signature lines that end the protocol PDF, in order",
+    )
 
 
 class GremiumUpdate(WireModel, frozen=True):
@@ -295,6 +299,10 @@ class GremiumUpdate(WireModel, frozen=True):
             "publishes ALL final protocols that are not held back; a job builds the "
             "missing public versions first."
         ),
+    )
+    protocolSignatures: list[str] | None = Field(
+        default=None,
+        description="Replaces the signature lines that end the protocol PDF, in order",
     )
 
 

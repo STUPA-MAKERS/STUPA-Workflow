@@ -2,11 +2,11 @@
 id: "003007"
 title: The signature lines of the protocol PDF are a setting of the Gremium
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "backend/tests/unit/modules/protocol/test_protocol_markdown.py:signature"
+  - "backend/tests/unit/modules/protocol/test_protocol_markdown.py:test_signature_lines_come_from_the_gremium"
 implementation:
   - backend/app/modules/gremien/models.py
   - backend/app/modules/protocol/markdown.py

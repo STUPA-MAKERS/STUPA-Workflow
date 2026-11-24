@@ -809,7 +809,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/002780](requirements/functional/meetings/protocols/002780_selection-format-bar.md) | A text selection shows a format bar | approved |
 | [F/meetings/protocols/002781](requirements/functional/meetings/protocols/002781_selection-bar-formats.md) | The format bar holds the inline formats | approved |
 | [F/meetings/protocols/002782](requirements/functional/meetings/protocols/002782_selection-bar-place.md) | The format bar shows below the selection | approved |
-| [F/meetings/protocols/003007](requirements/functional/meetings/protocols/003007_protocol-signature-lines.md) | The signature lines of the protocol PDF are a setting of the Gremium | draft |
+| [F/meetings/protocols/003007](requirements/functional/meetings/protocols/003007_protocol-signature-lines.md) | The signature lines of the protocol PDF are a setting of the Gremium | approved |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |

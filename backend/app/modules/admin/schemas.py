@@ -9,10 +9,10 @@ definitions come from the ``config_schemas`` models. The branding model is
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
@@ -135,6 +135,15 @@ class CdVariantLogoReorder(FrozenCamelModel, frozen=True):
     logo_ids: list[UUID] = Field(alias="logoIds")
 
 
+#: The most signature rows of one Antragsart or lines of one Gremium (specs 003005, 003007).
+MAX_SIGNATURE_ROWS = 10
+
+#: One signature line of the protocol PDF (spec 003007), for example "Schriftführung".
+SignatureLine = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
+
+
 class GremiumOut(FrozenCamelModel, frozen=True):
     """A gremium with its delegation, quorum and publication settings."""
 
@@ -178,6 +187,10 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     )
     #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
+    #: The signature lines that end the protocol PDF, in order (spec 003007).
+    protocol_signatures: list[str] = Field(
+        default_factory=list[str], serialization_alias="protocolSignatures"
+    )
 
 
 class GremiumAdminOut(GremiumOut, frozen=True):
@@ -220,6 +233,11 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
     #: Without a value the gremium takes ``termStartMonth`` of the meeting settings.
     term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
+    protocol_signatures: list[SignatureLine] = Field(
+        default_factory=list[SignatureLine],
+        alias="protocolSignatures",
+        max_length=MAX_SIGNATURE_ROWS,
+    )
 
 
 class GremiumUpdate(FrozenCamelModel, frozen=True):
@@ -247,6 +265,10 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
     guests_may_vote: bool | None = Field(default=None, alias="guestsMayVote")
     term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
+    #: A sent list replaces the lines; an omitted field keeps them.
+    protocol_signatures: list[SignatureLine] | None = Field(
+        default=None, alias="protocolSignatures", max_length=MAX_SIGNATURE_ROWS
+    )
 
 
 class GremiumPublicPreview(FrozenCamelModel, frozen=True):
@@ -357,10 +379,6 @@ class GremiumRoleMappingUpdate(_OidcGroupField, frozen=True):
         if not self.model_fields_set:
             raise ValueError("at least one field required")
         return self
-
-
-#: The most signature rows of one Antragsart (spec 003005).
-MAX_SIGNATURE_ROWS = 10
 
 
 class SignatureRow(FrozenStrictCamelModel, frozen=True):

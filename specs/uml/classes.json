@@ -3924,6 +3924,12 @@
           "type": "ARRAY"
         },
         {
+          "name": "protocol_signatures",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "ARRAY"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,

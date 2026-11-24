@@ -232,6 +232,8 @@ class ProtocolDoc:
         form: The form of the meeting (`presence`, `hybrid`, `video`).
         quorate: The quorum from the present members against the active members. `None`
             means no statement.
+        signatures: The signature lines of the Gremium, in order (spec 003007). The
+            renderer sets one line per entry for a hand signature; none gives no line.
     """
 
     title: str
@@ -252,6 +254,7 @@ class ProtocolDoc:
     form: str | None = None
     datalines: Sequence[str] = ()
     quorate: bool | None = None
+    signatures: Sequence[str] = ()
 
 
 #: The German names of the meeting kinds and forms in the protocol header.
@@ -266,12 +269,6 @@ MEETING_FORM_LABELS: Mapping[str, str] = {
     "hybrid": "Hybrid",
     "video": "Videokonferenz",
 }
-
-
-#: Signature block of the renderer (`unterschriften`). The frontmatter
-#: supplies the name of the secretary. The board line stays a blank
-#: line for a hand signature.
-_SIGNATURES = ("Schriftführung", "Vorstand")
 
 
 def _yaml_list(key: str, items: Sequence[str]) -> list[str]:
@@ -348,7 +345,7 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
         *_yaml_list("abwesend", doc.absent),
         *_yaml_entry("beschlussfaehigkeit", quorate),
         *_yaml_list("datalines", doc.datalines),
-        *_yaml_list("unterschriften", _SIGNATURES),
+        *_yaml_list("unterschriften", doc.signatures),
         "---",
     ]
 
