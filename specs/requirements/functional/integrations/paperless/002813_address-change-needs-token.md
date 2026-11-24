@@ -17,7 +17,7 @@ scope:
 
 A change of the address of the Paperless connection must carry the token in the same request.
 Without the token the change must answer 422 with the code `token_required` and must change
-nothing.
+nothing. This rule applies to the address only, not to the address for links (002844).
 
 Reason: The stored token must not follow a new address. Else a person with the admin page and
 without the token can send it to another host of the allowlist (002515).

@@ -23,9 +23,14 @@ import type {
   PaperlessFilingKind,
 } from '../admin.models';
 
-/** What the form edits: the address, a new token and the switch of each filing part. */
+/**
+ * What the form edits: the address, the address for links, a new token and the switch of
+ * each filing part.
+ */
 export interface PaperlessDraft {
   readonly baseUrl: string;
+  /** Empty: the links use the address (§F/integrations/paperless/002844). */
+  readonly publicUrl: string;
   /** Empty: the stored token stays. */
   readonly token: string;
   readonly fileProtocols: boolean;
@@ -80,6 +85,16 @@ const KIND_TEXT: Readonly<Record<PaperlessFilingKind, TranslationKey>> = {
 /** The prefix of the action key of "Erneut versuchen"; the id of the filing follows. */
 const RETRY = 'retry:';
 
+/** An absolute http(s) URL, as the address for links needs (§F/integrations/paperless/002844). */
+export function isWebUrl(text: string): boolean {
+  try {
+    const url = new URL(text.trim());
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !!url.hostname;
+  } catch {
+    return false;
+  }
+}
+
 /** An absolute http(s) URL without a user part. */
 export function isPaperlessUrl(text: string): boolean {
   try {
@@ -101,6 +116,8 @@ export function isPaperlessUrl(text: string): boolean {
  * refuses an address whose host is not in the deploy setting `PAPERLESS_HOST_ALLOWLIST`
  * (422 `paperless_host_not_allowed`); the address field then shows the error. A new
  * address needs the token again while a token is stored (§F/integrations/paperless/002813).
+ * The address for links is what each browser link to Paperless names; the server never calls
+ * it, so it needs neither an allowed host nor the token (§F/integrations/paperless/002844).
  *
  * "Verbindung testen" calls Paperless with the stored connection and shows the result as a
  * toast. "Bestehende Dokumente ablegen" starts a job for each final document without one,
@@ -120,7 +137,7 @@ export function isPaperlessUrl(text: string): boolean {
     TranslatePipe,
     SettingsScreenComponent,
     ScreenGroupDirective,
-      InputComponent,
+    InputComponent,
   ],
   templateUrl: './paperless.component.html',
 })
@@ -143,6 +160,7 @@ export class PaperlessComponent {
     put: (body) => this.put(body),
     draftOf: (s) => ({
       baseUrl: s.baseUrl ?? '',
+      publicUrl: s.publicUrl ?? '',
       token: '',
       fileProtocols: s.fileProtocols,
       fileApplications: s.fileApplications,
@@ -152,6 +170,7 @@ export class PaperlessComponent {
     }),
     initial: {
       baseUrl: '',
+      publicUrl: '',
       token: '',
       fileProtocols: false,
       fileApplications: false,
@@ -161,9 +180,10 @@ export class PaperlessComponent {
     },
     body: () => {
       const d = this.draft();
-      if (this.urlError() || this.tokenError()) return null;
+      if (this.urlError() || this.publicUrlError() || this.tokenError()) return null;
       return {
         baseUrl: d.baseUrl.trim() || null,
+        publicUrl: d.publicUrl.trim() || null,
         ...(d.token ? { token: d.token } : {}),
         fileProtocols: d.fileProtocols,
         fileApplications: d.fileApplications,
@@ -176,6 +196,7 @@ export class PaperlessComponent {
       const d = this.draft();
       return (
         d.baseUrl.trim() !== (s.baseUrl ?? '') ||
+        d.publicUrl.trim() !== (s.publicUrl ?? '') ||
         d.token !== '' ||
         SWITCHES.some(({ key }) => d[key] !== s[key])
       );
@@ -206,6 +227,15 @@ export class PaperlessComponent {
       });
     }
     return '';
+  });
+
+  /**
+   * The address for links is only for the browser, so it needs only the form of a web
+   * address: no allowlist, no token (§F/integrations/paperless/002844).
+   */
+  protected readonly publicUrlError = computed(() => {
+    const url = this.draft().publicUrl.trim();
+    return url && !isWebUrl(url) ? this.i18n.translate('admin.paperless.urlInvalid') : '';
   });
 
   /**
@@ -391,7 +421,9 @@ export class PaperlessComponent {
   protected act(key: string): void {
     if (key === 'test') this.test();
     if (key === 'backfill') this.backfill();
-    const filing = key.startsWith(RETRY) ? this.failed().find((f) => f.id === key.slice(RETRY.length)) : null;
+    const filing = key.startsWith(RETRY)
+      ? this.failed().find((f) => f.id === key.slice(RETRY.length))
+      : null;
     if (filing) this.retry(filing);
   }
 

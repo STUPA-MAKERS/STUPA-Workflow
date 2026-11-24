@@ -22,10 +22,12 @@ class ConnectionIn(FrozenStrictCamelModel, frozen=True):
     """The connection and the switches as the admin page saves them.
 
     ``token`` is write-only. Without it the stored token stays. ``clearToken`` removes
-    the stored token.
+    the stored token. ``publicUrl`` is the address for links; empty means the links use
+    ``baseUrl`` (§F/integrations/paperless/002844).
     """
 
     base_url: str | None = Field(default=None, alias="baseUrl", max_length=2000)
+    public_url: str | None = Field(default=None, alias="publicUrl", max_length=2000)
     token: str | None = Field(default=None, min_length=1, max_length=500)
     clear_token: bool = Field(default=False, alias="clearToken")
     file_protocols: bool = Field(default=False, alias="fileProtocols")
@@ -49,6 +51,7 @@ class ConnectionOut(FrozenCamelModel, frozen=True):
     """
 
     base_url: str | None = Field(default=None, serialization_alias="baseUrl")
+    public_url: str | None = Field(default=None, serialization_alias="publicUrl")
     token_set: bool = Field(serialization_alias="tokenSet")
     file_protocols: bool = Field(serialization_alias="fileProtocols")
     file_applications: bool = Field(serialization_alias="fileApplications")

@@ -3,7 +3,11 @@
   [groups]="groups()"
   [state]="screenState()"
   [notice]="notice()"
-  [save]="{ dirty: dirty(), busy: saving(), disabled: !!urlError() || !!tokenError() }"
+  [save]="{
+    dirty: dirty(),
+    busy: saving(),
+    disabled: !!urlError() || !!publicUrlError() || !!tokenError(),
+  }"
   (change)="set($event.key, $event.value)"
   (action)="act($event.key)"
   (save)="save()"
@@ -18,6 +22,16 @@
       [error]="urlError()"
       [ngModel]="draft().baseUrl"
       (ngModelChange)="patch({ baseUrl: $event })"
+    />
+    <app-input
+      type="url"
+      name="publicUrl"
+      autocomplete="off"
+      [label]="'admin.paperless.publicUrl' | t"
+      [hint]="'admin.paperless.publicUrlHint' | t"
+      [error]="publicUrlError()"
+      [ngModel]="draft().publicUrl"
+      (ngModelChange)="patch({ publicUrl: $event })"
     />
   </ng-template>
 

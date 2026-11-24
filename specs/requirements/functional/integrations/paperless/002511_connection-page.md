@@ -4,7 +4,7 @@ title: An admin connects one Paperless instance
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-23
+updated: 2026-11-24
 tests:
   - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_connection_saves_and_no_read_returns_the_token"
   - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_admin_routes_need_the_admin_permission"
@@ -20,7 +20,8 @@ scope:
 
 # An admin connects one Paperless instance
 
-The admin page `Paperless` must hold the address and the token of one Paperless-ngx instance.
+The admin page `Paperless` must hold the address, the optional address for links (002844) and
+the token of one Paperless-ngx instance.
 The page must have a button that tests the connection and shows the result. The page must need
 the permission `admin.paperless`.
 

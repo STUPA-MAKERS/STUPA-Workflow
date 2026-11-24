@@ -5099,6 +5099,8 @@
   "admin.paperless.connection": "Verbindung",
   "admin.paperless.url": "Adresse von Paperless",
   "admin.paperless.urlInvalid": "Bitte eine Adresse mit http:// oder https:// eingeben.",
+  "admin.paperless.publicUrl": "Adresse für Links",
+  "admin.paperless.publicUrlHint": "Die Adresse, unter der Menschen Paperless im Browser öffnen. Leer: Links nutzen die Adresse von Paperless.",
   "admin.paperless.hostNotAllowed": "Dieser Host ist im Betrieb nicht freigegeben. Freigegeben: {hosts}",
   "admin.paperless.token": "Token",
   "admin.paperless.tokenNew": "Neuer Token",

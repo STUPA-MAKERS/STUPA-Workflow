@@ -872,6 +872,7 @@ export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
 /** The Paperless connection of the mock: connected, with the protocols filed. */
 export const MOCK_PAPERLESS: PaperlessConnection = {
   baseUrl: 'https://paperless.example.org',
+  publicUrl: null,
   tokenSet: true,
   fileProtocols: true,
   fileApplications: false,

@@ -135,6 +135,7 @@ describe('AdminApiService — mock mode', () => {
     const saved = await firstValueFrom(
       s.putPaperless({
         baseUrl: 'https://paperless.example.org',
+        publicUrl: null,
         token: 'secret',
         fileProtocols: true,
         fileApplications: false,

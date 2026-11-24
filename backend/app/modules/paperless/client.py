@@ -452,6 +452,27 @@ class PaperlessClient:
         return response.content
 
 
-def document_url(base_url: str, document_id: int) -> str:
-    """The address of a document in the web UI of Paperless."""
-    return f"{base_url}/documents/{document_id}/details"
+def link_address(base_url: str | None, public_url: str | None) -> str | None:
+    """The address that a browser link names: the address for links, else the address.
+
+    The server calls the API only on ``base_url``. A person opens Paperless on its public
+    name, which often differs (§F/integrations/paperless/002844). None without either.
+    """
+    return public_url or base_url or None
+
+
+def link_address_valid(url: str) -> bool:
+    """Tell whether an address for links is an absolute ``http`` or ``https`` address.
+
+    The server never calls it, so the allowlist does not apply (002844).
+    """
+    parts = urlsplit(url)
+    return parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+
+
+def document_url(address: str, document_id: int) -> str:
+    """The address of a document in the web UI of Paperless.
+
+    ``address`` is the result of `link_address`, never the API address alone.
+    """
+    return f"{address}/documents/{document_id}/details"
