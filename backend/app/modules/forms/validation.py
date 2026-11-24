@@ -60,6 +60,8 @@ _RULE_NUMBER_TYPES = _NUMERIC_TYPES | {"funding"}
 #: The promote target of the amount of the Antrag.
 _AMOUNT = "amount"
 _CENT = Decimal("0.01")
+#: The step of a ``percent`` value: four decimal places of a fraction (spec 002962).
+_PERCENT_STEP = Decimal("0.0001")
 
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
@@ -339,24 +341,55 @@ class _Computed:
     errors: tuple[FieldError, ...]
 
 
-def _compute_step(state: _Computed, field: FormFieldDef, ctx: Mapping[str, Any]) -> _Computed:
-    """Evaluate one ``compute`` expression against ``ctx`` and the values computed so far.
+def _compute_step(
+    state: _Computed,
+    field: FormFieldDef,
+    fields: Sequence[FormFieldDef],
+    base: Mapping[str, Any],
+) -> _Computed:
+    """Evaluate one ``compute`` expression against the values of a form rule (spec 002960).
 
-    The value of a computed amount field must be a finite number from 0 and becomes whole
-    cents (spec 002841); a bad one is an error and gets no value.
+    The expression reads the answers, ``amount`` and ``costTotal`` as `rule_context` makes
+    them from the answers and the values computed so far. The value of a computed amount
+    field must be a finite number from 0 and becomes whole cents (spec 002841); a bad one
+    is an error and gets no value. Any other field that cannot be computed has no value and
+    no error (spec 002961), and its format rounds its value (spec 002962).
     """
+    ctx = rule_context(fields, {**base, **state.values})
     try:
-        value = eval_jsonlogic(field.compute, {**ctx, **state.values})
+        value = eval_jsonlogic(field.compute, ctx)
     except JsonLogicError as exc:
+        if not is_computed_amount(field):
+            return state
         failed = FieldError(field=field.key, msg=f"compute failed: {exc}")
         return replace(state, errors=(*state.errors, failed))
     if not is_computed_amount(field):
-        return replace(state, values={**state.values, field.key: value})
+        shown = _formatted(field.display_format or "number", value)
+        return state if shown is None else replace(state, values={**state.values, field.key: shown})
     cents = _cents(value)
     if cents is None:
         no_amount = FieldError(field=field.key, msg="the amount must be a finite number from 0")
         return replace(state, errors=(*state.errors, no_amount))
     return replace(state, values={**state.values, field.key: float(cents)})
+
+
+def _formatted(display_format: str, value: object) -> object | None:
+    """Return ``value`` rounded for its format, or ``None`` when it gives no value.
+
+    ``money`` rounds half up to cents and ``percent`` to four decimal places; both need a
+    number. ``number`` keeps any value. A number that is not finite is no value in every
+    format, because JSONB cannot store it.
+    """
+    is_number = isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
+    if value is None or (is_number and _finite_decimal(value) is None):
+        return None
+    if display_format == "number":
+        return value
+    num = _finite_decimal(value) if is_number else None
+    if num is None:
+        return None
+    step = _CENT if display_format == "money" else _PERCENT_STEP
+    return float(num.quantize(step, rounding=ROUND_HALF_UP))
 
 
 def _cents(value: object) -> Decimal | None:
@@ -394,9 +427,9 @@ def _computed(
     ``data`` holds no value of a ``computed`` field, so an expression reads only the answers
     and the values computed before it.
     """
-    ctx = {**(context or {}), **data, **_number_answers(fields, data)}
+    base = {**(context or {}), **data}
     return reduce(
-        lambda state, f: _compute_step(state, f, ctx),
+        lambda state, f: _compute_step(state, f, fields, base),
         (f for f in fields if f.type == "computed" and f.compute is not None),
         _Computed(values={}, errors=()),
     )

@@ -1,5 +1,5 @@
 import type { FormFieldDef } from '@core/api/models';
-import { formatAnswer, isEmptyAnswer } from './answer-format';
+import { formatAnswer, formatComputed, formatPercent, isEmptyAnswer } from './answer-format';
 import { normalizePositions, positionValue, positionsTotal, preferredOffer } from './positions';
 
 const env = { lang: 'de', yes: 'Ja', no: 'Nein' };
@@ -84,5 +84,22 @@ describe('positions', () => {
     expect(positionValue(p)).toBe(7);
     expect(positionValue({ offers: [{ label: 'A', value: null, preferred: true }] })).toBe(0);
     expect(positionsTotal([p, { offers: [] }])).toBe(7);
+  });
+});
+
+describe('formatComputed (spec 002964)', () => {
+  it('shows each format and keeps a value that the format cannot show', () => {
+    expect(formatComputed('number', 1.5, 'de-DE')).toBe('1.5');
+    expect(formatComputed('percent', 0.5, 'de-DE')).toMatch(/^50\s%$/);
+    expect(formatComputed('percent', 'abc', 'de-DE')).toBe('abc');
+    expect(formatComputed('money', 'abc', 'de-DE')).toBe('abc');
+    expect(formatPercent(Number.NaN, 'de-DE')).toBe('');
+  });
+
+  it('formats a computed answer by its field format, the amount as money', () => {
+    const plain: FormFieldDef = { key: 'q', type: 'computed', label: { de: 'Q' }, compute: { var: 'x' } };
+    expect(formatAnswer(plain, 0.5, env)).toBe('0.5');
+    expect(formatAnswer({ ...plain, format: 'percent' }, 0.5, env)).toMatch(/^50\s%$/);
+    expect(formatAnswer({ ...plain, isPromoted: true, promoteTarget: 'amount' }, 2, env)).toMatch(/^2,00\s€$/);
   });
 });

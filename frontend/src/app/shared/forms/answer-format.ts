@@ -2,7 +2,8 @@ import type { FormFieldDef } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
 import { resolveI18n } from './i18n-text';
 import { formatMoney } from '@shared/format-money';
-import { isComputedAmount } from './form-rules';
+import type { ComputedFormat } from '@core/api/models';
+import { computedFormat } from './form-rules';
 
 /**
  * Stringify an answer value without a field definition.
@@ -96,6 +97,7 @@ export function isEmptyAnswer(value: unknown): boolean {
  *   the Gremien and the cost centres into the options of the effective form.
  * - `multiselect`: the names, joined by commas.
  * - `currency` and `funding`: the amount in euro.
+ * - `computed`: the value in its format (spec 002964).
  * - Everything else: the value as text.
  *
  * An empty answer gives an empty string; the caller decides whether it shows a dash
@@ -122,9 +124,7 @@ export function formatAnswer(field: FormFieldDef, value: unknown, env: AnswerFor
     case 'funding':
       return formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value);
     case 'computed':
-      return isComputedAmount(field)
-        ? formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value)
-        : formatFieldValue(value);
+      return formatComputed(computedFormat(field), value, toFormatLocale(env.lang));
     default:
       return formatFieldValue(value);
   }
@@ -134,4 +134,21 @@ export function formatAnswer(field: FormFieldDef, value: unknown, env: AnswerFor
 function optionLabel(field: FormFieldDef, value: unknown, lang: string): string {
   const opt = field.options?.find((o) => o.value === value);
   return opt ? resolveI18n(opt.label, lang) : formatFieldValue(value);
+}
+
+/** A fraction as a percent with at most one decimal place: 0.8333 is "83,3 %" (spec 002964). */
+export function formatPercent(value: unknown, locale: string): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+  return new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 }).format(value);
+}
+
+/**
+ * A computed value in its format (spec 002964), in the `Intl` format locale: `money` as
+ * EUR, `percent` with at most one decimal place, `number` as it is. A value that the
+ * format cannot show keeps its own text.
+ */
+export function formatComputed(format: ComputedFormat, value: unknown, locale: string): string {
+  const shown =
+    format === 'money' ? formatMoney(value, locale) : format === 'percent' ? formatPercent(value, locale) : '';
+  return shown || formatFieldValue(value);
 }

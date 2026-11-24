@@ -1398,7 +1398,12 @@ export interface FormFieldDef {
   readonly isPII?: boolean;
   readonly isPromoted?: boolean;
   readonly promoteTarget?: string;
+  /** How a `computed` field shows and rounds its value (spec 002962); without it `number`. */
+  readonly format?: ComputedFormat;
 }
+
+/** The display format of a `computed` field (spec 002962). */
+export type ComputedFormat = 'number' | 'money' | 'percent';
 
 export interface FormSection {
   readonly key: string;
