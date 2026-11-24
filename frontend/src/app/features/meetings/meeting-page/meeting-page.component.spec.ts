@@ -23,6 +23,7 @@ import {
   vote,
 } from '../../../../testing/meeting-fixtures';
 import { MeetingPageComponent } from './meeting-page.component';
+import { TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { signal, type Provider } from '@angular/core';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { MeetingSessionService } from '../meeting-session.service';
@@ -261,6 +262,17 @@ describe('MeetingPageComponent', () => {
       fixture.componentRef.setInput('meeting', meeting({ canWrite: false }));
       fixture.detectChanges();
       expect(screen.queryByRole('button', { name: '0 live' })).toBeNull();
+    });
+
+    /** A member without the write right reads the text of the item as the room types it (spec 002980). */
+    it('lets a reader without the write right follow the text of the item', async () => {
+      const { fixture } = await setup();
+      const sheet = () =>
+        fixture.debugElement.query(By.directive(TopSheetComponent)).componentInstance as TopSheetComponent;
+      expect(sheet().follow()).toBe(false);
+      fixture.componentRef.setInput('meeting', meeting({ canWrite: false }));
+      fixture.detectChanges();
+      expect(sheet().follow()).toBe(true);
     });
 
     /**
