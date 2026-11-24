@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.deps import get_current_applicant, get_current_principal
+from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -28,11 +28,15 @@ from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.config_revision.revert import RevertService
+from app.modules.files.models import Attachment
+from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.orders.models import PurchaseOrder
+from app.modules.orders.router import get_order_files
 from app.settings import Settings
 from app.shared.errors import ConflictError
 from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow
+from tests._support.memory_storage import MemoryStorage, wire_storage
 
 pytestmark = pytest.mark.integration
 
@@ -49,6 +53,7 @@ _POSITIONS = [
     {"id": "p1", "label": "Regal", "offers": [{"label": "A", "value": 60}]},
     {"id": "p2", "label": "Drucker", "offers": [{"label": "B", "value": 500}]},
 ]
+_PDF = b"%PDF-1.4\n%invoice\n"
 
 
 @pytest.fixture
@@ -76,10 +81,19 @@ def _client(
     monkeypatch: pytest.MonkeyPatch,
     principal: Principal | None,
     applicant: Applicant | None = None,
+    storage: MemoryStorage | None = None,
 ) -> TestClient:
+    """Build a client of one caller; with ``storage`` the file routes use it."""
     api = build_api(migrated[1], settings, monkeypatch)
     api.dependency_overrides[get_current_principal] = lambda: principal
     api.dependency_overrides[get_current_applicant] = lambda: applicant
+
+    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+        return FilesService(session, storage=storage, settings=request_settings)
+
+    if storage is not None:
+        api.dependency_overrides[get_order_files] = _files
+        wire_storage(api, storage)
     return TestClient(api)
 
 
@@ -448,3 +462,68 @@ async def test_audit_revert_sets_the_old_values(
         with pytest.raises(ConflictError) as gone:
             await RevertService(session).revert(status.id, "revert-sub", _MANAGER)
         assert gone.value.code == "order_gone"
+
+
+async def test_a_bestellung_has_files_of_its_own(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002871: upload, list, download and delete; the Antrag does not show the files."""
+    storage = MemoryStorage()
+    api = _client(migrated, settings, monkeypatch, _MANAGER, storage=storage)
+    app_id = await _antrag(maker, seed)
+    order = api.post(f"/api/applications/{app_id}/orders", json={"title": "Regal"}).json()
+    files = f"/api/orders/{order['id']}/attachments"
+
+    up = api.post(files, files={"file": ("Rechnung.pdf", _PDF, "application/pdf")})
+    assert up.status_code == 201, up.text
+    first = up.json()
+    assert (first["filename"], first["scanned"]) == ("Rechnung.pdf", False)
+    second = api.post(files, files={"file": ("Beleg.pdf", _PDF, "application/pdf")}).json()
+    assert api.post(files, files={"file": ("leer.pdf", b"", "application/pdf")}).status_code == 415
+    assert [a["id"] for a in api.get(files).json()] == [first["id"], second["id"]]
+    assert api.get(f"/api/applications/{app_id}/attachments").json() == []
+    assert api.get(f"/api/attachments/{first['id']}").status_code == 409
+    assert api.delete(f"/api/attachments/{first['id']}").status_code == 404
+    assert len(storage.blobs) == 2
+
+    async with maker() as session:
+        await session.execute(update(Attachment).values(scanned=True, scan_result="clean"))
+        await session.commit()
+    down = api.get(f"/api/attachments/{first['id']}/download")
+    assert (down.status_code, down.content) == (200, _PDF)
+
+    reader = _client(migrated, settings, monkeypatch, _READER, storage=storage)
+    assert len(reader.get(files).json()) == 2
+    assert reader.get(f"/api/attachments/{first['id']}").status_code == 200
+    assert reader.post(files, files={"file": ("x.pdf", _PDF)}).status_code == 403
+    assert reader.delete(f"{files}/{first['id']}").status_code == 403
+    for stranger in (
+        _client(migrated, settings, monkeypatch, _BLIND, storage=storage),
+        _client(
+            migrated,
+            settings,
+            monkeypatch,
+            None,
+            Applicant(application_id=str(app_id)),
+            storage=storage,
+        ),
+    ):
+        assert stranger.get(files).status_code in (401, 404)
+        assert stranger.get(f"/api/attachments/{first['id']}").status_code == 404
+        assert stranger.get(f"/api/attachments/{first['id']}/download").status_code == 404
+
+    assert api.delete(f"{files}/{first['id']}").status_code == 204
+    assert api.delete(f"{files}/{first['id']}").status_code == 404
+    assert [a["id"] for a in api.get(files).json()] == [second["id"]]
+    assert len(storage.blobs) == 1
+    assert api.delete(f"/api/orders/{order['id']}").status_code == 204
+    assert storage.blobs == {}
+    assert api.get(f"/api/attachments/{second['id']}").status_code == 404
+    async with maker() as session:
+        assert await session.scalar(select(func.count()).select_from(Attachment)) == 0
+    assert len(await _audit(maker, "attachment_upload")) == 2
+    assert len(await _audit(maker, "attachment_delete")) == 2

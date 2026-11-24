@@ -14,7 +14,7 @@ optional infrastructure. Without MinIO an upload gives 503. Without Redis the fi
 quarantined.
 
 The routes are in `attachments` and not in `files`, because they check the read rule of
-the owner of a file: an application, a ticket or a to-do comment
+the owner of a file: an application, a ticket, a to-do comment or a Bestellung
 (§S/backend/python/000651). The URLs and the tag ``files`` are unchanged.
 """
 
@@ -49,6 +49,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import AttachmentOwner, application_id_of
+from app.modules.orders.models import PurchaseOrder
 from app.modules.tickets.access import works_on_ticket
 from app.modules.tickets.models import TicketNote
 from app.modules.tickets.service import reporter_reads_file
@@ -213,6 +214,8 @@ async def _assert_owner_reader(
       Gremium read scope, logged-in creator, magic-link applicant); an internal
       comment also needs ``can_see_internal``. An unconfirmed guest submission
       stays hidden unless the caller is its applicant.
+    * ``order``: the member read of the Antrag of the Bestellung. An applicant and an
+      observer do not read the files of a Bestellung (F/finance/orders/002864).
 
     Every "no" is 404, as for an unknown id, so the route is no existence oracle. The
     check runs before any quarantine gate.
@@ -228,6 +231,8 @@ async def _assert_owner_reader(
             await _assert_todo_comment_reader(db, owner, principal, missing)
         case "comment" | "application":
             await _assert_comment_reader(db, service, owner, principal, applicant, missing)
+        case "order":
+            await _assert_order_reader(db, owner, principal, applicant, missing)
 
 
 async def _assert_ticket_reader(
@@ -306,6 +311,32 @@ async def _assert_comment_reader(
     await service.assert_app_visible(
         comment.application_id, allow_unconfirmed=access.is_owning_applicant
     )
+
+
+async def _assert_order_reader(
+    db: AsyncSession,
+    owner: AttachmentOwner,
+    principal: Principal | None,
+    applicant: Applicant | None,
+    missing: NotFoundError,
+) -> None:
+    """Apply the read rule of the files of a Bestellung (see ``_assert_owner_reader``).
+
+    Raises:
+        NotFoundError: ``missing``, when the caller does not read the Antrag of the
+            Bestellung as a member.
+    """
+    application_id = await db.scalar(
+        select(PurchaseOrder.application_id).where(PurchaseOrder.id == owner.id)
+    )
+    if application_id is None:
+        raise missing
+    try:
+        access = await resolve_app_read(db, application_id, principal, applicant, observers=True)
+    except ForbiddenError as exc:
+        raise missing from exc
+    if access.is_applicant_view:
+        raise missing
 
 
 async def _application_access(

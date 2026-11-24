@@ -211,6 +211,13 @@
       "to": "Comment"
     },
     {
+      "column": "order_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "PurchaseOrder"
+    },
+    {
       "column": "ticket_id",
       "from": "Attachment",
       "multiplicity": "*",
@@ -2132,6 +2139,12 @@
         },
         {
           "name": "todo_comment_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "order_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

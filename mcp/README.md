@@ -113,6 +113,9 @@ neighbors), `todo_comment`, `todo_board_create` (a free board), `todo_board_entr
 `todo_label_*`, `todo_board_update`).
 Links between any two elements (spec 001409): `link_list`, `link_add`, `link_remove`,
 `link_targets`, `link_view`.
+Bestellungen of an Antrag (writes need `order.manage`): `order_list`, `order_get`,
+`order_create`, `order_update`, `order_set_status`, `order_delete`, `order_attachments`,
+`order_attachment_upload`, `order_attachment_delete`.
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
 `gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `notify_gremium_members`,
 `calendar_entries`, `create_appointment`, `answer_appointment`.

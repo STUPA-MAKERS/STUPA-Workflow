@@ -91,6 +91,9 @@ class Attachment(UUIDPkMixin, Base):
     todo_comment_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("todo_comment.id", ondelete="CASCADE"), nullable=True
     )
+    order_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("purchase_order.id", ondelete="CASCADE"), nullable=True
+    )
     comment_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("comment.id", ondelete="CASCADE"), nullable=True
     )
@@ -111,7 +114,7 @@ class Attachment(UUIDPkMixin, Base):
         CheckConstraint(f"size <= {MAX_ATTACHMENT_BYTES}", name="attachment_size_limit"),
         CheckConstraint(
             "num_nonnulls(application_id, ticket_id, ticket_note_id, todo_comment_id, "
-            "comment_id, draft_token_hash) = 1",
+            "comment_id, order_id, draft_token_hash) = 1",
             name="draft_xor_application",
         ),
         Index("ix_attachment_application_id", "application_id"),
@@ -119,6 +122,7 @@ class Attachment(UUIDPkMixin, Base):
         Index("ix_attachment_ticket_note_id", "ticket_note_id"),
         Index("ix_attachment_todo_comment_id", "todo_comment_id"),
         Index("ix_attachment_comment_id", "comment_id"),
+        Index("ix_attachment_order_id", "order_id"),
         Index(
             "ix_attachment_draft_token_hash",
             "draft_token_hash",

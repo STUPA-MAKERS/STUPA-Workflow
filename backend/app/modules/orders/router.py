@@ -5,6 +5,10 @@
   (F/finance/orders/002864).
 - ``POST /applications/{id}/orders``, ``PATCH /orders/{id}``, ``POST /orders/{id}/status``
   and ``DELETE /orders/{id}`` need ``order.manage`` and the read of the Antrag.
+- ``GET /orders/{id}/attachments`` lists the files of a Bestellung for a member who reads
+  its Antrag. ``POST /orders/{id}/attachments`` and
+  ``DELETE /orders/{id}/attachments/{attachment_id}`` need ``order.manage``
+  (F/finance/orders/002871). The download is ``GET /attachments/{id}/download``.
 - A Bestellung of an Antrag that the caller does not read answers 404
   (F/finance/orders/002863), so the answer does not tell that the Bestellung exists.
 """
@@ -16,7 +20,7 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile, status
 
 from app.deps import (
     DbSession,
@@ -27,6 +31,10 @@ from app.deps import (
 )
 from app.modules.applications.access import Access, require_app_view, resolve_app_read
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.files.body import read_capped
+from app.modules.files.queue import scan_queue_from_pool
+from app.modules.files.schemas import AttachmentOut
+from app.modules.files.service import FilesService, attachment_out
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import orders_sum, over_by
@@ -39,12 +47,18 @@ from app.modules.orders.schemas import (
     OrderUpdate,
 )
 from app.modules.orders.service import MANAGE_PERMISSION, OrderService
+from app.shared.antiabuse import enforce_attachment_body_cap, rate_limit_attachments
 from app.shared.errors import ForbiddenError, NotFoundError
 
 router = APIRouter(tags=["orders"])
 
 _ERRORS: dict[int | str, dict[str, object]] = {
     code: {"description": "problem+json"} for code in (401, 403, 404, 409, 422)
+}
+
+_UPLOAD_ERRORS: dict[int | str, dict[str, object]] = {
+    **_ERRORS,
+    **{code: {"description": "problem+json"} for code in (413, 415, 429, 503)},
 }
 
 ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
@@ -56,6 +70,19 @@ def get_order_service(db: DbSession, settings: SettingsDep) -> OrderService:
 
 
 ServiceDep = Annotated[OrderService, Depends(get_order_service)]
+
+
+def get_order_files(db: DbSession, request: Request, settings: SettingsDep) -> FilesService:
+    """Wire the files service with the optional storage and scan queue of the app state."""
+    return FilesService(
+        db,
+        storage=getattr(request.app.state, "object_storage", None),
+        queue=scan_queue_from_pool(getattr(request.app.state, "arq_pool", None)),
+        settings=settings,
+    )
+
+
+FilesDep = Annotated[FilesService, Depends(get_order_files)]
 
 
 def _out(row: PurchaseOrder, positions: tuple[str, ...]) -> OrderOut:
@@ -230,10 +257,84 @@ async def post_order_status(
 
 @router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, responses=_ERRORS)
 async def delete_order(
-    order_id: UUID, db: DbSession, service: ServiceDep, principal: ManagerDep
+    order_id: UUID, db: DbSession, service: ServiceDep, files: FilesDep, principal: ManagerDep
 ) -> Response:
-    """Delete a Bestellung."""
+    """Delete a Bestellung with its files."""
     await _readable(db, service, order_id, principal, None, observers=False)
+    storage_keys = await files.drop_for_order(order_id, actor=principal.sub)
     await service.delete(order_id, actor=principal.sub)
     await db.commit()
+    await files.remove_objects(storage_keys)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/orders/{order_id}/attachments",
+    response_model=list[AttachmentOut],
+    responses=_ERRORS,
+)
+async def list_order_attachments(
+    order_id: UUID,
+    db: DbSession,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> list[AttachmentOut]:
+    """List the files of a Bestellung, the oldest first, for a member who reads its Antrag."""
+    _, access = await _readable(db, service, order_id, principal, None, observers=True)
+    if access.is_applicant_view:
+        raise NotFoundError("Bestellung not found.")
+    return await files.list_for_order(order_id)
+
+
+@router.post(
+    "/orders/{order_id}/attachments",
+    response_model=AttachmentOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(enforce_attachment_body_cap), Depends(rate_limit_attachments)],
+    responses={
+        **_ERRORS,
+        **{code: {"description": "problem+json"} for code in (413, 415, 429, 503)},
+    },
+)
+async def upload_order_attachment(
+    order_id: UUID,
+    db: DbSession,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: ManagerDep,
+    file: Annotated[UploadFile, File()],
+) -> AttachmentOut:
+    """Upload a file of a Bestellung; it stays at ``scanned=false`` until the scan is clean."""
+    await _readable(db, service, order_id, principal, None, observers=False)
+    data = await read_capped(file, files.max_bytes)
+    attachment = await files.upload_for_order(
+        order_id, filename=file.filename, data=data, by=principal.sub
+    )
+    out = attachment_out(attachment)
+    await db.commit()
+    await files.enqueue_scan(out.id, actor=principal.sub)
+    return out
+
+
+@router.delete(
+    "/orders/{order_id}/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_ERRORS,
+)
+async def delete_order_attachment(
+    order_id: UUID,
+    attachment_id: UUID,
+    db: DbSession,
+    service: ServiceDep,
+    files: FilesDep,
+    principal: ManagerDep,
+) -> Response:
+    """Delete one file of a Bestellung."""
+    await _readable(db, service, order_id, principal, None, observers=False)
+    storage_keys = await files.drop_for_order(
+        order_id, actor=principal.sub, attachment_id=attachment_id
+    )
+    await db.commit()
+    await files.remove_objects(storage_keys)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

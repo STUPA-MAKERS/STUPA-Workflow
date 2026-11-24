@@ -35,7 +35,7 @@ from collections.abc import AsyncIterator, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from sqlalchemy import ColumnElement, Select, or_, select
+from sqlalchemy import ColumnElement, Select, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm.exc import StaleDataError
@@ -75,7 +75,7 @@ ATTACHMENT_REQUIRED = "attachment_required"
 #: The chat messages that own files.
 MessageOwner = Literal["ticket_note", "todo_comment", "comment"]
 #: Every owner of a bound attachment.
-OwnerKind = Literal["application", "ticket", "ticket_note", "todo_comment", "comment"]
+OwnerKind = Literal["application", "ticket", "ticket_note", "todo_comment", "comment", "order"]
 
 _OWNER_COLUMNS: dict[MessageOwner, InstrumentedAttribute[uuid.UUID | None]] = {
     "ticket_note": Attachment.ticket_note_id,
@@ -293,6 +293,7 @@ class FilesService:
                     Attachment.ticket_note_id,
                     Attachment.todo_comment_id,
                     Attachment.comment_id,
+                    Attachment.order_id,
                 ).where(Attachment.id == attachment_id)
             )
         ).first()
@@ -304,6 +305,7 @@ class FilesService:
             "ticket_note",
             "todo_comment",
             "comment",
+            "order",
         )
         return next(
             (
@@ -315,7 +317,7 @@ class FilesService:
         )
 
     async def _get_owned(self, attachment_id: uuid.UUID) -> Attachment:
-        """Load an attachment that a ticket or a message owns. Any other row gives 404.
+        """Load an attachment that a ticket, a message or a Bestellung owns; else 404.
 
         The router checks the read rule of the owner first, so the route is no
         existence oracle.
@@ -329,6 +331,7 @@ class FilesService:
             and attachment.ticket_note_id is None
             and attachment.todo_comment_id is None
             and attachment.comment_id is None
+            and attachment.order_id is None
         ):
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
@@ -507,6 +510,85 @@ class FilesService:
         except StorageError as exc:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return stream, attachment.filename, attachment.mime, attachment.size
+
+    async def upload_for_order(
+        self, order_id: uuid.UUID, *, filename: str | None, data: bytes, by: str
+    ) -> Attachment:
+        """Store a file of a Bestellung and create its row, without a commit.
+
+        The file belongs to the Bestellung and not to its Antrag (F/finance/orders/002871),
+        so no list of the Antrag shows it. The caller checks the right, commits and then
+        enqueues the scan with ``enqueue_scan``. The row stays at ``scanned=false`` until
+        the worker finishes the scan.
+
+        Raises:
+            PayloadTooLargeError: The file is larger than ``max_bytes`` (HTTP 413).
+            UnsupportedMediaTypeError: The file is empty or of a refused type (HTTP 415).
+            ServiceUnavailableError: Object storage is off (HTTP 503).
+        """
+        if len(data) > self.max_bytes:
+            raise PayloadTooLargeError(f"Attachment exceeds {self.max_bytes} bytes.")
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        mime, display_name = self.validate(filename, data)
+        storage_key = f"orders/{order_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
+        await self.put_object(storage_key, data, mime)
+        attachment = Attachment(
+            id=uuid.uuid4(),
+            order_id=order_id,
+            filename=display_name,
+            mime=mime,
+            size=len(data),
+            storage_key=storage_key,
+            scanned=False,
+            scan_result=None,
+        )
+        self.session.add(attachment)
+        await audit_record(
+            self.session,
+            actor=by,
+            action=AuditAction.ATTACHMENT_UPLOAD,
+            target_type="attachment",
+            target_id=str(attachment.id),
+            data=upload_audit_data(attachment),
+        )
+        await self.session.flush()
+        return attachment
+
+    async def list_for_order(self, order_id: uuid.UUID) -> list[AttachmentOut]:
+        """Return the files of a Bestellung, oldest first."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.order_id == order_id)
+                .order_by(Attachment.created_at, Attachment.id)
+            )
+        ).all()
+        return [attachment_out(a) for a in rows]
+
+    async def drop_for_order(
+        self, order_id: uuid.UUID, *, actor: str, attachment_id: uuid.UUID | None = None
+    ) -> list[str]:
+        """Delete the file rows of a Bestellung, or one of them, without a commit.
+
+        The caller commits and then calls ``remove_objects`` with the returned keys (see
+        ``drop_for_messages``).
+
+        Returns:
+            The storage keys of the removed files.
+
+        Raises:
+            NotFoundError: ``attachment_id`` names no file of this Bestellung (HTTP 404).
+        """
+        where = (
+            Attachment.order_id == order_id
+            if attachment_id is None
+            else and_(Attachment.order_id == order_id, Attachment.id == attachment_id)
+        )
+        rows = await self._locked_rows(where)
+        if attachment_id is not None and not rows:
+            raise NotFoundError(f"attachment {attachment_id} not found")
+        return await self._drop_rows(rows, actor=actor)
 
     async def list_for_ticket(self, ticket_id: uuid.UUID) -> list[AttachmentOut]:
         """Return the attachments of a ticket, oldest first."""
@@ -700,7 +782,14 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
 
 def _owner_data(attachment: Attachment) -> dict[str, object]:
     """Name the owner of an attachment in an audit entry: application, ticket, message or draft."""
-    keys = ("application_id", "ticket_id", "ticket_note_id", "todo_comment_id", "comment_id")
+    keys = (
+        "application_id",
+        "ticket_id",
+        "ticket_note_id",
+        "todo_comment_id",
+        "comment_id",
+        "order_id",
+    )
     values = ((key, getattr(attachment, key)) for key in keys)
     owners: Iterator[dict[str, object]] = (
         {key: str(value)} for key, value in values if value is not None
