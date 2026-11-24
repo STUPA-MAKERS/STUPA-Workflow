@@ -263,6 +263,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002841](requirements/functional/applications/forms/002841_computed-amount-cents.md) | A computed amount is a whole number of cents | approved |
 | [F/applications/forms/002842](requirements/functional/applications/forms/002842_computed-amount-display.md) | A computed amount shows as money | approved |
 | [F/applications/forms/002843](requirements/functional/applications/forms/002843_computed-amount-toggle.md) | The form builder makes a computed field the amount | approved |
+| [F/applications/forms/002960](requirements/functional/applications/forms/002960_computed-reads-rule-values.md) | A computed field reads the values of a form rule | draft |
+| [F/applications/forms/002961](requirements/functional/applications/forms/002961_computed-empty-on-failure.md) | A computed field that cannot be computed stays empty | draft |
+| [F/applications/forms/002962](requirements/functional/applications/forms/002962_computed-format.md) | A computed field has a display format | draft |
+| [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | draft |
+| [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | draft |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
