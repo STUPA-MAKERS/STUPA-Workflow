@@ -436,12 +436,16 @@ class PaperlessClient:
     async def download(self, document_id: int, max_bytes: int) -> bytes:
         """Read the PDF version of one document, the archive version of Paperless.
 
+        The request accepts ``*/*``: Paperless matches the Accept header of the download
+        route against its JSON renderers before it sends the file, so ``application/pdf``
+        gets 406. The size check and the PDF check of the caller still hold.
+
         Raises:
             PaperlessError: A call fails, or the file has more than ``max_bytes``
                 (`too_large`).
         """
         response = await self._request(
-            "GET", f"/api/documents/{document_id}/download/", accept="application/pdf"
+            "GET", f"/api/documents/{document_id}/download/", accept="*/*"
         )
         if len(response.content) > max_bytes:
             raise PaperlessError("too_large")
