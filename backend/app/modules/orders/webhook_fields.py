@@ -34,7 +34,7 @@ def order_fields(row: PurchaseOrder, application_title: str | None) -> Mapping[s
         "plannedAmount": money(row.planned_amount),
         "actualAmount": money(row.actual_amount),
         "applicationTitle": application_title,
-        "url": link(f"/applications/{row.application_id}?order={row.id}"),
+        "url": link(f"/orders/{row.id}"),
     }
 
 

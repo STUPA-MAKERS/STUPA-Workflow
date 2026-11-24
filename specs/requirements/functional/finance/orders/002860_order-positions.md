@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
   - backend/app/modules/orders/service.py
-  - frontend/src/app/pages/applications/orders/order-dialog.component.ts
+  - frontend/src/app/pages/orders/order-form.component.ts
 scope:
   - backend/app/modules/orders
   - backend/app/modules/forms

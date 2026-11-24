@@ -5,7 +5,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Attachment } from '@core/api/models';
 import { OrdersApiService } from '@core/api/orders.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { toastMock } from '../../../../testing/toast';
+import { toastMock } from '../../../testing/toast';
 import { OrderFilesComponent } from './order-files.component';
 
 const file = (over: Partial<Attachment> = {}): Attachment => ({

@@ -24,6 +24,7 @@ const KIND_ICON: Record<SearchKind, IconName> = {
   meeting: 'users',
   invoice: 'receipt',
   expense: 'swap',
+  order: 'package',
   budget: 'pie',
   gremium: 'landmark',
   principal: 'user',

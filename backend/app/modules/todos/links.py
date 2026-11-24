@@ -230,11 +230,11 @@ def _expense_target(exp: BudgetExpense, path_key: str | None) -> Resolved:
 
 
 def _order_target(order: PurchaseOrder) -> Resolved:
-    """A Bestellung; it opens in the detail of its Antrag, because it has no page."""
+    """A Bestellung; it opens in the pane of the page "Bestellungen"."""
     return Resolved(
         accessible=True,
         title=order.title,
-        url=f"/applications/{order.application_id}?order={order.id}",
+        url=f"/orders/{order.id}",
         detail=TodoLinkDetail(
             number=format_order_number(order.number),
             amount=_money(order_price(order.actual_amount, order.planned_amount)),

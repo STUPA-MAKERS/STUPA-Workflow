@@ -65,6 +65,8 @@ export class TransitionDetailComponent {
   readonly targetBudgetVote = input<boolean>(false);
 
   readonly guardChange = output<Guard | null>();
+  /** The status of a Bestellung that offers the transition, or '' for none. */
+  readonly orderOfferChange = output<string>();
   readonly actionAdd = output<string>();
   readonly actionRemove = output<number>();
   readonly actionParamChange = output<{ ai: number; key: string; value: string }>();
@@ -83,6 +85,19 @@ export class TransitionDetailComponent {
     if (!type) return;
     this.actionAdd.emit(type);
     this.pendingAction.set('');
+  }
+
+  /** The offer after a Bestellung shows only while the budget, the feature of the Bestellungen, is on. */
+  protected ordersOn(): boolean {
+    return this.features.isOn('budget');
+  }
+
+  /** The two statuses of a Bestellung that can offer a transition of the Antrag. */
+  protected orderOfferOptions(): SelectOption[] {
+    return [
+      { value: 'ordered', label: this.i18n.translate('orders.status.ordered') },
+      { value: 'delivered', label: this.i18n.translate('orders.status.delivered') },
+    ];
   }
 
   protected actionOptions(): SelectOption[] {

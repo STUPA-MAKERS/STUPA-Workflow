@@ -297,6 +297,7 @@ describe('graph ↔ JSON round-trip', () => {
           automatic: true,
           branch: 'pass',
           requiresAction: false,
+          offerOnOrderStatus: 'delivered',
         },
       ],
     };
@@ -322,6 +323,7 @@ describe('graph ↔ JSON round-trip', () => {
       automatic: true,
       branch: 'pass',
       requiresAction: false,
+      offerOnOrderStatus: 'delivered',
     });
   });
 

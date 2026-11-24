@@ -191,6 +191,8 @@ async def test_the_approved_antraege_without_a_bestellung(
     ]
     order = api.post(f"/api/applications/{app_id}/orders", json={"title": "Regal"}).json()
     assert pending() == []
+    offered = api.get("/api/orders/pending-applications", params={"withOrders": "true"}).json()
+    assert str(app_id) in [item["id"] for item in offered["items"]]
     api.post(f"/api/orders/{order['id']}/status", json={"status": "cancelled", "version": 1})
     assert len(pending()) == 1
 
@@ -248,9 +250,7 @@ async def test_search_links_and_webhooks(
     }
     assert (changed["orderId"], changed["applicationId"]) == (order["id"], str(app_id))
     hits = [hit for hit in found.hits if hit.kind == "order"]
-    assert [(hit.title, hit.url) for hit in hits] == [
-        ("Beamer", f"/applications/{app_id}?order={order['id']}")
-    ]
+    assert [(hit.title, hit.url) for hit in hits] == [("Beamer", f"/orders/{order['id']}")]
     assert [hit for hit in hidden.hits if hit.kind == "order"] == []
 
     ends = {

@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/webhooks/catalog.py
+  - backend/app/modules/orders/webhook_fields.py
 scope:
   - backend/app/modules/webhooks
   - backend/app/modules/orders

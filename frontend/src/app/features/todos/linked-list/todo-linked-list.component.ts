@@ -24,6 +24,7 @@ import {
   AvatarStackComponent,
   ButtonComponent,
   ButtonGroupComponent,
+  ButtonLinkComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
@@ -41,9 +42,17 @@ export interface LinkedLead {
   readonly icon: IconName;
   readonly title: string;
   readonly sub: string;
-  /** The router link. The row opens it in a new tab. */
-  readonly link: readonly unknown[];
+  /** The router link; null shows the row without a link. */
+  readonly link: readonly unknown[] | null;
   /** The query parameters of the link. */
+  readonly queryParams?: Readonly<Record<string, string>>;
+}
+
+/** One more button in the head of "Verknüpft": it opens a page, for example a form. */
+export interface LinkedAction {
+  readonly label: string;
+  readonly icon: IconName;
+  readonly link: readonly unknown[];
   readonly queryParams?: Readonly<Record<string, string>>;
 }
 
@@ -99,6 +108,7 @@ const cardRow = (card: TodoLinkedCard): LinkRow => ({
     AvatarStackComponent,
     ButtonComponent,
     ButtonGroupComponent,
+    ButtonLinkComponent,
     EmptyStateComponent,
     IconComponent,
     TodoLinkPickerComponent,
@@ -135,6 +145,8 @@ export class TodoLinkedListComponent {
    * Folgeanträge of an Antrag. They stand above the links and open in the same tab.
    */
   readonly rows = input<readonly LinkedLead[]>([]);
+  /** A button of the page in the head, before "Verknüpfen"; it shows without `actions` too. */
+  readonly extra = input<LinkedAction | null>(null);
   /** The head holds "Verknüpfen" and "To-Do anlegen". */
   readonly actions = input(false);
   /**
@@ -173,7 +185,7 @@ export class TodoLinkedListComponent {
   readonly showNew = computed(() => this.actions() && this.canAct() && this.features.isOn('todos'));
   /** "Verknüpfen": the person changes the element, or a card that may link it (spec 001404). */
   readonly showLink = computed(() => this.actions() && (this.canLink() || this.showNew()));
-  readonly showActions = computed(() => this.showNew() || this.showLink());
+  readonly showActions = computed(() => this.showNew() || this.showLink() || this.extra() !== null);
   readonly newLinks = computed<NewTodoLink[]>(() => [
     {
       kind: this.kind(),

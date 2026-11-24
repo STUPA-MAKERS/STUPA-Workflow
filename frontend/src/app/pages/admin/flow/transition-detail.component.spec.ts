@@ -156,6 +156,25 @@ describe('TransitionDetailComponent', () => {
   });
 
   /** Spec 000761: the editor offers no step of a feature that is off. */
+  /** §F/finance/orders/002931: the setting "nach Bestellung anbieten" of a transition. */
+  it('offers the two statuses of a Bestellung and emits the choice', async () => {
+    const { c } = await setup({ from: 'a', to: 'b', actions: [], offerOnOrderStatus: 'ordered' });
+    expect(c.ordersOn()).toBe(true);
+    expect(document.querySelector('[data-testid="td-order-offer"]')).not.toBeNull();
+    expect(c.orderOfferOptions()).toEqual([
+      { value: 'ordered', label: 'Bestellt' },
+      { value: 'delivered', label: 'Geliefert' },
+    ]);
+  });
+
+  it('hides the setting of the Bestellungen while the budget is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+    const { c } = await setup({ from: 'a', to: 'b', actions: [] });
+    localStorage.removeItem('ap.features.off');
+    expect(c.ordersOn()).toBe(false);
+    expect(document.querySelector('[data-testid="td-order-offer"]')).toBeNull();
+  });
+
   it('offers no action of a feature that is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['budget', 'meetings']));
     const { c } = await setup({ from: 'a', to: 'b', actions: [] });

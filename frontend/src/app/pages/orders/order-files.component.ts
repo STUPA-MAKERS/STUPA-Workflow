@@ -29,7 +29,7 @@ import {
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { formatBytes } from '../applications.util';
+import { formatBytes } from '../applications/applications.util';
 
 /** The text of a refused upload, by the status of the answer. */
 const UPLOAD_ERROR: Readonly<Record<number, TranslationKey>> = {

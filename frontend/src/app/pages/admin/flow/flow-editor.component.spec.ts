@@ -790,6 +790,18 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.branchesFor(key)).toEqual(['pass', 'fail']);
   });
 
+  /** §F/finance/orders/002931 */
+  it('sets the status of a Bestellung that offers a transition and clears it', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.setOrderOffer(0, 'delivered');
+    expect(c.graph().transitions[0].offerOnOrderStatus).toBe('delivered');
+    c.setOrderOffer(0, '');
+    expect(c.graph().transitions[0]).not.toHaveProperty('offerOnOrderStatus');
+  });
+
   it('sets a transition branch and clears it', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

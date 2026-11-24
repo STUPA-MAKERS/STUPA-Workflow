@@ -2,10 +2,11 @@
 id: "002890"
 title: The global search finds Bestellungen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - backend/app/modules/search/service.py
 scope:
   - backend/app/modules/search
   - backend/app/modules/orders

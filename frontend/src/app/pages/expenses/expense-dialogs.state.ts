@@ -23,7 +23,7 @@ import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 import { formatMoney } from '@shared/format-money';
 import { EventLinkState } from '../../features/todos/event-link.state';
-import { bookingPayee, bookingRest } from '../applications/orders/orders.util';
+import { bookingPayee, bookingRest } from '../orders/orders.util';
 
 /** The fiscal year that holds today, else the only active one, else null. */
 export function currentFiscalYear(

@@ -1,0 +1,116 @@
+<app-detail-screen
+  [head]="head()"
+  [state]="state()"
+  [actions]="actions()"
+  [comments]="order()?.applicationId ? { open: commentsOpen, label: 'applications.comments.title' | t } : null"
+  (action)="onAction($event.key)"
+>
+  <ng-template screenBody>
+    @if (order(); as current) {
+     <app-section [heading]="current.title" [hideHeading]="true">
+      @if (step(); as next) {
+        <app-button-group>
+          <app-button variant="primary" [loading]="busy()" data-testid="od-step" (click)="setStatus(next.status)">
+            {{ next.label }}
+          </app-button>
+        </app-button-group>
+      }
+      <app-section [heading]="'orders.dialog.details' | t" [hideHeading]="true">
+        <dl appFacts layout="rows">
+          @for (fact of facts(); track fact.label) {
+            <div>
+              <dt>{{ fact.label }}</dt>
+              <dd>
+                @if (fact.href) {
+                  <a [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
+                } @else {
+                  {{ fact.value }}
+                }
+              </dd>
+            </div>
+          }
+        </dl>
+      </app-section>
+      @if (covered().length) {
+        <app-section [heading]="'orders.field.positions' | t">
+          <app-field-group>
+            @for (position of covered(); track position.id) {
+              <app-field-row data-testid="od-position" [label]="position.label" [value]="position.value" />
+            }
+          </app-field-group>
+        </app-section>
+      }
+      @if (sumLine()) {
+        <app-section [heading]="'orders.detail.sumTitle' | t">
+          @if (warning()) {
+            <app-note kind="warn" icon="alert" role="status">{{ warning() }}</app-note>
+          }
+          <app-field-group>
+            <app-field-row data-testid="od-sum" [label]="'orders.section.sum' | t" [value]="sumLine()" />
+          </app-field-group>
+        </app-section>
+      }
+      <app-order-files [orderId]="current.id" [canManage]="canManage()" />
+      <app-todo-linked-list
+        kind="order"
+        headingId="od-linked"
+        [targetId]="current.id"
+        [rows]="linked()"
+        [actions]="true"
+        [linkLabel]="current.title"
+      />
+     </app-section>
+    }
+  </ng-template>
+  <ng-template screenComments>
+    @if (order()?.applicationId; as applicationId) {
+      <app-order-comments [applicationId]="applicationId" />
+    }
+  </ng-template>
+</app-detail-screen>
+
+<app-confirm-dialog
+  [open]="cancelling()"
+  [title]="'orders.cancel.title' | t"
+  [body]="cancelBody()"
+  [confirmLabel]="'orders.menu.cancel' | t"
+  (confirm)="confirmCancel()"
+  (cancel)="cancelling.set(false)"
+/>
+<app-confirm-dialog
+  [open]="deleting()"
+  [title]="'orders.delete.title' | t"
+  [body]="'orders.delete.body' | t: { title: order()?.title ?? '' }"
+  [busy]="busy()"
+  (confirm)="confirmDelete()"
+  (cancel)="deleting.set(false)"
+/>
+<app-todo-pick-dialog
+  [open]="linking()"
+  (openChange)="linking.set($event)"
+  [heading]="'orders.menu.invoiceLink' | t"
+  [searchLabel]="'orders.invoice.search' | t"
+  [query]="invoiceSearch.text()"
+  (queryChange)="invoiceSearch.set($event)"
+  [listLabel]="'orders.invoice.list' | t"
+  [emptyHeading]="'orders.invoice.none' | t"
+  [submitLabel]="'orders.invoice.link' | t"
+  submitIcon="link"
+  [rows]="invoiceRows()"
+  [(pick)]="invoicePick"
+  [busy]="busy()"
+  (picked)="setInvoice($event)"
+/>
+<app-dialog
+  size="sm"
+  [open]="offered().length > 0"
+  [heading]="'orders.offer.title' | t"
+  [closeLabel]="'action.close' | t"
+  [actions]="offerActions()"
+  (closed)="offered.set([])"
+  (action)="onOffer($event.key)"
+>
+  <ng-template dialogBody>
+    <app-note>{{ 'orders.offer.body' | t }}</app-note>
+  </ng-template>
+</app-dialog>

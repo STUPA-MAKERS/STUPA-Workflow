@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/orders-page.component.ts
+  - backend/app/modules/orders/listing.py
 scope:
   - frontend/src/app/pages
   - backend/app/modules/orders

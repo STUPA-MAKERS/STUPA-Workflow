@@ -2,10 +2,12 @@
 id: "002936"
 title: The detail of a Bestellung shows all of it in one pane
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/order-detail.component.ts
+  - frontend/src/app/pages/orders/order-address.guard.ts
 scope:
   - frontend/src/app/pages
 ---

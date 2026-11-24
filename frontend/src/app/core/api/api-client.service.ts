@@ -610,11 +610,19 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
   }
 
-  transitions(id: Uuid, opts: { detail?: boolean } = {}): Observable<Transition[]> {
+  /**
+   * The transitions the person can fire. `orderStatus` keeps those that the flow offers
+   * after a Bestellung of the Antrag got this status (setting `offerOnOrderStatus`).
+   */
+  transitions(
+    id: Uuid,
+    opts: { detail?: boolean; orderStatus?: 'ordered' | 'delivered' } = {},
+  ): Observable<Transition[]> {
     const lang = this.i18n.uiLocale();
     return this.http
       .get<TransitionOutWire[]>(`${this.base}/applications/${id}/transitions`, {
-        context: readContext({ quiet: true, ...opts }),
+        ...(opts.orderStatus ? { params: { orderStatus: opts.orderStatus } } : {}),
+        context: readContext({ quiet: true, detail: opts.detail }),
       })
       .pipe(map((items) => items.map((t) => mapTransition(t, lang))));
   }

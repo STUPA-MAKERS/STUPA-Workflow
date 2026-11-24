@@ -2,10 +2,13 @@
 id: "002883"
 title: Bestellungen is a page of its own with a list and a detail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/orders-page.component.ts
+  - frontend/src/app/layout/nav.service.ts
+  - backend/app/modules/orders/list_router.py
 scope:
   - frontend/src/app/pages
   - backend/app/modules/orders

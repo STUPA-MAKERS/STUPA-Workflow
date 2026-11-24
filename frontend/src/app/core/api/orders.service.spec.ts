@@ -92,4 +92,42 @@ describe('OrdersApiService', () => {
     http.expectOne('/api/invoices/i-1/orders').flush({ items: [], total: '0' });
     expect(got).toHaveBeenCalledWith({ items: [], total: '0' });
   });
+
+  /** §F/finance/orders/002883, 002934, 002886: the list, the Anträge without a Bestellung, the export. */
+  it('reads a page of the Bestellungen, the waiting Anträge, the export and the bookings', () => {
+    svc.page({ segment: 'open', q: 'Beamer', limit: 50, offset: 0 }).subscribe();
+    const page = http.expectOne((r) => r.url === '/api/orders');
+    expect(page.request.params.get('segment')).toBe('open');
+    expect(page.request.params.get('q')).toBe('Beamer');
+    expect(page.request.params.get('limit')).toBe('50');
+    page.flush({ items: [], total: 0 });
+    svc.page().subscribe();
+    http.expectOne('/api/orders').flush({ items: [], total: 0 });
+
+    svc.pending({ gremium: 'g-1', segment: 'open' }).subscribe();
+    const pending = http.expectOne((r) => r.url === '/api/orders/pending-applications');
+    expect(pending.request.params.get('gremium')).toBe('g-1');
+    expect(pending.request.params.has('segment')).toBe(false);
+    expect(pending.request.params.has('withOrders')).toBe(false);
+    pending.flush({ items: [], total: 0 });
+    svc.pending(undefined, true).subscribe();
+    const all = http.expectOne((r) => r.url === '/api/orders/pending-applications');
+    expect(all.request.params.get('withOrders')).toBe('true');
+    all.flush({ items: [], total: 0 });
+
+    const got = jest.fn();
+    svc.exportXlsx({ kind: 'outlay', limit: 50, offset: 50 }).subscribe(got);
+    const file = http.expectOne((r) => r.url === '/api/orders/export.xlsx');
+    expect(file.request.responseType).toBe('blob');
+    expect(file.request.params.get('kind')).toBe('outlay');
+    expect(file.request.params.has('limit')).toBe(false);
+    expect(file.request.params.has('offset')).toBe(false);
+    file.flush(new Blob(['x']));
+    expect(got.mock.calls[0][0]).toBeInstanceOf(Blob);
+    svc.exportXlsx().subscribe();
+    http.expectOne('/api/orders/export.xlsx').flush(new Blob(['x']));
+
+    svc.bookings('o-1').subscribe();
+    http.expectOne('/api/orders/o-1/bookings').flush([]);
+  });
 });

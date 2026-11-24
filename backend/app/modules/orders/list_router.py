@@ -137,9 +137,16 @@ async def list_pending_applications(
     principal: ReaderDep,
     wanted: FilterDep,
     page: Annotated[PageParams, Depends()],
+    with_orders: Annotated[bool, Query(alias="withOrders")] = False,
 ) -> Page[PendingApplicationOut]:
-    """List the approved Anträge of a type with money that have no Bestellung."""
-    return await OrderListing(db).pending(principal, wanted, limit=page.limit, offset=page.offset)
+    """List the approved Anträge of a type with money that have no Bestellung.
+
+    ``withOrders`` lists the Anträge that have a Bestellung too: the form of a new
+    Bestellung offers each Antrag that can take one.
+    """
+    return await OrderListing(db).pending(
+        principal, wanted, limit=page.limit, offset=page.offset, with_orders=with_orders
+    )
 
 
 @router.get("/orders/export.xlsx", responses=_ERRORS)

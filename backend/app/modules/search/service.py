@@ -78,7 +78,7 @@ HIT_URL: Mapping[SearchKind, str] = {
     "meeting": "/meetings/{id}",
     "invoice": "/invoices?id={id}",
     "expense": "/expenses?id={id}",
-    "order": "/applications/{application}?order={id}",
+    "order": "/orders/{id}",
     "budget": "/budget?costCentre={id}",
     "gremium": "/admin/committees/{id}/members",
     "principal": "/admin/users?q={id}",
@@ -262,7 +262,7 @@ class SearchService:
 
         The list holds the Bestellungen of the Anträge that the caller reads as a member,
         so the search needs no permission of its own. A hit opens the Bestellung in the
-        detail of its Antrag, because a Bestellung has no page of its own.
+        pane of the page "Bestellungen".
         """
         from app.modules.orders.listing import OrderFilter, OrderListing
         from app.modules.orders.numbers import format_number
@@ -278,7 +278,7 @@ class SearchService:
                 subtitle=" · ".join(
                     part for part in (format_number(row.number), row.supplier) if part
                 ),
-                url=HIT_URL["order"].format(application=row.application_id, id=row.id),
+                url=HIT_URL["order"].format(id=row.id),
             )
             for row in rows
         ]

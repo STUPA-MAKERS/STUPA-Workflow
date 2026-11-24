@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
-  - frontend/src/app/pages/applications/orders/orders.util.ts
-  - frontend/src/app/pages/applications/orders/order-dialog.component.ts
+  - frontend/src/app/pages/orders/orders.util.ts
+  - frontend/src/app/pages/orders/order-form.component.ts
 scope:
   - frontend/src/app/pages/applications
 ---

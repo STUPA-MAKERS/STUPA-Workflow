@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation:
   - backend/app/modules/files/service.py
   - backend/app/modules/orders/router.py
-  - frontend/src/app/pages/applications/orders/order-files.component.ts
+  - frontend/src/app/pages/orders/order-files.component.ts
 scope:
   - backend/app/modules/files
   - backend/app/modules/orders

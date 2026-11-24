@@ -1,6 +1,6 @@
 ---
 name: be-orders
-description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the statuses planned/ordered/delivered/cancelled, the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend section "Bestellungen" in the Antrag detail. Use when working on backend/app/modules/orders or frontend/src/app/pages/applications/orders.
+description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the statuses planned/ordered/delivered/cancelled, the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend page "Bestellungen" (/orders: list, detail and form in the pane). Use when working on backend/app/modules/orders or frontend/src/app/pages/orders.
 ---
 
 # Bestellungen — `backend/app/modules/orders`
@@ -61,17 +61,38 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   `order_create`, `order_update`, `order_set_status`, `order_delete`, `order_attachments`,
   `order_attachment_upload`, `order_attachment_delete`).
 
-**Frontend** (`frontend/src/app/pages/applications/orders/`, API in
-`core/api/orders.service.ts`):
-- `orders-section` — the section "Bestellungen" below the details of the Antrag detail:
-  rows (Bezeichnung, status, Händler, real price or planned price with "Preis geplant",
-  signed difference), the sum line, the warning above the approved amount, the ⋮ menu of a row,
-  the delete confirmation. It shows for a type with money or when a Bestellung exists.
-  After a change the page reads the timeline again (`changed`).
-- `order-dialog` — the form (kit `app-form`). Picked positions fill the planned price (sum
-  of the preferred offers) and, with one position, the link (first address in the text of
-  the preferred offer); a typed value stays. A person without `order.manage` gets the
-  values as facts and the files, without the form.
+**Frontend** (`frontend/src/app/pages/orders/`, API in `core/api/orders.service.ts`): the
+page "Bestellungen" at `/orders` (nav entry after Rechnungen, feature `budget`,
+`ORDER_PERMISSIONS` = `order.manage` or `budget.view`). A Bestellung is an element with a
+page of its own; the Antrag detail has no section and no dialog for it.
+- `orders-page` — kit `app-list-detail-screen`. The first chip is the segment ("Ohne
+  Bestellung" = `GET /orders/pending-applications`, "Offen" (default), "Geliefert",
+  "Erledigt" = `GET /orders?segment=`), no counts; chips Haushaltsjahr, Kostenstelle,
+  Gremium, Art, "Meine Käufe"; search and chips live in the URL; "Bestellung anlegen" is a
+  head action (a FAB would float over the pane), the XLSX export is in the ⋮ menu. A row of
+  "Ohne Bestellung" opens the form for its Antrag (`order.manage`), else the Antrag.
+- Child routes: `''` (kit `ListNoneComponent`), `new` and `:id/edit` (`order-form`,
+  `order.manage`, guard `leaveUnsaved`), `:id` (`order-detail`). The guard `orderAddress`
+  leads `/orders?id=<id>` and `/orders?new=order&application=<id>` to the child address.
+- `order-detail` — kit `app-detail-screen`: head (Bezeichnung, number, status, marks), the
+  next status as the main button, every other action in the ⋮ menu, the fields with the
+  signed "Abweichung", the covered positions, the sum of the Antrag with the warning,
+  `order-files`, "Verknüpft" (`app-todo-linked-list kind="order"`, built-in rows Antrag,
+  invoice, bookings from `GET /orders/{id}/bookings`) and the comments of the Antrag
+  (`order-comments`, posts to the comment routes of the Antrag). After "Bestellt" or
+  "Geliefert" it asks `GET /applications/{id}/transitions?orderStatus=` and offers the
+  transitions in a dialog; nothing fires by itself.
+- `order-form` — kit `app-form-screen`. A new Bestellung takes the Antrag from
+  `?application=<id>` or from the first field (`pending-applications?withOrders=true`).
+  Picked positions fill the planned price (sum of the preferred offers) and, with one
+  position, the link (first address in the text of the preferred offer); a typed value
+  stays. The account of the buyer is a picker below the form; in an existing Bestellung
+  its pick saves at once, because the save button shows only for a dirty form.
+- `OrdersRefresh` — the pane tells the list to read again after a write.
+- Antrag detail: the Bestellungen are rows of "Verknüpft" (`linkedRows`, link `/orders/<id>`,
+  no link in the applicant view) and "Bestellung anlegen" is the button `extra` in its head.
+- Flow editor: the setting "Nach einer Bestellung anbieten" of a transition
+  (`offerOnOrderStatus`), hidden while the feature `budget` is off.
 - `order-files` — list, upload, download and delete of the files.
 - `orders.util.ts` — the pure helpers; `orderPositions` finds the positions by their shape,
   because the key of a positions field differs from form to form.
@@ -81,9 +102,14 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   Antrag detail).
 
 **Traps:**
-- The three frontend components have no stylesheet and no class of their own (ratchet
-  `app-styles`): rows are `app-list-item` in an `app-field-group`, and the host of the section
-  hides itself with the `hidden` attribute.
+- The frontend components have no stylesheet and no class of their own (ratchet
+  `app-styles`). The body of the detail gets its vertical gaps from one outer `app-section`
+  with a hidden heading.
+- The kit list screen renders no row actions, so a row has one target only.
+- The empty pane is `order-none.ts`, a re-export of the kit `ListNoneComponent`: a
+  dynamic import of a whole kit entry in `app.routes.ts` keeps every export of it in the
+  start bundle (it cost 84 kB and broke the 1 MB budget).
+- The link kind `order` exists in the kit too (`TodoLinkKind`, `GraphKind`, board texts).
 - The table has no check "Auslage needs a buyer": the erasure of an account empties the
   buyer, so the rule lives in the service only.
 - A new `AuditAction` needs the frontend list `AUDIT_ACTIONS`, its spec copy and the de/en
@@ -106,14 +132,25 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   `order_has_bookings` (`ensure_deletable`, asked before the files go).
 - `OrderService.marks` reads `invoiceNumber`, `invoiceStatus` and `bookedAmount` at each
   read; the Bestellung stores no copy.
-- Frontend: the menu entries "Rechnung verknüpfen" (pick dialog in the section),
+- Frontend: the menu entries "Rechnung verknüpfen" (pick dialog of the detail),
   "Rechnung anlegen" (`/invoices?new=invoice&order=<id>`) and "Buchung anlegen"
   (`/expenses?new=booking&order=<id>`); `bookingRest` and `bookingPayee` give the amount
   and the payee of the booking; the cancel of a booked Bestellung asks first;
   `pages/invoices/invoice-orders` lists the Bestellungen in the invoice detail.
 
-**Not built yet:** the list page with the export, the offered transition of the Antrag,
-link kind, search, graph, webhooks.
+**List, export and the reach into other modules:**
+- `listing.py` (`OrderListing`, `OrderFilter`, `segment_clause`) and `list_router.py`:
+  `GET /api/orders` (segments `open`, `delivered`, `done`; filters `fiscalYear`, `budget`,
+  `gremium`, `kind`, `buyer`, `q`; `limit`/`offset`), `GET /api/orders/pending-applications`
+  (approved Anträge of a type with money without a Bestellung that is not cancelled;
+  `withOrders=true` keeps those with one, for the form) and `GET /api/orders/export.xlsx`
+  (`order.manage`). The listing reads the flag approved of the state, never a state key.
+- Link kind `order` (`todos/links.py` `_order_target`), the search source (`search/service.py`
+  `_orders`), the graph relations and the webhook events `order.created` and
+  `order.status_changed` (`webhook_fields.py`). Every address of a Bestellung is `/orders/<id>`.
+- A transition of the flow can carry `offerOnOrderStatus` (`ordered` or `delivered`);
+  `GET /api/applications/{id}/transitions?orderStatus=` keeps the transitions with it. The
+  platform only offers them; a person creates each Bestellung and fires each transition.
 
 **Related:** `be-applications`, `be-files`, `be-budget`, `be-audit`, `be-privacy`, `mcp`,
 `frontend`.

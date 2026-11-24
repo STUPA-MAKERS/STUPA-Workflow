@@ -14,6 +14,7 @@ import { API_BASE_URL } from '@core/api/api.config';
 import { mapAttachment } from '@core/api/mappers';
 import type { Attachment, AttachmentOutWire, IsoDateTime, Uuid } from '@core/api/models';
 import { skipLoading } from '@stupa-makers/ui-kit';
+import { httpParams } from './http-params';
 
 export type OrderStatus = 'planned' | 'ordered' | 'delivered' | 'cancelled';
 /** `order`: the Gremium buys. `outlay`: a person pays and gets the money back. */
@@ -101,6 +102,50 @@ export interface OrderInput {
   readonly note?: string | null;
 }
 
+/** The segments of the page "Bestellungen"; `pending` lists Anträge without a Bestellung. */
+export type OrderSegment = 'pending' | 'open' | 'delivered' | 'done';
+export const ORDER_SEGMENTS: readonly OrderSegment[] = ['pending', 'open', 'delivered', 'done'];
+
+/** The filter of the page "Bestellungen". An empty value is no filter. */
+export interface OrderQuery {
+  readonly segment?: Exclude<OrderSegment, 'pending'>;
+  readonly fiscalYear?: string;
+  readonly budget?: string;
+  readonly gremium?: string;
+  readonly kind?: string;
+  readonly buyer?: string;
+  readonly q?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+/** One page of Bestellungen, the newest change first. */
+export interface OrderPage {
+  readonly items: readonly Order[];
+  readonly total: number;
+}
+
+/** An approved Antrag of a type with money, for the segment "Ohne Bestellung" and the form. */
+export interface PendingApplication {
+  readonly id: Uuid;
+  readonly title: string | null;
+  readonly gremiumId: Uuid | null;
+  readonly gremiumName: string | null;
+  readonly approvedAmount: string | null;
+}
+
+export interface PendingPage {
+  readonly items: readonly PendingApplication[];
+  readonly total: number;
+}
+
+/** One booking that names a Bestellung. */
+export interface OrderBooking {
+  readonly id: Uuid;
+  readonly description: string | null;
+  readonly amount: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrdersApiService {
   private readonly http = inject(HttpClient);
@@ -108,6 +153,40 @@ export class OrdersApiService {
 
   list(applicationId: Uuid): Observable<OrderList> {
     return this.http.get<OrderList>(`${this.base}/applications/${applicationId}/orders`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** The Bestellungen of every Antrag that the person reads; `order.manage` or `budget.view`. */
+  page(query: OrderQuery = {}): Observable<OrderPage> {
+    return this.http.get<OrderPage>(`${this.base}/orders`, {
+      params: httpParams({ ...query }),
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * The approved Anträge of a type with money without a Bestellung. `withOrders` gives
+   * those with a Bestellung too, for the form of a new Bestellung.
+   */
+  pending(query: OrderQuery = {}, withOrders = false): Observable<PendingPage> {
+    return this.http.get<PendingPage>(`${this.base}/orders/pending-applications`, {
+      params: httpParams({ ...query, segment: undefined, ...(withOrders ? { withOrders: true } : {}) }),
+      context: skipLoading(),
+    });
+  }
+
+  /** The Bestellungen of a filter as an XLSX file; needs `order.manage`. */
+  exportXlsx(query: OrderQuery = {}): Observable<Blob> {
+    return this.http.get(`${this.base}/orders/export.xlsx`, {
+      params: httpParams({ ...query, limit: undefined, offset: undefined }),
+      responseType: 'blob',
+    });
+  }
+
+  /** The bookings that name a Bestellung; needs a read right of the budget. */
+  bookings(id: Uuid): Observable<readonly OrderBooking[]> {
+    return this.http.get<readonly OrderBooking[]>(`${this.base}/orders/${id}/bookings`, {
       context: skipLoading(),
     });
   }

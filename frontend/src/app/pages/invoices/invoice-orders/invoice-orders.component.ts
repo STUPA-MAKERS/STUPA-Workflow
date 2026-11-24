@@ -81,7 +81,7 @@ export class InvoiceOrdersComponent {
               .filter(Boolean)
               .join(' · '),
             price: this.money(item.actualAmount),
-            link: ['/applications', item.applicationId],
+            link: ['/orders', item.id],
           }
         : {
             key: `hidden-${index}`,

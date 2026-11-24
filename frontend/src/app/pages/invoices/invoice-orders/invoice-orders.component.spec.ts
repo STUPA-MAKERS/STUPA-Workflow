@@ -72,8 +72,8 @@ describe('InvoiceOrdersComponent', () => {
     expect(rows[1]).toContain('Preis offen');
     expect(rows[2]).toBe('Bestellung (kein Zugriff)');
     expect(cmp.rows().map((row: { link: unknown }) => row.link)).toEqual([
-      ['/applications', 'a-1'],
-      ['/applications', 'a-2'],
+      ['/orders', 'o-1'],
+      ['/orders', 'o-2'],
       null,
     ]);
     expect(screen.getByTestId('io-sum')).toHaveTextContent(/Summe der Bestellungen\s*72,50\s€ von 150,00\s€/);

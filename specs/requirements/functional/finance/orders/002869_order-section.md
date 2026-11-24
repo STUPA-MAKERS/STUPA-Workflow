@@ -2,10 +2,12 @@
 id: "002869"
 title: The Antrag lists its Bestellungen under Verknüpft
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/applications/applications-detail.component.ts
+  - frontend/src/app/features/todos/linked-list/todo-linked-list.component.ts
 scope:
   - frontend/src/app/pages/applications
   - frontend/src/app/features/todos

@@ -1,5 +1,4 @@
-import type { Order } from '@core/api/orders.service';
-import { order } from '../../../../testing/order-fixtures';
+import { order } from '../../../testing/order-fixtures';
 import {
   amountText,
   firstAddress,
@@ -9,7 +8,6 @@ import {
   bookingPayee,
   bookingRest,
   orderMarks,
-  orderMenu,
   orderPositions,
   positionPrefill,
   priceDifference,
@@ -131,16 +129,6 @@ describe('orders.util', () => {
     });
   });
 
-  /** §F/finance/orders/002870 */
-  it('offers the status steps without the current status, then the edit, the cancel and the delete', () => {
-    const ids = (o: Order) => orderMenu(o, t).map((s) => s.items.map((i) => i.id));
-    expect(ids(order())).toEqual([['ordered', 'delivered'], ['edit'], ['cancelled', 'delete']]);
-    expect(ids(order({ status: 'ordered' }))).toEqual([['delivered'], ['edit'], ['cancelled', 'delete']]);
-    expect(ids(order({ status: 'delivered' }))).toEqual([['ordered'], ['edit'], ['cancelled', 'delete']]);
-    expect(ids(order({ status: 'cancelled' }))).toEqual([['ordered', 'delivered'], ['edit'], ['delete']]);
-    expect(orderMenu(order(), t)[2].items[1]).toMatchObject({ danger: true });
-  });
-
   it('lists the values of a Bestellung for a reader and leaves out the empty ones', () => {
     const full = order({
       kind: 'outlay',
@@ -179,24 +167,6 @@ describe('orders.util', () => {
     expect(facts[9].value).toBe('20.11.2026');
     const bare = orderFacts({ ...order(), supplier: undefined, plannedAmount: undefined, positionIds: undefined }, [], 'de-DE', null, t);
     expect(bare.map((f) => f.label)).toEqual(['orders.field.number', 'orders.field.kind', 'orders.field.status']);
-  });
-
-  /** §F/finance/orders/002870 */
-  it('puts the invoice and the booking entries between the status steps and the edit', () => {
-    const ids = (rights: { invoices: boolean; book: boolean }) =>
-      orderMenu(order(), t, rights).flatMap((s) => s.items.map((i) => i.id));
-    expect(ids({ invoices: true, book: true })).toEqual([
-      'ordered',
-      'delivered',
-      'invoiceLink',
-      'invoiceNew',
-      'booking',
-      'edit',
-      'cancelled',
-      'delete',
-    ]);
-    expect(ids({ invoices: true, book: false })).toEqual(['ordered', 'delivered', 'invoiceLink', 'edit', 'cancelled', 'delete']);
-    expect(ids({ invoices: false, book: false })).toEqual(['ordered', 'delivered', 'edit', 'cancelled', 'delete']);
   });
 
   /** §F/finance/orders/002880 */

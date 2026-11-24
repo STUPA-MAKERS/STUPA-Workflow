@@ -422,15 +422,7 @@
       }
     </app-field-group>
   </app-section>
-  <app-orders-section
-    headingId="ad-orders"
-    [applicationId]="application.id"
-    [hasBudget]="hasBudget()"
-    [data]="application.data"
-    [currency]="application.currency"
-    (changed)="reloadTimeline()"
-  />
-  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" [actions]="true" [gremiumId]="application.gremiumId ?? null" [linkLabel]="title()" />
+  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" [rows]="linkedRows()" [actions]="true" [extra]="orderAction()" [gremiumId]="application.gremiumId ?? null" [linkLabel]="title()" />
 </ng-template>
 
 <ng-template #answers let-application>

@@ -126,7 +126,7 @@ _ORDER_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("plannedAmount", "369.00"),
     FieldSpec("actualAmount", None),
     FieldSpec("applicationTitle", "Zuschuss Sommerfest"),
-    FieldSpec("url", "https://example.org/applications/" + _ID + "?order=" + _ID),
+    FieldSpec("url", "https://example.org/orders/" + _ID),
 )
 
 _CATALOG: tuple[EventSpec, ...] = (

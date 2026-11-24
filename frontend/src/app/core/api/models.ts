@@ -2357,6 +2357,7 @@ export type SearchKind =
   | 'meeting'
   | 'invoice'
   | 'expense'
+  | 'order'
   | 'budget'
   | 'gremium'
   | 'principal'

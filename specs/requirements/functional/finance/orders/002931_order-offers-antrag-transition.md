@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/order-detail.component.ts
+  - frontend/src/app/pages/admin/flow/transition-detail.component.ts
 scope:
   - backend/app/modules/flow
   - backend/app/modules/orders

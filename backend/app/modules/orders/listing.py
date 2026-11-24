@@ -166,13 +166,22 @@ class OrderListing:
         return list(rows), total or 0
 
     async def pending(
-        self, principal: Principal, wanted: OrderFilter, *, limit: int, offset: int
+        self,
+        principal: Principal,
+        wanted: OrderFilter,
+        *,
+        limit: int,
+        offset: int,
+        with_orders: bool = False,
     ) -> Page[PendingApplicationOut]:
         """Return the approved Anträge without a Bestellung (F/finance/orders/002934).
 
         An Antrag counts when its state has the flag approved, its type has money and no
         Bestellung of it has a status other than "Storniert". An archived Antrag is out
         of the work, so the list leaves it out. The newest Antrag stands first.
+
+        ``with_orders`` keeps the Anträge that have a Bestellung too, because the form of
+        a new Bestellung offers every Antrag that can take one (F/finance/orders/002937).
         """
         has_order = (
             select(PurchaseOrder.id)
@@ -187,7 +196,7 @@ class OrderListing:
             Application.archived_at.is_(None),
             ApplicationType.has_budget.is_(True),
             State.is_approved.is_(True),
-            ~has_order,
+            *(() if with_orders else (~has_order,)),
         ]
         joined = (
             select(

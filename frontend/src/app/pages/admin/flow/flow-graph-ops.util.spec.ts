@@ -2,6 +2,7 @@ import type { FlowGraph } from '../admin.models';
 import {
   dissolveGroup,
   setActionMap,
+  setOrderOffer,
   setStateGremiumSource,
   setStateKind,
   setStateOutcome,
@@ -15,6 +16,19 @@ const graph = (over: Partial<FlowGraph> = {}): FlowGraph => ({
 });
 
 describe('flow-graph-ops.util', () => {
+  /** §F/finance/orders/002931: the status of a Bestellung that offers a transition. */
+  it('sets and takes away the status of a Bestellung that offers a transition', () => {
+    const base = graph({
+      states: [{ key: 'a', label: { de: 'A' } }, { key: 'b', label: { de: 'B' } }],
+      transitions: [{ from: 'a', to: 'b', actions: [] }],
+    });
+    const ordered = setOrderOffer(base, 0, 'ordered');
+    expect(ordered.transitions[0].offerOnOrderStatus).toBe('ordered');
+    expect(setOrderOffer(ordered, 0, 'delivered').transitions[0].offerOnOrderStatus).toBe('delivered');
+    expect(setOrderOffer(ordered, 0, '').transitions[0]).not.toHaveProperty('offerOnOrderStatus');
+    expect(setOrderOffer(ordered, 0, 'planned').transitions[0]).not.toHaveProperty('offerOnOrderStatus');
+  });
+
   /** § 000571: a state is approved or denied, never both, and a vote state neither. */
   it('keeps one outcome flag per state and drops both on a vote state', () => {
     const flags = (g: FlowGraph) => [g.states[0].isApproved, g.states[0].isDenied];

@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
   - backend/app/modules/orders/service.py
-  - frontend/src/app/pages/applications/orders/orders.util.ts
+  - frontend/src/app/pages/orders/orders.util.ts
 scope:
   - backend/app/modules/orders
   - backend/app/modules/budget

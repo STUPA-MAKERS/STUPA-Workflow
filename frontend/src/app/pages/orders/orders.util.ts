@@ -8,7 +8,7 @@ import {
   positionValue,
   preferredOffer,
 } from '@shared/forms/positions';
-import type { RowMenuSection, StatusKind } from '@stupa-makers/ui-kit';
+import type { StatusKind } from '@stupa-makers/ui-kit';
 
 export const ORDER_STATUS_LABEL: Readonly<Record<OrderStatus, TranslationKey>> = {
   planned: 'orders.status.planned',
@@ -152,57 +152,6 @@ export type OrderAction =
   | 'edit'
   | 'cancelled'
   | 'delete';
-
-/** What the reader can do beside `order.manage`. */
-export interface OrderMenuRights {
-  /** The reader reads the invoices: "Rechnung verknüpfen". */
-  readonly invoices: boolean;
-  /** The reader holds `budget.book`: "Rechnung anlegen" and "Buchung anlegen". */
-  readonly book: boolean;
-}
-
-/**
- * The menu of a row for a person with `order.manage`: the status steps without the
- * current status, the invoice and the booking, the edit, then the cancel and the delete.
- */
-export function orderMenu(
-  order: Order,
-  t: (key: TranslationKey) => string,
-  rights: OrderMenuRights = { invoices: false, book: false },
-): readonly RowMenuSection[] {
-  const step = (id: OrderAction & OrderStatus, key: TranslationKey, icon: 'send' | 'check') =>
-    order.status === id ? [] : [{ id, label: t(key), icon }];
-  return [
-    {
-      items: [
-        ...step('ordered', 'orders.menu.ordered', 'send'),
-        ...step('delivered', 'orders.menu.delivered', 'check'),
-      ],
-    },
-    {
-      items: [
-        ...(rights.invoices
-          ? [{ id: 'invoiceLink', label: t('orders.menu.invoiceLink'), icon: 'link' as const }]
-          : []),
-        ...(rights.book
-          ? [
-              { id: 'invoiceNew', label: t('orders.menu.invoiceNew'), icon: 'receipt' as const },
-              { id: 'booking', label: t('orders.menu.booking'), icon: 'plus' as const },
-            ]
-          : []),
-      ],
-    },
-    { items: [{ id: 'edit', label: t('action.edit'), icon: 'edit' as const }] },
-    {
-      items: [
-        ...(order.status === 'cancelled'
-          ? []
-          : [{ id: 'cancelled', label: t('orders.menu.cancel'), icon: 'x' as const }]),
-        { id: 'delete', label: t('action.delete'), icon: 'trash' as const, danger: true },
-      ],
-    },
-  ].filter((section) => section.items.length > 0);
-}
 
 /**
  * The marks of a Bestellung: "Rechnung offen" or "Rechnung bezahlt" from its invoice, and

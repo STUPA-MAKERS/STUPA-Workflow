@@ -2,10 +2,11 @@
 id: "002937"
 title: The form of a Bestellung opens in the pane of the page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/order-form.component.ts
 scope:
   - frontend/src/app/pages
 ---

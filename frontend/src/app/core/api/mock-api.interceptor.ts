@@ -159,6 +159,7 @@ const MOCK_PRINCIPAL: Principal = {
     'budget.view',
     'budget.structure',
     'budget.book',
+    'order.manage',
     'budget.export',
     'budget.plan.set_state',
     'mcp.use',

@@ -2,10 +2,11 @@
 id: "002870"
 title: The detail of a Bestellung has its actions
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation: null
+implementation:
+  - frontend/src/app/pages/orders/order-detail.component.ts
 scope:
   - frontend/src/app/pages
 ---
