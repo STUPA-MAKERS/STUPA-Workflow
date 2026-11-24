@@ -348,14 +348,14 @@ def _compute_step(state: _Computed, field: FormFieldDef, ctx: Mapping[str, Any])
     try:
         value = eval_jsonlogic(field.compute, {**ctx, **state.values})
     except JsonLogicError as exc:
-        error = FieldError(field=field.key, msg=f"compute failed: {exc}")
-        return replace(state, errors=(*state.errors, error))
+        failed = FieldError(field=field.key, msg=f"compute failed: {exc}")
+        return replace(state, errors=(*state.errors, failed))
     if not is_computed_amount(field):
         return replace(state, values={**state.values, field.key: value})
     cents = _cents(value)
     if cents is None:
-        error = FieldError(field=field.key, msg="the amount must be a finite number from 0")
-        return replace(state, errors=(*state.errors, error))
+        no_amount = FieldError(field=field.key, msg="the amount must be a finite number from 0")
+        return replace(state, errors=(*state.errors, no_amount))
     return replace(state, values={**state.values, field.key: float(cents)})
 
 
@@ -1038,13 +1038,15 @@ def _promote_flagged(out: dict[str, Any], field: FormFieldDef, value: object) ->
     target = field.promote_target
     if not (field.is_promoted and target) or value is None:
         return out
-    if is_computed_amount(field):
-        promoted: object = _cents(value)
-    elif field.type in _NUMERIC_TYPES:
-        promoted = _finite_decimal(value)
-    else:
-        promoted = value
+    promoted = _promoted_value(field, value)
     return out if promoted is None else {**out, target: promoted}
+
+
+def _promoted_value(field: FormFieldDef, value: object) -> object:
+    """Normalize the value of a promoted field: cents, a finite ``Decimal`` or as is."""
+    if is_computed_amount(field):
+        return _cents(value)
+    return _finite_decimal(value) if field.type in _NUMERIC_TYPES else value
 
 
 def extract_promoted(fields: Sequence[FormFieldDef], data: Mapping[str, Any]) -> dict[str, Any]:
