@@ -506,6 +506,7 @@ class OrderService:
                 **(extra or {}),
             },
         )
+        await self.session.refresh(row)
         return row
 
     async def update(self, order_id: UUID, payload: OrderUpdate, *, actor: str) -> PurchaseOrder:

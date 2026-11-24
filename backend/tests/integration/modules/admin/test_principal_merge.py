@@ -40,6 +40,7 @@ from app.modules.applications.models import (
     ApplicationLink,
     ApplicationLinkEvent,
     ApplicationObserver,
+    ApplicationOrderEvent,
     Comment,
     GuestApplicationSettings,
     StatusEvent,
@@ -82,6 +83,7 @@ from app.modules.meetings.models import (
 )
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
+from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
@@ -474,6 +476,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         )
         session.add(card)
         await session.flush()
+        order_id = uuid.uuid4()
         session.add_all(
             [
                 TodoAssignee(card_id=card.id, principal_id=old.id),
@@ -483,6 +486,16 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 TodoEvent(card_id=card.id, actor_id=old.id, kind="created"),
                 Link.between(("todo", card.id), ("ticket", ticket.id), old.id),
                 TodoEventSeries(name=f"Reihe {tag}", created_by=old.id),
+                PurchaseOrder(
+                    id=order_id,
+                    application_id=app_id,
+                    title=f"Bestellung {tag}",
+                    created_by=old.sub,
+                    buyer_id=old.id,
+                ),
+                ApplicationOrderEvent(
+                    application_id=app_id, order_id=order_id, actor=old.sub, kind="created"
+                ),
                 CalendarAppointment(
                     title=f"Termin {tag}",
                     starts_on=date(2031, 5, 5),
