@@ -9,7 +9,8 @@ tests:
   - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_the_last_manager_stays"
   - "frontend/src/app/pages/todos/board-settings/todo-board-settings.component.spec.ts:TodoBoardSettingsComponent"
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
+  - backend/app/modules/todos/service/base.py
   - frontend/src/app/pages/todos/board-settings/todo-board-settings.component.ts
   - frontend/src/app/pages/todos/board-entries/todo-board-entries.component.ts
 scope:

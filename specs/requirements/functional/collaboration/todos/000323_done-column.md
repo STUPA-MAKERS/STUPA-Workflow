@@ -6,7 +6,9 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/cards.py
+  - backend/app/modules/todos/service/columns.py
+  - backend/app/modules/todos/service/base.py
   - backend/app/modules/todos/hooks.py
   - backend/worker/todos.py
 scope:

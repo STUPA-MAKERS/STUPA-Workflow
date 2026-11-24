@@ -9,7 +9,7 @@ tests:
   - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_a_gremium_board_takes_entries_and_every_member_edits"
   - "frontend/src/app/pages/todos/board-settings/todo-board-settings.component.spec.ts:TodoBoardSettingsComponent"
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
   - frontend/src/app/pages/todos/board-settings/todo-board-settings.component.ts
 scope:
   - backend/app/modules/todos

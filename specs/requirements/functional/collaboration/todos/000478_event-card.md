@@ -8,7 +8,8 @@ updated: 2026-11-10
 implementation:
   - backend/app/modules/todos/models.py
   - backend/app/modules/todos/events.py
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/card_events.py
+  - backend/app/modules/todos/service/base.py
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:
   - backend/app/modules/todos
