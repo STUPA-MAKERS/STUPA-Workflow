@@ -2941,6 +2941,8 @@
   "admin.gremien.quorum": "Quorum (%)",
   "admin.gremien.mailRecipients": "Additional minutes recipients",
   "admin.gremien.mailRecipientsPlaceholder": "list@example.org\nboard@example.org",
+  "admin.gremien.protocolSignatures": "Signatures in the minutes",
+  "admin.gremien.protocolSignaturesPlaceholder": "One line per signature",
   "admin.gremien.memberPicked": "Selected",
   "admin.gremien.members": "Members",
   "admin.gremien.membersOf": "Members",

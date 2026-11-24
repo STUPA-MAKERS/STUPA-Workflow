@@ -210,6 +210,20 @@
           </label>
         </div>
 
+        <div class="gd__field">
+          <label class="gd__mail">
+            <span class="gd__mailLabel">{{ 'admin.gremien.protocolSignatures' | t }}</span>
+            <textarea
+              class="gd__mailInput"
+              rows="3"
+              name="protocolSignatures"
+              [ngModel]="form().protocolSignatures"
+              (ngModelChange)="patch('protocolSignatures', $event)"
+              [placeholder]="'admin.gremien.protocolSignaturesPlaceholder' | t"
+            ></textarea>
+          </label>
+        </div>
+
         <div class="gd__public">
           <div class="rowgroup rowgroup--settings">
             <app-switch

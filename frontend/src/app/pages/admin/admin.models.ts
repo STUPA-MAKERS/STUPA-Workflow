@@ -254,6 +254,8 @@ export interface Gremium {
   readonly roleCount?: number;
   /** The final protocols of the gremium show on the public protocol page. */
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /** `GET /admin/committees/{id}/public-preview`: what a switch to "public" publishes. */
@@ -285,6 +287,8 @@ export interface GremiumCreateBody {
   /** Without a value the gremium takes the month of the meeting periods. */
   readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /** Body for `PATCH /admin/committees/{id}` (`GremiumUpdate`) — all fields optional. */
@@ -307,6 +311,8 @@ export interface GremiumUpdateBody {
   readonly guestsMayVote?: boolean;
   readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /**

@@ -88,6 +88,8 @@ export interface GremiumForm {
   readonly mailRecipients: string;
   /** The final protocols show on the public protocol page. */
   readonly protocolsPublic: boolean;
+  /** The signature lines of the protocol PDF, one per line (spec 003007). */
+  readonly protocolSignatures: string;
 }
 
 export function emptyGremiumForm(): GremiumForm {
@@ -107,6 +109,7 @@ export function emptyGremiumForm(): GremiumForm {
     termStartMonth: null,
     mailRecipients: '',
     protocolsPublic: false,
+    protocolSignatures: '',
   };
 }
 
@@ -121,6 +124,14 @@ export function percentOrNull(value: number | string | null | undefined): number
 export function parseRecipients(raw: string): readonly string[] {
   return raw
     .split(/[\n,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/** Split the signature text into lines (spec 003007): one per line, trimmed, no empty one. */
+export function parseSignatureLines(raw: string): readonly string[] {
+  return raw
+    .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 }
@@ -279,6 +290,7 @@ export class GremiumDialogComponent {
       termStartMonth: g.termStartMonth ?? null,
       mailRecipients: '',
       protocolsPublic: g.protocolsPublic ?? false,
+      protocolSignatures: (g.protocolSignatures ?? []).join('\n'),
     });
     this.recipientsLoading.set(true);
     this.api.getGremiumMailRecipients(g.id).subscribe({
@@ -432,6 +444,7 @@ export class GremiumDialogComponent {
       guestsMayVote: f.guestsMayVote,
       ...(f.termStartMonth === null ? {} : { termStartMonth: f.termStartMonth }),
       protocolsPublic: f.protocolsPublic,
+      protocolSignatures: parseSignatureLines(f.protocolSignatures),
     } satisfies GremiumUpdateBody;
     const isNew = this.isNew();
     const g = this.gremium() ?? this.created;

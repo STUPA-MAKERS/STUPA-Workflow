@@ -2941,6 +2941,8 @@
   "admin.gremien.quorum": "Quorum (%)",
   "admin.gremien.mailRecipients": "Zusätzliche Protokoll-Empfänger",
   "admin.gremien.mailRecipientsPlaceholder": "listen@example.org\nvorstand@example.org",
+  "admin.gremien.protocolSignatures": "Unterschriften im Protokoll",
+  "admin.gremien.protocolSignaturesPlaceholder": "Eine Zeile je Unterschrift",
   "admin.gremien.memberPicked": "Gewählt",
   "admin.gremien.members": "Mitglieder",
   "admin.gremien.membersOf": "Mitglieder",
