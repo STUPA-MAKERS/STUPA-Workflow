@@ -268,7 +268,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002962](requirements/functional/applications/forms/002962_computed-format.md) | A computed field has a display format | approved |
 | [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | approved |
 | [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | approved |
-| [F/applications/forms/002990](requirements/functional/applications/forms/002990_funding-hint-own-help.md) | The funding hint is the help of the field | draft |
+| [F/applications/forms/002990](requirements/functional/applications/forms/002990_funding-hint-own-help.md) | The funding hint is the help of the field | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |

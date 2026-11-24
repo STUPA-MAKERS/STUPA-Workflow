@@ -2,7 +2,7 @@
 id: "002990"
 title: The funding hint is the help of the field
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
