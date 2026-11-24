@@ -2,11 +2,10 @@
 id: "001301"
 title: Antrag stellen stands in the header of the activity page
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - frontend/src/app/pages/activity/activity.component.html
+updated: 2026-11-24
+replaced_by: F/collaboration/notifications/002550
 scope:
   - frontend/src/app/pages/activity
 ---

@@ -9,7 +9,7 @@ tests:
   - "backend/tests/integration/modules/todos/test_todos_free_boards.py:test_archive_restore_and_delete"
   - "frontend/src/app/pages/todos/archived-boards/todo-archived-boards.component.spec.ts:TodoArchivedBoardsComponent"
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
   - backend/app/modules/todos/router.py
   - frontend/src/app/pages/todos/archived-boards/todo-archived-boards.component.ts
   - frontend/src/app/pages/todos/board-settings/todo-board-settings.component.ts

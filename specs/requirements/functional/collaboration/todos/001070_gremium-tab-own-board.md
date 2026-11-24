@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
 scope:
   - frontend/src/app/features/todos
   - frontend/src/app/features/gremien

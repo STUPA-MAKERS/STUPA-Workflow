@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -34,6 +34,7 @@ from app.modules.tickets.mailbox_schemas import (
 from app.modules.tickets.models import TicketArea, TicketMailbox
 from app.settings import Settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.ssrf import host_allowed
 
 #: The problem code of a second Postfach of one Bereich.
 MAILBOX_EXISTS = "ticket_mailbox_exists"
@@ -61,16 +62,6 @@ _WIRE: Mapping[str, str] = {
 _INBOX_FIELDS = frozenset({"imap_host", "imap_port", "imap_user"})
 
 Check = Callable[[MailAccount], str | None]
-
-
-def host_allowed(host: str, port: int, allowlist: Sequence[str]) -> bool:
-    """Tell whether the host, or the host with its port, is in the allowlist.
-
-    An empty list allows no host.
-    """
-    allowed = frozenset(entry.strip().lower() for entry in allowlist if entry.strip())
-    name = host.strip().lower()
-    return name in allowed or f"{name}:{port}" in allowed
 
 
 def imap_account(row: TicketMailbox) -> MailAccount:

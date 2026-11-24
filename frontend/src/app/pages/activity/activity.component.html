@@ -1,16 +1,15 @@
 <div class="act">
   <section class="ld-pane" aria-labelledby="act-title">
     <app-page-header [pane]="true" titleId="act-title" [title]="'activity.title' | t">
-      @if (!phone()) {
-        <ng-container ngProjectAs="[actions]">
-          <app-button-group>
-            <a appButton routerLink="/apply">
-              <app-icon name="plus" [size]="16" />
-              {{ 'fab.application' | t }}
-            </a>
-          </app-button-group>
-        </ng-container>
-      }
+      <ng-container ngProjectAs="[actions]">
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          data-testid="act-bell"
+          [ariaLabel]="'activity.notifications' | t"
+          (click)="openNotifications()"
+        ><app-icon name="bell" /></app-button>
+      </ng-container>
     </app-page-header>
 
     <app-sticky-bar class="ld-pane__filters">
@@ -52,7 +51,3 @@
     </div>
   </section>
 </div>
-
-@if (phone()) {
-  <app-fab [label]="'fab.application' | t" link="/apply" />
-}

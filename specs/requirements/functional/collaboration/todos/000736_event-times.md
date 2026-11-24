@@ -6,7 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/card_events.py
+  - backend/app/modules/todos/service/rows.py
   - backend/app/modules/calendar/ics.py
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.html
   - frontend/src/app/features/todos/new-dialog/todo-new-dialog.component.html

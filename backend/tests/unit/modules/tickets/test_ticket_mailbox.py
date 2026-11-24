@@ -17,11 +17,12 @@ from app.modules.audit.actions import AuditAction
 from app.modules.tickets import mail_client
 from app.modules.tickets import mailbox as mailbox_mod
 from app.modules.tickets.mail_client import MailAccount, MailError
-from app.modules.tickets.mailbox import TicketMailboxService, host_allowed, mailbox_out
+from app.modules.tickets.mailbox import TicketMailboxService, mailbox_out
 from app.modules.tickets.mailbox_schemas import MailboxCreate, MailboxPatch
 from app.modules.tickets.models import TicketArea, TicketMailbox
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.ssrf import host_allowed
 from tests.unit.modules.tickets.fakes import ScriptedSession
 
 AREA = uuid.uuid4()
