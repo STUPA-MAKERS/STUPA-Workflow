@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - backend/app/modules/todos
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # A Bestellung is a kind of link end

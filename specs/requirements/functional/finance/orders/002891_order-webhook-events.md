@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - backend/app/modules/webhooks
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The create and the status change of a Bestellung are webhook events

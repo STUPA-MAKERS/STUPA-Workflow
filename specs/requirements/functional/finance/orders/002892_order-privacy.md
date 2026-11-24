@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - backend/app/modules/privacy
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The privacy functions cover the buyer of a Bestellung

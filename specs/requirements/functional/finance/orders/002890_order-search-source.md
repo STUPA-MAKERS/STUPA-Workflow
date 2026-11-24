@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - backend/app/modules/search
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The global search finds Bestellungen

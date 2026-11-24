@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - backend/app/modules/files
-  - backend/app/modules/budget
+  - backend/app/modules/orders
   - frontend/src/app/pages/applications
 ---
 

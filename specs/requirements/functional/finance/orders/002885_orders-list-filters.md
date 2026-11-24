@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - frontend/src/app/pages
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The page Bestellungen filters like the bookings list

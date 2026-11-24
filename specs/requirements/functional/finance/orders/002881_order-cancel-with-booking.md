@@ -8,7 +8,7 @@ updated: 2026-11-24
 implementation: null
 scope:
   - frontend/src/app/pages/applications
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The cancel of a booked Bestellung asks first

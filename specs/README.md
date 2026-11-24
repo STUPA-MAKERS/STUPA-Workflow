@@ -590,6 +590,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002891](requirements/functional/finance/orders/002891_order-webhook-events.md) | The create and the status change of a Bestellung are webhook events | draft |
 | [F/finance/orders/002892](requirements/functional/finance/orders/002892_order-privacy.md) | The privacy functions cover the buyer of a Bestellung | draft |
 | [F/finance/orders/002893](requirements/functional/finance/orders/002893_order-anonymized-antrag.md) | The anonymization of an Antrag keeps its Bestellungen | draft |
+| [F/finance/orders/002930](requirements/functional/finance/orders/002930_order-created-by-hand.md) | Only a person creates a Bestellung | draft |
+| [F/finance/orders/002931](requirements/functional/finance/orders/002931_order-offers-antrag-transition.md) | A status change of a Bestellung offers a transition of the Antrag | draft |
+| [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | draft |
+| [F/finance/orders/002933](requirements/functional/finance/orders/002933_order-url-prefill.md) | The form fills the link from the preferred offer | draft |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |

@@ -7,13 +7,13 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null
 scope:
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # A Bestellung is an order or an Auslage
 
 The kind of a Bestellung must be `order` ("Bestellung") or `outlay` ("Auslage"). An Auslage is a
-purchase that a person paid and that the Studierendenschaft pays back. An Auslage must name its
+purchase that a person paid and that the organization pays back. An Auslage must name its
 buyer, as an account or as a name. A person must be able to change the kind of a Bestellung. The
 server must answer 422 `order_buyer_required` for a change to Auslage without a buyer.
 

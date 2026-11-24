@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null
 scope:
-  - backend/app/modules/budget
+  - backend/app/modules/orders
 ---
 
 # The invoice fills an empty real price

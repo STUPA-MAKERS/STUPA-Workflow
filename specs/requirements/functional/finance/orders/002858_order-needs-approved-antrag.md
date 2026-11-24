@@ -7,14 +7,15 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null
 scope:
-  - backend/app/modules/budget
+  - backend/app/modules/orders
   - backend/app/modules/applications
 ---
 
 # A new Bestellung needs an approved Antrag
 
 The server must create a Bestellung only for an Antrag in a state with the flag approved
-(F/applications/flow/000571). It must answer 409 `application_not_approved` for an Antrag in a
+(F/applications/flow/000571). It must read only this flag and must not compare the key of a
+state. It must answer 409 `application_not_approved` for an Antrag in a
 different state. A Bestellung that exists must stay and must stay editable when the Antrag
 leaves the approved state.
 
