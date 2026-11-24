@@ -343,6 +343,8 @@ class TicketMail(UUIDPkMixin, Base):
             an imported mail (§F/integrations/ticket-mail/002737).
         attempts: The failed sends in sequence.
         send_error: The short cause code of the newest failed send.
+        sender_checked: An imported mail answers a mail that the Postfach sent to its
+            ``From`` address (§F/integrations/ticket-mail/002816).
         next_try_at: The moment from which the worker tries the send again.
     """
 
@@ -368,6 +370,7 @@ class TicketMail(UUIDPkMixin, Base):
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )
     automatic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    sender_checked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     to_addresses: Mapped[list[str]] = mapped_column(
         JSONB, default=list, server_default=text("'[]'::jsonb")
     )

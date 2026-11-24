@@ -2,7 +2,7 @@
 
 Covers the public message on a mail ticket, the worker job ``send_ticket_mails``, the
 confirmation of a new ticket and the ticket by hand for an address (specs 002712,
-002722 and 002733 to 002738). ``Stack.send`` stands for the SMTP client, so no test
+002722, 002733 to 002738, 002814 to 002816). ``Stack.send`` stands for the SMTP client, so no test
 opens a socket.
 """
 
@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.files.models import Attachment
+from app.modules.tickets import mail_send
 from app.modules.tickets.mail_send import MAX_ATTEMPTS
 from app.modules.tickets.models import TicketArea, TicketMailbox
 from tests.integration.modules.tickets.conftest import MANAGER, Api, add_principal
@@ -277,11 +278,79 @@ async def test_a_new_mail_ticket_gets_one_confirmation_an_hour(stack: Stack) -> 
     ((_account, message),) = stack.sent
     assert message["To"] == "anna@example.org"
     assert message["Auto-Submitted"] == "auto-replied"
-    assert message["Subject"] == f"Re: Raumanfrage [T-{first.number}]"
+    assert message["Subject"] == f"Deine Nachricht ist eingegangen [T-{first.number}]"
+    assert "Raumanfrage" not in message.get_content()
     assert message["In-Reply-To"] == "<m1@example.org>"
     assert f"T-{first.number}" in message.get_content()
     out = [m for m in await stack.mails() if m.direction == "out"]
     assert [(m.automatic, m.note_id, m.state) for m in out] == [(True, None, "sent")]
+
+
+async def test_a_confirmation_holds_nothing_of_the_incoming_mail(stack: Stack) -> None:
+    """§ 002814: a forged sender cannot put a text of its own into a confirmation."""
+    await _set_box(stack, confirm=True)
+    spam = "Kaufen Sie jetzt billig bei example.net"
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>", subject=spam, body=spam))
+    await stack.run()
+    assert await stack.deliver() == 1
+    ((_account, message),) = stack.sent
+    assert spam not in str(message["Subject"])
+    assert spam not in message.get_content()
+
+
+async def test_a_postfach_sends_at_most_the_cap_of_confirmations_an_hour(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """§ 002815: the cap counts over all addresses; the tickets are still made."""
+    monkeypatch.setattr(mail_send, "CONFIRM_CAP", 2)
+    await _set_box(stack, confirm=True)
+    for n in range(3):
+        stack.inbox.put(
+            raw_mail(sender=f"person{n}@example.org", message_id=f"<m{n}@example.org>")
+        )
+    assert await stack.run() == 3
+    assert len(await stack.tickets()) == 3
+    assert await stack.deliver() == 2
+    assert sorted(str(m["To"]) for _a, m in stack.sent) == [
+        "person0@example.org",
+        "person1@example.org",
+    ]
+
+
+async def test_only_an_answer_to_a_sent_mail_has_a_checked_sender(stack: Stack) -> None:
+    """§ 002816: the number and the From alone do not check a sender."""
+    await _set_box(stack, confirm=True)
+    stack.inbox.put(raw_mail(message_id="<m1@example.org>"))
+    await stack.run()
+    await stack.deliver()
+    (ticket,) = await stack.tickets()
+    (sent,) = [m for m in await stack.mails() if m.direction == "out"]
+    stack.inbox.put(
+        raw_mail(message_id="<m2@example.org>", subject=f"Nachtrag [T-{ticket.number}]")
+    )
+    stack.inbox.put(
+        raw_mail(
+            message_id="<m3@example.org>",
+            subject="Re: Antwort",
+            In_Reply_To=sent.message_id,
+        )
+    )
+    stack.inbox.put(
+        raw_mail(
+            sender="mallory@example.org",
+            message_id="<m4@example.org>",
+            subject="Re: Antwort",
+            In_Reply_To=sent.message_id,
+        )
+    )
+    await stack.run()
+    checked = {m.message_id: m.sender_checked for m in await stack.mails() if m.direction == "in"}
+    assert checked == {
+        "<m1@example.org>": False,
+        "<m2@example.org>": False,
+        "<m3@example.org>": True,
+        "<m4@example.org>": False,
+    }
 
 
 async def test_no_confirmation_while_the_switch_is_off(stack: Stack) -> None:

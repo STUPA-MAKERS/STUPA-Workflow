@@ -51,7 +51,7 @@ DEFAULT_DESCRIPTION: I18nMap = {
 #: The language of the page head: ``index.html`` is ``lang="de"``.
 HEAD_LANG = "de"
 
-#: The paths of the branded images (``admin.router``).
+#: The paths of the branded images (``admin.router.branding_router``).
 PREVIEW_PATH = "/api/branding/preview.png"
 FAVICON_PATH = "/api/branding/favicon"
 APPLE_ICON_PATH = "/api/branding/icons/icon-180x180.png"

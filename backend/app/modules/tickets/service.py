@@ -2132,6 +2132,7 @@ def _mail_out(mail: TicketMail) -> TicketMailOut:
         cc=tuple(str(entry) for entry in mail.cc or []),
         subject=mail.subject,
         automatic=mail.automatic,
+        sender_checked=mail.sender_checked,
         source=_mail_source_state(mail),
         source_size=mail.source_size,
         skipped=tuple(TicketSkippedFile.model_validate(entry) for entry in mail.skipped or []),

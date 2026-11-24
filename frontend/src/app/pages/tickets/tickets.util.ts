@@ -211,6 +211,14 @@ export function skippedLine(mail: TicketMail | undefined, locale: string, t: Tra
   return t('tickets.mail.skipped', { files: files.join(', ') });
 }
 
+/**
+ * The hint under an imported mail whose sender is not checked: it answers no mail that
+ * the Postfach sent to its address (§F/integrations/ticket-mail/002816); empty otherwise.
+ */
+export function uncheckedLine(mail: TicketMail | undefined, t: Translate): string {
+  return mail?.direction === 'in' && !mail.senderChecked ? t('tickets.mail.unchecked') : '';
+}
+
 /** The text of a message with the line of its left-out files under it. */
 export function withSkipped(body: string, line: string): string {
   return line ? (body ? `${body}\n\n${line}` : line) : body;

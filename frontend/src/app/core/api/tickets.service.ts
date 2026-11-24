@@ -311,6 +311,8 @@ export interface TicketMail {
   readonly cc: readonly string[];
   readonly subject: string | null;
   readonly automatic: boolean;
+  /** An imported mail answers a mail that the Postfach sent to its sender (002816). */
+  readonly senderChecked: boolean;
   readonly source: 'clean' | 'infected' | 'closed' | 'gone';
   readonly sourceSize: number;
   readonly skipped: readonly TicketSkippedFile[];
