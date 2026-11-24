@@ -2,7 +2,7 @@
 id: "002980"
 title: A member reads the meeting on the meeting page
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

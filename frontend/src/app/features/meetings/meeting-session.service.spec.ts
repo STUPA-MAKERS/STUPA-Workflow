@@ -116,6 +116,44 @@ describe('MeetingSessionService', () => {
   });
 
 
+  /** An open blackout names its TOP, or the free text without a field. */
+  it('names the place of an open blackout when the finalize fails on it', () => {
+    const { http, session, toasts } = setup();
+    session.meeting.set(M({ status: 'closed' }));
+    for (const errors of [[{ field: 'top.3' }], []]) {
+      session.protocol.set(PROTOCOL);
+      session.finalize();
+      http.expectOne('/api/protocols/p-1').flush({ ...PROTOCOL });
+      http
+        .expectOne('/api/protocols/p-1/finalize')
+        .flush({ code: 'blackout_unclosed', errors }, { status: 422, statusText: 'Unprocessable' });
+    }
+    expect(toasts()).toContain('Eine Schwärzung ist nicht geschlossen (TOP 3). Ergänze das schließende %%.');
+    expect(toasts()).toContain('Eine Schwärzung ist nicht geschlossen (im Freitext). Ergänze das schließende %%.');
+    expect(session.finalizing()).toBe(false);
+  });
+
+  it('saves the planned date only with a meeting and a date, and reports the result', () => {
+    const { http, session, toasts } = setup();
+    session.planDate.set('2026-12-01');
+    session.savePlannedDate();
+    session.meeting.set(M());
+    session.planDate.set(' ');
+    session.savePlannedDate();
+    http.verify();
+    session.planDate.set('2026-12-01');
+    session.planTime.set('');
+    session.savePlannedDate();
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.body).toEqual({ date: '2026-12-01', startTime: null });
+    req.flush({ ...M(), date: '2026-12-01' });
+    expect(toasts()).toContain('Datum gespeichert.');
+    session.savePlannedDate();
+    http.expectOne('/api/meetings/m-1').flush({}, { status: 500, statusText: 'Error' });
+    expect(toasts()).toContain('Aktion fehlgeschlagen.');
+    expect(session.savingDate()).toBe(false);
+  });
+
   it('finalizes a protocol held back from the public page', () => {
     const { http, session } = setup();
     session.meeting.set(M({ status: 'closed' }));
