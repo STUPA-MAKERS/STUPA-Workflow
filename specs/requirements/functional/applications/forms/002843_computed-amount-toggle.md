@@ -2,7 +2,7 @@
 id: "002843"
 title: The form builder makes a computed field the amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

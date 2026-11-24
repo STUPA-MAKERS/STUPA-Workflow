@@ -2,7 +2,7 @@
 id: "002840"
 title: The server computes a computed amount
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

@@ -240,7 +240,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/000280](requirements/functional/applications/forms/000280_pin-not-mutate.md) | A form version is never changed | approved |
 | [F/applications/forms/000281](requirements/functional/applications/forms/000281_inactive-type.md) | A type without an active form is closed | approved |
 | [F/applications/forms/000282](requirements/functional/applications/forms/000282_system-title.md) | Every form has a title field | approved |
-| [F/applications/forms/000284](requirements/functional/applications/forms/000284_definition-check.md) | A form definition is checked at save time | draft |
+| [F/applications/forms/000284](requirements/functional/applications/forms/000284_definition-check.md) | A form definition is checked at save time | approved |
 | [F/applications/forms/000285](requirements/functional/applications/forms/000285_jsonlogic-whitelist.md) | JsonLogic uses a whitelist | approved |
 | [F/applications/forms/000286](requirements/functional/applications/forms/000286_all-errors.md) | Answer validation reports all errors | approved |
 | [F/applications/forms/000287](requirements/functional/applications/forms/000287_pattern-limits.md) | A pattern check cannot hang | approved |
@@ -259,10 +259,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/001730](requirements/functional/applications/forms/001730_position-files.md) | A position takes files in the form | approved |
 | [F/applications/forms/001731](requirements/functional/applications/forms/001731_submit-without-file-warning.md) | A submit without a file asks for a confirmation | approved |
 | [F/applications/forms/001732](requirements/functional/applications/forms/001732_type-requires-file.md) | An Antragsart can require a file | approved |
-| [F/applications/forms/002840](requirements/functional/applications/forms/002840_computed-amount.md) | The server computes a computed amount | draft |
-| [F/applications/forms/002841](requirements/functional/applications/forms/002841_computed-amount-cents.md) | A computed amount is a whole number of cents | draft |
-| [F/applications/forms/002842](requirements/functional/applications/forms/002842_computed-amount-display.md) | A computed amount shows as money | draft |
-| [F/applications/forms/002843](requirements/functional/applications/forms/002843_computed-amount-toggle.md) | The form builder makes a computed field the amount | draft |
+| [F/applications/forms/002840](requirements/functional/applications/forms/002840_computed-amount.md) | The server computes a computed amount | approved |
+| [F/applications/forms/002841](requirements/functional/applications/forms/002841_computed-amount-cents.md) | A computed amount is a whole number of cents | approved |
+| [F/applications/forms/002842](requirements/functional/applications/forms/002842_computed-amount-display.md) | A computed amount shows as money | approved |
+| [F/applications/forms/002843](requirements/functional/applications/forms/002843_computed-amount-toggle.md) | The form builder makes a computed field the amount | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |

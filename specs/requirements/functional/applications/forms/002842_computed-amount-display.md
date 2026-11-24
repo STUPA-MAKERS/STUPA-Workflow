@@ -2,7 +2,7 @@
 id: "002842"
 title: A computed amount shows as money
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
