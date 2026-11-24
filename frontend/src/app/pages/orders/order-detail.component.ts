@@ -301,10 +301,10 @@ export class OrderDetailComponent {
   protected readonly sumLine = computed(() => {
     const list = this.list();
     if (!list || list.total === null) return '';
-    const total = this.money(list.total);
-    const approved = this.money(list.approvedAmount);
-    return approved ? this.i18n.translate('orders.section.sumOfApproved', { total, approved }) : total;
+    return this.money(list.total);
   });
+
+  protected readonly approvedLine = computed(() => this.money(this.list()?.approvedAmount));
 
   protected readonly warning = computed(() => {
     const over = this.money(this.list()?.overBy);

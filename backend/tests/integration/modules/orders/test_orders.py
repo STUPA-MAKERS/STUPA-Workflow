@@ -33,7 +33,9 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
+from app.modules.budget.tree_schemas import ExpenseCreate
 from app.modules.config_revision.revert import RevertService
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
@@ -43,7 +45,7 @@ from app.modules.orders.privacy import clear_buyer_names
 from app.modules.orders.router import get_order_files
 from app.modules.privacy.service import AuskunftService, PrincipalService
 from app.settings import Settings
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow
 from tests._support.memory_storage import MemoryStorage, wire_storage
 
@@ -772,6 +774,23 @@ async def test_a_booking_names_a_bestellung(
         },
     )
     assert missing.status_code == 404
+    async with maker() as session:
+        booking = BudgetTreeService(session)
+        wanted = {"amount": Decimal("5.00"), "description": "x"}
+        with pytest.raises(NotFoundError):
+            await booking.book_expense(
+                ExpenseCreate(**wanted, applicationId=app_id, orderId=uuid.uuid4()),
+                actor="finance-sub",
+            )
+        with pytest.raises(ValidationProblem) as other:
+            await booking.book_expense(
+                ExpenseCreate(
+                    **wanted, applicationId=other_id, orderId=uuid.UUID(regal["id"])
+                ),
+                actor="finance-sub",
+            )
+        assert other.value.code == "order_application_mismatch"
+        await booking._require_order(uuid.UUID(regal["id"]), app_id)
 
     kept = api.delete(url)
     assert (kept.status_code, kept.json()["code"]) == (409, "order_has_bookings")

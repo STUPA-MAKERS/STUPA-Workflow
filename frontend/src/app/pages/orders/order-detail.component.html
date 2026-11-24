@@ -51,7 +51,17 @@
             <app-note kind="warn" icon="alert" role="status">{{ warning() }}</app-note>
           }
           <app-field-group>
-            <app-field-row data-testid="od-sum" [label]="'orders.section.sum' | t" [value]="sumLine()" />
+            <app-field-pair>
+              @if (approvedLine()) {
+                <app-field-row
+                  data-testid="od-approved"
+                  [label]="'orders.section.approved' | t"
+                  [value]="approvedLine()"
+                  [mono]="true"
+                />
+              }
+              <app-field-row data-testid="od-sum" [label]="'orders.section.sum' | t" [value]="sumLine()" [mono]="true" />
+            </app-field-pair>
           </app-field-group>
         </app-section>
       }
