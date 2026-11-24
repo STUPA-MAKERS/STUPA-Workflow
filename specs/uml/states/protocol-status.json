@@ -3,19 +3,19 @@
   "edges": [
     {
       "from": "draft",
-      "path": "backend/app/modules/protocol/service.py",
+      "path": "backend/app/modules/protocol/service/finalize.py",
       "to": "rendering",
       "trigger": "Protokoll abschließen after the meeting closed"
     },
     {
       "from": "rendering",
-      "path": "backend/app/modules/protocol/service.py",
+      "path": "backend/app/modules/protocol/service/finalize.py",
       "to": "final",
       "trigger": "Worker renders the PDF"
     },
     {
       "from": "rendering",
-      "path": "backend/app/modules/protocol/service.py",
+      "path": "backend/app/modules/protocol/service/finalize.py",
       "to": "draft",
       "trigger": "Render fails"
     }
@@ -25,17 +25,17 @@
       "id": "draft",
       "initial": true,
       "name": "draft",
-      "path": "backend/app/modules/protocol/service.py"
+      "path": "backend/app/modules/protocol/service/drafts.py"
     },
     {
       "id": "rendering",
       "name": "rendering",
-      "path": "backend/app/modules/protocol/service.py"
+      "path": "backend/app/modules/protocol/service/finalize.py"
     },
     {
       "id": "final",
       "name": "final",
-      "path": "backend/app/modules/protocol/service.py"
+      "path": "backend/app/modules/protocol/service/finalize.py"
     }
   ],
   "table": "protocol",

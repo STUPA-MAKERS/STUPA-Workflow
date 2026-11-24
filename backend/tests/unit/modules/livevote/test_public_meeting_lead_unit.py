@@ -39,7 +39,7 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.livevote.service.lifecycle import LifecycleOps
 from app.modules.meetings.present import Present
 from app.modules.protocol.markdown import build_vote_snippet, guest_vote_note
-from app.modules.protocol.service import _guest_note
+from app.modules.protocol.service.snippets import _guest_note
 from app.modules.voting.schemas import TallyOut, VoteOut
 from app.settings import get_settings
 from app.shared import antiabuse

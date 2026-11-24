@@ -14,9 +14,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import mark_vote_blocks
-from app.modules.protocol.service import _snippet, repeat_mark
+from app.modules.protocol.service.snippets import _snippet, repeat_mark
 from app.modules.voting.schemas import TallyOut, VoteOut
 from app.shared.config_schemas import ElectionConfig, VoteConfig
 from tests._support.protocol_fakes import FakeSession, result
@@ -80,7 +79,8 @@ async def _assemble(
         for view in views
     ]
     _Voting.views = {row.id: view for row, view in zip(rows, views, strict=True)}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(results=[result(item), result(*rows)])
     return await _service(session)._assemble_from_agenda(MID)
 
@@ -107,8 +107,6 @@ async def test_prepared_repeat_marks_nothing(monkeypatch: pytest.MonkeyPatch) ->
     second = _motion(attempt=2, repeatOfId=first.id, status="draft", result=None)
     md = await _assemble(monkeypatch, [first, second], "")
     assert "Wiederholt" not in md
-
-
 
 
 def test_repeat_of_an_election_names_the_next_ballot() -> None:

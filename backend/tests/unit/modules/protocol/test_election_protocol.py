@@ -12,7 +12,6 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import (
     ElectionLine,
     ElectionSnippet,
@@ -21,7 +20,7 @@ from app.modules.protocol.markdown import (
     votes_in_body,
 )
 from app.modules.protocol.public import PublicDecision, PublicTop
-from app.modules.protocol.service import _election_snippet, _snippet
+from app.modules.protocol.service.snippets import _election_snippet, _snippet
 from app.modules.voting.schemas import (
     ElectionLotOut,
     ElectionResultOut,
@@ -193,7 +192,8 @@ async def test_public_assembly_replaces_the_election_in_the_text(
     )
     vote = SimpleNamespace(id=uuid4())
     _Voting.views = {vote.id: view}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(results=[result(item), result(vote)])
     tops: list[PublicTop] = []
     md = await _service(session)._assemble_from_agenda(MID, public=True, tops=tops)
@@ -231,7 +231,8 @@ async def _assemble_two_rounds(
     item = SimpleNamespace(id=uuid4(), title="Wahlen", body=body, non_public=False)
     v1, v2 = SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())
     _Voting.views = {v1.id: first, v2.id: second}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(results=[result(item), result(v1, v2)])
     tops: list[PublicTop] = []
     md = await _service(session)._assemble_from_agenda(MID, public=public, tops=tops)

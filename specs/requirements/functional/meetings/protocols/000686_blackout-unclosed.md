@@ -8,7 +8,7 @@ updated: 2026-11-15
 tests:
   - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_start_finalize_refuses_an_open_marker"
 implementation:
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/finalize.py
   - frontend/src/app/shared/markdown/markdown.util.ts
   - frontend/src/app/features/meetings/top-sheet
 scope:
