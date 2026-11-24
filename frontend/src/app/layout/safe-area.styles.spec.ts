@@ -51,7 +51,6 @@ describe('safe-area styles', () => {
     );
     for (const page of [
       '../features/meetings/meeting-page/meeting-page.component.scss',
-      '../features/meetings/meeting-follow-view.component.scss',
     ]) {
       expect(read(page)).toMatch(
         /margin-block: calc\(var\(--app-top-safe-area, 0px\) - var\(--main-pad-top, var\(--space-8\)\)\)/,

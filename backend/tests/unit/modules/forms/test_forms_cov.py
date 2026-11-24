@@ -64,9 +64,7 @@ class _Session:
     `flush` assigns ids to the new objects, in place of the DB.
     """
 
-    def __init__(
-        self, results: Iterable[Any] = (), gets: Iterable[Any] = ()
-    ) -> None:
+    def __init__(self, results: Iterable[Any] = (), gets: Iterable[Any] = ()) -> None:
         self._results = list(results)
         self._gets = list(gets)
         self.added: list[Any] = []
@@ -156,6 +154,7 @@ def _form_field_row(
         is_pii=False,
         is_promoted=is_promoted,
         promote_target=promote_target,
+        display_format=None,
     )
 
 
@@ -542,9 +541,7 @@ def test_split_sections_empty_input_yields_one_main() -> None:
 
 def test_split_sections_marker_without_label() -> None:
     """Leave the label None for a marker with an empty label."""
-    out = _split_sections(
-        [_fd("a", "text"), _fd("step", "section", label={}), _fd("b", "text")]
-    )
+    out = _split_sections([_fd("a", "text"), _fd("step", "section", label={}), _fd("b", "text")])
     assert [s.key for s in out] == ["main", "step"]
     assert out[1].label is None
 
@@ -720,9 +717,7 @@ def test_extract_promoted_positions_total_none_no_amount() -> None:
     """Write no amount for a positions field without a preferred position."""
     fields = [_pos_field()]
     data = {
-        "positions": [
-            {"label": "P", "offers": [{"label": "A", "value": 5, "preferred": False}]}
-        ]
+        "positions": [{"label": "P", "offers": [{"label": "A", "value": 5, "preferred": False}]}]
     }
     assert extract_promoted(fields, data) == {}
 
@@ -735,3 +730,20 @@ def test_extract_promoted_positions_multiple_additive() -> None:
         "b": [{"label": "Q", "offers": [{"label": "Y", "value": 50, "preferred": True}]}],
     }
     assert extract_promoted(fields, data) == {"amount": Decimal("150")}
+
+
+def test_the_display_format_goes_into_the_row_and_back() -> None:
+    """Spec 002962: the format of a computed field is stored and read again."""
+    fd = FormFieldDef.model_validate(
+        {
+            "key": "q",
+            "type": "computed",
+            "label": {"de": "Q"},
+            "compute": {"var": "x"},
+            "format": "percent",
+        }
+    )
+    kwargs = field_def_to_row_kwargs(fd, 0)
+    assert kwargs["display_format"] == "percent"
+    row = FormField(form_version_id=uuid.uuid4(), **kwargs)
+    assert _row_to_field_def(row).display_format == "percent"

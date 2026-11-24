@@ -1,7 +1,10 @@
 import type { FormFieldDef, FormRule } from '@core/api/models';
 import fixture from './form-rules.fixture.json';
+import computedFixture from './computed.fixture.json';
 import {
   brokenRules,
+  computeValues,
+  formattedValue,
   costLine,
   costTotal,
   finiteNumber,
@@ -21,6 +24,41 @@ function field(key: string, type: FormFieldDef['type'], extra: Partial<FormField
 function position(value: unknown, preferred = true): Record<string, unknown> {
   return { label: 'P', offers: [{ label: 'A', value, preferred }] };
 }
+
+describe('computed fields (specs 002960-002962, shared fixture)', () => {
+  const computedFields = computedFixture.fields as unknown as FormFieldDef[];
+  it.each(computedFixture.cases.map((c) => [c.name, c] as const))('%s', (_name, c) => {
+    const got = computeValues(computedFields, c.data as Record<string, unknown>);
+    expect(Object.keys(got).sort()).toEqual(Object.keys(c.values).sort());
+    for (const [key, value] of Object.entries(c.values)) {
+      expect(got[key]).toBeCloseTo(value as number, 9);
+    }
+  });
+
+  it('rounds money half up away from 0 and percent to four places', () => {
+    expect(formattedValue('money', 0.125)).toBe(0.13);
+    expect(formattedValue('money', -0.125)).toBe(-0.13);
+    expect(formattedValue('percent', 1000 / 1200)).toBe(0.8333);
+  });
+
+  it('gives no value for a format that needs a number and for a number that is not finite', () => {
+    expect(formattedValue('money', true)).toBeNull();
+    expect(formattedValue('number', Infinity)).toBeNull();
+    expect(formattedValue('number', undefined)).toBeNull();
+    expect(formattedValue('number', true)).toBe(true);
+  });
+
+  it('gives a computed amount whole cents and none below 0', () => {
+    const amount = field('summe', 'computed', {
+      compute: { var: 'x' },
+      isPromoted: true,
+      promoteTarget: 'amount',
+    });
+    expect(computeValues([amount], { x: 29.405 })).toEqual({ summe: 29.41 });
+    expect(computeValues([amount], { x: -1 })).toEqual({});
+    expect(computeValues([amount], {})).toEqual({});
+  });
+});
 
 describe('form rules (spec 001671, shared fixture)', () => {
   it.each(fixture.cases.map((c) => [c.name, c] as const))('%s', (_name, c) => {

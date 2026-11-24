@@ -79,7 +79,8 @@
 
   <div class="mp__main">
     <!-- On a phone an open vote takes the place of the text (spec 001461); the sheet stays
-         alive behind it, so the editor keeps its state. -->
+         alive behind it, so the editor keeps its state. A member without the write right reads
+         the text of the item as it is typed (follow, spec 002930). -->
     @if (phoneVote(); as v) {
       <div class="mp__swap" role="group" [attr.aria-label]="'meetings.vote.inPlace' | t">
         <app-segmented
@@ -110,6 +111,7 @@
       [topIndex]="topIndex()"
       [editable]="editable()"
       [canEdit]="canEdit()"
+      [follow]="!m.canWrite"
       [saveState]="saveState()"
       [revision]="revision()"
       [canRename]="canRenameTop()"

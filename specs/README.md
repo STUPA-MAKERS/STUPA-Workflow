@@ -263,6 +263,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002841](requirements/functional/applications/forms/002841_computed-amount-cents.md) | A computed amount is a whole number of cents | approved |
 | [F/applications/forms/002842](requirements/functional/applications/forms/002842_computed-amount-display.md) | A computed amount shows as money | approved |
 | [F/applications/forms/002843](requirements/functional/applications/forms/002843_computed-amount-toggle.md) | The form builder makes a computed field the amount | approved |
+| [F/applications/forms/002960](requirements/functional/applications/forms/002960_computed-reads-rule-values.md) | A computed field reads the values of a form rule | approved |
+| [F/applications/forms/002961](requirements/functional/applications/forms/002961_computed-empty-on-failure.md) | A computed field that cannot be computed stays empty | approved |
+| [F/applications/forms/002962](requirements/functional/applications/forms/002962_computed-format.md) | A computed field has a display format | approved |
+| [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | approved |
+| [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
@@ -750,6 +755,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/meetings/001739](requirements/functional/meetings/meetings/001739_live-resync-on-return.md) | A live meeting page connects and reads again when the page returns | approved |
 | [F/meetings/meetings/001804](requirements/functional/meetings/meetings/001804_vote-tab-final-protocol.md) | A closed meeting keeps the vote tab | approved |
 | [F/meetings/meetings/001871](requirements/functional/meetings/meetings/001871_meetings-committee-param.md) | The meeting list reads the Gremium filter from the URL | approved |
+| [F/meetings/meetings/002980](requirements/functional/meetings/meetings/002980_member-reads-meeting-page.md) | A member reads the meeting on the meeting page | approved |
 | [F/meetings/protocols/000115](requirements/functional/meetings/protocols/000115_keeper-permission.md) | The keeper holds protocol.write | approved |
 | [F/meetings/protocols/000116](requirements/functional/meetings/protocols/000116_finalize.md) | Finalize needs a closed meeting and protocol.finalize | approved |
 | [F/meetings/protocols/000117](requirements/functional/meetings/protocols/000117_delete-draft-only.md) | Only a draft protocol is deleted | approved |

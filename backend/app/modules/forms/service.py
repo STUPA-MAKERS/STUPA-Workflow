@@ -51,6 +51,7 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
             "isPII": row.is_pii,
             "isPromoted": row.is_promoted,
             "promoteTarget": row.promote_target,
+            "format": row.display_format,
         }
     )
 
@@ -141,6 +142,7 @@ def field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
         "is_pii": field.is_pii,
         "is_promoted": field.is_promoted,
         "promote_target": field.promote_target,
+        "display_format": field.display_format,
     }
 
 

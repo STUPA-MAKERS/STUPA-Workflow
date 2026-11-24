@@ -714,12 +714,11 @@ def test_compute_derives_value() -> None:
     assert out["total"] == 30
 
 
-def test_compute_failure_reports_error() -> None:
-    """Report a compute error such as a division by zero."""
+def test_compute_failure_leaves_the_field_empty() -> None:
+    """A division by zero gives no value and no error (spec 002961)."""
     fields = [_field("total", "computed", compute={"/": [{"var": "a"}, {"var": "b"}]})]
-    with pytest.raises(AnswerValidationError) as ei:
-        validate_answers(fields, {"a": 1, "b": 0})
-    assert _errkeys(ei.value) == {"total"}
+    out = validate_answers(fields, {"a": 1, "b": 0})
+    assert "total" not in out
 
 
 def test_compute_value_visible_in_visible_if() -> None:
