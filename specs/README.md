@@ -267,7 +267,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/activity/001275](requirements/functional/collaboration/activity/001275_new-since-last-visit.md) | New events since the last visit are marked | approved |
 | [F/collaboration/activity/001276](requirements/functional/collaboration/activity/001276_paging.md) | The activity page loads 50 events per step without a time limit | approved |
 | [F/collaboration/activity/001300](requirements/functional/collaboration/activity/001300_activity-is-the-start-page.md) | The activity page is the start page | approved |
-| [F/collaboration/activity/001301](requirements/functional/collaboration/activity/001301_apply-button-in-activity-header.md) | Antrag stellen stands in the header of the activity page | approved |
+| [F/collaboration/activity/001301](requirements/functional/collaboration/activity/001301_apply-button-in-activity-header.md) | Antrag stellen stands in the header of the activity page | replaced |
 | [F/collaboration/activity/001302](requirements/functional/collaboration/activity/001302_live-meeting-on-activity.md) | The activity page shows a running meeting above the list | approved |
 | [F/collaboration/activity/001307](requirements/functional/collaboration/activity/001307_no-system-archive.md) | The automatic archive of a to-do card is not an activity | approved |
 | [F/collaboration/committees/001010](requirements/functional/collaboration/committees/001010_info-tab.md) | A Gremium has an Info tab | approved |
@@ -329,6 +329,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/002508](requirements/functional/collaboration/notifications/002508_push-jump-buttons.md) | A push can carry jump buttons | approved |
 | [F/collaboration/notifications/002509](requirements/functional/collaboration/notifications/002509_push-direct-actions.md) | A push can act without opening the app | approved |
 | [F/collaboration/notifications/002510](requirements/functional/collaboration/notifications/002510_push-endpoint-guard.md) | A push goes only to a known push service | approved |
+| [F/collaboration/notifications/002550](requirements/functional/collaboration/notifications/002550_push-bell-activity.md) | A bell in the head of Aktivität asks for push and opens the settings | draft |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
