@@ -13,7 +13,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    LargeBinary,
     Text,
     UniqueConstraint,
 )
@@ -21,6 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.shared.sealed import SealedBytes
 
 
 class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
@@ -41,7 +41,7 @@ class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
 
     name: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)
-    secret: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    secret: Mapped[bytes | None] = mapped_column(SealedBytes("webhook.secret"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
     subscriptions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")
     gremium_ids: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")

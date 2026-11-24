@@ -5810,6 +5810,12 @@
           "type": "TEXT"
         },
         {
+          "name": "calendar_token_hash",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "merged_into",
           "nullable": true,
           "primaryKey": false,
@@ -8331,7 +8337,7 @@
           "name": "secret",
           "nullable": true,
           "primaryKey": false,
-          "type": "BLOB"
+          "type": "TEXT"
         },
         {
           "name": "active",

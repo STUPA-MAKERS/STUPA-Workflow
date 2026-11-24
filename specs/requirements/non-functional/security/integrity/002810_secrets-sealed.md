@@ -25,7 +25,9 @@ of a Postfach, the Paperless token, the secret of a webhook, the private VAPID k
 calendar token of a person. The platform must seal with AES-256-GCM under the key `SECRETS_KEY`
 and must put the version of the key in front of each sealed value. One shared column type in
 `app/shared/` must do the sealing, and a module must not seal by itself. A migration must seal
-each value that is already stored.
+each value that is already stored. The feed must find a person by the sha256 of the calendar
+token, because a sealed value differs at each write. A value of an unknown key must read as
+empty and must be logged, so a copy of the database on another instance does not stop a page.
 
 Reason: A read of the database is enough today to log in to each Postfach, to read the archive in
 Paperless, and to forge webhook signatures and push messages. A dump, a restored backup or a

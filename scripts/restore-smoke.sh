@@ -79,6 +79,7 @@ cp .env.example .env
   echo "MINIO_SECRET_KEY=smokesecret123"
   echo "SESSION_SECRET=smoke-session-secret-that-is-long-enough-000000"
   echo "MAGIC_LINK_SECRET=smoke-magic-secret-that-is-long-enough-0000000"
+  echo "SECRETS_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
   echo "OIDC_CLIENT_SECRET=smoke-oidc-secret-that-is-long-enough-00000000"
   echo "ALTCHA_HMAC_SECRET=smoke-altcha-secret-that-is-long-enough-000000"
 } >> .env

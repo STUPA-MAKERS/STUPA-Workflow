@@ -23,6 +23,7 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, 
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.shared.sealed import Sealed
 
 
 class PushSubscription(UUIDPkMixin, CreatedAtMixin, Base):
@@ -66,7 +67,7 @@ class PushVapidKey(CreatedAtMixin, Base):
     __tablename__ = "push_vapid_key"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    private_pem: Mapped[str] = mapped_column(Text)
+    private_pem: Mapped[str] = mapped_column(Sealed("push_vapid_key.private_pem"))
     public_key: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (CheckConstraint("id = 1", name="push_vapid_key_singleton"),)

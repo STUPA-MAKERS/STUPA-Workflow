@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+from app.shared.sealed import Sealed
 
 #: The kinds of a filing. `protocol_public` is the public PDF of a protocol,
 #: `attachment` is one attachment of an Antrag, and `ticket_file` is one file of a
@@ -52,7 +53,7 @@ class PaperlessSettings(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     base_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token: Mapped[str | None] = mapped_column(Sealed("paperless_settings.token"), nullable=True)
     file_protocols: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     protocols_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     file_applications: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)

@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.models import calendar_token_hash
 from app.modules.calendar.ics import AppointmentEvent, CardEvent, DueCard, ExternalEvent
 from app.modules.gremien.gremium_roles import gremium_reader_ids
 from app.modules.gremien.models import Gremium
@@ -75,7 +76,7 @@ async def principal_by_calendar_token(db: AsyncSession, token: str) -> Principal
     return (
         await db.execute(
             select(PrincipalRow).where(
-                PrincipalRow.calendar_token == token,
+                PrincipalRow.calendar_token_hash == calendar_token_hash(token),
                 PrincipalRow.active.is_(True),
             )
         )
