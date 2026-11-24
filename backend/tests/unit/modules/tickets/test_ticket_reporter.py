@@ -214,7 +214,6 @@ async def test_a_message_of_the_reporter_is_public() -> None:
 
 
 async def test_a_message_with_files_locks_the_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.modules.tickets import service as svc_mod
 
     async def _check(_s: object, **_kw: Any) -> str:
         return "tok"
@@ -222,8 +221,8 @@ async def test_a_message_with_files_locks_the_ticket(monkeypatch: pytest.MonkeyP
     async def _bind(_s: object, **_kw: Any) -> None:
         return None
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.notes.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.notes.bind_drafts", _bind)
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME, None], execute=[[(ME, "Me", None)]])
     session.put(ticket)

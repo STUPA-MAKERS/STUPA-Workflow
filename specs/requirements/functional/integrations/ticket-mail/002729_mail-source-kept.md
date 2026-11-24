@@ -11,7 +11,7 @@ tests:
   - "frontend/src/app/pages/tickets/ticket-detail.component.spec.ts:TicketDetailComponent"
 implementation:
   - backend/app/modules/tickets/mail_import.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/mail.py
   - backend/app/modules/tickets/router.py
   - frontend/src/app/pages/tickets/ticket-detail.component.ts
   - mcp/antragsplattform_mcp/tools/tickets.py

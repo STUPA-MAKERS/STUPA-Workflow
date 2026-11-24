@@ -10,7 +10,8 @@ tests:
   - "frontend/src/app/pages/tickets/tickets.util.spec.ts:tickets.util"
 implementation:
   - backend/app/modules/tickets/models.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/changes.py
+  - backend/app/modules/tickets/service/base.py
   - backend/migrations/versions/a8c3f15d7e42_ticket_waiting_source.py
   - frontend/src/app/pages/tickets/tickets.util.ts
   - frontend/src/app/pages/tickets/ticket-detail.component.ts

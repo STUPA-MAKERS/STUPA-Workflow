@@ -8,7 +8,8 @@ updated: 2026-11-23
 tests:
   - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_a_message_of_the_sender_sets_in_progress_without_an_actor"
 implementation:
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/base.py
+  - backend/app/modules/tickets/service/reporter.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

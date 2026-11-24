@@ -18,7 +18,6 @@ from app.modules.auth.people import DELETED_PERSON, PersonRef
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 from app.modules.meetings.models import Meeting
-from app.modules.tickets import service as svc_mod
 from app.modules.tickets.access import PLATFORM_ONLY, area_workers
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.tickets.numbers import (
@@ -115,7 +114,7 @@ def test_a_number_parses_with_and_without_the_prefix() -> None:
 
 async def test_a_used_number_is_drawn_again(monkeypatch: pytest.MonkeyPatch) -> None:
     draws = iter(["AAAAAAAA", "BBBBBBBB"])
-    monkeypatch.setattr(svc_mod, "draw_number", lambda: next(draws))
+    monkeypatch.setattr("app.modules.tickets.service.base.draw_number", lambda: next(draws))
     session = ScriptedSession(scalar=[uuid.uuid4(), None])
     assert await _svc(session).free_number() == "BBBBBBBB"
     assert "ticket.number = 'AAAAAAAA'" in str(
@@ -191,8 +190,8 @@ async def test_create_checks_and_binds_the_drafts(monkeypatch: pytest.MonkeyPatc
     async def _bind(_s: object, **kw: Any) -> None:
         calls.append(("bind", kw))
 
-    monkeypatch.setattr(svc_mod, "check_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.create.check_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.create.bind_drafts", _bind)
     draft = uuid.uuid4()
     ticket = await _svc(ScriptedSession()).create(
         _create(attachmentIds=[str(draft)], draftToken="tok"),
@@ -425,7 +424,7 @@ async def test_the_application_target_needs_a_confirmed_readable_application(
         if not allowed["ok"]:
             raise ForbiddenError("no")
 
-    monkeypatch.setattr(svc_mod, "resolve_app_read", _read)
+    monkeypatch.setattr("app.modules.tickets.service.reads.resolve_app_read", _read)
     session = ScriptedSession()
     session.put(Application(id=app_id, data={"title": "Antrag"}, email_confirmed_at=NOW))
     assert await _detail_with_route(route, session) is None
@@ -640,8 +639,8 @@ async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPat
     async def _bind(_s: object, **kw: Any) -> None:
         calls.append(("bind", kw))
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.notes.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.notes.bind_drafts", _bind)
     ticket = _ticket()
     draft = uuid.uuid4()
     session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])

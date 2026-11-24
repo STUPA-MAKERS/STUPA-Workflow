@@ -11,7 +11,7 @@ tests:
   - "backend/tests/integration/modules/tickets/test_ticket_mail_send.py:test_a_ticket_by_hand_for_an_address_needs_a_postfach_and_sends_the_message"
   - "frontend/src/app/pages/tickets/ticket-new-dialog.component.spec.ts:TicketNewDialogComponent"
 implementation:
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/create.py
   - backend/app/modules/tickets/router.py
   - frontend/src/app/pages/tickets/ticket-new-dialog.component.ts
   - mcp/antragsplattform_mcp/tools/tickets.py

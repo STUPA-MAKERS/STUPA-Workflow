@@ -11,7 +11,7 @@ tests:
   - "backend/tests/integration/modules/tickets/test_ticket_areas_api.py:test_the_migration_seeds_plattform_and_every_report_lands_there"
 implementation:
   - backend/app/modules/tickets/models.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/create.py
   - backend/app/modules/tickets/areas.py
 scope:
   - backend/app/modules/tickets

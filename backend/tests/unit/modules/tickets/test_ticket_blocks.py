@@ -14,7 +14,6 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.files.schemas import MessageAttachmentOut
-from app.modules.tickets import service as svc_mod
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.tickets.schemas import TicketCreate
 from app.modules.tickets.service import (
@@ -102,7 +101,7 @@ async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing
     async def _check(_s: object, **_kw: Any) -> None:
         calls.append("check")
 
-    monkeypatch.setattr(svc_mod, "check_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.create.check_drafts", _check)
     block = uuid.uuid4()
     session = ScriptedSession(scalar=[block, None])
     payload = TicketCreate.model_validate(
@@ -114,7 +113,7 @@ async def test_a_blocked_report_takes_a_number_counts_the_hit_and_stores_nothing
             "draftToken": "tok",
         }
     )
-    monkeypatch.setattr(svc_mod, "draw_number", lambda: "7K3QX9MD")
+    monkeypatch.setattr("app.modules.tickets.service.base.draw_number", lambda: "7K3QX9MD")
     out = await _svc(session).create(payload, reporter_id=None, email="a@x", pepper="p")
     assert out == SwallowedReport(number="7K3QX9MD")
     assert out.id is None
