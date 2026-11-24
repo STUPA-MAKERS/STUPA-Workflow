@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Subscription } from 'rxjs';
 import {
@@ -14,16 +23,17 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { clock, isoDay, localToday, weekdayDate } from '@shared/date-format';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
-import { RouterLink, type Params } from '@angular/router';
-import { FabLinkDirective } from '@stupa-makers/ui-kit/shell';
-import { ActivityViewComponent, type ActivityEntry as ActivityViewEntry } from '@stupa-makers/ui-kit/views/activity';
+import { Router, type Params } from '@angular/router';
+import { PushDeviceService } from '@core/pwa/push-device.service';
+import {
+  ActivityViewComponent,
+  type ActivityEntry as ActivityViewEntry,
+} from '@stupa-makers/ui-kit/views/activity';
 import { LiveCardsComponent } from '../../features/meetings/live-cards/live-cards.component';
 import { injectPanePage } from '../admin/pane-page';
 import { RailStatusService } from '../../layout/rail-status.service';
 import {
-  ButtonGroupComponent,
-  ButtonLinkComponent,
-  FabComponent,
+  ButtonComponent,
   FilterSelectComponent,
   IconComponent,
   type IconName,
@@ -62,8 +72,8 @@ const KIND_FEATURE: Partial<Record<ActivityItemKind, 'todos' | 'tickets' | 'meet
  * The page loads 50 rows per step and the next 50 at the end of the list.
  *
  * It is the start page of a signed-in person (spec 001300): above the list it shows the
- * live meetings (spec 001302), and "Antrag stellen" is the one action of the header, on a
- * phone the floating button (spec 001301).
+ * live meetings (spec 001302), and the bell is the one action of the header
+ * (§F/collaboration/notifications/002550).
  *
  * The list is the activity view of the kit (§ui-kit:002280): the page maps its entries to the
  * view entries and keeps the head, the filters, the live meetings and the error toast.
@@ -76,13 +86,9 @@ const KIND_FEATURE: Partial<Record<ActivityItemKind, 'todos' | 'tickets' | 'meet
   imports: [
     TranslatePipe,
     ActivityViewComponent,
-    ButtonGroupComponent,
-    ButtonLinkComponent,
-    FabComponent,
-    FabLinkDirective,
+    ButtonComponent,
     FilterSelectComponent,
     LiveCardsComponent,
-    RouterLink,
     IconComponent,
     LoadErrorComponent,
     PageHeaderComponent,
@@ -98,6 +104,8 @@ export class ActivityComponent {
   private readonly features = inject(FeatureService);
   private readonly rail = inject(RailStatusService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly push = inject(PushDeviceService);
 
   /** The key of the stored choice of "Von" (spec 001273). */
   static readonly OWN_KEY = 'ap.activity.own';
@@ -134,12 +142,20 @@ export class ActivityComponent {
   readonly view = computed<LoadState<readonly ActivityViewEntry[]>>(() => {
     if (this.loading()) return { state: 'loading' };
     if (this.error()) {
-      return { state: 'error', message: this.i18n.translate('activity.loadError'), retry: () => this.retry() };
+      return {
+        state: 'error',
+        message: this.i18n.translate('activity.loadError'),
+        retry: () => this.retry(),
+      };
     }
     const entries = this.entries();
     if (!entries.length) {
       return this.filtered()
-        ? { state: 'empty', icon: 'searchOff', heading: this.i18n.translate('activity.emptyFiltered') }
+        ? {
+            state: 'empty',
+            icon: 'searchOff',
+            heading: this.i18n.translate('activity.emptyFiltered'),
+          }
         : { state: 'empty', icon: 'history', heading: this.i18n.translate('activity.empty') };
     }
     const locale = this.i18n.locale();
@@ -162,6 +178,22 @@ export class ActivityComponent {
       untracked(() => this.load(kinds, own));
     });
     this.destroyRef.onDestroy(() => this.request?.unsubscribe());
+  }
+
+  /**
+   * The bell of the phone head (§F/collaboration/notifications/002550): switch on push for this
+   * device when it can take push and has none yet (the browser asks), then open the settings.
+   * A refused permission still opens the settings.
+   */
+  async openNotifications(): Promise<void> {
+    if (
+      this.features.isOn('push') &&
+      this.push.support() === 'ready' &&
+      !(await this.push.endpoint())
+    ) {
+      await this.push.enable().catch(() => undefined);
+    }
+    await this.router.navigateByUrl('/account/notifications');
   }
 
   setKinds(values: readonly string[]): void {
@@ -228,12 +260,15 @@ export class ActivityComponent {
   }
 
   change(e: ActivityEntry): string {
-    return this.i18n.translate(`activity.change.${e.change}` as TranslationKey, { detail: this.detail(e) });
+    return this.i18n.translate(`activity.change.${e.change}` as TranslationKey, {
+      detail: this.detail(e),
+    });
   }
 
   private detail(e: ActivityEntry): string {
     if (e.status) {
-      const key = e.itemKind === 'ticket' ? `tickets.status.${e.status}` : `meetings.status.${e.status}`;
+      const key =
+        e.itemKind === 'ticket' ? `tickets.status.${e.status}` : `meetings.status.${e.status}`;
       return this.i18n.translate(key as TranslationKey);
     }
     return e.detail ?? '';
@@ -272,7 +307,10 @@ export class ActivityComponent {
     if (this.marked) return;
     this.marked = true;
     this.rail.activitySeen();
-    this.api.markSeen(page.readAt).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ error: () => undefined });
+    this.api
+      .markSeen(page.readAt)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => undefined });
   }
 }
 
@@ -313,7 +351,10 @@ function writeOwn(own: boolean): void {
  * Split an app URL into its path and its query params. A router link takes a path only and
  * encodes a `?` in it, so `/todos?card=<id>` as one string opens the 404 page.
  */
-export function splitUrl(url: string): { readonly path: string; readonly query: Readonly<Params> | null } {
+export function splitUrl(url: string): {
+  readonly path: string;
+  readonly query: Readonly<Params> | null;
+} {
   const at = url.indexOf('?');
   return at < 0
     ? { path: url, query: null }
