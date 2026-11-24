@@ -304,3 +304,31 @@ async def test_download_answers_the_pdf_and_refuses_a_file_over_the_limit() -> N
     with pytest.raises(PaperlessError) as error:
         await client.download(100, 5)
     assert error.value.code == "too_large"
+
+
+async def test_download_accepts_any_type_because_paperless_refuses_a_pdf_accept() -> None:
+    """§002528: Paperless answers 406 to ``Accept: application/pdf`` on the download route."""
+    fake = FakePaperless()
+    _document(fake, 3178, "Rechnung", None)
+    fake.files[3178] = b"%PDF-1.7 rechnung"
+
+    assert await fake.client().download(3178, 100) == b"%PDF-1.7 rechnung"
+    assert fake.requests[-1].headers["accept"] == "*/*"
+
+
+@pytest.mark.parametrize(
+    ("accept", "status"), [("application/pdf", 406), ("*/*", 200), ("application/json", 200)]
+)
+def test_the_fake_download_checks_accept_like_paperless(accept: str, status: int) -> None:
+    fake = FakePaperless()
+    fake.files[1] = b"%PDF-1.7"
+    request = httpx.Request(
+        "GET", f"{BASE_URL}/api/documents/1/download/", headers={"Accept": accept}
+    )
+    assert fake.handle(request).status_code == status
+
+
+async def test_a_refused_download_is_a_cause_code() -> None:
+    with pytest.raises(PaperlessError) as error:
+        await _answering(httpx.Response(406, json={"detail": "x"})).download(1, 100)
+    assert error.value.code == "status"

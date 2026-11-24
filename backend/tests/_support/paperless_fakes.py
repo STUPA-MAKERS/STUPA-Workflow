@@ -141,6 +141,20 @@ class FakePaperless:
             rows.reverse()
         return httpx.Response(200, json={"count": len(rows), "results": rows})
 
+    def _download(self, request: httpx.Request, document_id: int) -> httpx.Response:
+        """The PDF version of a document.
+
+        Paperless matches the Accept header against its JSON renderers before it sends
+        the file, so an Accept other than ``*/*`` or ``application/json`` gets 406.
+        """
+        if request.headers.get("accept") not in ("*/*", "application/json"):
+            return httpx.Response(
+                406, json={"detail": "Could not satisfy the request Accept header."}
+            )
+        return httpx.Response(
+            200, content=self.files[document_id], headers={"content-type": "application/pdf"}
+        )
+
     def handle(self, request: httpx.Request) -> httpx.Response:
         """Answer one request of the client."""
         self.requests.append(request)
@@ -158,7 +172,7 @@ class FakePaperless:
         if path == "documents":
             return self._search(request)
         if path.endswith("/download"):
-            return httpx.Response(200, content=self.files[int(path.split("/")[1])])
+            return self._download(request, int(path.split("/")[1]))
         return self._document(int(path.split("/")[1]), request)
 
     def client(
