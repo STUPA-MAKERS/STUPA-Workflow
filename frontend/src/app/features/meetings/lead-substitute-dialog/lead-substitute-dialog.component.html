@@ -20,7 +20,7 @@
   <ng-template dialogBody>
     <div class="dd">
       @if (!allowed()) {
-        <p class="dd__note dd__status" role="status">{{ 'meetings.leadSubstitute.notAllowed' | t }}</p>
+        <p class="dd__note" role="status">{{ 'meetings.leadSubstitute.notAllowed' | t }}</p>
       }
       @if (searchable()) {
         <app-search-pill

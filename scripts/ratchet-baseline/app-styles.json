@@ -101,7 +101,7 @@
   "frontend/src/app/features/meetings/create-meeting-dialog/create-meeting-dialog.component.scss": 23,
   "frontend/src/app/features/meetings/create-meeting-dialog/create-meeting-dialog.component.ts": 1,
   "frontend/src/app/features/meetings/delegation-dialog/delegation-dialog.component.html": 21,
-  "frontend/src/app/features/meetings/delegation-dialog/delegation-dialog.component.scss": 117,
+  "frontend/src/app/features/meetings/delegation-dialog/delegation-dialog.component.scss": 114,
   "frontend/src/app/features/meetings/delegation-dialog/delegation-dialog.component.ts": 1,
   "frontend/src/app/features/meetings/delete-meeting-dialog/delete-meeting-dialog.component.html": 1,
   "frontend/src/app/features/meetings/delete-meeting-dialog/delete-meeting-dialog.component.scss": 6,
