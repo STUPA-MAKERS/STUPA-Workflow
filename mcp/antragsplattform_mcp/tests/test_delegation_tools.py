@@ -54,7 +54,7 @@ def test_create_delegation_by_the_lead(fake_api: _FakeApi) -> None:
         (
             "POST",
             "/delegations",
-            {"meetingId": "m1", "delegateId": "b", "delegateVoting": False, "delegatorId": "a"},
+            {"meetingId": "m1", "delegateId": "b", "delegatorId": "a"},
         ),
         ("POST", "/delegations", {"meetingId": "m1", "delegateId": "b", "delegateVoting": False}),
     ]

@@ -293,6 +293,27 @@ async def test_create_undated_meeting_skips_deadline() -> None:
     assert db.committed == 1
 
 
+async def test_create_always_carries_the_vote() -> None:
+    """Store every new delegation with the vote (§F/meetings/delegations/002900)."""
+    me, delegate = _me(), _me("other")
+    db = _create_db(
+        meeting=_meeting(dated=False),
+        gremium=_gremium(),
+        me=me,
+        delegate=delegate,
+        pool_ids=[],
+        member_ids=[delegate.id],
+        existing=[],
+    )
+    out = await _svc(db).create(
+        DelegationCreate.model_validate(
+            {"meetingId": str(MEETING_ID), "delegateId": str(delegate.id), "delegateVoting": False}
+        ),
+        _actor(),
+    )
+    assert out.delegate_voting is True
+
+
 async def test_create_me_principal_missing_403() -> None:
     """Refuse a caller without a principal row with 403."""
     db = fake_session(result())
@@ -343,7 +364,7 @@ async def test_create_voting_existing_other_recipient_no_conflict() -> None:
         existing=[existing_row],
     )
     out = await _svc(db, voting=True).create(
-        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id, delegateVoting=True),
+        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id),
         _actor(),
     )
     assert out.delegate_voting is True
@@ -422,7 +443,6 @@ async def test_meeting_context_no_principal_row() -> None:
     assert ctx.recipients == []
     assert ctx.deadline is not None
     assert ctx.meeting_started is False
-    assert ctx.voting_delegation_enabled is True
 
 
 async def test_meeting_context_full_with_outgoing_incoming_and_recipients() -> None:
@@ -1096,7 +1116,7 @@ async def test_create_second_voting_delegation_is_allowed() -> None:
         existing=[(uuid4(), delegate.id, False, True)],
     )
     out = await _svc(db, voting=True).create(
-        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id, delegateVoting=True),
+        DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id),
         _actor(),
     )
     assert out.delegate_voting is True
@@ -1161,7 +1181,7 @@ async def test_create_pool_substitute_carries_one_vote_conflict() -> None:
     )
     with pytest.raises(ConflictError, match="carries") as exc:
         await _svc(db, voting=True).create(
-            DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id, delegateVoting=True),
+            DelegationCreate(meetingId=MEETING_ID, delegateId=delegate.id),
             _actor(),
         )
     assert exc.value.code == "delegate_already_voting"

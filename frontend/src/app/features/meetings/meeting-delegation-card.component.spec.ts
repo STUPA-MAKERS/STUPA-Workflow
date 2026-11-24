@@ -48,7 +48,6 @@ function ctx(over: Partial<MeetingDelegationContext> = {}): MeetingDelegationCon
     meetingId: 'm-1',
     gremiumId: 'g-1',
     allowVoteDelegation: true,
-    votingDelegationEnabled: true,
     delegationAllowExternal: false,
     deadline: null,
     deadlinePassed: false,

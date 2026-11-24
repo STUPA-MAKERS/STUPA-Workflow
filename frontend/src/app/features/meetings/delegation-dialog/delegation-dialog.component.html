@@ -21,106 +21,97 @@
 >
   <ng-template dialogBody>
     <div class="dd">
-      @if (substitutes().length) {
-        <section class="dd__group" [attr.aria-label]="'participant.delegation.yourSubstitutes' | t">
-          <h3 class="dd__cap cap">{{ 'participant.delegation.yourSubstitutes' | t }}</h3>
-          <div
-            class="dd__rows rowgroup rowgroup--bg3"
-            role="radiogroup"
-            [attr.aria-label]="'participant.delegation.yourSubstitutes' | t"
-          >
-            @for (r of substitutes(); track r.principalId) {
-              <ng-container
-                [ngTemplateOutlet]="row"
-                [ngTemplateOutletContext]="{ $implicit: r, off: false }"
-              />
+      <app-search-pill
+        class="dd__search"
+        size="md"
+        [clearable]="true"
+        [placeholder]="'participant.delegation.searchMember' | t"
+        [value]="query()"
+        (valueChange)="search($event)"
+      />
+      <div class="dd__slot">
+        @if (substitutes().length || others().length) {
+          <div class="dd__list" appScrollFade="y" data-testid="delegation-list">
+            @if (substitutes().length) {
+              <section class="dd__group" [attr.aria-label]="'participant.delegation.yourSubstitutes' | t">
+                <h3 class="dd__cap cap">{{ 'participant.delegation.yourSubstitutes' | t }}</h3>
+                <div
+                  class="dd__rows rowgroup rowgroup--bg3"
+                  role="radiogroup"
+                  [attr.aria-label]="'participant.delegation.yourSubstitutes' | t"
+                >
+                  @for (r of substitutes(); track r.principalId) {
+                    <ng-container
+                      [ngTemplateOutlet]="row"
+                      [ngTemplateOutletContext]="{ $implicit: r, off: false }"
+                    />
+                  }
+                </div>
+              </section>
             }
-          </div>
-        </section>
-      }
-
-      <section class="dd__group" [attr.aria-label]="'participant.delegation.others' | t">
-        <div class="dd__head">
-          <h3 class="dd__cap cap">{{ 'participant.delegation.others' | t }}</h3>
-          @if (c.deadline) {
-            <span class="dd__note">
-              {{
-                (othersOpen() ? 'participant.delegation.until' : 'participant.delegation.closedAt')
-                  | t: { date: (c.deadline | ldate: 'weekdayShort') }
-              }}
-            </span>
-          }
-        </div>
-        <fieldset class="dd__searchBox" [disabled]="!othersOpen()">
-          <app-search-pill
-            class="dd__search"
-            size="md"
-            [placeholder]="'participant.delegation.searchMember' | t"
-            [value]="query()"
-            (valueChange)="search($event)"
-          />
-        </fieldset>
-        @if (others().length) {
-          <div
-            class="dd__rows rowgroup rowgroup--bg3"
-            role="radiogroup"
-            [attr.aria-label]="'participant.delegation.others' | t"
-          >
-            @for (r of others(); track r.principalId) {
-              <ng-container
-                [ngTemplateOutlet]="row"
-                [ngTemplateOutletContext]="{ $implicit: r, off: !othersOpen() }"
-              />
+            @if (others().length) {
+              <section class="dd__group" [attr.aria-label]="'participant.delegation.others' | t">
+                <div class="dd__head">
+                  <h3 class="dd__cap cap">{{ 'participant.delegation.others' | t }}</h3>
+                  @if (c.deadline) {
+                    <span class="dd__note">
+                      {{
+                        (othersOpen() ? 'participant.delegation.until' : 'participant.delegation.closedAt')
+                          | t: { date: (c.deadline | ldate: 'weekdayShort') }
+                      }}
+                    </span>
+                  }
+                </div>
+                <div
+                  class="dd__rows rowgroup rowgroup--bg3"
+                  role="radiogroup"
+                  [attr.aria-label]="'participant.delegation.others' | t"
+                >
+                  @for (r of others(); track r.principalId) {
+                    <ng-container
+                      [ngTemplateOutlet]="row"
+                      [ngTemplateOutletContext]="{ $implicit: r, off: !othersOpen() }"
+                    />
+                  }
+                </div>
+              </section>
             }
           </div>
         } @else {
           <app-empty-state
-            icon="users"
+            [icon]="query() ? 'searchOff' : 'users'"
             shape="person"
             rows="3"
             [heading]="'participant.delegation.noMember' | t"
           />
         }
-      </section>
-
-      @if (c.votingDelegationEnabled) {
-        <div class="dd__voting">
-          <label class="dd__votingText" for="dd-voting">
-            <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
-            <span class="dd__note">{{
-              (voting() ? 'participant.delegation.votingOn' : 'participant.delegation.votingOff')
-                | t
-            }}</span>
-          </label>
-          <app-switch
-            [id]="'dd-voting'"
-            [checked]="voting()"
-            (checkedChange)="voting.set($event)"
-            [ariaLabel]="'delegation.dialog.voting' | t"
-          />
-        </div>
-      } @else {
-        <p class="dd__note">{{ 'delegation.dialog.votingDisabled' | t }}</p>
-      }
+      </div>
+      <p class="dd__note dd__vote" data-testid="delegation-vote-line">
+        {{ 'participant.delegation.votingOn' | t }}
+      </p>
     </div>
   </ng-template>
 </app-dialog>
 
 <ng-template #row let-r let-off="off">
-  <label class="dd__row" [class.dd__row--on]="selected() === r.principalId" [class.dd__row--off]="off">
+  @let on = selected() === r.principalId;
+  <label class="dd__row" [class.dd__row--on]="on" [class.dd__row--off]="off">
     <input
       class="dd__radio"
       type="radio"
       name="delegate"
       [value]="r.principalId"
-      [checked]="selected() === r.principalId"
+      [checked]="on"
       [disabled]="off"
       (change)="pick(r)"
     />
-    <app-avatar [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
+    <app-avatar class="dd__avatar" [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
     <span class="dd__text">
       <span class="dd__name ell" [appTruncated]="name(r)" #cut="appTruncated" [attr.title]="cut.truncated() ? name(r) : null">{{ name(r) }}</span>
-      <span class="dd__sub">{{ roleKey(r) | t }}</span>
+      <span class="dd__sub ell">{{ roleKey(r) | t }}</span>
     </span>
+    @if (on) {
+      <app-icon class="dd__check" name="check" [size]="18" />
+    }
   </label>
 </ng-template>

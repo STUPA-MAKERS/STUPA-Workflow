@@ -684,6 +684,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/000910](requirements/functional/meetings/delegations/000910_no-delegation-in-election.md) | An election takes no delegation ballot | approved |
 | [F/meetings/delegations/000938](requirements/functional/meetings/delegations/000938_pool-substitute-votes-in-election.md) | A pool substitute votes in an election | approved |
 | [F/meetings/delegations/002692](requirements/functional/meetings/delegations/002692_substitutes-page-per-gremium.md) | The Stellvertretungen of a Gremium have their own page | approved |
+| [F/meetings/delegations/002900](requirements/functional/meetings/delegations/002900_delegation-carries-the-vote.md) | A delegation always transfers the voting right | draft |
+| [F/meetings/delegations/002901](requirements/functional/meetings/delegations/002901_planned-delegations-get-the-vote.md) | Delegations of planned meetings get the voting right | draft |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -954,6 +956,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/layout/002610](requirements/non-functional/usability/layout/002610_settings-no-change-date.md) | A settings screen of Verwaltung shows no change date | approved |
 | [NF/usability/layout/002690](requirements/non-functional/usability/layout/002690_admin-lists-like-users.md) | Every list page of Verwaltung looks like Benutzer | approved |
 | [NF/usability/layout/002800](requirements/non-functional/usability/layout/002800_phone-dock-sheets-full-screen.md) | A sheet from the phone dock of a meeting opens over the whole screen | approved |
+| [NF/usability/layout/002902](requirements/non-functional/usability/layout/002902_delegation-search-pinned.md) | The delegation dialogs pin the search | draft |
+| [NF/usability/layout/002903](requirements/non-functional/usability/layout/002903_delegation-pick-rows.md) | The delegation dialogs use the pick rows | draft |
+| [NF/usability/layout/002904](requirements/non-functional/usability/layout/002904_delegation-vote-line.md) | The delegation dialog says that the vote moves | draft |
 | [P/integrations/webhooks/000963](protocols/integrations/webhooks/000963_webhook-delivery.md) | A webhook delivery is a signed JSON POST | approved |
 | [S/backend/database/000068](style/backend/database/000068_hash-revision.md) | A migration has a hash ID | approved |
 | [S/backend/database/000069](style/backend/database/000069_one-head.md) | Alembic has one head | approved |

@@ -20,76 +20,74 @@
   <ng-template dialogBody>
     <div class="dd">
       @if (!allowed()) {
-        <p class="dd__note" role="status">{{ 'meetings.leadSubstitute.notAllowed' | t }}</p>
+        <p class="dd__note dd__vote" role="status">{{ 'meetings.leadSubstitute.notAllowed' | t }}</p>
       }
-
-      <section class="dd__group" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
-        <h3 class="dd__cap cap">{{ 'meetings.leadSubstitute.pool' | t }}</h3>
-        @if (searchable()) {
-          <app-search-pill
-            class="dd__search"
-            size="md"
-            [placeholder]="'meetings.leadSubstitute.search' | t"
-            [value]="query()"
-            (valueChange)="query.set($event)"
-          />
-        }
-        @if (failed()) {
-          <app-load-error [message]="'meetings.leadSubstitute.loadFailed' | t" (retry)="retry()" />
-        }
+      @if (searchable()) {
+        <app-search-pill
+          class="dd__search"
+          size="md"
+          [clearable]="true"
+          [placeholder]="'meetings.leadSubstitute.search' | t"
+          [value]="query()"
+          (valueChange)="query.set($event)"
+        />
+      }
+      @if (failed()) {
+        <app-load-error [message]="'meetings.leadSubstitute.loadFailed' | t" (retry)="retry()" />
+      }
+      <div class="dd__slot">
         @if (pool() === null) {
-          <div class="dd__rows rowgroup rowgroup--bg3">
-            <app-skeleton
-              variant="items"
-              [lead]="true"
-              [count]="3"
-              [label]="'meetings.leadSubstitute.loading' | t"
-            />
-          </div>
+          <app-skeleton variant="rows" [count]="3" [label]="'meetings.leadSubstitute.loading' | t" />
         } @else if (shown().length) {
-          <div
-            class="dd__rows rowgroup rowgroup--bg3"
-            role="radiogroup"
-            [attr.aria-label]="'meetings.leadSubstitute.pool' | t"
-          >
-            @for (r of shown(); track r.principalId) {
-              <label
-                class="dd__row"
-                [class.dd__row--on]="selected() === r.principalId"
-                [class.dd__row--off]="!allowed()"
+          <div class="dd__list" appScrollFade="y" data-testid="delegation-list">
+            <section class="dd__group" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
+              <h3 class="dd__cap cap">{{ 'meetings.leadSubstitute.pool' | t }}</h3>
+              <div
+                class="dd__rows rowgroup rowgroup--bg3"
+                role="radiogroup"
+                [attr.aria-label]="'meetings.leadSubstitute.pool' | t"
               >
-                <input
-                  class="dd__radio"
-                  type="radio"
-                  name="lead-substitute"
-                  [value]="r.principalId"
-                  [checked]="selected() === r.principalId"
-                  [disabled]="!allowed()"
-                  (change)="selected.set(r.principalId)"
-                />
-                <app-avatar
-                  [name]="name(r)"
-                  [principalId]="r.principalId"
-                  size="sm"
-                  [decorative]="true"
-                />
-                <span class="dd__text">
-                  <span
-                    class="dd__name ell"
-                    [appTruncated]="name(r)"
-                    #cut="appTruncated"
-                    [attr.title]="cut.truncated() ? name(r) : null"
-                    >{{ name(r) }}</span
-                  >
-                  <span class="dd__sub">{{
-                    (r.isMember
-                      ? 'participant.delegation.member'
-                      : 'participant.delegation.substitute'
-                    ) | t
-                  }}</span>
-                </span>
-              </label>
-            }
+                @for (r of shown(); track r.principalId) {
+                  @let on = selected() === r.principalId;
+                  <label class="dd__row" [class.dd__row--on]="on" [class.dd__row--off]="!allowed()">
+                    <input
+                      class="dd__radio"
+                      type="radio"
+                      name="lead-substitute"
+                      [value]="r.principalId"
+                      [checked]="on"
+                      [disabled]="!allowed()"
+                      (change)="selected.set(r.principalId)"
+                    />
+                    <app-avatar
+                      class="dd__avatar"
+                      [name]="name(r)"
+                      [principalId]="r.principalId"
+                      size="sm"
+                      [decorative]="true"
+                    />
+                    <span class="dd__text">
+                      <span
+                        class="dd__name ell"
+                        [appTruncated]="name(r)"
+                        #cut="appTruncated"
+                        [attr.title]="cut.truncated() ? name(r) : null"
+                        >{{ name(r) }}</span
+                      >
+                      <span class="dd__sub ell">{{
+                        (r.isMember
+                          ? 'participant.delegation.member'
+                          : 'participant.delegation.substitute'
+                        ) | t
+                      }}</span>
+                    </span>
+                    @if (on) {
+                      <app-icon class="dd__check" name="check" [size]="18" />
+                    }
+                  </label>
+                }
+              </div>
+            </section>
           </div>
         } @else if (failed()) {
           <app-empty-state icon="alert" [heading]="'meetings.leadSubstitute.loadFailed' | t" />
@@ -104,25 +102,10 @@
             "
           />
         }
-      </section>
-
-      @if (votingEnabled()) {
-        <div class="dd__voting">
-          <label class="dd__votingText" for="lsd-voting">
-            <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
-            <span class="dd__note">{{
-              (voting() ? 'meetings.leadSubstitute.votingOn' : 'meetings.leadSubstitute.votingOff')
-                | t: { name: memberName() }
-            }}</span>
-          </label>
-          <app-switch
-            [id]="'lsd-voting'"
-            [checked]="voting()"
-            (checkedChange)="voting.set($event)"
-            [ariaLabel]="'delegation.dialog.voting' | t"
-          />
-        </div>
-      }
+      </div>
+      <p class="dd__note dd__vote" data-testid="delegation-vote-line">
+        {{ 'meetings.leadSubstitute.votingOn' | t: { name: memberName() } }}
+      </p>
     </div>
   </ng-template>
 </app-dialog>

@@ -25,13 +25,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   AvatarComponent,
-  ButtonComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
   liveSearch,
+  ScrollFadeDirective,
   SearchPillComponent,
-  SwitchComponent,
   ToastService,
   TruncatedDirective,
   DialogBodyDirective,
@@ -46,7 +45,11 @@ import {
  * - "Andere Mitglieder": the other members of the gremium, with a search. They need the
  *   lead time of the gremium: after the deadline the rows are off. When the gremium
  *   allows external substitutes, the search also asks the server for other persons.
- * - "Stimmrecht mit übertragen" with the line that says what it means.
+ * - One line below the list says that the vote moves: every delegation carries the
+ *   voting right (002900), so the dialog has no switch for it.
+ *
+ * The search stays on top and filters both groups; only the list below it scrolls
+ * (002902). The rows are the rows of the pick dialogs with the avatar (002903).
  *
  * The server checks every rule again (deadline, recipients, no chains). The dialog
  * reports the new delegation through `created`.
@@ -71,10 +74,9 @@ const REFUSAL_TEXT: Readonly<Record<string, TranslationKey>> = {
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
-    ButtonComponent,
     DialogComponent,
     IconComponent,
-    SwitchComponent,
+    ScrollFadeDirective,
   ],
   templateUrl: './delegation-dialog.component.html',
   styleUrl: './delegation-dialog.component.scss',
@@ -93,7 +95,6 @@ export class DelegationDialogComponent {
   readonly created = output<Delegation>();
 
   protected readonly selected = signal<Uuid | ''>('');
-  protected readonly voting = signal(false);
   protected readonly query = signal('');
   protected readonly busy = signal(false);
   /** The hits of the server search (externals allowed only), or `null`. */
@@ -107,8 +108,13 @@ export class DelegationDialogComponent {
     reset: () => this.searched.set(null),
   });
 
-  /** The substitutes of the member: no lead time until the start. */
-  protected readonly substitutes = computed(() => this.context().recipients.filter((r) => r.viaPool));
+  /** The substitutes of the member: no lead time until the start. The search filters them too. */
+  protected readonly substitutes = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+    return this.context().recipients.filter(
+      (r) => r.viaPool && (!needle || (r.displayName ?? '').toLowerCase().includes(needle)),
+    );
+  });
 
   /** The other members (and, with a server search, external persons). */
   protected readonly others = computed(() => {
@@ -131,7 +137,6 @@ export class DelegationDialogComponent {
       if (!this.open()) return;
       untracked(() => {
         this.selected.set('');
-        this.voting.set(false);
         this.query.set('');
         this.remote.sync('');
         this.searched.set(null);
@@ -165,11 +170,7 @@ export class DelegationDialogComponent {
     this.busy.set(true);
     const c = this.context();
     this.api
-      .create({
-        meetingId: c.meetingId,
-        delegateId,
-        delegateVoting: c.votingDelegationEnabled && this.voting(),
-      })
+      .create({ meetingId: c.meetingId, delegateId })
       .subscribe({
         next: (d) => {
           this.busy.set(false);

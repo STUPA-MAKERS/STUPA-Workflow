@@ -257,7 +257,6 @@ function flushDelegationContext(http: HttpTestingController): void {
         meetingId: 'm-1',
         gremiumId: 'g-1',
         allowVoteDelegation: false,
-        votingDelegationEnabled: false,
         delegationAllowExternal: false,
         deadline: null,
         deadlinePassed: false,

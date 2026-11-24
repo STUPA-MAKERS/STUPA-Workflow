@@ -18,8 +18,9 @@ from app.shared.schemas import FrozenCamelModel
 class DelegationCreate(FrozenCamelModel, frozen=True):
     """Delegation for one meeting.
 
-    `delegateId` gets access to the meeting `meetingId`. With `delegateVoting`
-    the delegate also gets the vote.
+    `delegateId` gets access to the meeting `meetingId` and always gets the vote
+    of the delegator (§F/meetings/delegations/002900). The model ignores a
+    `delegateVoting` of an older client.
 
     Without `delegatorId` the caller delegates for themselves, only while the
     meeting is planned. With `delegatorId` the meeting lead (`can_manage`)
@@ -30,7 +31,6 @@ class DelegationCreate(FrozenCamelModel, frozen=True):
 
     meeting_id: UUID = Field(alias="meetingId")
     delegate_id: UUID = Field(alias="delegateId")
-    delegate_voting: bool = Field(default=False, alias="delegateVoting")
     delegator_id: UUID | None = Field(default=None, alias="delegatorId")
 
 
@@ -95,10 +95,8 @@ class MeetingDelegationContext(FrozenCamelModel, frozen=True):
 
     meeting_id: UUID = Field(serialization_alias="meetingId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
-    #: Feature gate: the gremium switch. ``votingDelegationEnabled`` mirrors it, because
-    #: no server setting switches the vote transfer any more.
+    #: Feature gate: the gremium switch. Every delegation carries the vote.
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
-    voting_delegation_enabled: bool = Field(serialization_alias="votingDelegationEnabled")
     delegation_allow_external: bool = Field(serialization_alias="delegationAllowExternal")
     #: Deadline in UTC for a delegation from outside the pool. None means the meeting
     #: has no date and only the status gate applies. A pool delegation runs until the

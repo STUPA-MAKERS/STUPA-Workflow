@@ -78,7 +78,7 @@ describe('DelegationsApiService', () => {
   });
 
   it('creates a delegation (POST with the input body)', (done) => {
-    const input: DelegationInput = { meetingId: 'm-1', delegateId: 'p-2', delegateVoting: true };
+    const input: DelegationInput = { meetingId: 'm-1', delegateId: 'p-2' };
     const created = delegation();
     svc.create(input).subscribe((d) => {
       expect(d).toEqual(created);
@@ -105,7 +105,6 @@ describe('DelegationsApiService', () => {
       meetingId: 'm-1',
       gremiumId: 'g-1',
       allowVoteDelegation: true,
-      votingDelegationEnabled: true,
       delegationAllowExternal: false,
       deadline: '2026-06-19T23:59:00Z',
       deadlinePassed: false,
