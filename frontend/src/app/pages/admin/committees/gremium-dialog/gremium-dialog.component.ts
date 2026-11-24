@@ -26,6 +26,7 @@ import {
   type SelectOption,
   SkeletonComponent,
   SwitchComponent,
+  TextareaComponent,
   ToastService,
   DialogBodyDirective,
 } from '@stupa-makers/ui-kit';
@@ -173,6 +174,7 @@ import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-stat
     InputComponent,
     SelectFieldComponent,
     SwitchComponent,
+    TextareaComponent,
   ],
   templateUrl: './gremium-dialog.component.html',
   styleUrl: './gremium-dialog.component.scss',
