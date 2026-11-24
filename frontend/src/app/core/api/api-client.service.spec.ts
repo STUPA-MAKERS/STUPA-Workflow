@@ -738,7 +738,6 @@ describe('ApiClient', () => {
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.get('field_key')).toBe('invoice');
-    expect(form.get('position_id')).toBeNull();
     req.flush(
       {
         id: 'att-1',
@@ -755,11 +754,10 @@ describe('ApiClient', () => {
 
   it('uploads an attachment with no opts (no field_key)', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    api.uploadAttachment('app-1', file, { positionId: 'p-1' }).subscribe();
+    api.uploadAttachment('app-1', file).subscribe();
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.has('field_key')).toBe(false);
-    expect(form.has('position_id')).toBe(false);
     req.flush(
       { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true },
       { status: 201, statusText: 'Created' },
