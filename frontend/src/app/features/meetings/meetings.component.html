@@ -11,17 +11,6 @@
 } @else if (error()) {
   <app-load-error face [message]="'meetings.error' | t" (retry)="retryMeeting()" />
 } @else if (meeting(); as m) {
-  @if (isFollower()) {
-    <app-meeting-follow-view
-      [meeting]="m"
-      [agenda]="agenda()"
-      [attendance]="attendance()"
-      [savingAttendance]="savingAttendance()"
-      (back)="goBack()"
-      (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
-      (lateExcused)="attendance.set($event)"
-    />
-  } @else {
   <app-meeting-page
     [meeting]="m"
     [protocol]="protocol()"
@@ -175,7 +164,6 @@
     (closed)="dialogs.closeOpen.set(false)"
     (meetingClosed)="dialogs.meetingClosed($event)"
   />
-  }
 } @else if (!detailMode()) {
   <app-meetings-overview />
 }

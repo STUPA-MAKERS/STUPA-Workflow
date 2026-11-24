@@ -2,14 +2,15 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { SectionComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
-import { formatMoney } from '@shared/format-money';
+import type { ComputedFormat } from '@core/api/models';
+import { formatComputed } from '@shared/forms/answer-format';
 
 /**
  * Formly field type `display` for content that the applicant cannot edit.
  *
  * The content is an info text (`markdown`) or a derived value (`computed`). The field
- * collects no applicant input. A computed amount (`money`) shows as EUR in the language
- * of the interface (spec 002842).
+ * collects no applicant input. A computed value shows in its `format` in the language of
+ * the interface (specs 002842, 002964): `money` as EUR, `percent` as a percent.
  */
 @Component({
   selector: 'app-formly-display',
@@ -95,8 +96,8 @@ export class FormlyDisplayType extends FieldType<FieldTypeConfig> {
     if (this.isComputed) {
       const v = this.formControl.value;
       if (v === null || v === undefined || v === '') return '—';
-      const money = this.props['money'] ? formatMoney(v, this.i18n.formatLocale()) : '';
-      return money || String(v);
+      const format = (this.props['format'] as ComputedFormat | undefined) ?? 'number';
+      return formatComputed(format, v, this.i18n.formatLocale());
     }
     return (this.props['text'] as string | undefined) ?? '';
   }

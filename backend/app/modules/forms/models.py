@@ -84,5 +84,7 @@ class FormField(UUIDPkMixin, Base):
     is_pii: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_promoted: Mapped[bool] = mapped_column(Boolean, server_default="false")
     promote_target: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The display format of a ``computed`` field (spec 002962); ``NULL`` is ``number``.
+    display_format: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (UniqueConstraint("form_version_id", "key"),)

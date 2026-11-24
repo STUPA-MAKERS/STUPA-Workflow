@@ -213,6 +213,9 @@ class FormFieldDef(WireModel, frozen=True):
     compute: dict[str, Any] | None = Field(default=None, description="Required for type 'computed'")
     isPromoted: bool = False
     promoteTarget: str | None = None
+    format: Literal["number", "money", "percent"] | None = Field(
+        default=None, description="Display format of a 'computed' field"
+    )
 
 
 class FormFieldPatch(WireModel, frozen=True):
@@ -229,6 +232,7 @@ class FormFieldPatch(WireModel, frozen=True):
     compute: dict[str, Any] | None = None
     isPromoted: bool | None = None
     promoteTarget: str | None = None
+    format: Literal["number", "money", "percent"] | None = None
 
 
 # Admin: Gremien and RBAC.

@@ -1,13 +1,13 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { tap } from 'rxjs';
 import type { FieldType, FormFieldDef, FormSection, I18nMap, Lang } from '@core/api/models';
-import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
+import { isFieldVisible } from './jsonlogic';
 import { CATALOG, de, type TranslationKey } from '@core/i18n/translations';
 import { langAttr, resolvedI18nLang, resolveI18n } from './i18n-text';
 import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
-import { finiteNumber, isComputedAmount } from './form-rules';
+import { computedFormat, computeValues, finiteNumber } from './form-rules';
 import { budgetOptionTree } from './budget-options';
 
 /**
@@ -280,7 +280,7 @@ function displayProps(
     case 'markdown':
       return { text: help ?? fieldLabel(f, lang) };
     case 'computed':
-      return isComputedAmount(f) ? { computed: true, money: true } : { computed: true };
+      return { computed: true, format: computedFormat(f) };
     case 'table':
       return {
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],
@@ -301,7 +301,7 @@ function mapField(
   f: FormFieldDef,
   lang: Lang,
   extraContext: Readonly<Record<string, unknown>>,
-  all: readonly FormFieldDef[] = [],
+  all: readonly FormFieldDef[],
 ): FormlyFieldConfig {
   const costKeys = positionsKeys(all);
   const text = fieldLabel(f, lang);
@@ -322,7 +322,7 @@ function mapField(
     ...validationProps(f),
     ...displayProps(f, lang, help, all),
   };
-  const expressions = buildExpressions(f, extraContext, numberKeys(all));
+  const expressions = buildExpressions(f, extraContext, numberKeys(all), all);
   const config: FormlyFieldConfig = {
     key: f.key,
     type: FORMLY_TYPE[f.type],
@@ -352,6 +352,7 @@ function buildExpressions(
   f: FormFieldDef,
   extraContext: Readonly<Record<string, unknown>>,
   numbers: ReadonlySet<string> = new Set(),
+  all: readonly FormFieldDef[],
 ): FormlyFieldConfig['expressions'] | undefined {
   const visibleIf = f.visibleIf;
   const compute = f.type === 'computed' ? f.compute : undefined;
@@ -360,14 +361,9 @@ function buildExpressions(
     : {};
   const derived: Readonly<Record<string, FieldExpression>> = compute
     ? {
-        [`model.${f.key}`]: (field: FormlyFieldConfig) => {
-          try {
-            return evalJsonLogic(compute, ctxOf(field, extraContext, numbers));
-          } catch (err) {
-            if (err instanceof JsonLogicError) return null;
-            throw err;
-          }
-        },
+        [`model.${f.key}`]: (field: FormlyFieldConfig) =>
+          computeValues(all, (field.model ?? {}) as Record<string, unknown>, extraContext)[f.key] ??
+          null,
       }
     : {};
   const expressions: Record<string, FieldExpression> = { ...hide, ...derived };

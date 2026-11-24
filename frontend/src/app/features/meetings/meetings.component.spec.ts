@@ -731,10 +731,10 @@ describe('MeetingsComponent', () => {
   });
 
   /**
-   * The meeting has an assigned minute-taker, and it is someone else. The logged-in user is not the
-   * minute-taker, so the page shows the live/voting view, not the manager view.
+   * The meeting has an assigned minute-taker, and it is someone else. The logged-in user has no
+   * write and no manage right, so the page is the meeting page, read-only (spec 002980).
    */
-  it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
+  it('gives a member the meeting page, read-only, once a protokollant is assigned', async () => {
     const assigned: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -750,15 +750,13 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
-    expect(await screen.findByRole('complementary', { name: 'Teilnahme' })).toBeInTheDocument();
-    expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
+    expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).not.toBeInTheDocument();
   });
 
-  /**
-   * The follow view is the view of a plain member. It must not depend on an assigned minute-taker:
-   * no write and no manage right is enough.
-   */
-  it('keeps the follow view for a member without rights and without a minute-taker', async () => {
+  /** Without a minute-taker a plain member also gets the read-only meeting page (spec 002980). */
+  it('gives a member the meeting page, read-only, without a minute-taker', async () => {
     const member: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -774,8 +772,9 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
-    expect(await screen.findByRole('complementary', { name: 'Teilnahme' })).toBeInTheDocument();
-    expect(screen.queryByRole('toolbar', { name: 'Sitzungssteuerung' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).not.toBeInTheDocument();
   });
 
   describe('minute-taker exclusivity is about the protocol only', () => {
@@ -2116,25 +2115,20 @@ describe('MeetingsComponent — methods', () => {
     });
 
     /**
-     * A named protokollant leaves the rights of everybody else untouched. No write and no manage
-     * right gives the follow view, with or without a protokollant.
+     * A member without the write and the manage right gets the same meeting page as the
+     * minute-taker, read-only (spec 002930). There is no second participant view.
      */
-    it('marks a user as follower on the server rights alone, not on the protokollant', async () => {
-      const { cmp } = await loaded();
-      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
-      expect(cmp.isFollower()).toBe(false);
-      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
-      expect(cmp.isFollower()).toBe(false);
-      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: null, canWrite: false, canManage: false });
-      expect(cmp.isFollower()).toBe(true);
+    it('gives a member without write or manage rights the meeting page, read-only', async () => {
+      const { cmp, fixture } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', canWrite: false, canManage: false });
-      expect(cmp.isFollower()).toBe(true);
-      cmp.meeting.set(null);
-      expect(cmp.isFollower()).toBe(false);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('app-meeting-page')).not.toBeNull();
+      expect(cmp.canEditProtocol()).toBe(false);
     });
 
     /** A reader still may not type into the minutes. */
-    it('gives a meeting.view_all reader the full view read-only, never the follow view', async () => {
+    it('gives a meeting.view_all reader the full view read-only, like a member', async () => {
       const { cmp } = await loaded({ perms: ['meeting.view_all'] });
       cmp.meeting.set({
         ...cmp.meeting()!,
@@ -2142,7 +2136,6 @@ describe('MeetingsComponent — methods', () => {
         canManage: false,
         protokollantId: 'someone',
       });
-      expect(cmp.isFollower()).toBe(false);
       expect(cmp.canEditProtocol()).toBe(false);
     });
 
