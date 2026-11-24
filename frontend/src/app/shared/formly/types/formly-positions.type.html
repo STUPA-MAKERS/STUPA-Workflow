@@ -5,9 +5,6 @@
       <span class="pos__req" aria-hidden="true">*</span>
     }
   </legend>
-  <span class="pos__sum">
-    {{ t('forms.positions.sum') }} <span class="mono">{{ fmt(total()) }}</span>
-  </span>
   <div class="pos__inner">
   @if (props.description) {
     <p class="pos__hint">{{ props.description }}</p>
@@ -192,6 +189,11 @@
       }
     </div>
   }
+
+  <div class="pos__total" aria-live="polite">
+    <span>{{ t('forms.positions.sum') }}</span>
+    <span class="mono pos__sumValue">{{ fmt(total()) }}</span>
+  </div>
 
   @if (costLine(); as line) {
     <p class="pos__line" aria-live="polite">{{ costLineText(line) }}</p>

@@ -22,7 +22,7 @@ scope:
 
 A `positions` field must have the setting `validation.costLine`. The default is on. When it is
 off, the form must not show the line of 001630 and 001631 below the positions of this field. The
-sum in the head of the field must stay. The form editor must show the switch
+sum row of 003008 must stay. The form editor must show the switch
 `Summenzeile anzeigen` (`Show summary line`) at a `positions` field. The setting must not change
 a computation or a check.
 

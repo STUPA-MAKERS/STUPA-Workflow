@@ -26,15 +26,16 @@
   margin-inline-start: 2px;
   color: var(--color-danger);
 }
-.pos__sum {
-  float: right;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.25rem;
-}
-.pos__sum .mono {
-  color: var(--color-text);
+/* The sum row below the positions, aligned with the value of a collapsed position (spec 003008). */
+.pos__total {
+  display: flex;
+  justify-content: space-between;
+  line-height: 2.75rem;
+  padding: var(--space-2) calc(var(--space-3) + 2.25rem + 2 * var(--space-2)) var(--space-2)
+    calc(2 * var(--space-3) + 24px);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  font-weight: var(--fw-medium);
 }
 .pos__inner {
   display: flex;

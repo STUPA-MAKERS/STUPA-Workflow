@@ -880,7 +880,20 @@ describe('FormlyPositionsType — cost line setting (spec 003000)', () => {
     const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten }, props });
     expect(host.querySelector('.pos__line')).toBeNull();
     expect(host.textContent).not.toContain('Gesamtkosten');
-    expect(host.querySelector('.pos__sum')?.textContent).toContain('1.200,00');
+    expect(host.querySelector('.pos__total')?.textContent).toContain('1.200,00');
+  });
+});
+
+describe('FormlyPositionsType — sum row (spec 003008)', () => {
+  it('sumRow: shows the sum as a row below the positions and none in the head', async () => {
+    const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
+    const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten } });
+    const row = host.querySelector('.pos__total');
+    expect(row?.firstElementChild?.textContent?.trim()).toBe('Gesamt');
+    expect(row?.lastElementChild?.textContent?.replace(/\s/g, ' ').trim()).toBe('1.200,00 €');
+    const cards = host.querySelectorAll('.pos__card');
+    expect(cards[cards.length - 1]?.nextElementSibling).toBe(row);
+    expect(host.querySelector('.pos__legend')?.nextElementSibling).toBe(host.querySelector('.pos__inner'));
   });
 });
 

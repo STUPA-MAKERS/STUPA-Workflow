@@ -276,6 +276,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | approved |
 | [F/applications/forms/003004](requirements/functional/applications/forms/003004_funding-cap-switch.md) | The cap of the funding at the total cost is a setting | approved |
 | [F/applications/forms/003006](requirements/functional/applications/forms/003006_funding-no-auto-hint.md) | A funding field without help shows no hint | approved |
+| [F/applications/forms/003008](requirements/functional/applications/forms/003008_positions-sum-row.md) | The sum of the positions is a row below the positions | draft |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |
