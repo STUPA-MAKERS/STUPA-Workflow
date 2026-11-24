@@ -78,6 +78,7 @@ MINIO_ACCESS_KEY=smoke-minio-access
 MINIO_SECRET_KEY=smoke-minio-secret-key
 SESSION_SECRET=smoke-session-secret-0123456789
 MAGIC_LINK_SECRET=smoke-magic-link-secret-0123456789
+SECRETS_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 ALTCHA_HMAC_SECRET=smoke-altcha-hmac-secret-0123456789
 BOOTSTRAP_ADMIN_EMAILS=admin@smoke.example
 BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject

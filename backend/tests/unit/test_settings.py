@@ -309,3 +309,46 @@ def test_oidc_short_client_secret_still_rejected(monkeypatch: pytest.MonkeyPatch
     _oidc_env(monkeypatch, OIDC_CLIENT_SECRET="too-short")
     with pytest.raises(SettingsError):
         load_settings(_env_file=None)
+
+
+def test_strict_security_refuses_to_start_without_the_secrets_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Refuse the start under strict security without `SECRETS_KEY` (002811)."""
+    _base_env(monkeypatch)
+    monkeypatch.delenv("SECRETS_KEY", raising=False)
+    monkeypatch.delenv("STRICT_SECURITY", raising=False)
+    with pytest.raises(SettingsError, match="SECRETS_KEY"):
+        load_settings(_env_file=None)
+
+
+def test_without_strict_security_the_secrets_key_may_be_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Start a dev instance without `SECRETS_KEY` when strict security is off (002811)."""
+    _base_env(monkeypatch)
+    monkeypatch.delenv("SECRETS_KEY", raising=False)
+    monkeypatch.setenv("STRICT_SECURITY", "false")
+    assert load_settings(_env_file=None).secrets_key is None
+
+
+@pytest.mark.parametrize("key", ["not base64 !", "c2hvcnQ="])
+def test_a_malformed_secrets_key_is_refused(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
+    """Refuse a key that is not base64 of 32 bytes, also as an old key (002811)."""
+    _base_env(monkeypatch)
+    monkeypatch.setenv("STRICT_SECURITY", "false")
+    monkeypatch.setenv("SECRETS_KEY", key)
+    with pytest.raises(SettingsError, match="SECRETS_KEY"):
+        load_settings(_env_file=None)
+    monkeypatch.delenv("SECRETS_KEY")
+    monkeypatch.setenv("SECRETS_KEY_OLD", key)
+    with pytest.raises(SettingsError, match="SECRETS_KEY"):
+        load_settings(_env_file=None)
+
+
+def test_the_old_secrets_keys_are_a_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Read `SECRETS_KEY_OLD` as a comma list (002811)."""
+    _base_env(monkeypatch)
+    a, b = "A" * 43 + "=", "B" * 43 + "="
+    monkeypatch.setenv("SECRETS_KEY_OLD", f"{a},{b}")
+    assert load_settings(_env_file=None).secrets_key_old == [a, b]

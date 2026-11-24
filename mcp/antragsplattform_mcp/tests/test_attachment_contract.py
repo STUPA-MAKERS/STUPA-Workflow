@@ -41,6 +41,7 @@ if _BACKEND.is_dir() and str(_BACKEND) not in sys.path:
     sys.path.append(str(_BACKEND))
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
+os.environ.setdefault("SECRETS_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 

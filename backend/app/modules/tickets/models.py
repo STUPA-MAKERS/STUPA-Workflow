@@ -63,6 +63,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 from app.modules.tickets.numbers import draw_number
+from app.shared.sealed import Sealed
 
 #: The kinds of a ticket.
 TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea", "barrier")
@@ -167,11 +168,11 @@ class TicketMailbox(UUIDPkMixin, TimestampMixin, Base):
     imap_host: Mapped[str] = mapped_column(Text)
     imap_port: Mapped[int] = mapped_column(Integer)
     imap_user: Mapped[str] = mapped_column(Text)
-    imap_password: Mapped[str] = mapped_column(Text)
+    imap_password: Mapped[str] = mapped_column(Sealed("ticket_mailbox.imap_password"))
     smtp_host: Mapped[str] = mapped_column(Text)
     smtp_port: Mapped[int] = mapped_column(Integer)
     smtp_user: Mapped[str] = mapped_column(Text)
-    smtp_password: Mapped[str] = mapped_column(Text)
+    smtp_password: Mapped[str] = mapped_column(Sealed("ticket_mailbox.smtp_password"))
     done_folder: Mapped[str] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     uid_validity: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

@@ -238,6 +238,7 @@ jobs:
       DATABASE_URL: "postgresql+asyncpg://app:pw@localhost:5432/antrag_test"
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
+      SECRETS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -296,6 +297,7 @@ jobs:
       DATABASE_URL: "postgresql+asyncpg://app:pw@localhost:5432/antrag_test"
       SESSION_SECRET: "ci-session-secret"
       MAGIC_LINK_SECRET: "ci-magic-link-secret"
+      SECRETS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
@@ -538,6 +540,7 @@ jobs:
             -e DATABASE_URL="postgresql+asyncpg://app:pw@localhost/antrag_test" \
             -e SESSION_SECRET="ci-session-secret" \
             -e MAGIC_LINK_SECRET="ci-magic-link-secret" \
+            -e SECRETS_KEY="MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" \
             -e FORWARDED_ALLOW_IPS="*" \
             antrag-backend:ci
           for i in $(seq 1 30); do

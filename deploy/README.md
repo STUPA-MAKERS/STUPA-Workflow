@@ -95,10 +95,21 @@ Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator
 ## Configuration
 
 All secrets live in `.env`. The template is `.env.example`. The API needs `DATABASE_URL`,
-`SESSION_SECRET` and `MAGIC_LINK_SECRET` to start. OIDC, SMTP and ALTCHA turn on as soon as
+`SESSION_SECRET`, `MAGIC_LINK_SECRET` and, under strict security, `SECRETS_KEY` to start. OIDC, SMTP and ALTCHA turn on as soon as
 you set their values. If the values are missing, the platform keeps the matching features off
 and does not crash. For the full reference see the
 [Configuration wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
+
+### Sealed secrets
+
+`SECRETS_KEY` (base64 of 32 bytes, `openssl rand -base64 32`) seals the secrets of the
+integrations in the database: the Postfach passwords, the Paperless token, the webhook secrets,
+the private VAPID key and the calendar tokens. Keep the key in the deploy secrets, never in the
+database or a backup: a restore without it opens none of these values. The migrate service
+needs the key too, because the migration `80d82c7f078d` seals the values that are already
+stored. To change the key, set the new key as `SECRETS_KEY` and the old one in
+`SECRETS_KEY_OLD`. Each value then opens with both, and the next write seals it with the new
+key.
 
 ### Bootstrap of the first admins — mandatory step with real OIDC auth
 
