@@ -9,11 +9,11 @@ import pytest
 
 from app.modules.auth.principal import Principal
 from app.modules.tickets.models import TicketEvent
-from app.modules.todos import service as svc_mod
 from app.modules.todos.access import ReadScope
 from app.modules.todos.models import TodoColumn, TodoEvent, TodoLabel
 from app.modules.todos.schemas import BoardPatch, ColumnPatch, LabelCreate, LabelPatch
 from app.modules.todos.service import TodoService
+from app.modules.todos.service import common as todo_common
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.todos.fakes import (
     ME,
@@ -68,7 +68,7 @@ async def test_list_boards_sorts_counts_and_creates_the_personal_board(
         ensured.append(owner)
         return True
 
-    monkeypatch.setattr(svc_mod, "ensure_personal_board", _ensure)
+    monkeypatch.setattr("app.modules.todos.service.boards.ensure_personal_board", _ensure)
     personal = board(kind="personal", gremium_id=None, owner_id=ME, name="Meine To-Dos")
     stupa = board(name="StuPa")
     asta = board(name="asta")
@@ -88,7 +88,7 @@ async def test_list_boards_without_an_account_or_boards(monkeypatch: pytest.Monk
     async def _never(_s: Any, _owner: uuid.UUID) -> bool:
         raise AssertionError("no account, no personal board")
 
-    monkeypatch.setattr(svc_mod, "ensure_personal_board", _never)
+    monkeypatch.setattr("app.modules.todos.service.boards.ensure_personal_board", _never)
     session = ScriptedSession(scalars=[[]])
     assert await _svc(session, me=None, scope=ReadScope()).list_boards(USER) == []
 
@@ -211,9 +211,9 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     """
     b = board()
     first, done = column(b.id, "Offen"), column(b.id, "Erledigt", 1, is_done=True)
-    old_done = card(b, done, completed_at=svc_mod._now())
+    old_done = card(b, done, completed_at=todo_common._now())
     new_done = card(b, first)
-    kept = card(b, first, completed_at=svc_mod._now())
+    kept = card(b, first, completed_at=todo_common._now())
     ticket = uuid.uuid4()
     session = ScriptedSession(
         scalars=[[first, done], [old_done], [new_done, kept]],
@@ -246,7 +246,7 @@ async def test_patch_column_does_not_tell_tickets_of_archived_cards() -> None:
     """
     b = board()
     waiting, done = column(b.id, "Wartet"), column(b.id, "Erledigt", 1, is_done=True)
-    archived = card(b, waiting, archived_at=svc_mod._now())
+    archived = card(b, waiting, archived_at=todo_common._now())
     live = card(b, waiting)
     ticket = uuid.uuid4()
     session = ScriptedSession(
@@ -309,7 +309,7 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     first = column(b.id, "Offen", 0)
     col = column(b.id, "Wartet", 1)
     done = column(b.id, "Erledigt", 2, is_done=True)
-    moving = [card(b, col, rank="a"), card(b, col, rank="b", completed_at=svc_mod._now())]
+    moving = [card(b, col, rank="a"), card(b, col, rank="b", completed_at=todo_common._now())]
     present = card(b, done, rank="m")
     ticket = uuid.uuid4()
     session = ScriptedSession(
@@ -347,7 +347,7 @@ async def test_delete_column_into_done_does_not_tell_tickets_of_archived_cards()
     b = board()
     col = column(b.id, "Wartet", 0)
     done = column(b.id, "Erledigt", 1, is_done=True)
-    archived = card(b, col, rank="a", archived_at=svc_mod._now())
+    archived = card(b, col, rank="a", archived_at=todo_common._now())
     session = ScriptedSession(scalars=[[archived], [], [done]])
     session.put(b, col, done)
     service = _svc(session)

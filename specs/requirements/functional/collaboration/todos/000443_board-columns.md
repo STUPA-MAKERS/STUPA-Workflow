@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/todos/boards.py
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/columns.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos
