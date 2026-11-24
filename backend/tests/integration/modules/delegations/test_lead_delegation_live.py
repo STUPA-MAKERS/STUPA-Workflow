@@ -84,12 +84,11 @@ async def _principal_id(maker: async_sessionmaker[AsyncSession], sub: str) -> uu
     return pid
 
 
-def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict[str, Any]:
+def _body(s: _Setup, *, delegate: uuid.UUID | None = None) -> dict[str, Any]:
     return {
         "meetingId": str(s.meeting_id),
         "delegatorId": str(s.a),
         "delegateId": str(delegate or s.b),
-        "delegateVoting": voting,
     }
 
 
@@ -244,7 +243,7 @@ async def test_the_checks_of_the_lead_entry(
             json={**_body(s), "delegatorId": str(voteless)},
         )
         first = client.post("/api/delegations", json=_body(s))
-        second = client.post("/api/delegations", json=_body(s, voting=False))
+        second = client.post("/api/delegations", json=_body(s))
     assert not_in_pool.status_code == 403, not_in_pool.text
     assert same.status_code == 422, same.text
     assert unknown.status_code == 404, unknown.text
@@ -262,7 +261,7 @@ async def test_gremium_wide_substitute_may_step_in(
     await pool_entry(maker, s.gremium_id, wide)
     act(api, s.lead)
     with TestClient(api) as client:
-        created = client.post("/api/delegations", json=_body(s, delegate=wide, voting=False))
+        created = client.post("/api/delegations", json=_body(s, delegate=wide))
     assert created.status_code == 201, created.text
     assert (created.json()["delegateId"], created.json()["viaPool"]) == (str(wide), True)
 

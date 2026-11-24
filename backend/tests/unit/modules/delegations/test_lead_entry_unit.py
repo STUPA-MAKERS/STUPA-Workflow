@@ -71,10 +71,8 @@ def _person(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
 
 
-def _lead_payload(a: Any, b: Any, *, voting: bool = True) -> DelegationCreate:
-    return DelegationCreate(
-        meetingId=MEETING_ID, delegateId=b.id, delegatorId=a.id, delegateVoting=voting
-    )
+def _lead_payload(a: Any, b: Any) -> DelegationCreate:
+    return DelegationCreate(meetingId=MEETING_ID, delegateId=b.id, delegatorId=a.id)
 
 
 def _lead_db(*tail: Any, meeting: Any = None, gremium: Any = None) -> FakeSession:
@@ -142,8 +140,8 @@ async def test_lead_entry_without_attendance_record() -> None:
         result(),
         result(),
     )
-    out = await _svc(db).create(_lead_payload(a, b, voting=False), _actor())
-    assert out.delegate_voting is False
+    out = await _svc(db).create(_lead_payload(a, b), _actor())
+    assert out.delegate_voting is True
 
 
 async def test_lead_entry_needs_the_lead() -> None:

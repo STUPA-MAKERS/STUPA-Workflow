@@ -26,7 +26,6 @@ import {
   NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
-  ScrollFadeDirective,
   SearchPillComponent,
   SelectFieldComponent,
   type SelectFieldOption,
@@ -74,7 +73,6 @@ const SEARCH_LIMIT = 8;
   imports: [
     DialogBodyDirective,
     NoteComponent,
-    ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     AvatarComponent,

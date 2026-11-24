@@ -30,7 +30,6 @@ function ctx(over: Partial<MeetingDelegationContext> = {}): MeetingDelegationCon
     meetingId: 'mt-1',
     gremiumId: 'g-1',
     allowVoteDelegation: true,
-    votingDelegationEnabled: true,
     delegationAllowExternal: false,
     deadline: '2026-10-13T15:00:00Z',
     deadlinePassed: false,
@@ -51,7 +50,7 @@ async function setup(context: MeetingDelegationContext = ctx()) {
   const closed = jest.fn();
   const created = jest.fn();
   const view = await render(DelegationDialogComponent, {
-    inputs: { open: true, context, subtitle: '35. Sitzung · Di., 13.10.2026' },
+    inputs: { open: true, context },
     on: { closed, created },
     providers: [
       provideHttpClient(),
@@ -70,7 +69,6 @@ describe('DelegationDialogComponent', () => {
   /** A member without a name has a placeholder, never an id. */
   it('lists the own substitutes apart from the other members', async () => {
     const { dialog, group } = await setup();
-    expect(within(dialog()).getByText('35. Sitzung · Di., 13.10.2026')).toBeInTheDocument();
     const subs = group('Deine Stellvertretung');
     expect(within(subs).getAllByRole('radio')).toHaveLength(2);
     expect(within(subs).getAllByText('Stellvertretung')).toHaveLength(2);
@@ -93,7 +91,7 @@ describe('DelegationDialogComponent', () => {
     within(group('Andere Mitglieder'))
       .getAllByRole('radio')
       .forEach((r) => expect(r).toBeDisabled());
-    expect(within(dialog()).getByRole('searchbox', { name: 'Mitglied suchen' })).toBeDisabled();
+    expect(within(dialog()).getByRole('searchbox', { name: 'Mitglied suchen' })).toBeEnabled();
     within(group('Deine Stellvertretung'))
       .getAllByRole('radio')
       .forEach((r) => expect(r).toBeEnabled());
@@ -150,29 +148,40 @@ describe('DelegationDialogComponent', () => {
     }
   });
 
-  it('sends the pick with the voting right and says what the switch means', async () => {
+  /** 002900: no switch, no line about the vote, the body has no choice. */
+  it('always transfers the vote and says so', async () => {
     const { dialog, http, created } = await setup();
     const submit = () => within(dialog()).getByRole('button', { name: 'Vertretung einrichten' });
     expect(submit()).toBeDisabled();
+    expect(within(dialog()).queryByRole('switch')).toBeNull();
+    expect(within(dialog()).queryByText(/Die Vertretung stimmt/)).toBeNull();
     await userEvent.click(within(dialog()).getByRole('radio', { name: /Emma Vogel/ }));
-    expect(within(dialog()).getByText('Die Vertretung nimmt ohne Stimmrecht teil. Dein Stimmrecht bleibt bei dir.')).toBeInTheDocument();
-    await userEvent.click(within(dialog()).getByRole('switch', { name: 'Stimmrecht mit übertragen' }));
-    expect(within(dialog()).getByText('Die Vertretung stimmt für dich ab. Du selbst stimmst in dieser Sitzung nicht ab.')).toBeInTheDocument();
     await userEvent.click(submit());
     const req = http.expectOne(`${BASE}/delegations`);
-    expect(req.request.body).toEqual({ meetingId: 'mt-1', delegateId: 's-1', delegateVoting: true });
+    expect(req.request.body).toEqual({ meetingId: 'mt-1', delegateId: 's-1' });
     req.flush({ id: 'd-9' });
     expect(created).toHaveBeenCalledWith({ id: 'd-9' });
     expect(toast.success).toHaveBeenCalledWith('Vertretung eingerichtet.');
   });
 
-  it('sends no voting right when the server turned the transfer off', async () => {
-    const { dialog, http } = await setup(ctx({ votingDelegationEnabled: false }));
-    expect(within(dialog()).queryByRole('switch')).toBeNull();
-    expect(within(dialog()).getByText(/Die Übertragung des Stimmrechts ist serverseitig deaktiviert/)).toBeInTheDocument();
-    await userEvent.click(within(dialog()).getByRole('radio', { name: /Mara Keller/ }));
-    await userEvent.click(within(dialog()).getByRole('button', { name: 'Vertretung einrichten' }));
-    expect(http.expectOne(`${BASE}/delegations`).request.body.delegateVoting).toBe(false);
+  /** 002902: the search sits above the scroll box and filters both groups. */
+  it('pins the search above the list and filters the substitutes too', async () => {
+    const { dialog, group } = await setup();
+    const box = within(dialog()).getByRole('searchbox', { name: 'Mitglied suchen' });
+    const list = within(dialog()).getByTestId('delegation-list');
+    expect(list.contains(box)).toBe(false);
+    expect(list.contains(group('Deine Stellvertretung'))).toBe(true);
+    expect(list.contains(group('Andere Mitglieder'))).toBe(true);
+    await userEvent.type(box, 'emma');
+    expect(within(group('Deine Stellvertretung')).getAllByRole('radio')).toHaveLength(1);
+    expect(within(dialog()).queryByRole('radiogroup', { name: 'Andere Mitglieder' })).toBeNull();
+  });
+
+  it('marks the chosen row with a check', async () => {
+    const { dialog } = await setup();
+    const radio = within(dialog()).getByRole('radio', { name: /Mara Keller/ });
+    await userEvent.click(radio);
+    expect(radio.closest('label')?.querySelector('.dd__check')).not.toBeNull();
   });
 
   it('shows the reason of a refusal and keeps the dialog', async () => {

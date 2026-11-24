@@ -67,7 +67,7 @@ async def test_pool_substitute_on_all_six_paths(
         recipients = client.get(f"/api/delegations/meetings/{mid}/recipients")
         created = client.post(
             "/api/delegations",
-            json={"meetingId": str(mid), "delegateId": str(sam), "delegateVoting": True},
+            json={"meetingId": str(mid), "delegateId": str(sam)},
         )
 
     assert me.status_code == 200, me.text

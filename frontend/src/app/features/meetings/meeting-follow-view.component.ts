@@ -31,7 +31,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
-import { meetingLine, voteOptionLabel } from './meetings-display.util';
+import { voteOptionLabel } from './meetings-display.util';
 import {
   type OwnAttendanceChange,
   ParticipantAttendanceComponent,
@@ -300,10 +300,6 @@ export class MeetingFollowViewComponent {
       : this.i18n.translate('participant.start.on', { date });
   });
 
-  /** The line below the title of the delegation dialog: the meeting and its date. */
-  protected readonly dialogLine = computed(() =>
-    meetingLine(this.meeting(), this.i18n.formatLocale()),
-  );
 
   /** "TOP 3 von 8". */
   protected readonly positionText = computed(() =>

@@ -918,7 +918,6 @@ class MeetingSettingsUpdate(WireModel, frozen=True):
 class DelegationCreate(WireModel, frozen=True):
     meetingId: str
     delegateId: str
-    delegateVoting: bool = False
     delegatorId: str | None = Field(
         default=None,
         description=(

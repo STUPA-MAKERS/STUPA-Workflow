@@ -13,7 +13,6 @@ import {
 } from '@angular/core';
 import type { Attendance, Meeting, Uuid } from '@core/api/models';
 import { DelegationsApiService } from '@core/api/delegations.service';
-import { I18nService } from '@core/i18n/i18n.service';
 import type { LiveViewer } from '@core/ws/ws-messages';
 import {
   type AttendanceChange,
@@ -26,7 +25,6 @@ import {
   MeetingDelegationCardComponent,
 } from '../meeting-delegation-card.component';
 import { LeadSubstituteDialogComponent } from '../lead-substitute-dialog/lead-substitute-dialog.component';
-import { meetingLine } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { GuestListComponent } from '../guests/guest-list.component';
 import { GuestRequestsComponent } from '../guests/guest-requests.component';
@@ -66,7 +64,6 @@ function meetingApi(delegations: DelegationsApiService): MeetingApi {
   styleUrl: './attendance-sheet.component.scss',
 })
 export class AttendanceSheetComponent {
-  private readonly i18n = inject(I18nService);
 
   readonly open = model(false);
   /** The protocol of the meeting is final or in its render. */
@@ -92,9 +89,6 @@ export class AttendanceSheetComponent {
     this.guests && this.guests.meetingId() === this.meeting().id
       ? this.guests.admittedCount()
       : null,
-  );
-  protected readonly meetingLine = computed(() =>
-    meetingLine(this.meeting(), this.i18n.formatLocale()),
   );
   /** The missing member for whom the lead picks a substitute, or `null`. */
   protected readonly substituteFor = signal<Attendance | null>(null);

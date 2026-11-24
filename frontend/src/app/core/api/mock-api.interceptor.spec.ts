@@ -1998,7 +1998,6 @@ describe('mockApiInterceptor', () => {
             {
               meetingId: MEMBER_PLANNED,
               delegateId: 'p-10',
-              delegateVoting: true,
             },
           ),
         );
@@ -2055,7 +2054,6 @@ describe('mockApiInterceptor', () => {
             meetingId: LIVE,
             delegatorId: 'p-8',
             delegateId: 'p-11',
-            delegateVoting: true,
           }),
         );
         expect(made).toMatchObject({
