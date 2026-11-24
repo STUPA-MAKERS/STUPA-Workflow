@@ -11,7 +11,7 @@ tests:
   - "backend/tests/unit/modules/tickets/test_ticket_waiting.py:test_the_choices_are_plattform_and_the_bereiche_with_the_switch"
   - "frontend/src/app/features/help/report-dialog/report-dialog.component.spec.ts:ReportDialogComponent"
 implementation:
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/create.py
   - backend/app/modules/tickets/areas.py
   - backend/app/modules/tickets/router.py
   - frontend/src/app/features/help/report-dialog/report-dialog.component.ts

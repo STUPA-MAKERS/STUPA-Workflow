@@ -11,7 +11,7 @@ tests:
   - "backend/tests/unit/modules/tickets/test_ticket_router.py:test_a_late_message_of_the_reporter_becomes_a_new_ticket"
 implementation:
   - backend/app/modules/tickets/models.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/reporter.py
   - backend/app/modules/tickets/router.py
   - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:

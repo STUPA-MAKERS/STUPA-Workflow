@@ -198,7 +198,6 @@ async def test_a_late_answer_opens_a_follow_up_ticket_in_the_same_bereich() -> N
 async def test_a_late_answer_binds_its_files_to_the_new_ticket(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.modules.tickets import service as svc_mod
 
     bound: list[dict[str, Any]] = []
 
@@ -208,8 +207,8 @@ async def test_a_late_answer_binds_its_files_to_the_new_ticket(
     async def _bind(_s: object, **kw: Any) -> None:
         bound.append(kw)
 
-    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
-    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    monkeypatch.setattr("app.modules.tickets.service.reporter.check_message_drafts", _check)
+    monkeypatch.setattr("app.modules.tickets.service.reporter.bind_drafts", _bind)
     old = _ticket(status="rejected", context={}, closed_at=datetime.now(UTC) - timedelta(days=40))
     session = ScriptedSession(scalar=[ME, None, None, None])
     session.put(old)

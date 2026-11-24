@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
   - backend/app/modules/tickets/router.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/create.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets

@@ -9,7 +9,7 @@ tests:
   - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_a_move_clears_the_kategorie_and_the_foreign_assignee"
   - "backend/tests/unit/modules/tickets/test_ticket_areas.py:test_a_move_keeps_the_assignee_with_the_right_and_drops_the_kind"
 implementation:
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/changes.py
   - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:
   - backend/app/modules/tickets

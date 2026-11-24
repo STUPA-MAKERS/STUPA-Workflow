@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/worker/tickets.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/anonymize.py
 scope:
   - backend/app/modules/tickets
   - frontend/src/app/pages/tickets
