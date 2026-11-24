@@ -563,9 +563,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002865](requirements/functional/finance/orders/002865_order-audit.md) | Each write of a Bestellung has an audit entry | approved |
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | approved |
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | approved |
-| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | approved |
-| [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The detail of an Antrag has the section Bestellungen | approved |
-| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The row of a Bestellung has a menu with its actions | approved |
+| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | draft |
+| [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | draft |
+| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | draft |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |
 | [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | approved |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | approved |
@@ -576,13 +576,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002879](requirements/functional/finance/orders/002879_order-create-booking.md) | Buchung anlegen fills the booking form from the Bestellung | approved |
 | [F/finance/orders/002880](requirements/functional/finance/orders/002880_order-marks.md) | A Bestellung shows marks for its invoice and its bookings | approved |
 | [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | approved |
-| [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | The page Bestellungen lists the Bestellungen of all Anträge | approved |
+| [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | Bestellungen is a page of its own with a list and a detail | draft |
 | [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The page Bestellungen has three segments | approved |
 | [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | approved |
 | [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | approved |
 | [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a link kind | approved |
 | [F/finance/orders/002889](requirements/functional/finance/orders/002889_order-builtin-relations.md) | The relations of a Bestellung show without a link | approved |
-| [F/finance/orders/002890](requirements/functional/finance/orders/002890_order-search-source.md) | The global search finds Bestellungen | approved |
+| [F/finance/orders/002890](requirements/functional/finance/orders/002890_order-search-source.md) | The global search finds Bestellungen | draft |
 | [F/finance/orders/002891](requirements/functional/finance/orders/002891_order-webhook-events.md) | The create and the status change of a Bestellung are webhook events | approved |
 | [F/finance/orders/002892](requirements/functional/finance/orders/002892_order-privacy.md) | The buyer of a Bestellung follows the privacy rules | approved |
 | [F/finance/orders/002930](requirements/functional/finance/orders/002930_order-created-by-hand.md) | Only a person creates a Bestellung | approved |
@@ -590,6 +590,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | approved |
 | [F/finance/orders/002934](requirements/functional/finance/orders/002934_orders-list-without-order.md) | The list shows the approved Anträge without a Bestellung | approved |
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | approved |
+| [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | draft |
+| [F/finance/orders/002937](requirements/functional/finance/orders/002937_order-form-in-pane.md) | The form of a Bestellung opens in the pane of the page | draft |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |

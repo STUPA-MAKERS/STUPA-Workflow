@@ -1,28 +1,29 @@
 ---
 id: "002869"
-title: The detail of an Antrag has the section Bestellungen
+title: The Antrag lists its Bestellungen under Verknüpft
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation:
-  - frontend/src/app/pages/applications/orders/orders-section.component.ts
-  - frontend/src/app/pages/applications/orders/orders.util.ts
+implementation: null
 scope:
   - frontend/src/app/pages/applications
+  - frontend/src/app/features/todos
 ---
 
-# The detail of an Antrag has the section Bestellungen
+# The Antrag lists its Bestellungen under Verknüpft
 
-The detail of an Antrag of a type with money must have the section "Bestellungen" below the
-details. Each row must show the Bezeichnung, the Händler, the status, the price and the marks of
-002880. The price must be the real price, else the planned price with the word "geplant". When
-the real price and the planned price differ, the row must show the difference in euro with its
-sign. Below the rows a line must show the sum and the approved amount. The heading must not show
-a count.
+The detail of an Antrag must show each Bestellung of the Antrag as a row of the list
+"Verknüpft", like a linked element. The row must show the Bezeichnung, the status and the price,
+and it must open the Bestellung on the page "Bestellungen" (002883). The detail of an Antrag must
+not have a section "Bestellungen" and must not open a dialog for a Bestellung. For a person with
+`order.manage` the head of "Verknüpft" of an approved Antrag of a type with money must have the
+action "Bestellung anlegen", which opens the form on the page "Bestellungen" with this Antrag.
+In the applicant view the row must show the values of 002864 and must not be a link.
 
-Reason: The work on a purchase starts at the Antrag. The planned price is what the Gremium saw,
-so a deviation and the spent part of the approved amount must show at once.
+Reason: A section with a dialog inside the Antrag hides the Bestellungen and is slow to work
+with. The page "Bestellungen" is the place of the work, and the Antrag only points to it, like
+to every other linked element.
 
-Test: A frontend unit test renders an Antrag with two Bestellungen, one with 100,00 € planned
-and 112,50 € real, and reads the rows, "+12,50 €", the sum line and the heading.
+Test: A frontend unit test renders an Antrag with two Bestellungen, reads the two rows under
+"Verknüpft" with their link to the page and finds no section "Bestellungen".

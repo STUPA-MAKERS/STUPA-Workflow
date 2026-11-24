@@ -4442,6 +4442,7 @@
             "gremium",
             "invoice",
             "expense",
+            "order",
             "budget",
             "ticket",
             "todo",
@@ -4468,6 +4469,7 @@
             "gremium",
             "invoice",
             "expense",
+            "order",
             "budget",
             "ticket",
             "todo",
@@ -8276,6 +8278,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"
+        },
+        {
+          "name": "offer_on_order_status",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
         },
         {
           "name": "id",

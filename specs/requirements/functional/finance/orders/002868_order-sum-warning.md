@@ -2,7 +2,7 @@
 id: "002868"
 title: A sum above the approved amount warns and does not block
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
@@ -10,15 +10,16 @@ implementation:
   - frontend/src/app/pages/applications/orders/orders-section.component.ts
 scope:
   - backend/app/modules/orders
-  - frontend/src/app/pages/applications
+  - frontend/src/app/pages
 ---
 
 # A sum above the approved amount warns and does not block
 
 The sum of the Bestellungen of an Antrag is the sum of the real price, else the planned price,
-of each Bestellung that is not "Storniert". When the sum is above the approved amount, the
-section "Bestellungen" must show a warning with the difference. The server must not refuse a
-Bestellung because of the sum.
+of each Bestellung that is not "Storniert". The detail and the form of a Bestellung must show
+this sum and the approved amount of the Antrag. When the sum is above the approved amount, they
+must show a warning with the difference. The server must not refuse a Bestellung because of the
+sum.
 
 Reason: A price often differs by the shipping or by some cents. A block would stop the entry of
 a purchase that is already made. The available amount of a Kostenstelle can be negative too

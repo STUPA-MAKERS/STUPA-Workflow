@@ -1,27 +1,26 @@
 ---
 id: "002870"
-title: The row of a Bestellung has a menu with its actions
+title: The detail of a Bestellung has its actions
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation:
-  - frontend/src/app/pages/applications/orders/orders-section.component.ts
-  - frontend/src/app/pages/applications/orders/orders.util.ts
+implementation: null
 scope:
-  - frontend/src/app/pages/applications
+  - frontend/src/app/pages
 ---
 
-# The row of a Bestellung has a menu with its actions
+# The detail of a Bestellung has its actions
 
-For a person with `order.manage` the ⋮ menu of a row must have these entries in this order: "Als
-bestellt markieren", "Als geliefert markieren", "Rechnung verknüpfen", "Rechnung anlegen",
-"Buchung anlegen", "Bearbeiten", "Stornieren", "Löschen". The menu must leave out the entry of
-the current status. "Rechnung anlegen" and "Buchung anlegen" must show only for a person with
-`budget.book`. "Löschen" must ask before it deletes.
+For a person with `order.manage` the detail of a Bestellung (002936) must have these actions in
+this order: "Als bestellt markieren", "Als geliefert markieren", "Rechnung verknüpfen", "Rechnung
+anlegen", "Buchung anlegen", "Bearbeiten", "Stornieren", "Löschen". The next status of the
+Bestellung must be the main button, and the other actions must be in the ⋮ menu. The detail must
+leave out the action of the current status. "Rechnung anlegen" and "Buchung anlegen" must show
+only for a person with `budget.book`. "Löschen" must ask before it deletes.
 
-Reason: The usual steps of a purchase are one click each. An entry that the person cannot use
+Reason: The usual steps of a purchase are one click each. An action that the person cannot use
 must not show.
 
-Test: A frontend unit test opens the menu with and without `budget.book` and for a delivered
-Bestellung and reads the entries.
+Test: A frontend unit test opens the detail with and without `budget.book` and for a delivered
+Bestellung and reads the actions.
