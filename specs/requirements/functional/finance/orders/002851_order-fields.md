@@ -2,7 +2,7 @@
 id: "002851"
 title: A Bestellung holds these fields
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

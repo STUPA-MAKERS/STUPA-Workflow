@@ -2,7 +2,7 @@
 id: "002932"
 title: Each position of a Kostenaufstellung has a fixed id
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

@@ -2,7 +2,7 @@
 id: "002892"
 title: The buyer of a Bestellung follows the privacy rules
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

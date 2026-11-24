@@ -2,7 +2,7 @@
 id: "002856"
 title: The link of a Bestellung is an http or https address
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

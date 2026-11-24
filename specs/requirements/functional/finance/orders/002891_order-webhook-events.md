@@ -2,7 +2,7 @@
 id: "002891"
 title: The create and the status change of a Bestellung are webhook events
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

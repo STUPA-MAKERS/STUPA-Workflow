@@ -2,7 +2,7 @@
 id: "002869"
 title: The detail of an Antrag has the section Bestellungen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

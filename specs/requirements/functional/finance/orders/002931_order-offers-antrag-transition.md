@@ -2,7 +2,7 @@
 id: "002931"
 title: A status change of a Bestellung offers a transition of the Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

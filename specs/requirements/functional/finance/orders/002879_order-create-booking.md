@@ -2,7 +2,7 @@
 id: "002879"
 title: Buchung anlegen fills the booking form from the Bestellung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

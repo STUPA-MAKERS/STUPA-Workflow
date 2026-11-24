@@ -2,7 +2,7 @@
 id: "002889"
 title: The relations of a Bestellung show without a link
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

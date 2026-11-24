@@ -2,7 +2,7 @@
 id: "002853"
 title: A Bestellung has four statuses for the goods
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

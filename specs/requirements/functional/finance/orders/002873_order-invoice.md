@@ -2,7 +2,7 @@
 id: "002873"
 title: A Bestellung has at most one invoice
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

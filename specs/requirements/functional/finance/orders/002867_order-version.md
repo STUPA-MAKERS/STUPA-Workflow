@@ -2,7 +2,7 @@
 id: "002867"
 title: A change of a Bestellung names its version
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

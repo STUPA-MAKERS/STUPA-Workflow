@@ -2,7 +2,7 @@
 id: "002858"
 title: A Bestellung needs an approved Antrag of a type with money
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

@@ -2,7 +2,7 @@
 id: "002881"
 title: The cancel of a booked Bestellung asks first
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

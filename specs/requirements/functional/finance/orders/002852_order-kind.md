@@ -2,7 +2,7 @@
 id: "002852"
 title: A Bestellung is an order or an Auslage
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

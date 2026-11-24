@@ -2,7 +2,7 @@
 id: "002878"
 title: A booking can name a Bestellung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

@@ -2,7 +2,7 @@
 id: "002934"
 title: The list shows the approved Anträge without a Bestellung
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

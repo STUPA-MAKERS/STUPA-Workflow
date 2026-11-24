@@ -2,7 +2,7 @@
 id: "002855"
 title: A new Bestellung gets a random number of eight characters
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

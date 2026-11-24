@@ -2,7 +2,7 @@
 id: "002862"
 title: The write of a Bestellung needs order.manage
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

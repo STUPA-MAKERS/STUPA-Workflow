@@ -2,7 +2,7 @@
 id: "002880"
 title: A Bestellung shows marks for its invoice and its bookings
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

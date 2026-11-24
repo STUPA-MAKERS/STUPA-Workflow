@@ -2,7 +2,7 @@
 id: "002864"
 title: The applicant reads the Bezeichnung and the status only
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

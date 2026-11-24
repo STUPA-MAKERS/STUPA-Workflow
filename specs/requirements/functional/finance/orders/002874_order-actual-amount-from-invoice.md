@@ -2,7 +2,7 @@
 id: "002874"
 title: The invoice fills an empty real price
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null

@@ -2,7 +2,7 @@
 id: "002861"
 title: The form fills the planned price and the link from the preferred offers
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation: null
