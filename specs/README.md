@@ -609,7 +609,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
 | [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | approved |
 | [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | approved |
-| [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | draft |
+| [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | approved |
 | [F/integrations/ticket-mail/002816](requirements/functional/integrations/ticket-mail/002816_unchecked-sender-marked.md) | A mail message of an unchecked sender is marked | draft |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |
 | [F/integrations/webhooks/000299](requirements/functional/integrations/webhooks/000299_idempotent-delivery.md) | A delivery runs once per key | approved |
