@@ -607,7 +607,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/ticket-mail/002741](requirements/functional/integrations/ticket-mail/002741_mail-rate-limit.md) | One address opens at most 20 tickets an hour by mail | approved |
 | [F/integrations/ticket-mail/002742](requirements/functional/integrations/ticket-mail/002742_file-to-paperless.md) | The team files an attachment of a ticket in Paperless | approved |
 | [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
-| [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | draft |
+| [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | approved |
 | [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | draft |
 | [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | draft |
 | [F/integrations/ticket-mail/002816](requirements/functional/integrations/ticket-mail/002816_unchecked-sender-marked.md) | A mail message of an unchecked sender is marked | draft |
@@ -914,8 +914,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/integrity/000296](requirements/non-functional/security/integrity/000296_secret-hidden.md) | A webhook secret is never shown | approved |
 | [NF/security/integrity/000297](requirements/non-functional/security/integrity/000297_signature.md) | A webhook request is signed with a timestamp | approved |
 | [NF/security/integrity/000393](requirements/non-functional/security/integrity/000393_db-roles.md) | Database roles are separated | approved |
-| [NF/security/integrity/002810](requirements/non-functional/security/integrity/002810_secrets-sealed.md) | A secret of an integration is sealed in the database | draft |
-| [NF/security/integrity/002811](requirements/non-functional/security/integrity/002811_secrets-key.md) | The key of the sealed secrets comes from the deploy | draft |
+| [NF/security/integrity/002810](requirements/non-functional/security/integrity/002810_secrets-sealed.md) | A secret of an integration is sealed in the database | approved |
+| [NF/security/integrity/002811](requirements/non-functional/security/integrity/002811_secrets-key.md) | The key of the sealed secrets comes from the deploy | approved |
 | [NF/security/network/000182](requirements/non-functional/security/network/000182_webhook-ssrf.md) | The webhook SSRF guard runs at send time | approved |
 | [NF/security/network/000335](requirements/non-functional/security/network/000335_avatar-fetch.md) | The avatar fetch is fixed and limited | approved |
 | [NF/security/network/000389](requirements/non-functional/security/network/000389_typst-isolated.md) | The render service has no network egress | approved |
