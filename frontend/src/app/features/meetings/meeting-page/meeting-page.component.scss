@@ -224,16 +224,30 @@
     // the protocol with a small gap above the navigation bar, and a light shadow lifts it
     // off the protocol.
     box-shadow: var(--shadow-md);
+    outline: var(--pop-edge, none);
+    outline-offset: var(--pop-edge-offset, 0);
+  }
+  // The glass is a layer behind the dock, not the dock itself: a backdrop filter makes its
+  // box the frame of every fixed box inside it, so the bottom sheet of the minute-taker
+  // (`SessionDockViewComponent`) would open inside the dock and be cut off (spec 002800).
+  .mp__dock::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
     @include frosted-pop(var(--color-surface-2), 85%, 20px);
+    outline: none;
   }
   // Before the opening the dock only says "Noch nicht eröffnet", which the status in the
   // head already says, so it shows nothing there (`SessionDockComponent`).
   .mp__dock--quiet {
     outline: none;
-    background: none;
     box-shadow: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+  }
+  .mp__dock--quiet::before {
+    display: none;
   }
 }
 
