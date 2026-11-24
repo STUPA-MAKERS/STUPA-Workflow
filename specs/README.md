@@ -928,7 +928,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/002744](requirements/non-functional/security/network/002744_ticket-mail-host-allowlist.md) | The hosts of a Postfach need the deploy settings | approved |
 | [NF/security/network/002745](requirements/non-functional/security/network/002745_ticket-mail-tls.md) | The platform talks to a mail server only through TLS | approved |
 | [NF/security/network/002746](requirements/non-functional/security/network/002746_ticket-mail-password.md) | No read returns the password of a Postfach | approved |
-| [NF/security/network/002817](requirements/non-functional/security/network/002817_push-token-not-logged.md) | An access log holds no token of a path | draft |
+| [NF/security/network/002817](requirements/non-functional/security/network/002817_push-token-not-logged.md) | An access log holds no token of a path | approved |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
