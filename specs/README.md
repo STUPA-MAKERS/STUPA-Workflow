@@ -549,15 +549,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to one Antrag | draft |
 | [F/finance/orders/002851](requirements/functional/finance/orders/002851_order-fields.md) | A Bestellung holds these fields | draft |
 | [F/finance/orders/002852](requirements/functional/finance/orders/002852_order-kind.md) | A Bestellung is an order or an Auslage | draft |
-| [F/finance/orders/002853](requirements/functional/finance/orders/002853_order-status.md) | A Bestellung has four statuses | draft |
-| [F/finance/orders/002854](requirements/functional/finance/orders/002854_order-status-dates.md) | A status change fills an empty date | draft |
+| [F/finance/orders/002853](requirements/functional/finance/orders/002853_order-status.md) | A Bestellung has four statuses for the goods | draft |
 | [F/finance/orders/002855](requirements/functional/finance/orders/002855_order-number.md) | A new Bestellung gets a random number of eight characters | draft |
 | [F/finance/orders/002856](requirements/functional/finance/orders/002856_order-url.md) | The link of a Bestellung is an http or https address | draft |
-| [F/finance/orders/002857](requirements/functional/finance/orders/002857_order-moves-no-money.md) | A Bestellung changes no figure of the Haushalt | draft |
-| [F/finance/orders/002858](requirements/functional/finance/orders/002858_order-needs-approved-antrag.md) | A new Bestellung needs an approved Antrag | draft |
-| [F/finance/orders/002859](requirements/functional/finance/orders/002859_order-needs-money-type.md) | A Bestellung needs an Antrag of a type with money | draft |
+| [F/finance/orders/002857](requirements/functional/finance/orders/002857_order-moves-no-money.md) | A Bestellung moves no money | draft |
+| [F/finance/orders/002858](requirements/functional/finance/orders/002858_order-needs-approved-antrag.md) | A Bestellung needs an approved Antrag of a type with money | draft |
 | [F/finance/orders/002860](requirements/functional/finance/orders/002860_order-positions.md) | A Bestellung can name positions of the Kostenaufstellung | draft |
-| [F/finance/orders/002861](requirements/functional/finance/orders/002861_order-planned-amount-prefill.md) | The form fills the planned price from the preferred offers | draft |
+| [F/finance/orders/002861](requirements/functional/finance/orders/002861_order-planned-amount-prefill.md) | The form fills the planned price and the link from the preferred offers | draft |
 | [F/finance/orders/002862](requirements/functional/finance/orders/002862_order-permission.md) | The write of a Bestellung needs order.manage | draft |
 | [F/finance/orders/002863](requirements/functional/finance/orders/002863_order-read.md) | A person who reads the Antrag reads its Bestellungen | draft |
 | [F/finance/orders/002864](requirements/functional/finance/orders/002864_order-applicant-view.md) | The applicant reads the Bezeichnung and the status only | draft |
@@ -565,35 +563,30 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | draft |
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | draft |
 | [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | draft |
-| [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag detail has the section Bestellungen | draft |
+| [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The detail of an Antrag has the section Bestellungen | draft |
 | [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The row of a Bestellung has a menu with its actions | draft |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | draft |
 | [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | draft |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | draft |
 | [F/finance/orders/002874](requirements/functional/finance/orders/002874_order-actual-amount-from-invoice.md) | The invoice fills an empty real price | draft |
-| [F/finance/orders/002875](requirements/functional/finance/orders/002875_order-price-deviation.md) | A row shows the difference between the real and the planned price | draft |
 | [F/finance/orders/002876](requirements/functional/finance/orders/002876_order-create-invoice.md) | Rechnung anlegen opens the invoice form from the Bestellung | draft |
 | [F/finance/orders/002877](requirements/functional/finance/orders/002877_order-invoice-shows-orders.md) | The invoice detail lists its Bestellungen | draft |
 | [F/finance/orders/002878](requirements/functional/finance/orders/002878_order-booking-reference.md) | A booking can name a Bestellung | draft |
 | [F/finance/orders/002879](requirements/functional/finance/orders/002879_order-create-booking.md) | Buchung anlegen fills the booking form from the Bestellung | draft |
 | [F/finance/orders/002880](requirements/functional/finance/orders/002880_order-marks.md) | A Bestellung shows marks for its invoice and its bookings | draft |
 | [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | draft |
-| [F/finance/orders/002882](requirements/functional/finance/orders/002882_order-closed-year.md) | A Bestellung stays editable in a closed Haushaltsjahr | draft |
 | [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | The page Bestellungen lists the Bestellungen of all Anträge | draft |
 | [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The page Bestellungen has three segments | draft |
 | [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | draft |
 | [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | draft |
-| [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a kind of link end | draft |
-| [F/finance/orders/002888](requirements/functional/finance/orders/002888_order-link-right.md) | The change right of a Bestellung in a link is order.manage | draft |
+| [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a link kind | draft |
 | [F/finance/orders/002889](requirements/functional/finance/orders/002889_order-builtin-relations.md) | The relations of a Bestellung show without a link | draft |
 | [F/finance/orders/002890](requirements/functional/finance/orders/002890_order-search-source.md) | The global search finds Bestellungen | draft |
 | [F/finance/orders/002891](requirements/functional/finance/orders/002891_order-webhook-events.md) | The create and the status change of a Bestellung are webhook events | draft |
-| [F/finance/orders/002892](requirements/functional/finance/orders/002892_order-privacy.md) | The privacy functions cover the buyer of a Bestellung | draft |
-| [F/finance/orders/002893](requirements/functional/finance/orders/002893_order-anonymized-antrag.md) | The anonymization of an Antrag keeps its Bestellungen | draft |
+| [F/finance/orders/002892](requirements/functional/finance/orders/002892_order-privacy.md) | The buyer of a Bestellung follows the privacy rules | draft |
 | [F/finance/orders/002930](requirements/functional/finance/orders/002930_order-created-by-hand.md) | Only a person creates a Bestellung | draft |
 | [F/finance/orders/002931](requirements/functional/finance/orders/002931_order-offers-antrag-transition.md) | A status change of a Bestellung offers a transition of the Antrag | draft |
 | [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | draft |
-| [F/finance/orders/002933](requirements/functional/finance/orders/002933_order-url-prefill.md) | The form fills the link from the preferred offer | draft |
 | [F/finance/orders/002934](requirements/functional/finance/orders/002934_orders-list-without-order.md) | The list shows the approved Anträge without a Bestellung | draft |
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | draft |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |

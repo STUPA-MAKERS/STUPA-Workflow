@@ -1,6 +1,6 @@
 ---
 id: "002892"
-title: The privacy functions cover the buyer of a Bestellung
+title: The buyer of a Bestellung follows the privacy rules
 kind: functional
 status: draft
 owner: frederikbeimgraben
@@ -9,16 +9,18 @@ implementation: null
 scope:
   - backend/app/modules/privacy
   - backend/app/modules/orders
+  - backend/app/modules/applications
 ---
 
-# The privacy functions cover the buyer of a Bestellung
+# The buyer of a Bestellung follows the privacy rules
 
 The data export of a person must list the Bestellungen that name the person as the buyer. The
-erasure of an account must clear `buyerId` and must set `buyerName` to empty for these
-Bestellungen. The merge of two accounts must move `buyerId` to the account that stays.
+erasure of an account must clear the buyer of these Bestellungen. The merge of two accounts must
+move the buyer to the account that stays. The anonymization of an Antrag must keep its
+Bestellungen and must clear a typed buyer name in each of them.
 
-Reason: The buyer is personal data. The other fields of a Bestellung are records of the finances
-and stay.
+Reason: The buyer is the only personal data of a Bestellung. The other fields are records of the
+finances, like a booking, and must stay for the Kassenprüfung.
 
 Test: A backend integration test exports, merges and erases an account that is the buyer of a
-Bestellung.
+Bestellung, anonymizes an Antrag and reads its Bestellungen without the buyer name.
