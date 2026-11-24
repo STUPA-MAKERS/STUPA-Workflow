@@ -5,9 +5,6 @@ kind: non-functional
 status: removed
 owner: frederikbeimgraben
 updated: 2026-11-24
-implementation:
-  - frontend/src/app/features/meetings/delegation-dialog/delegation-dialog.component.html
-  - frontend/src/app/features/meetings/lead-substitute-dialog/lead-substitute-dialog.component.html
 scope:
   - frontend/src/app/features/meetings
 ---
