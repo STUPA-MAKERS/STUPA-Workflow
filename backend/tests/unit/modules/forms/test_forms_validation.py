@@ -360,6 +360,29 @@ def test_funding_above_cost_total_rejected() -> None:
     assert [e.msg for e in ei.value.errors] == ["greater than the cost total 500"]
 
 
+def test_funding_cap_setting() -> None:
+    """Accept a funding above the cost total only with ``capAtCost`` off (spec 003004)."""
+    data = {"positions": _costs(300, 200), "foerderung": 900}
+    off = _funding_form(validation={"capAtCost": False})
+    assert validate_answers(off, data)["foerderung"] == 900
+    with pytest.raises(AnswerValidationError):
+        validate_answers(_funding_form(validation={"capAtCost": True}), data)
+
+
+def test_cost_line_setting() -> None:
+    """Save the display settings of a positions field and read them back (spec 003000)."""
+    settings = {
+        "costLine": False,
+        "placeholderWarning": False,
+        "positionFiles": False,
+        "fileReminder": False,
+    }
+    field = _positions_field(validation={"minOffers": 1, **settings})
+    validate_definition([field])
+    dumped = field.model_dump(by_alias=True, exclude_none=True)["validation"]
+    assert {k: dumped[k] for k in settings} == settings
+
+
 def test_funding_without_positions_answer_rejected() -> None:
     fields = [
         _positions_field(validation={"minOffers": 1}, visibleIf={"==": [{"var": "x"}, 1]}),

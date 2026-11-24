@@ -2,7 +2,7 @@
 id: "003003"
 title: The question about a missing file is a setting of the positions field
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

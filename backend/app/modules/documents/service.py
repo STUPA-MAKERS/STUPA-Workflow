@@ -154,12 +154,24 @@ class ApplicationPdfService:
         )
         return resolve_i18n(names, LANG) if isinstance(names, dict) else None
 
-    async def _signs(self, type_id: uuid.UUID) -> bool:
-        """Tell whether the Antrag PDF of the type ends with the signature section."""
-        return bool(
-            await self.session.scalar(
-                select(ApplicationType.pdf_signatures).where(ApplicationType.id == type_id)
+    async def _signs(self, type_id: uuid.UUID) -> tuple[tuple[str, str], ...]:
+        """Return the signature rows that end the Antrag PDF of the type (spec 003005).
+
+        The rows are empty while the switch "Unterschriften im PDF" is off.
+        """
+        row = (
+            await self.session.execute(
+                select(ApplicationType.pdf_signatures, ApplicationType.signature_rows).where(
+                    ApplicationType.id == type_id
+                )
             )
+        ).first()
+        if row is None or not row.pdf_signatures or not isinstance(row.signature_rows, list):
+            return ()
+        return tuple(
+            (str(r["label"]), str(r["signer"]))
+            for r in row.signature_rows
+            if isinstance(r, dict) and r.get("label") and r.get("signer")
         )
 
     async def _gremium(self, gremium_id: uuid.UUID | None) -> Gremium | None:

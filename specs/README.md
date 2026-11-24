@@ -200,7 +200,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/applications/001721](requirements/functional/applications/applications/001721_new-version-link.md) | A new version links to the old Antrag | approved |
 | [F/applications/applications/001722](requirements/functional/applications/applications/001722_new-version-closes-old.md) | Submitting the new version closes the old Antrag | approved |
 | [F/applications/applications/001982](requirements/functional/applications/applications/001982_applications-list-two-fabs.md) | The Anträge list has the FABs Antrag stellen and Antrag erfassen | approved |
-| [F/applications/applications/003005](requirements/functional/applications/applications/003005_pdf-signature-rows.md) | The signature rows of the Antrag PDF are a setting of the Antragsart | draft |
+| [F/applications/applications/003005](requirements/functional/applications/applications/003005_pdf-signature-rows.md) | The signature rows of the Antrag PDF are a setting of the Antragsart | approved |
 | [F/applications/dashboard/000421](requirements/functional/applications/dashboard/000421_dashboard.md) | The start page is a work list with a side sheet | replaced |
 | [F/applications/dashboard/000550](requirements/functional/applications/dashboard/000550_start-due-cards.md) | Start shows the due cards of the person | replaced |
 | [F/applications/dashboard/000650](requirements/functional/applications/dashboard/000650_start-apply-button-tab-line.md) | Antrag stellen stands in the tab line of the desktop start page | replaced |
@@ -269,12 +269,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/applications/forms/002962](requirements/functional/applications/forms/002962_computed-format.md) | A computed field has a display format | approved |
 | [F/applications/forms/002963](requirements/functional/applications/forms/002963_computed-format-editor.md) | The form builder sets the format of a computed field | approved |
 | [F/applications/forms/002964](requirements/functional/applications/forms/002964_computed-format-display.md) | A computed value shows in its format | approved |
-| [F/applications/forms/003000](requirements/functional/applications/forms/003000_cost-line-switch.md) | The cost line is a setting of the positions field | draft |
-| [F/applications/forms/003001](requirements/functional/applications/forms/003001_placeholder-warning-switch.md) | The placeholder warning is a setting of the positions field | draft |
-| [F/applications/forms/003002](requirements/functional/applications/forms/003002_position-files-switch.md) | The files per position are a setting of the positions field | draft |
-| [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | draft |
-| [F/applications/forms/003004](requirements/functional/applications/forms/003004_funding-cap-switch.md) | The cap of the funding at the total cost is a setting | draft |
-| [F/applications/forms/003006](requirements/functional/applications/forms/003006_funding-no-auto-hint.md) | A funding field without help shows no hint | draft |
+| [F/applications/forms/003000](requirements/functional/applications/forms/003000_cost-line-switch.md) | The cost line is a setting of the positions field | approved |
+| [F/applications/forms/003001](requirements/functional/applications/forms/003001_placeholder-warning-switch.md) | The placeholder warning is a setting of the positions field | approved |
+| [F/applications/forms/003002](requirements/functional/applications/forms/003002_position-files-switch.md) | The files per position are a setting of the positions field | approved |
+| [F/applications/forms/003003](requirements/functional/applications/forms/003003_file-reminder-switch.md) | The question about a missing file is a setting of the positions field | approved |
+| [F/applications/forms/003004](requirements/functional/applications/forms/003004_funding-cap-switch.md) | The cap of the funding at the total cost is a setting | approved |
+| [F/applications/forms/003006](requirements/functional/applications/forms/003006_funding-no-auto-hint.md) | A funding field without help shows no hint | approved |
 | [F/collaboration/activity/001270](requirements/functional/collaboration/activity/001270_activity-page.md) | The activity page lists the events of the items of a person | approved |
 | [F/collaboration/activity/001271](requirements/functional/collaboration/activity/001271_items-of-a-person.md) | An item belongs to a person when they made, hold or touched it | approved |
 | [F/collaboration/activity/001272](requirements/functional/collaboration/activity/001272_reuse-gates.md) | The activity page reuses the read gate of each module | approved |

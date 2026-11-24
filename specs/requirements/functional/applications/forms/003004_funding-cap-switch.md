@@ -2,7 +2,7 @@
 id: "003004"
 title: The cap of the funding at the total cost is a setting
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

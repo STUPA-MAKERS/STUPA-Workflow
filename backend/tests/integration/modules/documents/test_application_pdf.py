@@ -278,7 +278,13 @@ async def test_the_switch_of_the_antragsart_adds_the_signature_section(
         await session.execute(
             update(ApplicationType)
             .where(ApplicationType.id == seed.type_id)
-            .values(pdf_signatures=True)
+            .values(
+                pdf_signatures=True,
+                signature_rows=[
+                    {"label": "Geprüft", "signer": "Kasse"},
+                    {"label": "Frei", "signer": "Vorsitz"},
+                ],
+            )
         )
         await session.commit()
     assert reader.get(f"/api/applications/{app_id}/pdf").status_code == 200

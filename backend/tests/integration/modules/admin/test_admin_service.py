@@ -322,6 +322,16 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
     assert signed.pdf_signatures is True
     listed = {t.id: t for t in await svc.list_application_types()}
     assert listed[created.id].pdf_signatures is True
+    assert listed[created.id].signature_rows == []
+    rows = [{"label": "Geprüft", "signer": "Kasse"}, {"label": "Frei", "signer": "Vorsitz"}]
+    with_rows = await svc.update_application_type(
+        created.id, ApplicationTypeUpdate.model_validate({"signatureRows": rows}), _ACTOR
+    )
+    assert [r.model_dump() for r in with_rows.signature_rows] == rows
+    kept = await svc.update_application_type(
+        created.id, ApplicationTypeUpdate(hasBudget=False), _ACTOR
+    )
+    assert len(kept.signature_rows) == 2
 
 
 async def test_application_type_list_gives_the_active_form_version(

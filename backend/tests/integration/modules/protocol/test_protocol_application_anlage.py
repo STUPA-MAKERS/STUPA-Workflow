@@ -183,7 +183,7 @@ async def test_the_protocol_appends_the_antrag_as_it_was_at_the_close_of_the_top
         await session.execute(
             update(ApplicationType)
             .where(ApplicationType.id == seed.type_id)
-            .values(pdf_signatures=True)
+            .values(pdf_signatures=True, signature_rows=[{"label": "A", "signer": "B"}])
         )
         open_id = await _application(session, seed, zweck="alte Fassung")
         secret_id = await _application(session, seed, zweck="geheim")

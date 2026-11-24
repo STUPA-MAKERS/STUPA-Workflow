@@ -2,7 +2,7 @@
 id: "003002"
 title: The files per position are a setting of the positions field
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:

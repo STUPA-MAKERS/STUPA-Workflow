@@ -391,6 +391,10 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     gremiumId: str | None = None
     hasBudget: bool = False
     pdfSignatures: bool = False
+    signatureRows: list[dict[str, str]] = Field(
+        default_factory=list[dict[str, str]],
+        description="The signature rows of the Antrag PDF: [{label, signer}], in order",
+    )
     attachmentRequired: bool = Field(
         default=False, description="The Antrag needs a file before the submit"
     )
@@ -405,6 +409,10 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     gremiumId: str | None = None
     hasBudget: bool | None = None
     pdfSignatures: bool | None = None
+    signatureRows: list[dict[str, str]] | None = Field(
+        default=None,
+        description="Replaces the signature rows of the Antrag PDF: [{label, signer}]",
+    )
     attachmentRequired: bool | None = Field(
         default=None, description="The Antrag needs a file before the submit"
     )

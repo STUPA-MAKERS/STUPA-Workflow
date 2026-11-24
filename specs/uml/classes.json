@@ -1833,6 +1833,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "signature_rows",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
           "name": "attachment_required",
           "nullable": false,
           "primaryKey": false,

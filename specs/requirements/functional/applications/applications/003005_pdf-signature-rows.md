@@ -2,12 +2,12 @@
 id: "003005"
 title: The signature rows of the Antrag PDF are a setting of the Antragsart
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
   - "backend/tests/unit/modules/documents/test_application_markdown.py:test_signature_rows"
-  - "backend/tests/integration/admin/test_application_types.py:test_signature_rows"
+  - "backend/tests/integration/modules/admin/test_admin_service.py:signature_rows"
 implementation:
   - backend/app/modules/application_types/models.py
   - backend/app/modules/admin/service/application_types.py

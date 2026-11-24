@@ -359,6 +359,22 @@ class GremiumRoleMappingUpdate(_OidcGroupField, frozen=True):
         return self
 
 
+#: The most signature rows of one Antragsart (spec 003005).
+MAX_SIGNATURE_ROWS = 10
+
+
+class SignatureRow(FrozenStrictCamelModel, frozen=True):
+    """One signature row of the Antrag PDF (spec 003005).
+
+    Attributes:
+        label: The label of the row, for example "Sachlich richtig".
+        signer: The caption of the signature line, for example "Finanzreferent:in".
+    """
+
+    label: str = Field(min_length=1, max_length=120)
+    signer: str = Field(min_length=1, max_length=120)
+
+
 class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     """An application type."""
 
@@ -368,6 +384,9 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
     pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
+    signature_rows: list[SignatureRow] = Field(
+        default_factory=list[SignatureRow], serialization_alias="signatureRows"
+    )
     #: The Antrag needs a file before the submit (spec 001732).
     attachment_required: bool = Field(default=False, serialization_alias="attachmentRequired")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
@@ -389,6 +408,9 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
     pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
+    signature_rows: list[SignatureRow] = Field(
+        default_factory=list[SignatureRow], alias="signatureRows", max_length=MAX_SIGNATURE_ROWS
+    )
     attachment_required: bool = Field(default=False, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
@@ -402,6 +424,10 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
     pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
+    #: A sent list replaces the rows; an omitted field keeps them.
+    signature_rows: list[SignatureRow] | None = Field(
+        default=None, alias="signatureRows", max_length=MAX_SIGNATURE_ROWS
+    )
     attachment_required: bool | None = Field(default=None, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)

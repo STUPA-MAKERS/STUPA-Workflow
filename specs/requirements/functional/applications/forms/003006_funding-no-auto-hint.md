@@ -2,7 +2,7 @@
 id: "003006"
 title: A funding field without help shows no hint
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
