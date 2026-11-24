@@ -74,7 +74,9 @@ both rules.
 
 `--font-sans` = **IBM Plex Sans** (400/500/600/700). `--font-mono` = **IBM Plex Mono**
 (400/500) for amounts, short IDs, keys and code. Both are under the SIL Open Font License.
-The kit ships them as `woff2` in a `latin` and a `latin-ext` subset. `angular.json` copies
+The kit ships them as `woff2` in a `latin` and a `latin-ext` subset. IBM Plex Sans has an
+`arrows` subset too, so write an arrow in a text as the character (→): it comes from the same
+font and sits at the height of the text. `angular.json` copies
 them to `/assets/fonts`. The CSP allows `font-src 'self' data:` only, so never load a font
 from Google Fonts or another CDN. **DIN stays PDF only** (typst render service).
 
