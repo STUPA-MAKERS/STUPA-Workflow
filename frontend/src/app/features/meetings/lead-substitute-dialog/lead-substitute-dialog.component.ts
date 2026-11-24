@@ -20,13 +20,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
-  ButtonComponent,
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
   SearchPillComponent,
   SkeletonComponent,
-  SwitchComponent,
   ToastService,
   TruncatedDirective,
   DialogBodyDirective,
@@ -45,8 +43,7 @@ const SEARCH_ABOVE = 5;
  * personal entries for the member and the gremium-wide entries
  * (`GET /delegations/meetings/{id}/recipients?delegatorId=`). The server leaves out the
  * lead and the member. A pick plus "Vertretung eintragen" sends `POST /delegations` with
- * `delegatorId`. The vote goes with it by default, when the platform allows a vote
- * transfer.
+ * `delegatorId`. The vote always goes with it (002900). The search stays on top; only the list below it scrolls (002902).
  *
  * The ui-kit dialog is a centered dialog on a desktop and a bottom sheet on a phone. The
  * server checks every rule again (live, lead, missing, pool, no chains).
@@ -64,11 +61,9 @@ const SEARCH_ABOVE = 5;
     SearchPillComponent,
     TranslatePipe,
     AvatarComponent,
-    ButtonComponent,
-    DialogComponent,
+      DialogComponent,
     IconComponent,
-    SwitchComponent,
-  ],
+    ],
   templateUrl: './lead-substitute-dialog.component.html',
   styleUrl: './lead-substitute-dialog.component.scss',
 })
@@ -90,7 +85,6 @@ export class LeadSubstituteDialogComponent {
   /** The gates of the meeting, or `null` while they load. */
   protected readonly context = signal<MeetingDelegationContext | null>(null);
   protected readonly selected = signal<Uuid | ''>('');
-  protected readonly voting = signal(true);
   protected readonly query = signal('');
   protected readonly busy = signal(false);
 
@@ -105,7 +99,6 @@ export class LeadSubstituteDialogComponent {
 
   /** The gremium allows a delegation. Unknown counts as allowed: the server decides. */
   protected readonly allowed = computed(() => this.context()?.allowVoteDelegation ?? true);
-  protected readonly votingEnabled = computed(() => this.context()?.votingDelegationEnabled ?? false);
   protected readonly searchable = computed(() => (this.pool()?.length ?? 0) > SEARCH_ABOVE);
 
   protected readonly shown = computed(() => {
@@ -142,7 +135,6 @@ export class LeadSubstituteDialogComponent {
     this.pool.set(null);
     this.failed.set(false);
     this.selected.set('');
-    this.voting.set(true);
     this.query.set('');
     this.api.poolSubstitutes(meetingId, memberId).subscribe({
       next: (rows) => {
@@ -178,7 +170,6 @@ export class LeadSubstituteDialogComponent {
         meetingId: this.meetingId(),
         delegatorId: m.principalId,
         delegateId: this.selected() as Uuid,
-        delegateVoting: this.votingEnabled() && this.voting(),
       })
       .subscribe({
         next: (d) => {

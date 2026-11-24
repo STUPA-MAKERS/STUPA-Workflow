@@ -57,7 +57,7 @@ class _FakeService:
         return _out(
             meeting_id=payload.meeting_id,
             delegate_id=payload.delegate_id,
-            delegate_voting=payload.delegate_voting,
+            delegate_voting=True,
         )
 
     async def revoke(self, delegation_id, actor):
@@ -72,7 +72,6 @@ class _FakeService:
             meeting_id=meeting_id,
             gremium_id=uuid4(),
             allow_vote_delegation=True,
-            voting_delegation_enabled=False,
             delegation_allow_external=False,
             deadline=None,
             deadline_passed=False,
@@ -172,7 +171,7 @@ def test_list_returns_camelcase() -> None:
 
 def test_create_returns_201_camelcase() -> None:
     mid, did = str(uuid4()), str(uuid4())
-    body = {"meetingId": mid, "delegateId": did, "delegateVoting": True}
+    body = {"meetingId": mid, "delegateId": did}
     r = _client(_MEMBER).post("/api/delegations", json=body)
     assert r.status_code == 201
     data = r.json()
@@ -216,7 +215,6 @@ def test_meeting_context_camelcase() -> None:
     expected = {
         "meetingId",
         "allowVoteDelegation",
-        "votingDelegationEnabled",
         "delegationAllowExternal",
         "deadlinePassed",
         "meetingStarted",

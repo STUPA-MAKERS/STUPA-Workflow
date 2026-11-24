@@ -905,16 +905,30 @@ async def test_resolve_access_token_expired() -> None:
 async def test_resolve_access_token_valid() -> None:
     row = SimpleNamespace(
         revoked_at=None, access_expires_at=NOW + timedelta(hours=1),
-        principal_id="pid", scope="read votes:write",
+        principal_id="pid", scope="read votes:write", id="gid", client_id="mcp",
     )
     db = fake_session(result(row))
     out = await oauth_service.resolve_access_token(db, token="t", now=NOW)
     assert out == ("pid", "read votes:write")
 
 
+async def test_resolve_access_grant_names_the_grant() -> None:
+    """The grant carries the id of the token row and its client (spec 002923)."""
+    row = SimpleNamespace(
+        revoked_at=None, access_expires_at=None,
+        principal_id="pid", scope="read", id="gid", client_id="mcp",
+    )
+    db = fake_session(result(row))
+    out = await oauth_service.resolve_access_grant(db, token="t", now=NOW)
+    assert out == oauth_service.AccessGrant(
+        principal_id="pid", scope="read", grant_id="gid", client_id="mcp"  # type: ignore[arg-type]
+    )
+
+
 async def test_resolve_access_token_never_expires() -> None:
     row = SimpleNamespace(
         revoked_at=None, access_expires_at=None, principal_id="pid", scope="read",
+        id="gid", client_id="mcp",
     )
     db = fake_session(result(row))
     out = await oauth_service.resolve_access_token(db, token="t", now=NOW)

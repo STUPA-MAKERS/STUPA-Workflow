@@ -301,7 +301,8 @@ async def consent_request(
     also marks the scopes that the user holds. That mark is a UX hint only, because
     the server caps the permissions at runtime. An admin holds all of them. A key
     counts when the user holds it globally OR through a gremium role in any gremium;
-    otherwise a gremium chair would see ``meetings:write`` as not held.
+    otherwise a gremium chair would see ``meetings:write`` as not held. An opt-in scope
+    (``paperless:use``) shows only when the user holds it (§F/integrations/mcp/002920).
     """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
     tx = (
@@ -326,7 +327,7 @@ async def consent_request(
         "clientId": tx["client_id"],
         "canUseMcp": principal.has("mcp.use"),
         "requestedScopes": [
-            {"key": s, "held": s in held} for s in oauth.SCOPE_ORDER if s in requested
+            {"key": s, "held": s in held} for s in oauth.offered_scopes(requested, held)
         ],
         "lifetimes": list(oauth.LIFETIMES.keys()),
         "defaultLifetime": oauth.DEFAULT_LIFETIME,

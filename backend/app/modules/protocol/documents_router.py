@@ -38,7 +38,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from app.deps import DbSession, get_current_applicant, get_current_principal
+from app.deps import DbSession, get_current_applicant, get_current_principal, refuse_agent_token
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Applicant, Principal
@@ -115,10 +115,13 @@ async def insert_paperless_document(
     """Copy the PDF version of one Paperless document for a text of the protocol.
 
     The name of the copy is the title of the document. The copy has the limits of an
-    upload: at most 20 MiB and 100 pages, unencrypted.
+    upload: at most 20 MiB and 100 pages, unencrypted. An OAuth token gets 403
+    ``cookie_session_required``, also with the scope ``paperless:use``
+    (§F/integrations/mcp/002921).
     """
     if not principal.has("paperless.use"):
         raise ForbiddenError("Missing permission paperless.use.")
+    refuse_agent_token(principal, "Agent tokens cannot copy a Paperless document.")
     await protocols.authorize_write_meeting(meeting_id, principal)
     client = await connection.client() if insert_on(await connection.row()) else None
     if client is None:

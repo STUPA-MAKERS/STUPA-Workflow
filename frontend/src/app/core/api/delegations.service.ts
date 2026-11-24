@@ -37,11 +37,10 @@ export interface Delegation {
   readonly direction: 'outgoing' | 'incoming' | null;
 }
 
-/** Body for POST /delegations. */
+/** Body for POST /delegations. Every delegation carries the vote (002900). */
 export interface DelegationInput {
   readonly meetingId: Uuid;
   readonly delegateId: Uuid;
-  readonly delegateVoting: boolean;
   /**
    * The meeting lead enters a substitute for this missing member while the meeting is
    * live. Omit it to delegate for yourself.
@@ -63,7 +62,6 @@ export interface MeetingDelegationContext {
   readonly meetingId: Uuid;
   readonly gremiumId: Uuid;
   readonly allowVoteDelegation: boolean;
-  readonly votingDelegationEnabled: boolean;
   readonly delegationAllowExternal: boolean;
   /** Deadline for non-pool delegations (ISO/UTC). `null` = status gate only. */
   readonly deadline: IsoDateTime | null;

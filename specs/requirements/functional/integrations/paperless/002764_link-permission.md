@@ -4,7 +4,7 @@ title: A Paperless link needs the Paperless permission
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-23
+updated: 2026-11-24
 tests:
   - "backend/tests/integration/modules/todos/test_paperless_links.py:test_a_link_needs_the_permission"
   - "frontend/src/app/features/todos/linked-list/todo-linked-list.component.spec.ts:TodoLinkedListComponent"
@@ -23,8 +23,8 @@ A person must be able to add or remove a link with a Paperless end only with the
 `paperless.use` and the change right of the other element (F/collaboration/links/001404). A
 person without `paperless.use` must see the end as `Paperless-Dokument (kein Zugriff)`, without
 title, address or detail (001405). The link search must not offer the kind to that person, and a
-card must not give read access to a Paperless end (F/collaboration/todos/000487). No OAuth scope
-must reach the kind (002524).
+card must not give read access to a Paperless end (F/collaboration/todos/000487). Only the OAuth scope
+`paperless:use` must reach the kind (F/integrations/mcp/002920).
 
 Reason: The title of a document in the archive can be confidential. The link follows the same
 rule as the search and the entry `In Paperless öffnen`.

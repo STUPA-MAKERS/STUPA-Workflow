@@ -48,7 +48,6 @@ function ctx(over: Partial<MeetingDelegationContext> = {}): MeetingDelegationCon
     meetingId: 'm-1',
     gremiumId: 'g-1',
     allowVoteDelegation: true,
-    votingDelegationEnabled: true,
     delegationAllowExternal: false,
     deadline: null,
     deadlinePassed: false,
@@ -76,7 +75,7 @@ async function setup(variant: 'section' | 'box' = 'section') {
       { provide: API_BASE_URL, useValue: BASE },
       { provide: ToastService, useValue: toast },
     ],
-    inputs: { meetingId: 'm-1', variant, subtitle: 'Sitzung · Di., 13.10.2026' },
+    inputs: { meetingId: 'm-1', variant },
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const flush = (body: MeetingDelegationContext | null) => {
@@ -211,7 +210,6 @@ describe('MeetingDelegationCardComponent', () => {
     flush(ctx());
     await userEvent.click(screen.getByRole('button', { name: 'Vertretung einrichten' }));
     const dialog = screen.getByRole('dialog', { name: 'Vertretung einrichten' });
-    expect(within(dialog).getByText('Sitzung · Di., 13.10.2026')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('radio', { name: /Max Mitglied/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vertretung einrichten' }));
     http.expectOne((r) => r.method === 'POST').flush(delegation());

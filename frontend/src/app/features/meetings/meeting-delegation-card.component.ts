@@ -63,8 +63,6 @@ export class MeetingDelegationCardComponent {
 
   readonly meetingId = input.required<Uuid>();
   readonly variant = input<'section' | 'box' | 'inline'>('section');
-  /** The line below the title of the dialog: the meeting and its date. */
-  readonly subtitle = input('');
   /** The own delegation changed. The attendance sheet then loads its delegations again. */
   readonly changed = output<DelegationCardChange>();
   /** The context of the meeting, after each load. The participant view reads it. */

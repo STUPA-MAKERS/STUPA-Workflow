@@ -69,8 +69,8 @@ async def tickets_get(ticket_id: str) -> dict:
     has a `state` (`sending`, `sent` or `failed`) and its `to` addresses; send a failed
     one again with `tickets_resend_mail`. `mailAnswer` names the recipients of the next
     public note on a mail ticket (`to`, `cc`) and tells with `enabled` if the Postfach
-    of the Bereich is on. `paperless` lists the clean files for
-    `tickets_file_in_paperless`; it is null without `paperless.use` and while the
+    of the Bereich is on. `paperless` lists the clean files with their filing state; it
+    is null without `paperless.use` and while the
     Paperless connection is off.
     """
     return await api().get(f"/tickets/{ticket_id}")
@@ -111,24 +111,6 @@ async def tickets_resend_mail(ticket_id: str, mail_id: str) -> dict:
     mail whose `state` is not `failed`, 409 `mailbox_off` while the Postfach is off.
     """
     return await api().post(f"/tickets/{ticket_id}/mails/{mail_id}/resend")
-
-
-@group.tool
-async def tickets_file_in_paperless(ticket_id: str, attachment_id: str) -> dict:
-    """File one clean file of a ticket in Paperless ("In Paperless ablegen").
-
-    `POST /tickets/{id}/files/{attachmentId}/paperless`. Needs the work right in the
-    Bereich and `paperless.use`. `paperless.files` of `tickets_get` lists the files that
-    can be filed, with their `state` (`none`, `pending`, `filed`, `failed`) and, after
-    the filing, the `url` of the document. The call opens a job, and the worker files
-    the document with the number of the ticket in its title. A second call for the
-    same file adds no second document, and a call for a `failed` file starts its job
-    again.
-
-    409 `paperless_off` while the Paperless connection is off, 409 `file_not_clean`
-    for a file without a clean scan, 404 for a file that is not of the ticket.
-    """
-    return await api().post(f"/tickets/{ticket_id}/files/{attachment_id}/paperless")
 
 
 @group.tool
