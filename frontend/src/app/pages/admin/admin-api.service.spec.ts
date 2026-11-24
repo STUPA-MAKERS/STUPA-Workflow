@@ -426,8 +426,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, attachmentRequired: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, attachmentRequired: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, signatureRows: [], attachmentRequired: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, signatureRows: [], attachmentRequired: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
   });
 
   it('maps the number of the active form version', () => {
@@ -575,6 +575,7 @@ describe('AdminApiService — real mode (contract)', () => {
       gremiumId: null,
       hasBudget: false,
       pdfSignatures: false,
+      signatureRows: [],
       attachmentRequired: false,
       retentionMonths: null,
       activeFormVersionId: null,

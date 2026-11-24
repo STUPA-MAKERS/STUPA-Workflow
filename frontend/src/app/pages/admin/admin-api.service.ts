@@ -28,6 +28,7 @@ import {
   type BackupList,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
+  type SignatureRow,
   type ApplicationTypeGroupBody,
   type ApplicationTypeGroupFull,
   type ApplicationTypeUpdateBody,
@@ -160,6 +161,7 @@ interface ApplicationTypeOutWire {
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
   readonly pdfSignatures?: boolean;
+  readonly signatureRows?: readonly SignatureRow[];
   readonly attachmentRequired?: boolean;
   readonly retentionMonths?: number | null;
   readonly activeFormVersionId?: Uuid | null;
@@ -183,6 +185,7 @@ function mapTypeFull(t: ApplicationTypeOutWire): ApplicationTypeFull {
     gremiumId: t.gremiumId ?? null,
     hasBudget: t.hasBudget ?? false,
     pdfSignatures: t.pdfSignatures ?? false,
+    signatureRows: t.signatureRows ?? [],
     attachmentRequired: t.attachmentRequired ?? false,
     retentionMonths: t.retentionMonths ?? null,
     activeFormVersionId: t.activeFormVersionId ?? null,
@@ -989,7 +992,7 @@ export class AdminApiService {
   /** Create a new application type/form — POST /admin/application-types. */
   createApplicationType(body: ApplicationTypeCreateBody): Observable<ApplicationTypeFull> {
     if (this.mock) {
-      const created: ApplicationTypeFull = {
+      const created: (typeof this.store.appTypes)[number] = {
         id: `f-${body.key || this.store.appTypes.length + 1}`,
         name: { ...body.name },
         gremiumId: body.gremiumId ?? null,
@@ -1034,6 +1037,7 @@ export class AdminApiService {
       ...(body.gremiumId !== undefined ? { gremiumId: body.gremiumId } : {}),
       ...(body.hasBudget !== undefined ? { hasBudget: body.hasBudget } : {}),
       ...(body.pdfSignatures !== undefined ? { pdfSignatures: body.pdfSignatures } : {}),
+      ...(body.signatureRows !== undefined ? { signatureRows: body.signatureRows } : {}),
       ...(body.attachmentRequired !== undefined
         ? { attachmentRequired: body.attachmentRequired }
         : {}),

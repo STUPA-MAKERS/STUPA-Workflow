@@ -769,6 +769,26 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
     expect(c.groups()[0].fields[0].validation).toEqual({});
   });
 
+  /** Specs 003000-003004: the switches that are on by default store only false. */
+  it('setDefaultOn stores only false and shows the switches of positions and funding', async () => {
+    const { c, v, fixture } = await setup(
+      draft([
+        { key: 'q', type: 'positions', label: { de: 'A', en: '' } },
+        { key: 'f', type: 'funding', label: { de: 'F', en: '' } },
+      ]),
+    );
+    v.setDefaultOn({ gi: 0, qi: 0 }, 'costLine', false);
+    v.setDefaultOn({ gi: 0, qi: 0 }, 'fileReminder', false);
+    expect(c.groups()[0].fields[0].validation).toEqual({ costLine: false, fileReminder: false });
+    v.setDefaultOn({ gi: 0, qi: 0 }, 'costLine', true);
+    expect(c.groups()[0].fields[0].validation).toEqual({ fileReminder: false });
+    v.setDefaultOn({ gi: 0, qi: 1 }, 'capAtCost', false);
+    expect(c.groups()[0].fields[1].validation).toEqual({ capAtCost: false });
+    v.selectQuestion({ gi: 0, qi: 0 }, false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Summenzeile anzeigen');
+  });
+
   it('parses valid JsonLogic into the field and reflects the raw input', async () => {
     const { c, v } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     v.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"var":"x"}');
@@ -1397,6 +1417,34 @@ describe('group serialize/deserialize round-trip', () => {
       c.attachmentRequired.set(true);
       c.save();
       expect(updateApplicationType.mock.calls[0][1]).toMatchObject({ attachmentRequired: true });
+    });
+
+    it('signature rows: edits, orders and saves the filled rows with the type (spec 003005)', async () => {
+      const rows = [
+        { label: 'Geprüft', signer: 'Kasse' },
+        { label: 'Frei', signer: 'Vorsitz' },
+      ];
+      const { c, v, fixture, updateApplicationType } = await setup(
+        draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
+        { type: { ...TYPE, pdfSignatures: true, signatureRows: rows } },
+      );
+      fixture.detectChanges();
+      expect(fixture.nativeElement.textContent).toContain('Unterschriftenzeilen');
+      v.moveSignatureRow(0, 1);
+      v.moveSignatureRow(1, 1);
+      v.addSignatureRow();
+      v.setSignatureRow(2, { label: ' Halb ' });
+      v.setSignatureRow(0, { signer: ' Vorstand ' });
+      v.removeSignatureRow(1);
+      v.addSignatureRow();
+      v.setSignatureRow(2, { label: 'Neu', signer: 'Wer' });
+      c.save();
+      expect(updateApplicationType.mock.calls[0][1]).toMatchObject({
+        signatureRows: [
+          { label: 'Frei', signer: 'Vorstand' },
+          { label: 'Neu', signer: 'Wer' },
+        ],
+      });
     });
   });
 });

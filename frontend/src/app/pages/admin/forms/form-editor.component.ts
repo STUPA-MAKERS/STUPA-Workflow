@@ -38,6 +38,7 @@ import {
 } from '@stupa-makers/ui-kit/views/form-editor';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 import { AdminApiService } from '../admin-api.service';
+import type { SignatureRow } from '../admin.models';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type QuestionGroup,
@@ -106,6 +107,8 @@ export class FormEditorComponent {
   protected readonly hasBudget = signal(false);
   /** The Antrag PDF of this type ends with the signature section (spec 000888). */
   protected readonly pdfSignatures = signal(false);
+  /** The signature rows of the Antrag PDF, in order (spec 003005). */
+  protected readonly signatureRows = signal<readonly SignatureRow[]>([]);
   /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
   protected readonly attachmentRequired = signal(false);
   /** The rules across fields (spec 001670); the logic stays text while it is typed. */
@@ -164,6 +167,7 @@ export class FormEditorComponent {
     title: { de: '', en: '' } as I18nMap,
     hasBudget: false,
     pdfSignatures: false,
+    signatureRows: '[]',
     attachmentRequired: false,
     cmpRequired: false,
     cmpMinCount: 2,
@@ -181,6 +185,7 @@ export class FormEditorComponent {
       !sameI18n(this.title(), o.title) ||
       this.hasBudget() !== o.hasBudget ||
       this.pdfSignatures() !== o.pdfSignatures ||
+      JSON.stringify(this.signatureRows()) !== o.signatureRows ||
       this.attachmentRequired() !== o.attachmentRequired ||
       this.cmpRequired() !== o.cmpRequired ||
       this.cmpMinCount() !== o.cmpMinCount
@@ -214,6 +219,7 @@ export class FormEditorComponent {
           this.title.set({ de: '', en: '', ...t.name });
           this.hasBudget.set(t.hasBudget);
           this.pdfSignatures.set(t.pdfSignatures ?? false);
+          this.signatureRows.set(t.signatureRows ?? []);
           this.attachmentRequired.set(t.attachmentRequired ?? false);
           const co = t.comparisonOffers;
           this.cmpRequired.set(co?.required ?? false);
@@ -304,6 +310,7 @@ export class FormEditorComponent {
       title: { ...this.title() },
       hasBudget: this.hasBudget(),
       pdfSignatures: this.pdfSignatures(),
+      signatureRows: JSON.stringify(this.signatureRows()),
       attachmentRequired: this.attachmentRequired(),
       cmpRequired: this.cmpRequired(),
       cmpMinCount: this.cmpMinCount(),
@@ -329,6 +336,7 @@ export class FormEditorComponent {
             name: { ...this.title() },
             hasBudget: this.hasBudget(),
             pdfSignatures: this.pdfSignatures(),
+            signatureRows: filledRows(this.signatureRows()),
             attachmentRequired: this.attachmentRequired(),
             comparisonOffers: {
               required: this.cmpRequired(),
@@ -356,4 +364,11 @@ export class FormEditorComponent {
       },
     });
   }
+}
+
+/** The signature rows that the server takes: both texts given, trimmed (spec 003005). */
+function filledRows(rows: readonly SignatureRow[]): readonly SignatureRow[] {
+  return rows
+    .map((r) => ({ label: r.label.trim(), signer: r.signer.trim() }))
+    .filter((r) => r.label !== '' && r.signer !== '');
 }

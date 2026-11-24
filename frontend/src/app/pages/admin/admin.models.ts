@@ -725,6 +725,8 @@ export interface ApplicationTypeFull {
   readonly hasBudget: boolean;
   /** The Antrag PDF ends with the signature section (spec 000888). */
   readonly pdfSignatures?: boolean;
+  /** The signature rows of the Antrag PDF, in order (spec 003005). */
+  readonly signatureRows?: readonly SignatureRow[];
   /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
   readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
@@ -737,6 +739,12 @@ export interface ApplicationTypeFull {
   readonly groupId?: Uuid | null;
   /** The order inside the group (spec 001183). The server sends the list in this order. */
   readonly position?: number;
+}
+
+/** One signature row of the Antrag PDF (spec 003005): the label and the signer. */
+export interface SignatureRow {
+  readonly label: string;
+  readonly signer: string;
 }
 
 /** A group of Antragsarten, `ApplicationTypeGroupOut` (spec 001180). */
@@ -769,6 +777,8 @@ export interface ApplicationTypeUpdateBody {
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
   readonly pdfSignatures?: boolean;
+  /** Replaces the signature rows of the Antrag PDF (spec 003005). */
+  readonly signatureRows?: readonly SignatureRow[];
   readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** `null` takes the type out of its group (spec 001180); absent keeps it. */
