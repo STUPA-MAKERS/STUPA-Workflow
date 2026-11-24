@@ -445,13 +445,17 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
-  /** A public comment shows its reader and its frame, and the next one starts internal again. */
+  /**
+   * A public draft keeps the plain field (no frame, kit 866cf83), and the next comment starts
+   * internal again.
+   */
   it('shows a public choice before the send and resets it after the send', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
     await userEvent.click(within(group).getByRole('radio', { name: 'Öffentlich' }));
     detectChanges();
-    expect(document.querySelector('.chat__box--public')).not.toBeNull();
+    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toBeChecked();
+    expect(document.querySelector('.chat__box--public')).toBeNull();
     type('An alle');
     const post = http.expectOne(url('/comments'));
     expect(post.request.body).toEqual({ body: 'An alle', visibility: 'public' });

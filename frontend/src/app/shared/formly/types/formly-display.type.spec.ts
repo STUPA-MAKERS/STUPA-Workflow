@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { render, screen } from '@testing-library/angular';
@@ -28,7 +29,7 @@ async function renderField(
 }
 
 function makeType(props: Record<string, unknown>, value?: unknown): FormlyDisplayType {
-  const cmp = new FormlyDisplayType();
+  const cmp = TestBed.runInInjectionContext(() => new FormlyDisplayType());
   cmp.field = {
     props,
     formControl: new FormControl(value),
@@ -55,6 +56,18 @@ describe('FormlyDisplayType (rendered)', () => {
       { total: 42 },
     );
     expect(screen.getByText('42')).toBeInTheDocument();
+  });
+
+  it('shows a computed amount as euro in the language of the interface (spec 002842)', async () => {
+    await renderField(
+      { key: 'summe', type: 'display', props: { computed: true, money: true } },
+      { summe: 29.4 },
+    );
+    expect(screen.getByText(/29,40\s€/)).toBeInTheDocument();
+  });
+
+  it('keeps the raw text of a computed amount that is no number', () => {
+    expect(makeType({ computed: true, money: true }, 'abc').text).toBe('abc');
   });
 
   it('renders a heading with title and subtitle', async () => {

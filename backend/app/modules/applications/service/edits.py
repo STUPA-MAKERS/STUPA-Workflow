@@ -39,6 +39,7 @@ from app.modules.forms.validation import (
     AnswerValidationError,
     system_title_field,
     validate_answers,
+    with_computed,
 )
 from app.shared.errors import ConflictError, ValidationProblem
 
@@ -101,8 +102,8 @@ class EditOps(ApplicationsServiceBase):
         app_type = await self.session.get(ApplicationType, app.type_id)
         pii_keys = await self._pii_keys_for_type(app.type_id) if preserve_pii else set[str]()
         sent = _with_stored_pii(data, app.data or {}, pii_keys) if preserve_pii else data
-        clean = _whitelist(fields, sent)
         context = {"has_budget": app_type.has_budget if app_type is not None else False}
+        clean = with_computed(fields, _whitelist(fields, sent), context)
         try:
             validate_answers(fields, clean, context)
         except AnswerValidationError as exc:

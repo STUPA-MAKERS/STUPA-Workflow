@@ -281,6 +281,22 @@ describe('FormEditorComponent', () => {
     expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
+  it('makes a computed field the amount with its own switch (spec 002843)', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'summe', type: 'computed', label: { de: 'Summe', en: '' }, compute: { var: 'km' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const v = editorOf(fixture);
+    expect(v.isAmount(c.groups()[0].fields[0])).toBe(false);
+    v.onAmountToggle({ gi: 0, qi: 0 }, true);
+    expect(c.groups()[0].fields[0]).toMatchObject({ isPromoted: true, promoteTarget: 'amount' });
+    expect(v.isAmount(c.groups()[0].fields[0])).toBe(true);
+    v.onAmountToggle({ gi: 0, qi: 0 }, false);
+    expect(c.groups()[0].fields[0].isPromoted).toBeUndefined();
+    expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
+  });
+
   it('blocks saving a funding field without cost positions and names the problem', async () => {
     const { c } = await setup(
       draft([{ key: 'foerderung', type: 'funding', label: { de: 'Förderung', en: '' } }]),

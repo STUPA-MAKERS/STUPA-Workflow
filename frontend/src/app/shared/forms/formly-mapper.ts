@@ -7,6 +7,7 @@ import { langAttr, resolvedI18nLang, resolveI18n } from './i18n-text';
 import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
+import { finiteNumber, isComputedAmount } from './form-rules';
 import { budgetOptionTree } from './budget-options';
 
 /**
@@ -279,7 +280,7 @@ function displayProps(
     case 'markdown':
       return { text: help ?? fieldLabel(f, lang) };
     case 'computed':
-      return { computed: true };
+      return isComputedAmount(f) ? { computed: true, money: true } : { computed: true };
     case 'table':
       return {
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],
@@ -321,7 +322,7 @@ function mapField(
     ...validationProps(f),
     ...displayProps(f, lang, help, all),
   };
-  const expressions = buildExpressions(f, extraContext);
+  const expressions = buildExpressions(f, extraContext, numberKeys(all));
   const config: FormlyFieldConfig = {
     key: f.key,
     type: FORMLY_TYPE[f.type],
@@ -350,17 +351,18 @@ type FieldExpression = (field: FormlyFieldConfig) => unknown;
 function buildExpressions(
   f: FormFieldDef,
   extraContext: Readonly<Record<string, unknown>>,
+  numbers: ReadonlySet<string> = new Set(),
 ): FormlyFieldConfig['expressions'] | undefined {
   const visibleIf = f.visibleIf;
   const compute = f.type === 'computed' ? f.compute : undefined;
   const hide: Readonly<Record<string, FieldExpression>> = visibleIf
-    ? { hide: (field: FormlyFieldConfig) => !isFieldVisible(visibleIf, ctxOf(field, extraContext)) }
+    ? { hide: (field: FormlyFieldConfig) => !isFieldVisible(visibleIf, ctxOf(field, extraContext, numbers)) }
     : {};
   const derived: Readonly<Record<string, FieldExpression>> = compute
     ? {
         [`model.${f.key}`]: (field: FormlyFieldConfig) => {
           try {
-            return evalJsonLogic(compute, ctxOf(field, extraContext));
+            return evalJsonLogic(compute, ctxOf(field, extraContext, numbers));
           } catch (err) {
             if (err instanceof JsonLogicError) return null;
             throw err;
@@ -372,10 +374,29 @@ function buildExpressions(
   return Object.keys(expressions).length > 0 ? expressions : undefined;
 }
 
+/** The keys of the numeric fields, whose answer the input holds as a text. */
+function numberKeys(all: readonly FormFieldDef[]): ReadonlySet<string> {
+  return new Set(all.filter((f) => NUMBER_TYPES.has(f.type)).map((f) => f.key));
+}
+
+const NUMBER_TYPES: ReadonlySet<FieldType> = new Set<FieldType>(['number', 'currency', 'funding']);
+
+/**
+ * The values that an expression reads. A numeric answer that the input holds as a text
+ * (`"84"`) is read as its number, as the server reads it (spec 002840); without that a
+ * computed value over a typed number stays empty.
+ */
 function ctxOf(
   field: FormlyFieldConfig,
   extraContext: Readonly<Record<string, unknown>>,
+  numbers: ReadonlySet<string> = new Set(),
 ): Record<string, unknown> {
   const model = (field.model ?? {}) as Record<string, unknown>;
-  return { ...extraContext, ...model };
+  const read = Object.fromEntries(
+    Object.entries(model)
+      .filter(([key, value]) => numbers.has(key) && typeof value === 'string')
+      .map(([key, value]) => [key, finiteNumber(value)] as const)
+      .filter(([, n]) => n !== null),
+  );
+  return { ...extraContext, ...model, ...read };
 }

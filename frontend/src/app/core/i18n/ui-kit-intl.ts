@@ -574,6 +574,7 @@ export const UI_KIT_APP_KEYS: Partial<Record<UiKitTextKey, TranslationKey>> = {
   'admin.form.groupTitlePlaceholder': 'admin.form.groupTitlePlaceholder',
   'admin.form.isPII': 'admin.form.isPII',
   'admin.form.isPromoted': 'admin.form.isPromoted',
+  'admin.form.isAmount': 'admin.form.isAmount',
   'admin.form.max': 'admin.form.max',
   'admin.form.maxLen': 'admin.form.maxLen',
   'admin.form.metric.amount': 'admin.form.metric.amount',

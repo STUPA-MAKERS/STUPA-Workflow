@@ -15,6 +15,16 @@ type RuleField = Pick<FormFieldDef, 'key' | 'type' | 'isPromoted' | 'promoteTarg
 
 const NUMERIC: ReadonlySet<FieldType> = new Set<FieldType>(['number', 'currency']);
 
+/** A `computed` field that is the amount of the Antrag (spec 002840). */
+export function isComputedAmount(f: Pick<FormFieldDef, 'type' | 'isPromoted' | 'promoteTarget'>): boolean {
+  return f.type === 'computed' && !!f.isPromoted && f.promoteTarget === 'amount';
+}
+
+/** An amount rounded half up to whole cents, as the server rounds it (spec 002841). */
+export function toCents(value: number): number {
+  return Math.round(Number(`${value}e2`)) / 100;
+}
+
 /** A finite number from an answer, or null: a number, or a text that is one. */
 export function finiteNumber(raw: unknown): number | null {
   if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
@@ -60,7 +70,7 @@ export function costTotal(
 /**
  * The amount of the Antrag as the server makes it (`extract_promoted`): a filled-in
  * `funding` field wins; else the cost total of the positions, which a promoted numeric
- * field after them replaces.
+ * field after them replaces. A computed amount field gives its value in whole cents from 0.
  */
 export function promotedAmount(
   fields: readonly RuleField[],
@@ -71,6 +81,10 @@ export function promotedAmount(
     if (f.type === 'positions') {
       const total = positionsAnswerTotal(data[f.key]);
       return total === null ? amount : (amount ?? 0) + total;
+    }
+    if (isComputedAmount(f)) {
+      const raw = data[f.key];
+      return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? toCents(raw) : amount;
     }
     const flagged = !!f.isPromoted && f.promoteTarget === 'amount' && NUMERIC.has(f.type);
     const value = flagged ? finiteNumber(data[f.key]) : null;
