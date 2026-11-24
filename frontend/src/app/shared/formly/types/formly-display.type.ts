@@ -48,10 +48,23 @@ import { formatMoney } from '@shared/format-money';
         flex-direction: column;
         gap: var(--space-1);
       }
+      /* The box of a labelled input: its height, corner, label line and value line. */
       .display--computed {
-        padding: var(--space-3) var(--space-4);
+        box-sizing: border-box;
+        min-height: var(--field-height);
+        justify-content: space-between;
+        gap: 0;
+        padding: 8px var(--space-4) 10px;
         background: var(--color-surface-sunken);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-field);
+      }
+      .display--computed .display__label {
+        font-size: 0.75rem;
+        line-height: 1rem;
+        color: var(--color-text-subtle);
+      }
+      .display--computed .display__value {
+        margin: 0;
       }
       .display__label {
         font-size: var(--fs-sm);
