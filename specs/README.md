@@ -329,7 +329,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/notifications/002508](requirements/functional/collaboration/notifications/002508_push-jump-buttons.md) | A push can carry jump buttons | approved |
 | [F/collaboration/notifications/002509](requirements/functional/collaboration/notifications/002509_push-direct-actions.md) | A push can act without opening the app | approved |
 | [F/collaboration/notifications/002510](requirements/functional/collaboration/notifications/002510_push-endpoint-guard.md) | A push goes only to a known push service | approved |
-| [F/collaboration/notifications/002550](requirements/functional/collaboration/notifications/002550_push-bell-activity.md) | A bell in the head of Aktivität asks for push and opens the settings | draft |
+| [F/collaboration/notifications/002550](requirements/functional/collaboration/notifications/002550_push-bell-activity.md) | A bell in the head of Aktivität asks for push and opens the settings | approved |
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |

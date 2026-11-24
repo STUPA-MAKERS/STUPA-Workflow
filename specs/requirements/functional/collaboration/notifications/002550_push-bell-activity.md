@@ -2,7 +2,7 @@
 id: "002550"
 title: A bell in the head of Aktivität asks for push and opens the settings
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
