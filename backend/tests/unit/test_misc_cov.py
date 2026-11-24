@@ -71,6 +71,7 @@ from app.modules.applications.router import (
     get_magic_link_sender,
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
+from app.modules.auth.oauth_service import AccessGrant
 from app.modules.gremien.role_schemas import GremiumRoleOut
 from app.modules.site_config.branding import Branding, PublicBranding
 from app.settings import Settings, get_settings, load_settings
@@ -196,7 +197,7 @@ async def test_principal_from_access_token_invalid(
     async def _none(*a: object, **k: object) -> None:
         return None
 
-    monkeypatch.setattr(deps.oauth_service, "resolve_access_token", _none)
+    monkeypatch.setattr(deps.oauth_service, "resolve_access_grant", _none)
     out = await deps._principal_from_access_token(
         SimpleNamespace(), "apat_x", datetime.now(UTC)  # type: ignore[arg-type]
     )
@@ -206,10 +207,10 @@ async def test_principal_from_access_token_invalid(
 async def test_principal_from_access_token_principal_row_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _resolve(*a: object, **k: object) -> tuple[Any, str]:
-        return (uuid4(), "read")
+    async def _resolve(*a: object, **k: object) -> AccessGrant:
+        return AccessGrant(principal_id=uuid4(), scope="read", grant_id=uuid4(), client_id="mcp")
 
-    monkeypatch.setattr(deps.oauth_service, "resolve_access_token", _resolve)
+    monkeypatch.setattr(deps.oauth_service, "resolve_access_grant", _resolve)
 
     class _DB:
         async def execute(self, _stmt: object) -> Any:
@@ -224,10 +225,10 @@ async def test_principal_from_access_token_principal_row_missing(
 async def test_principal_from_access_token_inactive_row(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _resolve(*a: object, **k: object) -> tuple[Any, str]:
-        return (uuid4(), "read")
+    async def _resolve(*a: object, **k: object) -> AccessGrant:
+        return AccessGrant(principal_id=uuid4(), scope="read", grant_id=uuid4(), client_id="mcp")
 
-    monkeypatch.setattr(deps.oauth_service, "resolve_access_token", _resolve)
+    monkeypatch.setattr(deps.oauth_service, "resolve_access_grant", _resolve)
 
     class _DB:
         async def execute(self, _stmt: object) -> Any:
@@ -249,13 +250,13 @@ async def test_principal_from_access_token_ok_caps_scope(
     The scope cap is set, which neutralizes the admin bypass.
     """
 
-    async def _resolve(*a: object, **k: object) -> tuple[Any, str]:
-        return (uuid4(), "read")
+    async def _resolve(*a: object, **k: object) -> AccessGrant:
+        return AccessGrant(principal_id=uuid4(), scope="read", grant_id=uuid4(), client_id="mcp")
 
     async def _rbac(*a: object, **k: object) -> Principal:
         return Principal(sub="mcp", roles=["admin"], permissions={"x"})
 
-    monkeypatch.setattr(deps.oauth_service, "resolve_access_token", _resolve)
+    monkeypatch.setattr(deps.oauth_service, "resolve_access_grant", _resolve)
     monkeypatch.setattr(deps.rbac, "resolve_principal", _rbac)
 
     class _DB:
@@ -269,6 +270,8 @@ async def test_principal_from_access_token_ok_caps_scope(
     )
     assert out is not None
     assert out.scope_permissions is not None
+    assert out.grant is not None
+    assert out.grant["client"] == "mcp"
 
 
 async def test_get_current_principal_uses_oauth_bearer(

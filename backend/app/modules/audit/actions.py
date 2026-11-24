@@ -147,6 +147,12 @@ class AuditAction(StrEnum):
             (§F/integrations/ticket-mail/002743). The target is the Bereich
             (``ticket_area``). ``data`` holds the operation and the names of the changed
             fields, never a password.
+        LINK_ADD: A link between two elements added through ``/api/links`` or with a new
+            card (§F/collaboration/links/002923). The target is the link. ``data`` holds
+            both ends as ``{"kind", "id"}``, a Paperless end also with its ``number``,
+            and for an OAuth token the ``grant`` (``{"id", "client"}``).
+        LINK_REMOVE: A link removed through ``/api/links``, with the same ``data`` as
+            ``LINK_ADD``.
         PII_EXPORT: GDPR export (Art. 15). ANONYMIZATION and the ``ERASURE_*`` entries
             cover erasure (Art. 17) and its request queue, RETENTION_ANONYMIZE covers
             retention (Art. 5(1)(e)).
@@ -293,6 +299,8 @@ class AuditAction(StrEnum):
     PAPERLESS_FILED = "paperless_filed"
     PAPERLESS_INSERTED = "paperless_inserted"
     TICKET_MAILBOX = "ticket_mailbox"
+    LINK_ADD = "link_add"
+    LINK_REMOVE = "link_remove"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(

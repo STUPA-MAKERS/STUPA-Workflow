@@ -46,17 +46,18 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/admin/privacy/erasures/{}/execute"),
         # The login lifetime: the server refuses every agent token.
         ("PUT", "/admin/login-settings"),
-        # Paperless: no OAuth scope carries `admin.paperless` or `paperless.use`.
+        # Paperless: no OAuth scope carries `admin.paperless`.
         ("GET", "/admin/paperless"),
         ("PUT", "/admin/paperless"),
         ("POST", "/admin/paperless/test"),
         ("GET", "/admin/paperless/failed-filings"),
         ("POST", "/admin/paperless/failed-filings/{}/retry"),
         ("POST", "/admin/paperless/backfill"),
-        ("GET", "/paperless/documents/{}/{}"),
+        # A token does not copy documents into or out of Paperless (§ 002921).
         ("GET", "/paperless/insert"),
         ("GET", "/paperless/search"),
         ("POST", "/meetings/{}/documents/paperless"),
+        ("POST", "/tickets/{}/files/{}/paperless"),
         # Ticket mail: no OAuth scope carries `admin.ticket_mail`.
         ("GET", "/admin/ticket-mailboxes"),
         ("POST", "/admin/ticket-areas/{}/mailbox"),

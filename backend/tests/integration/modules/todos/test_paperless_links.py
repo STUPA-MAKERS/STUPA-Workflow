@@ -5,6 +5,8 @@ two documents do not link. § 002764 the link needs `paperless.use`. § 002765 t
 keeps the title of the moment of the link. § 002766 the link search asks Paperless and
 keeps the other kinds in an outage. § 002767 the switch of the links. § 002768 the
 graph shows the document only with the permission.
+§ F/integrations/mcp/002920 a token reaches the links only with the scope `paperless:use`.
+§ F/collaboration/links/002923 each added or removed link has an audit entry with the grant.
 """
 
 from __future__ import annotations
@@ -19,6 +21,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.audit.models import AuditEntry
+from app.modules.auth import oauth
 from app.modules.auth.principal import Principal
 from app.modules.paperless import links as paperless_links
 from app.modules.paperless.connection import ConnectionService
@@ -274,3 +278,86 @@ async def test_the_graph_shows_the_document_only_with_the_permission(
     with TestClient(api.app) as client:
         page = _ok(client.get("/api/graph", params={"relations": "links", "noAccess": True}))
         assert (page["nodes"], page["edges"]) == ([], [])
+
+
+_GRANT = {"id": "6d1c4a3e-0000-4000-8000-000000000001", "client": "antragsplattform-mcp"}
+
+
+def _token(principal: Principal, *scopes: str) -> Principal:
+    """The principal as an OAuth token with these scopes sees it."""
+    return replace(
+        principal, scope_permissions=oauth.scope_permissions(list(scopes)), grant=dict(_GRANT)
+    )
+
+
+async def test_a_token_links_only_with_the_paperless_scope(
+    api: Api, maker: Maker, settings: Settings, fake: FakePaperless
+) -> None:
+    """§ 002920: without the scope 403 as before, with it the link, the search and the read."""
+    await _switch(maker, settings, on=True)
+    board, user, _other = await _people(maker)
+    api.login(user)
+    with TestClient(api.app) as client:
+        card = _card(client, board, "Beamer kaufen")
+    api.login(_token(user, "read", "todos:write"))
+    with TestClient(api.app) as client:
+        refused = _link(client, card, 41)
+        assert (refused.status_code, refused.json()["code"]) == (403, "link_forbidden")
+        assert _ok(client.get("/api/links/targets", params={"kind": "paperless"})) == []
+        closed = client.get(f"/api/paperless/documents/protocol/{uuid.uuid4()}")
+        assert closed.status_code == 403
+    api.login(_token(user, "read", "todos:write", "paperless:use"))
+    with TestClient(api.app) as client:
+        hits = _ok(client.get("/api/links/targets", params={"kind": "paperless", "q": "beamer"}))
+        assert [h["targetId"] for h in hits] == [str(document_ref(41))]
+        (row,) = _ok(_link(client, card, 41), 201)["links"]
+        assert (row["kind"], row["accessible"]) == ("paperless", True)
+        (read,) = _ok(client.get("/api/links", params={"kind": "todo", "id": card}))["links"]
+        assert read["title"] == "Angebot Beamer"
+        assert _ok(client.get(f"/api/paperless/documents/protocol/{uuid.uuid4()}")) is not None
+        _ok(client.delete(f"/api/links/{row['id']}"), 204)
+
+
+async def test_the_audit_names_the_grant(
+    api: Api, maker: Maker, settings: Settings, fake: FakePaperless
+) -> None:
+    """§ 002923: `link_add` and `link_remove` name both ends, the number and the grant."""
+    await _switch(maker, settings, on=True)
+    board, user, _other = await _people(maker)
+    api.login(user)
+    with TestClient(api.app) as client:
+        card = _card(client, board, "Beamer kaufen")
+    api.login(_token(user, "todos:write", "paperless:use"))
+    with TestClient(api.app) as client:
+        (row,) = _ok(_link(client, card, 41), 201)["links"]
+        _ok(client.delete(f"/api/links/{row['id']}"), 204)
+    api.login(user)
+    with TestClient(api.app) as client:
+        _ok(
+            client.post(
+                "/api/todos/cards",
+                json={
+                    "boardId": str(board),
+                    "title": "Mit Dokument",
+                    "links": [{"kind": "paperless", "targetId": str(document_ref(42))}],
+                },
+            ),
+            201,
+        )
+    async with maker() as session:
+        entries = (
+            await session.scalars(
+                select(AuditEntry)
+                .where(AuditEntry.action.in_(["link_add", "link_remove"]))
+                .order_by(AuditEntry.id)
+            )
+        ).all()
+    assert [e.action for e in entries] == ["link_add", "link_remove", "link_add"]
+    added, removed, browser = entries
+    assert added.target_type == "link"
+    assert added.target_id == removed.target_id == row["id"]
+    assert added.data["grant"] == removed.data["grant"] == _GRANT
+    ends = {added.data["a"]["kind"]: added.data["a"], added.data["b"]["kind"]: added.data["b"]}
+    assert ends["todo"]["id"] == card
+    assert ends["paperless"] == {"kind": "paperless", "id": str(document_ref(41)), "number": 41}
+    assert "grant" not in browser.data

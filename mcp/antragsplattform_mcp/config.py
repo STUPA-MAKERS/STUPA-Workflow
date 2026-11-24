@@ -32,8 +32,9 @@ except Exception:
 # todo.write, todo.configure and todo.all through, `read` lets todo.read_all through,
 # `tickets:write` lets ticket.manage and ticket.work through, `committees:write` lets info.write and
 # members.notify through (the Info tab of a Gremium and the message to its members). The
-# set mirrors the platform's
-# `oauth.SCOPES`. Narrow it with ANTRAGSPLATTFORM_SCOPE.
+# set mirrors the platform's `oauth.DEFAULT_SCOPE`. Narrow it with ANTRAGSPLATTFORM_SCOPE.
+# The opt-in scope `paperless:use` (the Paperless links and the address of a filed
+# document) is not in the default: add it to ANTRAGSPLATTFORM_SCOPE by name.
 DEFAULT_SCOPE = (
     "read applications:write votes:write budget:write meetings:write "
     "tickets:write todos:write committees:write forms:write flows:write admin:write"

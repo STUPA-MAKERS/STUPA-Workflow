@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 
 from app import deps
+from app.modules.auth.oauth_service import AccessGrant
 from app.modules.auth.principal import Principal
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
@@ -31,13 +32,13 @@ class _DB:
 
 
 def _patch(monkeypatch: pytest.MonkeyPatch, principal: Principal) -> None:
-    async def _resolve(*_a: object, **_k: object) -> tuple[Any, str]:
-        return (uuid4(), "read")
+    async def _resolve(*_a: object, **_k: object) -> AccessGrant:
+        return AccessGrant(principal_id=uuid4(), scope="read", grant_id=uuid4(), client_id="mcp")
 
     async def _rbac(*_a: object, **_k: object) -> Principal:
         return principal
 
-    monkeypatch.setattr(deps.oauth_service, "resolve_access_token", _resolve)
+    monkeypatch.setattr(deps.oauth_service, "resolve_access_grant", _resolve)
     monkeypatch.setattr(deps.rbac, "resolve_principal", _rbac)
 
 

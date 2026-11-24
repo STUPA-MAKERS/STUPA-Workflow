@@ -23,6 +23,9 @@ class Principal:
     #: range. A set makes only these permissions reachable. The cap also applies to an
     #: admin, so a scoped token cannot bypass it through the admin role.
     scope_permissions: frozenset[str] | None = None
+    #: The grant of the OAuth token (``{"id": …, "client": …}``), `None` for a session
+    #: cookie. The audit log names it (§F/collaboration/links/002923).
+    grant: dict[str, str] | None = None
 
     def has(self, perm: str) -> bool:
         """Tell whether the principal holds ``perm``.

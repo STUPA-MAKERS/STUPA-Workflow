@@ -96,10 +96,10 @@ async def _principal_from_access_token(
     The kill switch re-checks ``mcp.use`` against the UNSCOPED permission set (before the
     scope cap), because revoking ``mcp.use`` must invalidate the tokens already issued.
     """
-    resolved = await oauth_service.resolve_access_token(db, token=token, now=now)
+    resolved = await oauth_service.resolve_access_grant(db, token=token, now=now)
     if resolved is None:
         return None
-    principal_id, scope = resolved
+    principal_id, scope = resolved.principal_id, resolved.scope
     row = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.id == principal_id))
     ).scalar_one_or_none()
@@ -108,7 +108,11 @@ async def _principal_from_access_token(
     principal = await rbac.resolve_principal(db, row, now)
     if not principal.has("mcp.use"):
         return None
-    return replace(principal, scope_permissions=oauth.scope_permissions(oauth.parse_scope(scope)))
+    return replace(
+        principal,
+        scope_permissions=oauth.scope_permissions(oauth.parse_scope(scope)),
+        grant={"id": str(resolved.grant_id), "client": resolved.client_id},
+    )
 
 
 async def get_current_principal(
@@ -206,6 +210,17 @@ def require_principal(*perms: str) -> Callable[..., Principal]:
         return principal
 
     return dependency
+
+
+def refuse_agent_token(principal: Principal, detail: str) -> None:
+    """Refuse an OAuth token with 403 ``cookie_session_required``.
+
+    Call it after the permission check, so a token without the permission still gets
+    the plain 403 of the missing permission. A route that only a person in the browser
+    may use calls it, whatever the scope says (§F/integrations/mcp/002921).
+    """
+    if principal.scope_permissions is not None:
+        raise ForbiddenError(detail, code="cookie_session_required")
 
 
 def require_any_permission(*perms: str) -> Callable[..., Principal]:
