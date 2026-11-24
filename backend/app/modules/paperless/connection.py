@@ -1,7 +1,7 @@
 """The Paperless connection: the read, the save, the test and the client of the worker.
 
-One row holds the address, the token and the five switches. A save checks the host of
-the address against the deploy setting `PAPERLESS_HOST_ALLOWLIST`
+One row holds the address, the address for links, the token and the five switches. A save
+checks the host of the address against the deploy setting `PAPERLESS_HOST_ALLOWLIST`
 (§NF/security/network/002514) and writes an audit entry without the token
 (§F/integrations/paperless/002531). No read returns the token
 (§NF/security/network/002515).
@@ -28,6 +28,7 @@ from app.modules.paperless.client import (
     PaperlessClient,
     PaperlessError,
     address_allowed,
+    link_address_valid,
     normalize_url,
 )
 from app.modules.paperless.models import PaperlessSettings
@@ -42,6 +43,8 @@ Part = Literal["protocols", "applications", "plans"]
 TEST_TIMEOUT_SECONDS = 5.0
 #: The problem code of an address change that keeps the stored token.
 TOKEN_REQUIRED = "token_required"
+#: The problem code of an address for links that is not `http` or `https` (002844).
+LINK_ADDRESS_INVALID = "paperless_link_address_invalid"
 
 ClientFactory = Callable[[str, str, tuple[str, ...]], PaperlessClient]
 
@@ -83,6 +86,7 @@ class ConnectionService:
     def _out(self, row: PaperlessSettings) -> ConnectionOut:
         return ConnectionOut(
             base_url=row.base_url,
+            public_url=row.public_url,
             token_set=bool(row.token),
             file_protocols=bool(row.file_protocols),
             file_applications=bool(row.file_applications),
@@ -103,7 +107,9 @@ class ConnectionService:
             ValidationProblem: The host of the address is not in the allowlist (422
                 `paperless_host_not_allowed`), or the address changes without a new token
                 while a token is stored (422 `token_required`,
-                §F/integrations/paperless/002813).
+                §F/integrations/paperless/002813), or the address for links is not
+                an absolute `http` or `https` address (422
+                `paperless_link_address_invalid`, 002844).
         """
         base_url = (normalize_url(data.base_url) if data.base_url else "") or None
         if base_url is not None and not address_allowed(
@@ -113,6 +119,13 @@ class ConnectionService:
                 "The host of this address is not in PAPERLESS_HOST_ALLOWLIST.",
                 code="paperless_host_not_allowed",
                 errors=[{"field": "baseUrl", "msg": "host not allowed"}],
+            )
+        public_url = (normalize_url(data.public_url) if data.public_url else "") or None
+        if public_url is not None and not link_address_valid(public_url):
+            raise ValidationProblem(
+                "The address for links must be an absolute http or https address.",
+                code=LINK_ADDRESS_INVALID,
+                errors=[{"field": "publicUrl", "msg": "http or https address required"}],
             )
         before = await self.row()
         old_token = before.token
@@ -134,6 +147,7 @@ class ConnectionService:
             .where(PaperlessSettings.id == 1)
             .values(
                 base_url=base_url,
+                public_url=public_url,
                 token=token,
                 file_protocols=data.file_protocols,
                 protocols_since=_since(data.file_protocols, before.protocols_since, now),
@@ -154,6 +168,7 @@ class ConnectionService:
             target_id="1",
             data={
                 "baseUrl": base_url,
+                "publicUrl": public_url,
                 "tokenChanged": token_changed,
                 "fileProtocols": data.file_protocols,
                 "fileApplications": data.file_applications,

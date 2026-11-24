@@ -135,6 +135,7 @@ describe('AdminApiService — mock mode', () => {
     const saved = await firstValueFrom(
       s.putPaperless({
         baseUrl: 'https://paperless.example.org',
+        publicUrl: null,
         token: 'secret',
         fileProtocols: true,
         fileApplications: false,
@@ -469,6 +470,7 @@ describe('AdminApiService — real mode (contract)', () => {
     read.flush({});
     const body = {
       baseUrl: 'https://paperless.example.org',
+      publicUrl: null,
       fileProtocols: true,
       fileApplications: false,
       filePlans: false,

@@ -21,7 +21,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.models import Attachment
-from app.modules.paperless.client import document_url
+from app.modules.paperless.client import document_url, link_address
 from app.modules.paperless.filings import NewFiling, open_filings, retry_filing
 from app.modules.paperless.models import PaperlessFiling, PaperlessSettings
 from app.modules.site_config.features import Feature, feature_on
@@ -114,9 +114,8 @@ async def paperless_of(session: AsyncSession, ticket: Ticket) -> TicketPaperless
         return None
     files = [file for file in await _files(session, ticket.id) if _is_clean(file)]
     filings = await _filings(session, [file.id for file in files])
-    return TicketPaperless(
-        files=tuple(_out(file, filings.get(file.id), connection.base_url) for file in files)
-    )
+    address = link_address(connection.base_url, connection.public_url)
+    return TicketPaperless(files=tuple(_out(file, filings.get(file.id), address) for file in files))
 
 
 async def file_in_paperless(
@@ -158,4 +157,4 @@ async def file_in_paperless(
             ],
         )
     after = before or (await _filings(session, [file.id])).get(file.id)
-    return _out(file, after, connection.base_url)
+    return _out(file, after, link_address(connection.base_url, connection.public_url))

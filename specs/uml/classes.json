@@ -5638,6 +5638,12 @@
           "type": "TEXT"
         },
         {
+          "name": "public_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
           "name": "token",
           "nullable": true,
           "primaryKey": false,

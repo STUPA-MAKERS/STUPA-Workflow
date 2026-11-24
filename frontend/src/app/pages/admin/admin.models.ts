@@ -1443,6 +1443,8 @@ export interface HelpTicketsSettings {
  */
 export interface PaperlessConnection {
   readonly baseUrl: string | null;
+  /** The address for links; `null`: the links use `baseUrl` (§F/integrations/paperless/002844). */
+  readonly publicUrl: string | null;
   readonly tokenSet: boolean;
   readonly fileProtocols: boolean;
   readonly fileApplications: boolean;
@@ -1456,6 +1458,7 @@ export interface PaperlessConnection {
 /** The body of `PUT /admin/paperless`. Without `token` the stored token stays. */
 export interface PaperlessConnectionIn {
   readonly baseUrl: string | null;
+  readonly publicUrl: string | null;
   readonly token?: string;
   readonly fileProtocols: boolean;
   readonly fileApplications: boolean;

@@ -23,7 +23,7 @@ from sqlalchemy.orm import aliased
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.paperless.client import document_url
+from app.modules.paperless.client import document_url, link_address
 from app.modules.paperless.models import PaperlessFiling, PaperlessSettings
 from app.modules.paperless.schemas import (
     ElementDocumentOut,
@@ -318,8 +318,16 @@ async def retry_filing(session: AsyncSession, filing_id: UUID, now: datetime) ->
         raise NotFoundError("Unknown failed filing.")
 
 
-async def _base_url(session: AsyncSession) -> str | None:
-    return await session.scalar(select(PaperlessSettings.base_url).where(PaperlessSettings.id == 1))
+async def _link_address(session: AsyncSession) -> str | None:
+    """The address that a browser link names (§F/integrations/paperless/002844)."""
+    row = (
+        await session.execute(
+            select(PaperlessSettings.base_url, PaperlessSettings.public_url).where(
+                PaperlessSettings.id == 1
+            )
+        )
+    ).first()
+    return link_address(row.base_url, row.public_url) if row is not None else None
 
 
 async def element_document(
@@ -330,7 +338,7 @@ async def element_document(
     A protocol links to its internal PDF and an Antrag to its PDF, not to an
     attachment.
     """
-    base_url = await _base_url(session)
+    base_url = await _link_address(session)
     document_id = await session.scalar(
         select(PaperlessFiling.document_id)
         .where(
@@ -356,7 +364,7 @@ async def filed_for_applications(
     """
     if not application_ids:
         return {}
-    base_url = await _base_url(session)
+    base_url = await _link_address(session)
     rows = (
         await session.scalars(
             select(PaperlessFiling)

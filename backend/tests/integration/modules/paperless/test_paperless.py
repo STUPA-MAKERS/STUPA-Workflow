@@ -8,7 +8,8 @@ document gets the tag `Ersetzt`. § 002523, 002526 a job that fails eight times 
 the failed list and starts again. § 002524, 002525 the entry `In Paperless öffnen`.
 § 002530 the backfill. § 002531 the audit entries. § NF/security/network/002514 the
 host allowlist. § 002515 no read returns the token. § 002527-002529, 002534 the insert:
-the search and the copy. § 002813 a new address needs the token again.
+the search and the copy. § 002813 a new address needs the token again. § 002844 the
+links name the address for links, the calls go to the address.
 """
 
 from __future__ import annotations
@@ -125,6 +126,7 @@ async def _connect(
     plans: bool = False,
     insert: bool = False,
     now: datetime = _SINCE,
+    public_url: str | None = None,
 ) -> None:
     """Save the connection with the switches of a test."""
     async with maker() as session:
@@ -132,6 +134,7 @@ async def _connect(
             ConnectionIn.model_validate(
                 {
                     "baseUrl": BASE_URL,
+                    "publicUrl": public_url,
                     "token": TOKEN,
                     "fileProtocols": protocols,
                     "fileApplications": applications,
@@ -330,6 +333,7 @@ def test_the_connection_saves_and_no_read_returns_the_token(
         assert first.status_code == 200
         assert first.json() == {
             "baseUrl": None,
+            "publicUrl": None,
             "tokenSet": False,
             "fileProtocols": False,
             "fileApplications": False,
@@ -396,6 +400,50 @@ def test_a_new_address_needs_the_token_again(
         moved_ok = client.put("/api/admin/paperless", json={**_BODY, "baseUrl": moved})
         assert moved_ok.status_code == 200
         assert moved_ok.json()["baseUrl"] == moved
+
+
+_PUBLIC = "https://paperless.example.org"
+
+
+def test_the_address_for_links_changes_without_the_token(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakePaperless,
+) -> None:
+    """§ 002844: no call goes to the address for links, so 002813 does not apply to it."""
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        assert client.put("/api/admin/paperless", json=_BODY).status_code == 200
+        saved = client.put(
+            "/api/admin/paperless", json={**_BODY, "publicUrl": f"{_PUBLIC}/", "token": None}
+        )
+        assert saved.status_code == 200
+        assert saved.json()["publicUrl"] == _PUBLIC
+        assert saved.json()["baseUrl"] == BASE_URL
+        assert saved.json()["tokenSet"] is True
+        assert client.post("/api/admin/paperless/test").json() == {"ok": True, "error": None}
+        assert fake.requests[-1].url.host == HOST
+
+        emptied = client.put("/api/admin/paperless", json={**_BODY, "token": None})
+        assert emptied.json()["publicUrl"] is None
+        assert emptied.json()["tokenSet"] is True
+
+
+@pytest.mark.parametrize("value", ["ftp://paperless.example.org", "paperless.example.org"])
+def test_the_address_for_links_needs_http_or_https(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    fake: FakePaperless,
+    value: str,
+) -> None:
+    """§ 002844: the address for links is outside the allowlist, but it must be a web address."""
+    with _client(migrated, settings, monkeypatch, fake, _ADMIN) as client:
+        assert client.put("/api/admin/paperless", json=_BODY).status_code == 200
+        refused = client.put("/api/admin/paperless", json={**_BODY, "publicUrl": value})
+        assert refused.status_code == 422
+        assert refused.json()["code"] == "paperless_link_address_invalid"
+        assert client.get("/api/admin/paperless").json()["publicUrl"] is None
 
 
 def test_a_host_outside_the_allowlist_is_refused(
@@ -756,6 +804,31 @@ async def test_the_entry_opens_the_document_only_with_the_permission(
     await _connect(maker, settings, protocols=False)
     with _client(migrated, settings, monkeypatch, fake, _USER) as client:
         assert client.get(path).json() == {"url": None, "documentId": None}
+
+
+async def test_the_entry_names_the_address_for_links_and_the_calls_go_to_the_server_address(
+    migrated: tuple[str, str],
+    maker: Maker,
+    settings: Settings,
+    ctx: dict[str, Any],
+    storage: MemoryStorage,
+    fake: FakePaperless,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§ 002844: the browser link names the public name, the API calls the address."""
+    await _connect(maker, settings, protocols=True, public_url=_PUBLIC)
+    protocol_id, _meeting = await _protocol(maker, storage)
+
+    assert await _run(ctx) == 2
+    assert fake.requests
+    assert {request.url.host for request in fake.requests} == {HOST}
+    internal = next(row.document_id for row in await _filings(maker) if row.kind == "protocol")
+    with _client(migrated, settings, monkeypatch, fake, _USER) as client:
+        entry = client.get(f"/api/paperless/documents/protocol/{protocol_id}")
+        assert entry.json() == {
+            "url": f"{_PUBLIC}/documents/{internal}/details",
+            "documentId": internal,
+        }
 
 
 def _archive(fake: FakePaperless, document_id: int, title: str, content: bytes) -> None:

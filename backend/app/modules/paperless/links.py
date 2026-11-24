@@ -22,7 +22,12 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.paperless.client import DocumentHit, PaperlessError, document_url
+from app.modules.paperless.client import (
+    DocumentHit,
+    PaperlessError,
+    document_url,
+    link_address,
+)
 from app.modules.paperless.connection import ConnectionService, links_on
 from app.modules.paperless.models import PaperlessDocument, PaperlessSettings
 from app.settings import get_settings
@@ -97,7 +102,9 @@ class DocumentLinks:
         if not ids:
             return {}
         settings = await _settings(self.session)
-        base = settings.base_url if settings is not None else None
+        base = (
+            link_address(settings.base_url, settings.public_url) if settings is not None else None
+        )
         rows = (
             await self.session.scalars(
                 select(PaperlessDocument).where(PaperlessDocument.id.in_(list(ids)))

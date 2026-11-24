@@ -37,7 +37,11 @@ class PaperlessSettings(Base):
     """The connection to one Paperless-ngx instance and its switches (single row id=1).
 
     Attributes:
-        base_url: The address of the instance, or NULL without a connection.
+        base_url: The address of the instance, or NULL without a connection. The server
+            calls the API only on this address.
+        public_url: The address for links, or NULL. Each browser link to Paperless names
+            it, or ``base_url`` when it is NULL. The server never calls it
+            (§F/integrations/paperless/002844).
         token: The token of the account of the platform. No read of the API returns it
             (§NF/security/network/002515).
         file_protocols: The switch `Protokolle ablegen`. Each switch starts off
@@ -53,6 +57,7 @@ class PaperlessSettings(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     base_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     token: Mapped[str | None] = mapped_column(Sealed("paperless_settings.token"), nullable=True)
     file_protocols: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     protocols_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

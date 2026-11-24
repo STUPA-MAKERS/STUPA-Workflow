@@ -5099,6 +5099,8 @@
   "admin.paperless.connection": "Connection",
   "admin.paperless.url": "Address of Paperless",
   "admin.paperless.urlInvalid": "Enter an address with http:// or https://.",
+  "admin.paperless.publicUrl": "Address for links",
+  "admin.paperless.publicUrlHint": "The address where people open Paperless in the browser. Empty: links use the address of Paperless.",
   "admin.paperless.hostNotAllowed": "The operator has not allowed this host. Allowed: {hosts}",
   "admin.paperless.token": "Token",
   "admin.paperless.tokenNew": "New token",

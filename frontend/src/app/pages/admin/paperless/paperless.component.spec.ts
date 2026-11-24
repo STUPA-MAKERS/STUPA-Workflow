@@ -10,17 +10,18 @@ import type {
   PaperlessConnectionIn,
   PaperlessFailedFiling,
 } from '../admin.models';
-import { PaperlessComponent, isPaperlessUrl } from './paperless.component';
+import { PaperlessComponent, isPaperlessUrl, isWebUrl } from './paperless.component';
 import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
 const STORED: PaperlessConnection = {
   baseUrl: 'https://paperless.example.org',
+  publicUrl: null,
   tokenSet: true,
   fileProtocols: true,
   fileApplications: false,
   filePlans: false,
   insertEnabled: false,
-      linkEnabled: false,
+  linkEnabled: false,
   allowedHosts: ['paperless.example.org'],
 };
 
@@ -85,7 +86,9 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
 }
 
 const urlField = () => screen.getByLabelText(/Adresse von Paperless/) as HTMLInputElement;
-const tokenField = (name: RegExp = /Neuer Token/) => screen.getByLabelText(name) as HTMLInputElement;
+const publicField = () => screen.getByLabelText(/Adresse für Links/) as HTMLInputElement;
+const tokenField = (name: RegExp = /Neuer Token/) =>
+  screen.getByLabelText(name) as HTMLInputElement;
 const save = () => screen.getByRole('button', { name: 'Speichern' });
 const sw = (name: string) => screen.getByRole('switch', { name });
 /** The rows of "Fehlgeschlagene Ablagen": each is one button with the title and the line under it. */
@@ -106,6 +109,17 @@ describe('isPaperlessUrl', () => {
     ['', false],
   ])('%s → %s', (text, ok) => {
     expect(isPaperlessUrl(text)).toBe(ok);
+  });
+});
+
+describe('isWebUrl', () => {
+  it.each([
+    ['https://paperless.example.org', true],
+    ['http://paperless.example.org:8000/dms', true],
+    ['ftp://paperless.example.org', false],
+    ['paperless.example.org', false],
+  ])('%s → %s', (text, ok) => {
+    expect(isWebUrl(text)).toBe(ok);
   });
 });
 
@@ -143,6 +157,7 @@ describe('PaperlessComponent', () => {
     await userEvent.click(save());
     expect(api.putPaperless).toHaveBeenLastCalledWith({
       baseUrl: 'https://paperless.example.org',
+      publicUrl: null,
       fileProtocols: false,
       fileApplications: true,
       filePlans: false,
@@ -176,7 +191,9 @@ describe('PaperlessComponent', () => {
     const { api, page } = await setup();
     await userEvent.clear(urlField());
     await userEvent.type(urlField(), 'paperless');
-    expect(screen.getByText('Bitte eine Adresse mit http:// oder https:// eingeben.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Bitte eine Adresse mit http:// oder https:// eingeben.'),
+    ).toBeInTheDocument();
     expect(save()).toBeDisabled();
     page.save();
     expect(api.putPaperless).not.toHaveBeenCalled();
@@ -195,7 +212,9 @@ describe('PaperlessComponent', () => {
     await userEvent.click(save());
     fixture.detectChanges();
     expect(
-      screen.getByText('Dieser Host ist im Betrieb nicht freigegeben. Freigegeben: paperless.example.org'),
+      screen.getByText(
+        'Dieser Host ist im Betrieb nicht freigegeben. Freigegeben: paperless.example.org',
+      ),
     ).toBeInTheDocument();
     expect(save()).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
@@ -209,7 +228,9 @@ describe('PaperlessComponent', () => {
     const { api, page } = await setup();
     await userEvent.clear(urlField());
     await userEvent.type(urlField(), 'https://paperless.example.org/dms');
-    expect(screen.getByText('Bei einer neuen Adresse bitte den Token erneut eingeben.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Bei einer neuen Adresse bitte den Token erneut eingeben.'),
+    ).toBeInTheDocument();
     expect(save()).toBeDisabled();
     page.save();
     expect(api.putPaperless).not.toHaveBeenCalled();
@@ -219,6 +240,44 @@ describe('PaperlessComponent', () => {
     expect(api.putPaperless).toHaveBeenLastCalledWith(
       expect.objectContaining({ baseUrl: 'https://paperless.example.org/dms', token: 'new-token' }),
     );
+  });
+
+  /** § F/integrations/paperless/002844: the address for links needs no token and no allowed host. */
+  it('saves the address for links without the token', async () => {
+    const { api } = await setup();
+    expect(publicField().value).toBe('');
+    expect(screen.getByText(/Leer: Links nutzen die Adresse von Paperless/)).toBeInTheDocument();
+    await userEvent.type(publicField(), 'https://dms.example.net');
+    expect(screen.queryByText(/Token erneut/)).toBeNull();
+    await userEvent.click(save());
+    expect(api.putPaperless).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        baseUrl: 'https://paperless.example.org',
+        publicUrl: 'https://dms.example.net',
+      }),
+    );
+    expect(api.putPaperless.mock.lastCall?.[0]).not.toHaveProperty('token');
+  });
+
+  it('refuses an address for links that is not http(s)', async () => {
+    const { api, page } = await setup();
+    await userEvent.type(publicField(), 'dms.example.net');
+    expect(
+      screen.getByText('Bitte eine Adresse mit http:// oder https:// eingeben.'),
+    ).toBeInTheDocument();
+    expect(save()).toBeDisabled();
+    page.save();
+    expect(api.putPaperless).not.toHaveBeenCalled();
+  });
+
+  it('shows the stored address for links and sends null when it is emptied', async () => {
+    const { api } = await setup({
+      api: makeApi({ ...STORED, publicUrl: 'https://dms.example.net' }),
+    });
+    expect(publicField().value).toBe('https://dms.example.net');
+    await userEvent.clear(publicField());
+    await userEvent.click(save());
+    expect(api.putPaperless).toHaveBeenLastCalledWith(expect.objectContaining({ publicUrl: null }));
   });
 
   it('asks for no token for the stored address with a slash at its end', async () => {
@@ -301,7 +360,9 @@ describe('PaperlessComponent', () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Fehlgeschlagene Ablagen' })).toBeInTheDocument();
     expect(rows()).toEqual([
-      expect.stringMatching(/^3\. Sitzung ?Protokoll · 20\.11\.2026.* · Paperless ist nicht erreichbar\.$/),
+      expect.stringMatching(
+        /^3\. Sitzung ?Protokoll · 20\.11\.2026.* · Paperless ist nicht erreichbar\.$/,
+      ),
       expect.stringMatching(/^Plakate – angebot\.pdf ?Anhang · Unbekannter Fehler\.$/),
     ]);
   });
