@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/todos/hooks.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/changes.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

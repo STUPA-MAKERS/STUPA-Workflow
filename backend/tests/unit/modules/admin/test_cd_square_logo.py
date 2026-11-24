@@ -29,7 +29,6 @@ from fastapi.testclient import TestClient
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.admin import router as admin_router
 from app.modules.admin.router import get_cd_variant_service
 from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.auth import policy
@@ -503,7 +502,7 @@ def app(fake: _FakeSquare, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     async def visible(_db: Any, principal: Principal, gremium_id: uuid.UUID) -> bool:
         return principal.sub == "member"
 
-    monkeypatch.setattr(admin_router, "can_view_gremium", visible)
+    monkeypatch.setattr("app.modules.admin.router.cd_variants_router.can_view_gremium", visible)
     return application
 
 

@@ -13,10 +13,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.markdown import PollLine, PollSnippet, build_poll_snippet
 from app.modules.protocol.public import PublicTop
-from app.modules.protocol.service import (
+from app.modules.protocol.service.snippets import (
     _snippet,
     poll_meta,
     poll_option_label,
@@ -157,7 +156,8 @@ async def test_public_assembly_lists_no_poll_as_a_decision(
     item = SimpleNamespace(id=uuid4(), title="Stimmungsbild", body="Text", non_public=False)
     vote = SimpleNamespace(id=uuid4())
     _Voting.views = {vote.id: view}
-    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.document.VotingService", _Voting)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.VotingService", _Voting)
     session = FakeSession(results=[result(item), result(vote)])
     tops: list[PublicTop] = []
     md = await _service(session)._assemble_from_agenda(MID, public=True, tops=tops)

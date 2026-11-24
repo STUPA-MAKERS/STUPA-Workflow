@@ -15,9 +15,9 @@ implementation:
   - backend/app/modules/site_config/models.py
   - backend/migrations/versions/6d89f29dead1_pdf_asset.py
   - backend/app/modules/admin/service/pdf_branding.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/site_router.py
   - backend/app/modules/files/pdf_branding.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/render.py
   - backend/app/modules/documents/service.py
   - typst/typst_service/document.py
   - typst/template/protocol.typ
@@ -25,7 +25,7 @@ implementation:
 scope:
   - backend/app/modules/files/pdf_branding.py
   - backend/app/modules/admin
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service
   - typst/template/protocol.typ
   - frontend/src/app/pages/admin/branding
 ---

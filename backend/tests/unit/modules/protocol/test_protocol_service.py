@@ -19,7 +19,6 @@ from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.pdf.typst_client import TypstError
-from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
@@ -606,7 +605,9 @@ async def test_start_finalize_marks_rendering_and_audits(
     async def _record(_session: Any, **kw: Any) -> None:
         calls.append(kw)
 
-    monkeypatch.setattr(protocol_service_mod, "audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.base.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.drafts.audit_record", _record)
+    monkeypatch.setattr("app.modules.protocol.service.finalize.audit_record", _record)
     proto = _protocol()
     session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
     out = await _service(session).start_finalize(PID, actor="lead")

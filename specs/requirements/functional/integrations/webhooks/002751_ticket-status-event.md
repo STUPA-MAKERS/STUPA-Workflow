@@ -10,7 +10,7 @@ tests:
   - "backend/tests/unit/modules/tickets/test_ticket_webhooks.py:test_status_holds_both_statuses"
 implementation:
   - backend/app/modules/tickets/webhook_fields.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/changes.py
   - backend/app/modules/webhooks/catalog.py
 scope:
   - backend/app/modules/webhooks

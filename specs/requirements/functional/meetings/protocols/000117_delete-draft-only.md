@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-15
 implementation:
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/drafts.py
 scope:
   - backend/app/modules/protocol
   - frontend/src/app/features/meetings

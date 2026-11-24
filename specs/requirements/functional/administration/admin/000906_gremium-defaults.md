@@ -10,7 +10,7 @@ tests:
   - "backend/tests/unit/modules/livevote/test_open_window.py:test_update_gremium_defaults_audits_only_the_change"
 implementation:
   - backend/app/modules/livevote/open_window.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/settings_router.py
   - backend/app/modules/meetings/models.py
   - frontend/src/app/pages/admin/committees/gremium-defaults-dialog/gremium-defaults-dialog.component.ts
   - frontend/src/app/pages/admin/committees/gremium-dialog/gremium-dialog.component.ts

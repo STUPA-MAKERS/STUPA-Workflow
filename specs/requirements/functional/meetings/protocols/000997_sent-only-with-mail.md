@@ -10,7 +10,7 @@ tests:
   - "backend/tests/unit/worker/test_protocol_worker.py:test_render_protocol_success_finalizes"
   - "frontend/src/app/features/meetings/protocol-bar/protocol-bar.component.spec.ts:ProtocolBarViewComponent"
 implementation:
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/finalize.py
   - backend/app/modules/protocol/public.py
   - backend/app/modules/meetings/protocol_models.py
   - backend/migrations/versions/a7d3e91f5b20_protocol_finalized_at.py

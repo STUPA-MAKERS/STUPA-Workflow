@@ -11,7 +11,8 @@ tests:
 implementation:
   - backend/app/modules/tickets/models.py
   - backend/app/modules/tickets/areas.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/changes.py
+  - backend/app/modules/tickets/service/create.py
   - frontend/src/app/pages/tickets/ticket-detail.component.ts
   - frontend/src/app/pages/admin/help-tickets/ticket-area-dialog.component.ts
 scope:

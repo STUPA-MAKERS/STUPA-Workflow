@@ -25,12 +25,19 @@ works on its tickets: status, assignee, Kategorie, move to another Bereich, note
   `Ticket.kind` nullable (only a ticket of `Plattform` has a kind).
 - `schemas.py` — wire models (camelCase). `TicketCreate` caps every string, because the
   route is public. `TicketPatch.assigneeId: null` unassigns (`model_fields_set`).
-- `service.py` — `TicketService` (create, list with `q`, counts, assignees, detail with
-  `contextTarget`, patch, notes, anonymize; every work method takes `areas: AreaScope`),
-  `format_number`,
-  `TicketTodoHooks` (the to-do coupling: `openTodoCount`, `completeTodos`, and
-  `readable_cards`, so a `todo_done` event shows the card title only to a reader of its
-  board; the implementation is `todos/hooks.py`).
+- `service/` — package; `__init__.py` re-exports the public names, so
+  `from app.modules.tickets.service import TicketService` works. `service.py` is the
+  `TicketService` facade over ops classes (every work method takes `areas: AreaScope`):
+  `base.py` (constructor, `free_number`, `_get`, `_event`, `_set_status`, sender check),
+  `create.py` (report, ticket by hand), `blocks.py` (sender blocks), `reads.py` (list with
+  `q`, counts, assignees, detail with `contextTarget`), `mail.py` (mail answers, resend,
+  source, Paperless), `changes.py` (patch: status, assignee, Bereich, Kategorie, duplicate),
+  `notes.py`, `reporter.py` (`reporter_*`), `anonymize.py`; pure helpers in `common.py`,
+  `filters.py`, `rows.py`. `common.TicketTodoHooks` is the to-do coupling
+  (`openTodoCount`, `completeTodos`, and `readable_cards`, so a `todo_done` event shows the
+  card title only to a reader of its board; the implementation is `todos/hooks.py`). A test
+  that monkeypatches a name patches the submodule that uses it
+  (e.g. `service.notes.bind_drafts`).
 - `router.py` — the routes; `get_ticket_service` is where the todos module wires its
   hooks; `get_ticket_mail_sender` is the override point for tests.
 - `access.py` — `TICKET_MANAGE`, `TICKET_WORK`, `AreaScope` (`None` = every Bereich, else

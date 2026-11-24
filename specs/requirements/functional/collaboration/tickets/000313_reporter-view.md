@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/tickets/access.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/reporter.py
   - frontend/src/app/pages/tickets/tickets.component.ts
   - frontend/src/app/pages/tickets/ticket-detail.component.ts
 scope:

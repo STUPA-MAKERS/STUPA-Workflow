@@ -12,7 +12,8 @@ tests:
 implementation:
   - backend/app/modules/tickets/access.py
   - backend/app/modules/tickets/router.py
-  - backend/app/modules/tickets/service.py
+  - backend/app/modules/tickets/service/reads.py
+  - backend/app/modules/tickets/service/base.py
   - backend/app/modules/gremien/gremium_roles.py
   - frontend/src/app/core/auth/auth.service.ts
 scope:
