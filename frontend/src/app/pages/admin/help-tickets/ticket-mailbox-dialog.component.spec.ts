@@ -120,7 +120,7 @@ describe('the draft of a Postfach', () => {
   });
 
   it('asks for each field of a new Postfach, and for no password of a stored one', () => {
-    expect(Object.keys(draftErrors(draftOf(null), false)).sort()).toEqual([
+    expect(Object.keys(draftErrors(draftOf(null), null)).sort()).toEqual([
       'address',
       'imapHost',
       'imapPassword',
@@ -129,17 +129,33 @@ describe('the draft of a Postfach', () => {
       'smtpPassword',
       'smtpUser',
     ]);
-    expect(draftErrors(draftOf(BOX), true)).toEqual({});
+    expect(draftErrors(draftOf(BOX), draftOf(BOX))).toEqual({});
   });
 
   it('refuses a bad address and a bad port', () => {
     const draft = { ...draftOf(BOX), address: 'kein', imapPort: '0', smtpPort: '70000' };
-    expect(draftErrors(draft, true)).toEqual({
+    expect(draftErrors(draft, draftOf(BOX))).toEqual({
       address: 'admin.helpTickets.mailbox.addressInvalid',
       imapPort: 'admin.helpTickets.mailbox.portInvalid',
       smtpPort: 'admin.helpTickets.mailbox.portInvalid',
+      imapPassword: 'admin.helpTickets.mailbox.passwordAgain',
+      smtpPassword: 'admin.helpTickets.mailbox.passwordAgain',
     });
-    expect(draftErrors({ ...draftOf(BOX), imapPort: 'abc' }, true)).toHaveProperty('imapPort');
+    expect(draftErrors({ ...draftOf(BOX), imapPort: 'abc' }, draftOf(BOX))).toHaveProperty('imapPort');
+  });
+
+  /** § F/integrations/ticket-mail/002812: a stored password does not follow a change. */
+  it('asks for the password again when host, port or user of an account changes', () => {
+    const stored = draftOf(BOX);
+    expect(draftErrors({ ...stored, imapHost: 'other.example.org' }, stored)).toEqual({
+      imapPassword: 'admin.helpTickets.mailbox.passwordAgain',
+    });
+    expect(draftErrors({ ...stored, smtpPort: '465', imapUser: 'x' }, stored)).toEqual({
+      imapPassword: 'admin.helpTickets.mailbox.passwordAgain',
+      smtpPassword: 'admin.helpTickets.mailbox.passwordAgain',
+    });
+    expect(draftErrors({ ...stored, imapUser: 'x', imapPassword: 'neu' }, stored)).toEqual({});
+    expect(draftErrors({ ...stored, imapHost: ' MAIL.example.org ' }, stored)).toEqual({});
   });
 
   it('sends a password only when the person typed one', () => {
@@ -224,7 +240,7 @@ describe('TicketMailboxDialogComponent', () => {
         error: { code: 'mail_host_not_allowed', errors: [{ field: 'imapHost' }] },
       })),
     );
-    await act(() => cmp.patch({ imapHost: 'intern.local' }));
+    await act(() => cmp.patch({ imapHost: 'intern.local', imapPassword: 'geheim' }));
     await act(() => cmp.onAction('save'));
     expect(cmp.errors()).toEqual({
       imapHost:
@@ -233,6 +249,16 @@ describe('TicketMailboxDialogComponent', () => {
     expect(toast.error).not.toHaveBeenCalled();
     await act(() => cmp.patch({ imapHost: 'mail.example.org' }));
     expect(cmp.errors()).toEqual({});
+  });
+
+  it('asks for the password again before it saves a new host', async () => {
+    const { cmp, act, api } = await setup(BOX);
+    await act(() => cmp.patch({ smtpUser: 'office' }));
+    await act(() => cmp.onAction('save'));
+    expect(api.updateMailbox).not.toHaveBeenCalled();
+    expect(cmp.errors()).toEqual({
+      smtpPassword: 'Bei neuem Host, Port oder Benutzer bitte das Passwort erneut eingeben.',
+    });
   });
 
   it.each([

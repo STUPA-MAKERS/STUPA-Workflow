@@ -191,6 +191,7 @@ describe('PaperlessComponent', () => {
     const { fixture } = await setup({ api });
     await userEvent.clear(urlField());
     await userEvent.type(urlField(), 'https://other.example.org');
+    await userEvent.type(tokenField(), 'new-token');
     await userEvent.click(save());
     fixture.detectChanges();
     expect(
@@ -201,6 +202,29 @@ describe('PaperlessComponent', () => {
     fixture.detectChanges();
     expect(urlField().value).toBe(STORED.baseUrl);
     expect(screen.queryByText(/nicht freigegeben/)).toBeNull();
+  });
+
+  /** § F/integrations/paperless/002813: a new address needs the token again. */
+  it('asks for the token again when the address changes', async () => {
+    const { api, page } = await setup();
+    await userEvent.clear(urlField());
+    await userEvent.type(urlField(), 'https://paperless.example.org/dms');
+    expect(screen.getByText('Bei einer neuen Adresse bitte den Token erneut eingeben.')).toBeInTheDocument();
+    expect(save()).toBeDisabled();
+    page.save();
+    expect(api.putPaperless).not.toHaveBeenCalled();
+    await userEvent.type(tokenField(), 'new-token');
+    expect(screen.queryByText(/Token erneut/)).toBeNull();
+    await userEvent.click(save());
+    expect(api.putPaperless).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseUrl: 'https://paperless.example.org/dms', token: 'new-token' }),
+    );
+  });
+
+  it('asks for no token for the stored address with a slash at its end', async () => {
+    await setup();
+    await userEvent.type(urlField(), '/');
+    expect(screen.queryByText(/Token erneut/)).toBeNull();
   });
 
   it('shows no host error for another failed save', async () => {
