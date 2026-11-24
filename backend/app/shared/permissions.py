@@ -87,6 +87,9 @@ Keys that need a note:
   no member. A personal board stays private.
 - `todo.create_board`: create a free to-do board (spec 001061). The creator becomes a
   member with the role `manage`; the right reaches no existing board.
+- `order.manage`: create, change and delete the Bestellungen of the Anträge that the
+  person reads (F/finance/orders/002862). It is separate from `budget.book`, so a role
+  can order without the right to book.
 - `calendar.manage`: read, change and delete every Termin of the Kalender and invite
   any Gremium. Without it a person changes only the own Termine.
 - `admin.calendars`: subscribe, change and delete the external calendars
@@ -169,6 +172,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "backup.manage",
     "mcp.use",
     "ticket.manage",
+    "order.manage",
     "todo.read_all",
     "todo.all",
     "todo.create_board",

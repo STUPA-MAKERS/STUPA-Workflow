@@ -25,6 +25,7 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
     text,
 )
@@ -474,4 +475,37 @@ class Comment(UUIDPkMixin, Base):
         CheckConstraint("author_kind IN ('principal','applicant')", name="comment_author_kind"),
         CheckConstraint("visibility IN ('internal','public')", name="comment_visibility"),
         Index("ix_comment_application_id_at", "application_id", "at"),
+    )
+
+
+class ApplicationOrderEvent(UUIDPkMixin, Base):
+    """One timeline event of a Bestellung of an Antrag (F/finance/orders/002866).
+
+    The module ``orders`` writes the rows and the timeline of the Antrag reads them. An
+    event names the Bestellung without a foreign key, because the event of a delete must
+    stay when the row is gone.
+
+    Attributes:
+        application_id: The Antrag of the Bestellung; the event goes with the Antrag.
+        order_id: The id of the Bestellung, without a foreign key, so that the event of
+            a delete stays.
+        actor: The ``sub`` of the person.
+        kind: ``created``, ``status`` or ``deleted``.
+        payload: ``number`` and ``title``, and ``from`` and ``to`` of a status change.
+    """
+
+    __tablename__ = "purchase_order_event"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    order_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    kind: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('created', 'status', 'deleted')", name="kind"),
+        Index("ix_purchase_order_event_application_id", "application_id"),
     )

@@ -147,6 +147,15 @@ class AuditAction(StrEnum):
             (§F/integrations/ticket-mail/002743). The target is the Bereich
             (``ticket_area``). ``data`` holds the operation and the names of the changed
             fields, never a password.
+        ORDER_CREATE: A person created a Bestellung (F/finance/orders/002865). The target
+            is the Bestellung (``order``). ``data`` holds the Antrag, the number and the
+            new values.
+        ORDER_UPDATE: A person changed fields of a Bestellung. ``data`` holds the old and
+            the new values of the changed fields, so the entry is revertable.
+        ORDER_STATUS: A person set the status of a Bestellung. ``data`` holds the old and
+            the new status and dates, so the entry is revertable.
+        ORDER_DELETE: A person deleted a Bestellung. ``data`` holds its last values. A
+            delete is not revertable.
         PII_EXPORT: GDPR export (Art. 15). ANONYMIZATION and the ``ERASURE_*`` entries
             cover erasure (Art. 17) and its request queue, RETENTION_ANONYMIZE covers
             retention (Art. 5(1)(e)).
@@ -293,6 +302,10 @@ class AuditAction(StrEnum):
     PAPERLESS_FILED = "paperless_filed"
     PAPERLESS_INSERTED = "paperless_inserted"
     TICKET_MAILBOX = "ticket_mailbox"
+    ORDER_CREATE = "order_create"
+    ORDER_UPDATE = "order_update"
+    ORDER_STATUS = "order_status"
+    ORDER_DELETE = "order_delete"
 
 
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(
@@ -304,4 +317,9 @@ REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(
         AuditAction.BUDGET_EXPENSE_CREATE,
         AuditAction.BUDGET_EXPENSE_UPDATE,
     }
+)
+
+#: The writes of a Bestellung that the audit log can take back (F/finance/orders/002865).
+REVERTABLE_ORDER_ACTIONS: frozenset[AuditAction] = frozenset(
+    {AuditAction.ORDER_UPDATE, AuditAction.ORDER_STATUS}
 )

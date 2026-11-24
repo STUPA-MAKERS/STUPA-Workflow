@@ -19,7 +19,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
+from app.modules.audit.actions import (
+    REVERTABLE_BUDGET_ACTIONS,
+    REVERTABLE_ORDER_ACTIONS,
+    AuditAction,
+)
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.principal import Principal
 from app.modules.config_revision.reapply import reapply_snapshot
@@ -134,6 +138,8 @@ class RevertService:
             return await self._revert_status(entry, actor, principal)
         if entry.action in REVERTABLE_BUDGET_ACTIONS:
             return await self._revert_budget(entry, actor, principal)
+        if entry.action in REVERTABLE_ORDER_ACTIONS:
+            return await self._revert_order(entry, actor, principal)
         raise ConflictError("This audit entry is not revertable.", code="not_revertable")
 
     @staticmethod
@@ -246,6 +252,20 @@ class RevertService:
             entity_type="application",
             entity_id=app_id,
             reverted_audit_id=entry.id,
+        )
+
+    async def _revert_order(
+        self, entry: AuditEntry, actor: str, principal: Principal | None
+    ) -> RevertResult:
+        """Take back a change or a status change of a Bestellung (needs ``order.manage``)."""
+        from datetime import UTC, datetime
+
+        from app.modules.orders.service import MANAGE_PERMISSION, OrderService
+
+        self._require(principal, MANAGE_PERMISSION, "a change of a Bestellung")
+        await OrderService(self.session, today=datetime.now(UTC).date()).revert_audit(entry, actor)
+        return RevertResult(
+            entity_type="order", entity_id=entry.target_id or "", reverted_audit_id=entry.id
         )
 
     async def _revert_budget(

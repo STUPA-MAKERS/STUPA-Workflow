@@ -1,52 +1,44 @@
-"""Tables of the Bestellungen: ``purchase_order`` and its positions and events.
+"""Tables of the Bestellungen: ``purchase_order`` and its positions.
 
 The table is ``purchase_order``, because ``order`` is a reserved word of SQL.
 
-A Bestellung belongs to exactly one Antrag and goes with it (§F/finance/orders/002850). It
+A Bestellung belongs to exactly one Antrag and goes with it (F/finance/orders/002850). It
 holds no figure of the Haushalt: the Antrag and its bookings set those
-(§F/finance/orders/002857). ``invoice_id`` names at most one invoice, and the delete of the
-invoice clears it (§F/finance/orders/002873).
+(F/finance/orders/002857). ``invoice_id`` names at most one invoice, and the delete of the
+invoice clears it (F/finance/orders/002873).
 
 ``purchase_order_position`` holds the positions of the Kostenaufstellung that a Bestellung
-covers, by the ``id`` of the position in the data of the Antrag (§F/finance/orders/002860).
+covers, by the ``id`` of the position in the data of the Antrag (F/finance/orders/002860).
 
-``purchase_order_event`` is the timeline: the create, each status change and the delete. An
-event names the Antrag and not the Bestellung with a foreign key, because the event of a
-delete must stay when the row is gone. Its payload carries the number and the title.
+The timeline events of a Bestellung are rows of ``purchase_order_event``. That table belongs to
+the module ``applications`` (`ApplicationOrderEvent`), because the timeline of the Antrag reads
+it and a module imports only from its own layer and from lower layers.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
     Numeric,
     Text,
-    Uuid,
-    func,
-    text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 from app.modules.orders.numbers import draw_number
 
-#: The kinds of a Bestellung: an order of the Studierendenschaft or an Auslage of a person.
+#: The kinds of a Bestellung: an order of the organization or an Auslage of a person.
 ORDER_KINDS: tuple[str, ...] = ("order", "outlay")
 #: The statuses of a Bestellung, in the order of the usual way.
 ORDER_STATUSES: tuple[str, ...] = ("planned", "ordered", "delivered", "cancelled")
-#: The kinds of a timeline event.
-ORDER_EVENT_KINDS: tuple[str, ...] = ("created", "status", "deleted")
 
 
 def _in(values: tuple[str, ...]) -> str:
@@ -124,32 +116,3 @@ class PurchaseOrderPosition(Base):
         ForeignKey("purchase_order.id", ondelete="CASCADE"), primary_key=True
     )
     position_id: Mapped[str] = mapped_column(Text, primary_key=True)
-
-
-class PurchaseOrderEvent(UUIDPkMixin, Base):
-    """One timeline event of a Bestellung.
-
-    Attributes:
-        application_id: The Antrag of the Bestellung; the event goes with the Antrag.
-        order_id: The id of the Bestellung, without a foreign key, so that the event of
-            a delete stays.
-        actor: The ``sub`` of the person.
-        kind: ``created``, ``status`` or ``deleted``.
-        payload: ``number`` and ``title``, and ``from`` and ``to`` of a status change.
-    """
-
-    __tablename__ = "purchase_order_event"
-
-    application_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE")
-    )
-    order_id: Mapped[uuid.UUID] = mapped_column(Uuid)
-    actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    kind: Mapped[str] = mapped_column(Text)
-    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        CheckConstraint(f"kind IN ({_in(ORDER_EVENT_KINDS)})", name="kind"),
-        Index("ix_purchase_order_event_application_id", "application_id"),
-    )
