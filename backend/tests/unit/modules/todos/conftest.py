@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 
 from app.modules.auth.people import PersonRef
-from app.modules.todos import service as svc_mod
 from app.modules.todos.links import LinkResolver
 
 
@@ -21,7 +20,10 @@ def people(monkeypatch: pytest.MonkeyPatch) -> dict[uuid.UUID, PersonRef]:
     async def _refs(_session: Any, ids: Iterable[uuid.UUID | None]) -> dict[uuid.UUID, PersonRef]:
         return {pid: known[pid] for pid in ids if pid is not None and pid in known}
 
-    monkeypatch.setattr(svc_mod, "person_refs", _refs)
+    monkeypatch.setattr("app.modules.todos.service.base.person_refs", _refs)
+    monkeypatch.setattr("app.modules.todos.service.boards.person_refs", _refs)
+    monkeypatch.setattr("app.modules.todos.service.comments.person_refs", _refs)
+    monkeypatch.setattr("app.modules.todos.service.details.person_refs", _refs)
     return known
 
 

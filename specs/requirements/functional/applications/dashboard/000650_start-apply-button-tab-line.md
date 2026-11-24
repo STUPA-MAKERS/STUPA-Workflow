@@ -5,7 +5,7 @@ kind: functional
 status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-19
-replaced_by: F/collaboration/activity/001301
+replaced_by: F/collaboration/notifications/002550
 scope:
   - frontend/src/app/pages/activity
 ---

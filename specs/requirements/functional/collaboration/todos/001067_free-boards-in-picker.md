@@ -9,7 +9,8 @@ tests:
   - "frontend/src/app/pages/todos/board-picker/todo-board-picker.component.spec.ts:TodoBoardPickerComponent"
 implementation:
   - frontend/src/app/pages/todos/board-picker/todo-board-picker.component.ts
-  - backend/app/modules/todos/service.py
+  - backend/app/modules/todos/service/boards.py
+  - backend/app/modules/todos/service/common.py
 scope:
   - backend/app/modules/todos
   - frontend/src/app/pages/todos
