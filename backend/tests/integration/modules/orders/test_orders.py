@@ -1,0 +1,450 @@
+"""Bestellungen of an Antrag on a real Postgres.
+
+§ F/finance/orders/002850 a Bestellung belongs to one Antrag and goes with it. § 002858 the
+create needs an approved Antrag of a type with money. § 002853 each status from each other
+status, with the dates. § 002860 a position belongs to at most one Bestellung that is not
+cancelled. § 002862 only ``order.manage`` writes. § 002863 the read follows the Antrag.
+§ 002864 the applicant view. § 002865 the audit entries and the revert. § 002866 the
+timeline. § 002867 the version. § 002868 the sum. § 002930 no migration creates a Bestellung.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncIterator
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.deps import get_current_applicant, get_current_principal
+from app.modules.application_types.models import ApplicationType
+from app.modules.applications.models import Application
+from app.modules.applications.schemas import ApplicationCreate
+from app.modules.applications.service import ApplicationsService
+from app.modules.audit.models import AuditEntry
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Applicant, Principal
+from app.modules.config_revision.revert import RevertService
+from app.modules.flow.models import State
+from app.modules.orders.models import PurchaseOrder
+from app.settings import Settings
+from app.shared.errors import ConflictError
+from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow
+
+pytestmark = pytest.mark.integration
+
+_READ = {"application.read"}
+_MANAGER = Principal(sub="orders-sub", roles=["member"], permissions={*_READ, "order.manage"})
+_READER = Principal(sub="reader-sub", roles=["member"], permissions=_READ)
+_BOOKER = Principal(
+    sub="booker-sub",
+    roles=["member"],
+    permissions={*_READ, "application.manage", "budget.book"},
+)
+_BLIND = Principal(sub="blind-sub", roles=["member"], permissions={"order.manage"})
+_POSITIONS = [
+    {"id": "p1", "label": "Regal", "offers": [{"label": "A", "value": 60}]},
+    {"id": "p2", "label": "Drucker", "offers": [{"label": "B", "value": 500}]},
+]
+
+
+@pytest.fixture
+async def maker(
+    migrated: tuple[str, str], engine: Engine
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    eng = create_async_engine(migrated[1])
+    yield async_sessionmaker(eng, expire_on_commit=False)
+    await eng.dispose()
+
+
+@pytest.fixture
+def settings(migrated: tuple[str, str]) -> Settings:
+    return guest_settings(migrated[1])
+
+
+@pytest.fixture
+async def seed(maker: async_sessionmaker[AsyncSession]) -> GuestSeed:
+    return await seed_guest_flow(maker)
+
+
+def _client(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    principal: Principal | None,
+    applicant: Applicant | None = None,
+) -> TestClient:
+    api = build_api(migrated[1], settings, monkeypatch)
+    api.dependency_overrides[get_current_principal] = lambda: principal
+    api.dependency_overrides[get_current_applicant] = lambda: applicant
+    return TestClient(api)
+
+
+async def _antrag(
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+    *,
+    money: bool = True,
+    approved: bool = True,
+) -> uuid.UUID:
+    """Create an Antrag with two positions, approved for 500 euro by default."""
+    payload = ApplicationCreate.model_validate(
+        {
+            "typeId": str(seed.type_id),
+            "data": {"title": "Büroausstattung"},
+            "applicantEmail": "luis@example.org",
+            "applicantName": "Luis Meyer",
+        }
+    )
+    async with maker() as session:
+        app, _ = await ApplicationsService(session).create(
+            payload, actor="owner-sub", email_confirmed=True
+        )
+        await session.execute(
+            update(ApplicationType)
+            .where(ApplicationType.id == seed.type_id)
+            .values(has_budget=money)
+        )
+        await session.execute(
+            update(State).where(State.id == seed.open_state_id).values(is_approved=approved)
+        )
+        await session.execute(
+            update(Application)
+            .where(Application.id == app.id)
+            .values(
+                approved_amount=Decimal("500.00"),
+                data={"title": "Büroausstattung", "kosten": _POSITIONS},
+            )
+        )
+        await session.commit()
+        return app.id
+
+
+async def _count(maker: async_sessionmaker[AsyncSession]) -> int:
+    async with maker() as session:
+        return int(await session.scalar(select(func.count()).select_from(PurchaseOrder)) or 0)
+
+
+async def _audit(maker: async_sessionmaker[AsyncSession], action: str) -> list[AuditEntry]:
+    async with maker() as session:
+        return list(
+            await session.scalars(
+                select(AuditEntry).where(AuditEntry.action == action).order_by(AuditEntry.id)
+            )
+        )
+
+
+async def test_no_bestellung_exists_before_a_person_creates_one(
+    maker: async_sessionmaker[AsyncSession], seed: GuestSeed
+) -> None:
+    """§ 002930: the migrations and the create of an Antrag create no Bestellung."""
+    await _antrag(maker, seed)
+    assert await _count(maker) == 0
+
+
+async def test_create_needs_an_approved_antrag_of_a_type_with_money(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002858 + § 002862 + § 002856 + § 002852: the gates of the create."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed, approved=False)
+    base = f"/api/applications/{app_id}/orders"
+    refused = api.post(base, json={"title": "Regal"})
+    assert (refused.status_code, refused.json()["code"]) == (409, "application_not_approved")
+    assert api.get(base).json()["canCreate"] is False
+
+    await _antrag(maker, seed, money=False)
+    no_money = api.post(base, json={"title": "Regal"})
+    assert (no_money.status_code, no_money.json()["code"]) == (
+        422,
+        "application_type_without_budget",
+    )
+
+    await _antrag(maker, seed)
+    for principal in (_READER, _BOOKER):
+        other = _client(migrated, settings, monkeypatch, principal)
+        assert other.post(base, json={"title": "Regal"}).status_code == 403
+    blind = _client(migrated, settings, monkeypatch, _BLIND)
+    assert blind.post(base, json={"title": "Regal"}).status_code == 403
+    anonymous = _client(migrated, settings, monkeypatch, None)
+    assert anonymous.post(base, json={"title": "Regal"}).status_code == 401
+
+    bad_link = api.post(base, json={"title": "Regal", "url": "javascript:alert(1)"})
+    assert (bad_link.status_code, bad_link.json()["code"]) == (422, "order_url_invalid")
+    no_buyer = api.post(base, json={"title": "Stifte", "kind": "outlay"})
+    assert (no_buyer.status_code, no_buyer.json()["code"]) == (422, "order_buyer_required")
+    ghost = api.post(base, json={"title": "Stifte", "buyerId": str(uuid.uuid4())})
+    assert (ghost.status_code, ghost.json()["code"]) == (422, "order_buyer_unknown")
+    assert await _count(maker) == 0
+
+    created = api.post(
+        base,
+        json={
+            "title": "Regal",
+            "supplier": "OTTO Office",
+            "url": "https://shop.example/regal",
+            "plannedAmount": "60.94",
+            "kind": "outlay",
+            "buyerName": "Anna",
+            "status": "ordered",
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["number"].startswith("B-")
+    assert len(body["number"]) == 10
+    assert (body["status"], body["version"], body["buyerName"]) == ("ordered", 1, "Anna")
+    assert body["orderedOn"] is not None
+    assert body["deliveredOn"] is None
+    listed = api.get(base).json()
+    assert listed["canManage"] is True
+    assert listed["canCreate"] is True
+    assert [item["id"] for item in listed["items"]] == [body["id"]]
+
+
+async def test_status_version_and_change(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002853 + § 002867 + § 002852 + § 002858: status, version, kind and the left state."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed)
+    order = api.post(f"/api/applications/{app_id}/orders", json={"title": "Regal"}).json()
+    url = f"/api/orders/{order['id']}"
+
+    delivered = api.post(f"{url}/status", json={"status": "delivered", "version": 1})
+    assert delivered.status_code == 200, delivered.text
+    assert (delivered.json()["status"], delivered.json()["version"]) == ("delivered", 2)
+    assert delivered.json()["deliveredOn"] is not None
+    assert delivered.json()["orderedOn"] is None
+    old = api.post(f"{url}/status", json={"status": "planned", "version": 1})
+    assert (old.status_code, old.json()["code"]) == (409, "order_version_conflict")
+    for step, status in enumerate(("planned", "cancelled", "ordered", "delivered"), start=2):
+        answer = api.post(f"{url}/status", json={"status": status, "version": step})
+        assert answer.status_code == 200, answer.text
+    assert api.post(f"{url}/status", json={"status": "paid", "version": 6}).status_code == 422
+
+    typed = api.patch(url, json={"version": 6, "deliveredOn": "2026-11-02", "note": "Raum 12"})
+    assert typed.status_code == 200, typed.text
+    assert (typed.json()["deliveredOn"], typed.json()["note"]) == ("2026-11-02", "Raum 12")
+    again = api.post(f"{url}/status", json={"status": "delivered", "version": 7})
+    assert again.json()["deliveredOn"] == "2026-11-02"
+
+    stale = api.patch(url, json={"version": 1, "title": "Tisch"})
+    assert (stale.status_code, stale.json()["code"]) == (409, "order_version_conflict")
+    outlay = api.patch(url, json={"version": 8, "kind": "outlay"})
+    assert (outlay.status_code, outlay.json()["code"]) == (422, "order_buyer_required")
+    with_buyer = api.patch(url, json={"version": 8, "kind": "outlay", "buyerName": "Anna"})
+    assert with_buyer.json()["kind"] == "outlay"
+    no_title = api.patch(url, json={"version": 9, "title": None})
+    assert (no_title.status_code, no_title.json()["code"]) == (422, "order_title_required")
+    no_kind = api.patch(url, json={"version": 9, "kind": None})
+    assert (no_kind.status_code, no_kind.json()["code"]) == (422, "order_kind_required")
+    bad_link = api.patch(url, json={"version": 9, "url": "ftp://x"})
+    assert (bad_link.status_code, bad_link.json()["code"]) == (422, "order_url_invalid")
+    cleared = api.patch(url, json={"version": 9, "note": "", "url": "https://shop.example/a"})
+    assert (cleared.json()["note"], cleared.json()["url"]) == (None, "https://shop.example/a")
+
+    async with maker() as session:
+        await session.execute(
+            update(State).where(State.id == seed.open_state_id).values(is_approved=False)
+        )
+        await session.commit()
+    after = api.patch(url, json={"version": 10, "supplier": "Böttcher"})
+    assert after.json()["supplier"] == "Böttcher"
+    assert api.post(f"/api/applications/{app_id}/orders", json={"title": "x"}).status_code == 409
+
+    assert api.get(f"/api/orders/{uuid.uuid4()}").status_code == 404
+    assert _client(migrated, settings, monkeypatch, _BLIND).get(url).status_code == 404
+    assert (
+        _client(migrated, settings, monkeypatch, _BLIND)
+        .patch(url, json={"version": 11, "title": "Tisch"})
+        .status_code
+        == 404
+    )
+
+
+async def test_positions_belong_to_one_bestellung(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002860: unknown id, taken position, free again after the cancel."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed)
+    base = f"/api/applications/{app_id}/orders"
+    unknown = api.post(base, json={"title": "Regal", "positionIds": ["p9"]})
+    assert (unknown.status_code, unknown.json()["code"]) == (422, "order_position_unknown")
+    first = api.post(base, json={"title": "Regal", "positionIds": ["p1", "p1"]}).json()
+    assert first["positionIds"] == ["p1"]
+    taken = api.post(base, json={"title": "Regal 2", "positionIds": ["p1", "p2"]})
+    assert (taken.status_code, taken.json()["code"]) == (409, "order_position_taken")
+    second = api.post(base, json={"title": "Drucker", "positionIds": ["p2"]}).json()
+    moved = api.patch(f"/api/orders/{second['id']}", json={"version": 1, "positionIds": ["p1"]})
+    assert (moved.status_code, moved.json()["code"]) == (409, "order_position_taken")
+
+    cancelled = api.post(
+        f"/api/orders/{first['id']}/status", json={"status": "cancelled", "version": 1}
+    )
+    assert cancelled.status_code == 200
+    both = api.patch(
+        f"/api/orders/{second['id']}", json={"version": 1, "positionIds": ["p1", "p2"]}
+    )
+    assert both.json()["positionIds"] == ["p1", "p2"]
+    back = api.post(f"/api/orders/{first['id']}/status", json={"status": "planned", "version": 2})
+    assert (back.status_code, back.json()["code"]) == (409, "order_position_taken")
+    freed = api.patch(f"/api/orders/{second['id']}", json={"version": 2, "positionIds": []})
+    assert freed.json()["positionIds"] == []
+    assert (
+        api.post(
+            f"/api/orders/{first['id']}/status", json={"status": "planned", "version": 2}
+        ).status_code
+        == 200
+    )
+
+
+async def test_sum_applicant_view_timeline_and_delete(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002868 + § 002864 + § 002866 + § 002850: sum, short view, timeline, delete."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed)
+    base = f"/api/applications/{app_id}/orders"
+    regal = api.post(base, json={"title": "Regal", "plannedAmount": "60.00"}).json()
+    api.post(base, json={"title": "Drucker", "actualAmount": "539.09", "note": "intern"})
+    gone = api.post(base, json={"title": "Stuhl", "plannedAmount": "900.00"}).json()
+    api.post(f"/api/orders/{gone['id']}/status", json={"status": "cancelled", "version": 1})
+
+    listed = api.get(base).json()
+    assert (listed["total"], listed["approvedAmount"], listed["overBy"]) == (
+        "599.09",
+        "500.00",
+        "99.09",
+    )
+    reader = _client(migrated, settings, monkeypatch, _READER)
+    assert reader.get(base).json()["canManage"] is False
+    assert reader.get(f"/api/orders/{regal['id']}").json()["plannedAmount"] == "60.00"
+
+    applicant = _client(
+        migrated, settings, monkeypatch, None, Applicant(application_id=str(app_id))
+    )
+    short = applicant.get(base).json()
+    assert short["total"] is None
+    assert set(short["items"][0]) == {
+        "id",
+        "number",
+        "title",
+        "kind",
+        "status",
+        "orderedOn",
+        "deliveredOn",
+    }
+    assert set(applicant.get(f"/api/orders/{regal['id']}").json()) == set(short["items"][0])
+    assert applicant.post(base, json={"title": "x"}).status_code in (401, 403)
+
+    api.post(f"/api/orders/{regal['id']}/status", json={"status": "delivered", "version": 1})
+    assert api.delete(f"/api/orders/{gone['id']}").status_code == 204
+    assert api.delete(f"/api/orders/{gone['id']}").status_code == 404
+    timeline = [
+        event["order"]
+        for event in api.get(f"/api/applications/{app_id}/timeline").json()
+        if event["kind"] == "order"
+    ]
+    assert [(e["title"], e["change"], e["toStatus"]) for e in timeline] == [
+        ("Regal", "created", None),
+        ("Drucker", "created", None),
+        ("Stuhl", "created", None),
+        ("Stuhl", "status", "cancelled"),
+        ("Regal", "status", "delivered"),
+        ("Stuhl", "deleted", None),
+    ]
+    assert len(await _audit(maker, "order_create")) == 3
+    assert len(await _audit(maker, "order_delete")) == 1
+
+    async with maker() as session:
+        await ApplicationsService(session).delete(app_id, actor="orders-sub")
+    assert await _count(maker) == 0
+
+
+async def test_audit_revert_sets_the_old_values(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002865: the revert of a change and of a status change; no revert of a delete."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed)
+    async with maker() as session:
+        buyer = PrincipalRow(sub="anna-sub", display_name="Anna")
+        session.add(buyer)
+        await session.commit()
+    order = api.post(
+        f"/api/applications/{app_id}/orders",
+        json={"title": "Regal", "plannedAmount": "60.00", "positionIds": ["p1"]},
+    ).json()
+    url = f"/api/orders/{order['id']}"
+    api.patch(
+        url,
+        json={
+            "version": 1,
+            "plannedAmount": "75.00",
+            "orderedOn": "2026-11-02",
+            "buyerId": str(buyer.id),
+            "positionIds": ["p2"],
+        },
+    )
+    api.post(f"{url}/status", json={"status": "delivered", "version": 2})
+    change = (await _audit(maker, "order_update"))[0]
+    assert change.data["before"] == {
+        "plannedAmount": "60.00",
+        "orderedOn": None,
+        "buyerId": None,
+        "positionIds": ["p1"],
+    }
+    status = (await _audit(maker, "order_status"))[0]
+    assert status.data["before"]["status"] == "planned"
+
+    async with maker() as session:
+        await RevertService(session).revert(status.id, "revert-sub", _MANAGER)
+        await RevertService(session).revert(change.id, "revert-sub", _MANAGER)
+        await session.commit()
+    reverted = api.get(url).json()
+    assert (
+        reverted["status"],
+        reverted["plannedAmount"],
+        reverted["orderedOn"],
+        reverted["buyerId"],
+        reverted["positionIds"],
+        reverted["version"],
+    ) == ("planned", "60.00", None, None, ["p1"], 5)
+
+    async with maker() as session:
+        with pytest.raises(ConflictError) as stale:
+            await RevertService(session).revert(change.id, "revert-sub", _MANAGER)
+        assert stale.value.code == "stale_revert"
+        created = (await _audit(maker, "order_create"))[0]
+        with pytest.raises(ConflictError):
+            await RevertService(session).revert(created.id, "revert-sub", _MANAGER)
+    api.delete(url)
+    async with maker() as session:
+        with pytest.raises(ConflictError) as gone:
+            await RevertService(session).revert(status.id, "revert-sub", _MANAGER)
+        assert gone.value.code == "order_gone"
