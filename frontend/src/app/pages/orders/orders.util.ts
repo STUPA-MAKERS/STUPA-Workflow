@@ -190,11 +190,30 @@ export function bookingPayee(order: Pick<Order, 'kind' | 'buyerLabel' | 'supplie
   return (order.kind === 'outlay' ? order.buyerLabel : order.supplier) ?? '';
 }
 
-/** One value of a Bestellung in the read view. `href` makes the value a link. */
+/**
+ * One value of a Bestellung in the read view. `href` makes the value a link, `mono` shows
+ * a number, an amount or a date in the mono face.
+ */
 export interface OrderFact {
   readonly label: string;
   readonly value: string;
   readonly href?: string;
+  readonly mono?: boolean;
+  /** The value takes a row of its own: a link, a list or a free text. */
+  readonly wide?: boolean;
+}
+
+/**
+ * The values in rows as the fields of an Antrag show: two short values side by side, a
+ * wide value alone. A short value without a partner stands alone too.
+ */
+export function factRows(facts: readonly OrderFact[]): readonly (readonly OrderFact[])[] {
+  return facts.reduce<readonly (readonly OrderFact[])[]>((rows, fact) => {
+    const last = rows.at(-1);
+    return last && last.length === 1 && !last[0].wide && !fact.wide
+      ? [...rows.slice(0, -1), [last[0], fact]]
+      : [...rows, [fact]];
+  }, []);
 }
 
 /**
@@ -215,22 +234,23 @@ export function orderFacts(
     .map((id) => labels.get(id) ?? t('orders.position.removed'))
     .join(', ');
   const facts: readonly OrderFact[] = [
-    { label: t('orders.field.number'), value: order.number },
+    { label: t('orders.field.number'), value: order.number, mono: true },
     { label: t('orders.field.kind'), value: t(ORDER_KIND_LABEL[order.kind]) },
     { label: t('orders.field.status'), value: t(ORDER_STATUS_LABEL[order.status]) },
     { label: t('orders.field.supplier'), value: order.supplier ?? '' },
-    { label: t('orders.field.positions'), value: picked },
-    { label: t('orders.field.url'), value: order.url ?? '', href: order.url ?? undefined },
-    { label: t('orders.field.planned'), value: money(order.plannedAmount) },
-    { label: t('orders.field.actual'), value: money(order.actualAmount) },
-    { label: t('orders.field.orderNumber'), value: order.orderNumber ?? '' },
-    { label: t('orders.field.orderedOn'), value: dayMonthYear(order.orderedOn, locale) },
-    { label: t('orders.field.deliveredOn'), value: dayMonthYear(order.deliveredOn, locale) },
+    { label: t('orders.field.positions'), value: picked, wide: true },
+    { label: t('orders.field.url'), value: order.url ?? '', href: order.url ?? undefined, wide: true },
+    { label: t('orders.field.planned'), value: money(order.plannedAmount), mono: true },
+    { label: t('orders.field.actual'), value: money(order.actualAmount), mono: true },
+    { label: t('orders.field.orderNumber'), value: order.orderNumber ?? '', mono: true },
+    { label: t('orders.field.orderedOn'), value: dayMonthYear(order.orderedOn, locale), mono: true },
+    { label: t('orders.field.deliveredOn'), value: dayMonthYear(order.deliveredOn, locale), mono: true },
     { label: t('orders.field.buyer'), value: order.buyerLabel ?? '' },
-    { label: t('orders.field.note'), value: order.note ?? '' },
+    { label: t('orders.field.note'), value: order.note ?? '', wide: true },
     {
       label: t('orders.field.booked'),
       value: money(moneyNumber(order.bookedAmount) ? order.bookedAmount : null),
+      mono: true,
     },
   ];
   return facts.filter((fact) => fact.value !== '');

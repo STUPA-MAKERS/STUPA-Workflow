@@ -1,6 +1,7 @@
 import { order } from '../../../testing/order-fixtures';
 import {
   amountText,
+  factRows,
   firstAddress,
   orderBody,
   orderFacts,
@@ -165,6 +166,18 @@ describe('orders.util', () => {
     expect(facts[5]).toMatchObject({ href: 'https://shop.example.org' });
     expect(facts[7].value).toBe('112,50\u00a0€');
     expect(facts[9].value).toBe('20.11.2026');
+    expect(factRows(facts).map((row) => row.map((f) => f.label.replace('orders.field.', '')))).toEqual([
+      ['number', 'kind'],
+      ['status', 'supplier'],
+      ['positions'],
+      ['url'],
+      ['planned', 'actual'],
+      ['orderNumber', 'orderedOn'],
+      ['deliveredOn', 'buyer'],
+      ['note'],
+      ['booked'],
+    ]);
+    expect(factRows([])).toEqual([]);
     const bare = orderFacts({ ...order(), supplier: undefined, plannedAmount: undefined, positionIds: undefined }, [], 'de-DE', null, t);
     expect(bare.map((f) => f.label)).toEqual(['orders.field.number', 'orders.field.kind', 'orders.field.status']);
   });

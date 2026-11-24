@@ -24,8 +24,8 @@ import {
   ConfirmDialogComponent,
   DialogBodyDirective,
   DialogComponent,
-  FactsComponent,
   FieldGroupComponent,
+  FieldPairComponent,
   FieldRowComponent,
   type LoadState,
   NoteComponent,
@@ -60,6 +60,7 @@ import {
   ORDER_STATUS_LABEL,
   type OrderAction,
   type OrderFact,
+  factRows,
   orderFacts,
   orderMarks,
   orderPositions,
@@ -119,8 +120,8 @@ const HEAD_FACTS: readonly TranslationKey[] = [
     DetailScreenComponent,
     DialogBodyDirective,
     DialogComponent,
-    FactsComponent,
     FieldGroupComponent,
+    FieldPairComponent,
     FieldRowComponent,
     NoteComponent,
     OrderCommentsDirective,
@@ -261,6 +262,8 @@ export class OrderDetailComponent {
     ];
   });
 
+  protected readonly factRows = computed(() => factRows(this.facts()));
+
   private readonly positions = computed(() => orderPositions(this.application()?.data));
 
   protected readonly facts = computed<readonly OrderFact[]>(() => {
@@ -277,7 +280,7 @@ export class OrderDetailComponent {
       .filter((fact) => !hidden.has(fact.label))
       .flatMap((fact) =>
         fact.label === actual && difference
-          ? [fact, { label: t('orders.field.difference'), value: difference }]
+          ? [fact, { label: t('orders.field.difference'), value: difference, mono: true }]
           : [fact],
       );
   });

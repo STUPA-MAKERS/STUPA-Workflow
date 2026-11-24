@@ -16,20 +16,25 @@
         </app-button-group>
       }
       <app-section [heading]="'orders.dialog.details' | t" [hideHeading]="true">
-        <dl appFacts layout="rows">
-          @for (fact of facts(); track fact.label) {
-            <div>
-              <dt>{{ fact.label }}</dt>
-              <dd>
-                @if (fact.href) {
-                  <a [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
-                } @else {
-                  {{ fact.value }}
+        <app-field-group>
+          @for (row of factRows(); track $index) {
+            @if (row.length > 1) {
+              <app-field-pair>
+                @for (fact of row; track fact.label) {
+                  <app-field-row data-testid="od-fact" [label]="fact.label" [mono]="!!fact.mono">{{ fact.value }}</app-field-row>
                 }
-              </dd>
-            </div>
+              </app-field-pair>
+            } @else {
+              <app-field-row data-testid="od-fact" [label]="row[0].label" [mono]="!!row[0].mono">
+                @if (row[0].href) {
+                  <a [href]="row[0].href" target="_blank" rel="noopener noreferrer">{{ row[0].value }}</a>
+                } @else {
+                  {{ row[0].value }}
+                }
+              </app-field-row>
+            }
           }
-        </dl>
+        </app-field-group>
       </app-section>
       @if (covered().length) {
         <app-section [heading]="'orders.field.positions' | t">
