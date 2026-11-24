@@ -582,7 +582,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002766](requirements/functional/integrations/paperless/002766_link-search.md) | The link search finds Paperless documents | approved |
 | [F/integrations/paperless/002767](requirements/functional/integrations/paperless/002767_link-switch.md) | The links to Paperless have their own switch | approved |
 | [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
-| [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | draft |
+| [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | approved |
 | [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
 | [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
 | [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
@@ -608,7 +608,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/ticket-mail/002742](requirements/functional/integrations/ticket-mail/002742_file-to-paperless.md) | The team files an attachment of a ticket in Paperless | approved |
 | [F/integrations/ticket-mail/002743](requirements/functional/integrations/ticket-mail/002743_postfach-audit.md) | A change of a Postfach is in the audit log | approved |
 | [F/integrations/ticket-mail/002812](requirements/functional/integrations/ticket-mail/002812_account-change-needs-password.md) | A change of a mail account needs its password again | approved |
-| [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | draft |
+| [F/integrations/ticket-mail/002814](requirements/functional/integrations/ticket-mail/002814_confirmation-names-number.md) | The confirmation names only the number of the ticket | approved |
 | [F/integrations/ticket-mail/002815](requirements/functional/integrations/ticket-mail/002815_confirmation-cap.md) | A Postfach sends at most 30 confirmations an hour | draft |
 | [F/integrations/ticket-mail/002816](requirements/functional/integrations/ticket-mail/002816_unchecked-sender-marked.md) | A mail message of an unchecked sender is marked | draft |
 | [F/integrations/webhooks/000298](requirements/functional/integrations/webhooks/000298_retry.md) | A failed delivery is retried with backoff | approved |

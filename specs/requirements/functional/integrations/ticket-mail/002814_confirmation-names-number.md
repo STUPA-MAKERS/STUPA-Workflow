@@ -2,7 +2,7 @@
 id: "002814"
 title: The confirmation names only the number of the ticket
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
