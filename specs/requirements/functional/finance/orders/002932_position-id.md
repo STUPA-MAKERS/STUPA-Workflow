@@ -15,9 +15,10 @@ scope:
 
 # Each position of a Kostenaufstellung has a fixed id
 
-Each position of a Kostenaufstellung must have an `id` (UUID). The server must give an id to a
-position that arrives without one and must keep the id of a position through later versions of
-the Antrag. A migration must give an id to each position of each stored version, and the same
+Each position of a Kostenaufstellung must have an `id`. The server must keep an id that arrives
+with a position, because the form gives a new position its id and the files of the position name
+it (001730). The server must give an id to a position that arrives
+without one and must keep the id of a position through later versions of the Antrag. A migration must give an id to each position of each stored version, and the same
 position in two versions of an Antrag must get the same id there. The id must not change the
 diff of two versions.
 

@@ -34,11 +34,18 @@ def test_positions_are_found_by_their_shape() -> None:
 
 
 def test_a_new_antrag_gets_an_id_for_each_position() -> None:
-    data = {"title": "x", "kosten": [_pos("Regal"), _pos("Tisch", id="invented"), "kaputt"]}
+    data = {"title": "x", "kosten": [_pos("Regal"), _pos("Tisch", id=7), "kaputt"]}
     out = with_position_ids(data, {}, _ids())
     assert [row["id"] for row in out["kosten"][:2]] == ["new-1", "new-2"]
     assert out["kosten"][2] == "kaputt"
     assert out["title"] == "x"
+
+
+def test_the_id_that_the_form_gave_a_new_position_stays() -> None:
+    """The files of a position name the id of the form, so the server keeps it."""
+    data = {"kosten": [_pos("Regal", id="p-form-1"), _pos("Tisch", id="x" * 65)]}
+    out = with_position_ids(data, {}, _ids())
+    assert [row["id"] for row in out["kosten"]] == ["p-form-1", "new-1"]
 
 
 def test_a_position_keeps_its_id_through_an_edit() -> None:
