@@ -7,6 +7,7 @@ import { langAttr, resolvedI18nLang, resolveI18n } from './i18n-text';
 import { baseLocale, toFormatLocale } from '@core/i18n/i18n.service';
 import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
+import { isComputedAmount } from './form-rules';
 import { budgetOptionTree } from './budget-options';
 
 /**
@@ -279,7 +280,7 @@ function displayProps(
     case 'markdown':
       return { text: help ?? fieldLabel(f, lang) };
     case 'computed':
-      return { computed: true };
+      return isComputedAmount(f) ? { computed: true, money: true } : { computed: true };
     case 'table':
       return {
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],

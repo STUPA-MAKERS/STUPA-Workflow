@@ -66,6 +66,16 @@ describe('costTotal and promotedAmount', () => {
     expect(promotedAmount([kosten, field('t', 'text')], { kosten: [position(10)], t: '3' })).toBe(10);
   });
 
+  it('takes a computed amount in whole cents from 0 (specs 002840, 002841)', () => {
+    const km = field('km', 'number');
+    const summe = field('summe', 'computed', { isPromoted: true, promoteTarget: 'amount' });
+    expect(promotedAmount([km, summe], { km: 84, summe: 29.400000000000002 })).toBe(29.4);
+    expect(promotedAmount([km, summe], { summe: 29.405 })).toBe(29.41);
+    expect(promotedAmount([km, summe], { summe: -1 })).toBeNull();
+    expect(promotedAmount([km, summe], { summe: '5' })).toBeNull();
+    expect(promotedAmount([field('c', 'computed')], { c: 5 })).toBeNull();
+  });
+
   it('lets a filled-in funding win', () => {
     const funding = field('f', 'funding');
     expect(promotedAmount([kosten, funding], { kosten: [position(10)], f: 4 })).toBe(4);

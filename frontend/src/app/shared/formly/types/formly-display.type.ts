@@ -1,12 +1,15 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { SectionComponent } from '@stupa-makers/ui-kit';
+import { I18nService } from '@core/i18n/i18n.service';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * Formly field type `display` for content that the applicant cannot edit.
  *
  * The content is an info text (`markdown`) or a derived value (`computed`). The field
- * collects no applicant input.
+ * collects no applicant input. A computed amount (`money`) shows as EUR in the language
+ * of the interface (spec 002842).
  */
 @Component({
   selector: 'app-formly-display',
@@ -64,6 +67,8 @@ import { SectionComponent } from '@stupa-makers/ui-kit';
   ],
 })
 export class FormlyDisplayType extends FieldType<FieldTypeConfig> {
+  private readonly i18n = inject(I18nService);
+
   get isComputed(): boolean {
     return Boolean(this.props['computed']);
   }
@@ -76,7 +81,9 @@ export class FormlyDisplayType extends FieldType<FieldTypeConfig> {
   get text(): string {
     if (this.isComputed) {
       const v = this.formControl.value;
-      return v === null || v === undefined || v === '' ? '—' : String(v);
+      if (v === null || v === undefined || v === '') return '—';
+      const money = this.props['money'] ? formatMoney(v, this.i18n.formatLocale()) : '';
+      return money || String(v);
     }
     return (this.props['text'] as string | undefined) ?? '';
   }

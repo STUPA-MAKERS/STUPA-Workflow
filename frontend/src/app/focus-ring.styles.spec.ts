@@ -32,6 +32,9 @@ const SCRIPT_TARGETS: Readonly<Record<string, readonly string[]>> = {
   'vendor/ui-kit/src/lib/side-sheet/side-sheet.component.scss': ['.ss:focus'],
   // The viewer root takes the focus when it has no control; its controls draw `--fv-focus`.
   'vendor/ui-kit/src/lib/file-viewer/file-viewer.component.scss': ['.fv'],
+  // No focus style: the mixin draws the very-high-contrast edge of a glass box as an
+  // outline, and a box without glass (`$hide`) has no edge.
+  'vendor/ui-kit/src/styles/_frosted.scss': ['@if $hide', '@else'],
 };
 
 function scssFiles(dir: string): string[] {

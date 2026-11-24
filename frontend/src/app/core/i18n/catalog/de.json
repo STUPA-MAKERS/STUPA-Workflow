@@ -1927,6 +1927,7 @@
   "admin.form.compute": "Berechnung (JsonLogic)",
   "admin.form.isPII": "Personenbezogen (PII)",
   "admin.form.isPromoted": "In Kennzahl übernehmen",
+  "admin.form.isAmount": "Ist der Antragsbetrag",
   "admin.form.promoteTarget": "Ziel-Kennzahl",
   "admin.form.dupKeys": "Doppelte Feld-Schlüssel: {keys}",
   "admin.form.fundingTwice": "Ein Formular hat höchstens ein Feld „Beantragte Förderung“.",

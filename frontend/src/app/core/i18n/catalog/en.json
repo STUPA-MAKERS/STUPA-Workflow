@@ -1927,6 +1927,7 @@
   "admin.form.compute": "Compute (JsonLogic)",
   "admin.form.isPII": "Personal data (PII)",
   "admin.form.isPromoted": "Promote to metric",
+  "admin.form.isAmount": "Is the application amount",
   "admin.form.promoteTarget": "Target metric",
   "admin.form.dupKeys": "Duplicate field keys: {keys}",
   "admin.form.fundingTwice": "A form has at most one “Requested funding” field.",
