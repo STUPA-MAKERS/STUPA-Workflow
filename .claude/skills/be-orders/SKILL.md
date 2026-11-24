@@ -59,7 +59,8 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   actor. Privacy: `privacy/service.py` calls the three functions of `privacy.py`.
 - MCP: `mcp/antragsplattform_mcp/tools/orders.py` (`order_list`, `order_get`,
   `order_create`, `order_update`, `order_set_status`, `order_delete`, `order_attachments`,
-  `order_attachment_upload`, `order_attachment_delete`).
+  `order_attachment_upload`, `order_attachment_delete`, `order_list_all`,
+  `order_pending_applications`, `order_bookings`, `export_orders_xlsx`).
 
 **Frontend** (`frontend/src/app/pages/orders/`, API in `core/api/orders.service.ts`): the
 page "Bestellungen" at `/orders` (nav entry after Rechnungen, feature `budget`,

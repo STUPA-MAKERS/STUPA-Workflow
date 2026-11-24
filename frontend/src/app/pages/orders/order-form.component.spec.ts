@@ -213,7 +213,7 @@ describe('OrderFormComponent', () => {
   });
 
   it('opens a Bestellung without account and without Antrag', async () => {
-    const { cmp, api } = await setup({ id: 'o-1', first: order({ applicationId: null, buyerId: 'p-9', buyerLabel: null }) });
+    const { cmp, api } = await setup({ id: 'o-1', first: order({ applicationId: undefined, buyerId: 'p-9', buyerLabel: null }) });
     expect(cmp.buyer()).toEqual({ id: 'p-9', name: '' });
     expect(api.list).not.toHaveBeenCalled();
     cmp.save(cmp.value());

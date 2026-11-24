@@ -1,6 +1,6 @@
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
+import { BehaviorSubject, type Observable, Subject, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Application, Transition } from '@core/api/models';
 import { type Order, type OrderList, OrdersApiService } from '@core/api/orders.service';
@@ -44,7 +44,7 @@ async function setup(options: Options = {}) {
     get: jest.fn(() => of(first)),
     list: jest.fn(() => (options.list === null ? broken() : of(options.list ?? LIST))),
     bookings: jest.fn(() => of([{ id: 'b-1', description: 'Beamer bezahlt', amount: '40.00' }, { id: 'b-2', description: null, amount: '10.00' }])),
-    setStatus: jest.fn((_id: string, status: Order['status']) => of({ ...first, status, version: 2 })),
+    setStatus: jest.fn((_id: string, status: Order['status']): Observable<Order> => of({ ...first, status, version: 2 })),
     setInvoice: jest.fn((_id: string, invoiceId: string | null) => of({ ...first, invoiceId, invoiceNumber: invoiceId ? 'R-1' : null, invoiceStatus: invoiceId ? ('open' as const) : null })),
     remove: jest.fn(() => of(undefined)),
     files: jest.fn(() => of([])),
@@ -163,7 +163,7 @@ describe('OrderDetailComponent', () => {
   });
 
   it('shows a Bestellung without Antrag, sum or difference with its plain parts', async () => {
-    const first = order({ applicationId: null, applicationTitle: null, invoiceId: 'i-1', invoiceNumber: 'R-9', invoiceStatus: 'open' });
+    const first = order({ applicationId: undefined, applicationTitle: null, invoiceId: 'i-1', invoiceNumber: 'R-9', invoiceStatus: 'open' });
     const { cmp, api, client } = await setup({ first, permissions: [] });
     expect(api.list).not.toHaveBeenCalled();
     expect(client.getApplication).not.toHaveBeenCalled();
@@ -320,7 +320,7 @@ describe('OrderDetailComponent', () => {
     client.transitions.mockReturnValue(throwError(() => ({ status: 500 })));
     cmp.setStatus('ordered');
     expect(cmp.offered()).toEqual([]);
-    api.setStatus.mockReturnValueOnce(of(order({ applicationId: null, status: 'delivered' })));
+    api.setStatus.mockReturnValueOnce(of(order({ applicationId: undefined, status: 'delivered' })));
     client.transitions.mockClear();
     cmp.setStatus('delivered');
     expect(client.transitions).not.toHaveBeenCalled();

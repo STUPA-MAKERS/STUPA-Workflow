@@ -13,12 +13,14 @@ them to a member who reads the Antrag.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from mcp.server.fastmcp import FastMCP
 
 from .. import schemas as S
 from ..schemas import dump_create, dump_patch
-from ._common import ToolGroup, api
-from .meetings import _attachment_part
+from ._common import ToolGroup, api, params
+from .meetings import _attachment_part, download_to
 
 group = ToolGroup()
 
@@ -153,6 +155,114 @@ async def order_attachment_upload(
 async def order_attachment_delete(order_id: str, attachment_id: str) -> dict:
     """Delete one file of a Bestellung. Requires `order.manage`. Audited."""
     return await api().delete(f"/orders/{order_id}/attachments/{attachment_id}")
+
+
+OrderSegment = Literal["open", "delivered", "done"]
+
+
+def _filter(
+    fiscal_year: str | None,
+    budget: str | None,
+    gremium: str | None,
+    kind: S.OrderKind | None,
+    buyer: str | None,
+    q: str | None,
+) -> dict[str, object]:
+    """The filter of the order list as query parameters, without the empty ones."""
+    return params(
+        fiscalYear=fiscal_year, budget=budget, gremium=gremium, kind=kind, buyer=buyer, q=q
+    )
+
+
+@group.tool
+async def order_list_all(
+    segment: OrderSegment | None = None,
+    fiscal_year: str | None = None,
+    budget: str | None = None,
+    gremium: str | None = None,
+    kind: S.OrderKind | None = None,
+    buyer: str | None = None,
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict:
+    """List the Bestellungen of every Antrag that the caller reads, the newest change first.
+
+    Requires `order.manage` or `budget.view`. `segment` is `open` (planned or ordered),
+    `delivered` (delivered and not fully booked) or `done`. `fiscal_year`, `budget`
+    (a Kostenstelle with its subtree), `gremium` and `buyer` are ids. `q` searches the
+    number, the title, the supplier and the order number of the supplier. The answer is
+    a page: `items` (as in `order_list`, with `applicationId` and `applicationTitle`),
+    `total`, `limit`, `offset`.
+    """
+    return await api().get(
+        "/orders",
+        params={
+            **params(segment=segment, limit=limit, offset=offset),
+            **_filter(fiscal_year, budget, gremium, kind, buyer, q),
+        },
+    )
+
+
+@group.tool
+async def order_pending_applications(
+    fiscal_year: str | None = None,
+    budget: str | None = None,
+    gremium: str | None = None,
+    q: str | None = None,
+    with_orders: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict:
+    """List the approved Anträge of a type with money that have no Bestellung.
+
+    Requires `order.manage` or `budget.view`. A cancelled Bestellung does not count.
+    `with_orders` lists the Anträge that have a Bestellung too: each Antrag that can
+    take a new one. Each item has `id`, `title`, `gremiumId`, `gremiumName` and
+    `approvedAmount`. The platform never creates a Bestellung for them.
+    """
+    return await api().get(
+        "/orders/pending-applications",
+        params={
+            **params(limit=limit, offset=offset, withOrders=True if with_orders else None),
+            **_filter(fiscal_year, budget, gremium, None, None, q),
+        },
+    )
+
+
+@group.tool
+async def order_bookings(order_id: str) -> dict:
+    """List the bookings that name a Bestellung: `id`, `description` and `amount`.
+
+    Requires a read permission of the budget and the read of the Antrag.
+    """
+    return await api().get(f"/orders/{order_id}/bookings")
+
+
+@group.tool
+async def export_orders_xlsx(
+    target_path: str,
+    segment: OrderSegment | None = None,
+    fiscal_year: str | None = None,
+    budget: str | None = None,
+    gremium: str | None = None,
+    kind: S.OrderKind | None = None,
+    buyer: str | None = None,
+    q: str | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Export the order list as `.xlsx` to a local file. Requires `order.manage`.
+
+    The filters work as in `order_list_all`.
+    """
+    return await download_to(
+        "GET",
+        "/orders/export.xlsx",
+        target_path,
+        overwrite=overwrite,
+        fallback="bestellungen.xlsx",
+        query={**params(segment=segment), **_filter(fiscal_year, budget, gremium, kind, buyer, q)},
+    )
 
 
 def register(mcp: FastMCP) -> None:

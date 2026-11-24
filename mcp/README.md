@@ -115,7 +115,8 @@ Links between any two elements (spec 001409): `link_list`, `link_add`, `link_rem
 `link_targets`, `link_view`.
 Bestellungen of an Antrag (writes need `order.manage`): `order_list`, `order_get`,
 `order_create`, `order_update`, `order_set_status`, `order_delete`, `order_set_invoice`,
-`invoice_orders`, `order_attachments`, `order_attachment_upload`, `order_attachment_delete`.
+`invoice_orders`, `order_attachments`, `order_attachment_upload`, `order_attachment_delete`,
+`order_list_all`, `order_pending_applications`, `order_bookings`, `export_orders_xlsx`.
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
 `gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `notify_gremium_members`,
 `calendar_entries`, `create_appointment`, `answer_appointment`.

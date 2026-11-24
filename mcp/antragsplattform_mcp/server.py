@@ -121,6 +121,9 @@ TYPICAL FLOWS:
   `order_update` (needs `version`), `order_set_status`, `order_delete`,
   `order_set_invoice` (the invoice of a Bestellung), `invoice_orders`, and the files of
   a Bestellung `order_attachments`, `order_attachment_upload`, `order_attachment_delete`.
+  The list of every Antrag: `order_list_all` (segment and filters),
+  `order_pending_applications` (approved Anträge without a Bestellung), `order_bookings`
+  and `export_orders_xlsx`.
   Only a person creates a Bestellung, for an approved Antrag of a type with money. A
   write needs `order.manage`.
 - Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,

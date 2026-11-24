@@ -55,6 +55,42 @@ def test_order_invoice_tools_set_remove_and_list(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_order_list_tools_send_the_filter(fake_api: _FakeApi) -> None:
+    """§F/finance/orders/002883, 002934: the list, the waiting Anträge and the bookings."""
+    asyncio.run(orders.order_list_all(segment="open", gremium="g1", q="Beamer", limit=50))
+    asyncio.run(orders.order_list_all())
+    asyncio.run(orders.order_pending_applications(budget="b1", with_orders=True))
+    asyncio.run(orders.order_pending_applications())
+    asyncio.run(orders.order_bookings("o1"))
+    assert fake_api.calls == [
+        ("GET", "/orders", {"segment": "open", "limit": 50, "gremium": "g1", "q": "Beamer"}),
+        ("GET", "/orders", {}),
+        ("GET", "/orders/pending-applications", {"withOrders": True, "budget": "b1"}),
+        ("GET", "/orders/pending-applications", {}),
+        ("GET", "/orders/o1/bookings", None),
+    ]
+
+
+def test_export_orders_passes_the_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§F/finance/orders/002886: the export takes the filter of the list."""
+    seen: dict[str, object] = {}
+
+    async def fake_download(method: str, path: str, target: str, **kw: object) -> dict:
+        seen.update(method=method, path=path, target=target, **kw)
+        return {}
+
+    monkeypatch.setattr(orders, "download_to", fake_download)
+    asyncio.run(orders.export_orders_xlsx("/tmp/x.xlsx", segment="done", kind="outlay"))
+    assert seen == {
+        "method": "GET",
+        "path": "/orders/export.xlsx",
+        "target": "/tmp/x.xlsx",
+        "overwrite": False,
+        "fallback": "bestellungen.xlsx",
+        "query": {"segment": "done", "kind": "outlay"},
+    }
+
+
 def test_order_file_tools_list_upload_and_delete(fake_api: _FakeApi, tmp_path: Path) -> None:
     """A Bestellung has files of its own: list, upload from a local file, delete."""
     pdf = tmp_path / "Rechnung.pdf"
