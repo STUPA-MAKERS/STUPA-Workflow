@@ -3841,6 +3841,7 @@
   "tickets.event.todoDoneHidden": "{actor} completed a to-do",
   "tickets.event.mailAuto": "Automatic reply from {name}: {subject}",
   "tickets.mail.skipped": "Not imported: {files}",
+  "tickets.mail.unchecked": "Sender not checked",
   "tickets.mail.skippedSize": "{name} ({size}, too large)",
   "tickets.mail.skippedType": "{name} ({size}, file type not allowed)",
   "tickets.mail.toCc": "{to} (Cc: {cc})",
