@@ -20,6 +20,7 @@ from sqlalchemy import Engine, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
+from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.application_types.models import ApplicationType
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationCreate
@@ -32,7 +33,9 @@ from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.orders.models import PurchaseOrder
+from app.modules.orders.privacy import clear_buyer_names
 from app.modules.orders.router import get_order_files
+from app.modules.privacy.service import AuskunftService, PrincipalService
 from app.settings import Settings
 from app.shared.errors import ConflictError
 from tests._support.guest_apps import GuestSeed, build_api, guest_settings, seed_guest_flow
@@ -527,3 +530,55 @@ async def test_a_bestellung_has_files_of_its_own(
         assert await session.scalar(select(func.count()).select_from(Attachment)) == 0
     assert len(await _audit(maker, "attachment_upload")) == 2
     assert len(await _audit(maker, "attachment_delete")) == 2
+
+
+async def test_the_buyer_follows_the_privacy_rules(
+    migrated: tuple[str, str],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    maker: async_sessionmaker[AsyncSession],
+    seed: GuestSeed,
+) -> None:
+    """§ 002892: export, merge and erasure of the buyer; the anonymized Antrag keeps its rows."""
+    api = _client(migrated, settings, monkeypatch, _MANAGER)
+    app_id = await _antrag(maker, seed)
+    async with maker() as session:
+        old = PrincipalRow(sub="anna-old", display_name="Anna", email="anna@example.org")
+        new = PrincipalRow(sub="anna-new", display_name="Anna B.", email="anna.b@example.org")
+        session.add_all([old, new, PrincipalRow(sub="merge-admin", display_name="Admin")])
+        await session.commit()
+    base = f"/api/applications/{app_id}/orders"
+    bought = api.post(
+        base, json={"title": "Regal", "kind": "outlay", "buyerId": str(old.id)}
+    ).json()
+    typed = api.post(
+        base, json={"title": "Drucker", "kind": "outlay", "buyerName": "Ben Typed"}
+    ).json()
+
+    async with maker() as session:
+        assert (await AuskunftService(session).collect("nobody@example.org"))["orders"] == []
+        exported = (await AuskunftService(session).collect("anna@example.org"))["orders"]
+    assert [(o["number"], o["title"], o["kind"]) for o in exported] == [
+        (bought["number"], "Regal", "outlay")
+    ]
+
+    async with maker() as session:
+        await PrincipalMergeService(session).merge(old.id, new.id, actor="merge-admin")
+    assert api.get(f"/api/orders/{bought['id']}").json()["buyerId"] == str(new.id)
+    async with maker() as session:
+        assert len((await AuskunftService(session).collect("anna.b@example.org"))["orders"]) == 1
+
+    async with maker() as session:
+        await PrincipalService(session).erase(new.id, actor="merge-admin")
+    assert api.get(f"/api/orders/{bought['id']}").json()["buyerId"] is None
+
+    async with maker() as session:
+        await ApplicationsService(session).anonymize(app_id, commit=False)
+        await clear_buyer_names(session, app_id)
+        await session.commit()
+    listed = api.get(base).json()["items"]
+    assert [(o["title"], o["buyerId"], o["buyerName"]) for o in listed] == [
+        ("Regal", None, None),
+        ("Drucker", None, None),
+    ]
+    assert typed["buyerName"] == "Ben Typed"

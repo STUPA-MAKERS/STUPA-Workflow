@@ -158,6 +158,11 @@
     {
       "count": 1,
       "from": "admin",
+      "to": "orders"
+    },
+    {
+      "count": 1,
+      "from": "admin",
       "to": "paperless"
     },
     {
@@ -1244,6 +1249,11 @@
       "count": 7,
       "from": "privacy",
       "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "privacy",
+      "to": "orders"
     },
     {
       "count": 3,

@@ -99,9 +99,6 @@ class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
         CheckConstraint(f"status IN ({_in(ORDER_STATUSES)})", name="status"),
         CheckConstraint("planned_amount IS NULL OR planned_amount >= 0", name="planned_amount"),
         CheckConstraint("actual_amount IS NULL OR actual_amount >= 0", name="actual_amount"),
-        CheckConstraint(
-            "kind <> 'outlay' OR buyer_id IS NOT NULL OR buyer_name IS NOT NULL", name="buyer"
-        ),
         Index("ix_purchase_order_application_id", "application_id"),
         Index("ix_purchase_order_invoice_id", "invoice_id"),
     )

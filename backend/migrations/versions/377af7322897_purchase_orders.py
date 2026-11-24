@@ -62,8 +62,6 @@ _UPGRADE: tuple[str, ...] = (
             CHECK (planned_amount IS NULL OR planned_amount >= 0),
         CONSTRAINT ck_purchase_order_actual_amount
             CHECK (actual_amount IS NULL OR actual_amount >= 0),
-        CONSTRAINT ck_purchase_order_buyer
-            CHECK (kind <> 'outlay' OR buyer_id IS NOT NULL OR buyer_name IS NOT NULL),
         CONSTRAINT uq_purchase_order_number UNIQUE (number),
         CONSTRAINT fk_purchase_order_application_id_application
             FOREIGN KEY(application_id)
