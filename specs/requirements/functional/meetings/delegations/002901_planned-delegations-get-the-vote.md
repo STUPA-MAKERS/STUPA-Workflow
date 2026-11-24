@@ -2,7 +2,7 @@
 id: "002901"
 title: Delegations of planned meetings get the voting right
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

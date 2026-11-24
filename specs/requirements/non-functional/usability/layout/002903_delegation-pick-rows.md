@@ -2,7 +2,7 @@
 id: "002903"
 title: The delegation dialogs use the pick rows
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

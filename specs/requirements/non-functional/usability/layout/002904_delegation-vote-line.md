@@ -2,7 +2,7 @@
 id: "002904"
 title: The delegation dialog says that the vote moves
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:

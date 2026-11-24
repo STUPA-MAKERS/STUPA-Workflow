@@ -2,7 +2,7 @@
 id: "002902"
 title: The delegation dialogs pin the search
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
