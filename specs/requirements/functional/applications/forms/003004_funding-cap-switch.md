@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
   - "backend/tests/unit/modules/forms/test_forms_validation.py:test_funding_cap_setting"
-  - "frontend/src/app/shared/forms/formly-mapper.spec.ts:funding cap"
+  - "frontend/src/app/shared/forms/formly-mapper.spec.ts:capAtCost"
 implementation:
   - backend/app/shared/config_schemas.py
   - backend/app/modules/forms/validation.py

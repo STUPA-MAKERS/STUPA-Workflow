@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:position files"
+  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:positionFiles"
 implementation:
   - backend/app/shared/config_schemas.py
   - frontend/src/app/shared/formly/types/formly-positions.type.ts

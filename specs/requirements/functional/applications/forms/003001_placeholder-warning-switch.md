@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:placeholder"
+  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:placeholderWarning"
 implementation:
   - backend/app/shared/config_schemas.py
   - frontend/src/app/shared/formly/types/formly-positions.type.ts

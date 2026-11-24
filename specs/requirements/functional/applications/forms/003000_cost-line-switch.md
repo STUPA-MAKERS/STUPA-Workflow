@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:cost line"
+  - "frontend/src/app/shared/formly/types/formly-positions.type.spec.ts:costLine"
   - "backend/tests/unit/modules/forms/test_forms_validation.py:test_cost_line_setting"
 implementation:
   - backend/app/shared/config_schemas.py

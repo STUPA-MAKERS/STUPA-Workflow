@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 tests:
-  - "frontend/src/app/features/apply/apply-wizard.component.spec.ts:file reminder"
+  - "frontend/src/app/features/apply/apply-wizard.component.spec.ts:fileReminder"
 implementation:
   - backend/app/shared/config_schemas.py
   - frontend/src/app/features/apply/apply-wizard.component.ts
