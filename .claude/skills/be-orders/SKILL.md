@@ -71,7 +71,7 @@ page of its own; the Antrag detail has no section and no dialog for it.
   "Erledigt" = `GET /orders?segment=`), no counts; chips Haushaltsjahr, Kostenstelle,
   Gremium, Art, "Meine Käufe"; search and chips live in the URL; "Bestellung anlegen" is a
   head action (a FAB would float over the pane), the XLSX export is in the ⋮ menu. A row of
-  "Ohne Bestellung" opens the form for its Antrag (`order.manage`), else the Antrag.
+  "Ohne Bestellung" opens its Antrag and has the row action "Bestellung anlegen" (`order.manage`).
 - Child routes: `''` (kit `ListNoneComponent`), `new` and `:id/edit` (`order-form`,
   `order.manage`, guard `leaveUnsaved`), `:id` (`order-detail`). The guard `orderAddress`
   leads `/orders?id=<id>` and `/orders?new=order&application=<id>` to the child address.

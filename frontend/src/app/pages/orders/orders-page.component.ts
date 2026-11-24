@@ -67,8 +67,8 @@ export function orderQuery(query: ListQuery): OrderQuery {
  * step of the work. No segment shows a count. The other chips filter by Haushaltsjahr,
  * Kostenstelle, Gremium, kind and the own purchases, and the search reads the number, the
  * Bezeichnung, the Händler and the Bestellnummer. The search and the chips live in the
- * URL. A row opens its Bestellung in the pane; a row of "Ohne Bestellung" opens the form
- * of a new Bestellung for its Antrag, or the Antrag for a person without `order.manage`.
+ * URL. A row opens its Bestellung in the pane; a row of "Ohne Bestellung" opens its Antrag
+ * and has the action "Bestellung anlegen" for a person with `order.manage`.
  */
 @Component({
   selector: 'app-orders-page',
@@ -263,7 +263,6 @@ export class OrdersPageComponent {
     return {
       id: order.id,
       title: order.title,
-      icon: 'package',
       meta: [order.applicationTitle, order.supplier].filter((part): part is string => !!part),
       status: {
         label: this.i18n.translate(ORDER_STATUS_LABEL[order.status]),
@@ -278,12 +277,19 @@ export class OrdersPageComponent {
     return {
       id: application.id,
       title: application.title || this.i18n.translate('applications.list.untitled'),
-      icon: 'file',
       meta: application.gremiumName ? [application.gremiumName] : [],
       trailing: this.money(application.approvedAmount) || undefined,
-      link: this.canManage()
-        ? { commands: ['/orders', 'new'], query: { application: application.id } }
-        : { commands: ['/applications', application.id] },
+      link: { commands: ['/applications', application.id] },
+      actions: this.canManage()
+        ? [
+            {
+              key: 'order',
+              label: this.i18n.translate('orders.dialog.create'),
+              icon: 'plus',
+              route: { commands: ['/orders', 'new'], query: { application: application.id } },
+            },
+          ]
+        : undefined,
     };
   }
 }

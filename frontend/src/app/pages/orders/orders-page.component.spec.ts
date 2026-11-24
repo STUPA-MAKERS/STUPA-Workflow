@@ -109,7 +109,6 @@ describe('OrdersPageComponent', () => {
     expect(data[0]).toMatchObject({
       id: 'o-1',
       title: 'Beamer',
-      icon: 'package',
       meta: ['Technik für den Sitzungssaal', 'Technikhaus'],
       status: { label: 'Geplant', kind: 'neutral' },
       link: { commands: ['/orders', 'o-1'] },
@@ -122,7 +121,7 @@ describe('OrdersPageComponent', () => {
   });
 
   /** §F/finance/orders/002934: "Ohne Bestellung" lists the Anträge that wait for a purchase. */
-  it('lists the Anträge without a Bestellung and opens the form for a person with order.manage', async () => {
+  it('lists the Anträge without a Bestellung and gives the action "Bestellung anlegen" to a person with order.manage', async () => {
     const { cmp, api, rows } = await setup();
     cmp.onQuery(query({ segment: 'pending', gremium: 'g-1' }));
     expect(api.pending).toHaveBeenLastCalledWith({
@@ -136,9 +135,11 @@ describe('OrdersPageComponent', () => {
     expect(data[0]).toMatchObject({
       id: 'a-1',
       title: 'Technik',
-      icon: 'file',
       meta: ['StuPa'],
-      link: { commands: ['/orders', 'new'], query: { application: 'a-1' } },
+      link: { commands: ['/applications', 'a-1'] },
+      actions: [
+        { key: 'order', label: 'Bestellung anlegen', route: { commands: ['/orders', 'new'], query: { application: 'a-1' } } },
+      ],
     });
     expect(data[0].trailing).toMatch(/^500,00\s€$/);
     expect(data[1]).toMatchObject({ title: 'Ohne Titel', meta: [], trailing: undefined });
@@ -149,6 +150,7 @@ describe('OrdersPageComponent', () => {
     cmp.onQuery(query({ segment: 'pending' }));
     const state = rows();
     expect(state.state === 'ready' && state.data[0].link).toEqual({ commands: ['/applications', 'a-1'] });
+    expect(state.state === 'ready' && state.data[0].actions).toBeUndefined();
     expect(cmp.actions()).toEqual([]);
   });
 
