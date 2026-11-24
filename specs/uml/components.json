@@ -1071,6 +1071,11 @@
       "to": "site_config"
     },
     {
+      "count": 1,
+      "from": "orders",
+      "to": "shared"
+    },
+    {
       "count": 4,
       "from": "paperless",
       "to": "audit"
@@ -1778,6 +1783,12 @@
       "layer": 5,
       "name": "notifications",
       "path": "backend/app/modules/notifications"
+    },
+    {
+      "id": "orders",
+      "layer": 0,
+      "name": "orders",
+      "path": "backend/app/modules/orders"
     },
     {
       "id": "paperless",
