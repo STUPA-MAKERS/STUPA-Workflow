@@ -10,7 +10,7 @@ tests:
   - "typst/tests/test_document.py:test_the_header_names_the_kind_the_place_and_the_form"
 implementation:
   - backend/app/modules/protocol/markdown.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
   - typst/typst_service/document.py
 scope:
   - backend/app/modules/protocol

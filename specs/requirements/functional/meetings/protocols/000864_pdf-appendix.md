@@ -13,7 +13,7 @@ implementation:
   - typst/typst_service/appendix.py
   - typst/typst_service/document.py
   - typst/template/protocol.typ
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/render.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/media

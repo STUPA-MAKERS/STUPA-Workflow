@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/protocol/markdown.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
 scope:
   - backend/app/modules/protocol
 ---

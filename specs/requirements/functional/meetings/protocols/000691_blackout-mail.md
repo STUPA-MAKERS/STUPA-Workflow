@@ -8,7 +8,7 @@ updated: 2026-11-11
 tests:
   - "backend/tests/integration/modules/protocol/test_protocol_blackout.py:test_finalize_with_a_mark_mails_the_public_pdf"
 implementation:
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/finalize.py
 scope:
   - backend/app/modules/protocol
   - backend/worker/protocol.py

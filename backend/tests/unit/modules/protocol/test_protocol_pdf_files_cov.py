@@ -694,7 +694,7 @@ async def test_embed_vote_title_for_application_reference() -> None:
 
 
 def test_vote_title_generic_question_fallbacks() -> None:
-    from app.modules.protocol.service import _vote_title
+    from app.modules.protocol.service.snippets import _vote_title
 
     assert _vote_title(None, "Frage?") == "Frage?"
     assert _vote_title(None, "   ") == "Beschlussfrage"

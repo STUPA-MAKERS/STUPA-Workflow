@@ -11,7 +11,8 @@ tests:
 implementation:
   - backend/app/shared/blackout.py
   - backend/app/modules/protocol/public.py
-  - backend/app/modules/protocol/service.py
+  - backend/app/modules/protocol/service/document.py
+  - backend/app/modules/protocol/service/render.py
 scope:
   - backend/app/modules/protocol
   - backend/app/modules/media
