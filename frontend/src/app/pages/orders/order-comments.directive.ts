@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Directive, computed, effect, inject, input, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { ApplicationComment, Uuid } from '@core/api/models';
@@ -6,7 +6,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { actorLabel } from '@shared/actor-label.util';
 import {
-  ChatComponent,
   ChatOutbox,
   appendOnce,
   chatPeople,
@@ -30,58 +29,36 @@ const VISIBILITY_GUARD: ChatVisibilityGuard = {
 };
 
 /**
- * The comments of the Antrag of a Bestellung, in the detail of the Bestellung.
+ * The comments of the Antrag of a Bestellung, on the chat in the detail of the Bestellung.
  *
  * A Bestellung has no comments of its own, because the people talk about a purchase
  * where they talk about the Antrag. A comment written here is a comment of the Antrag:
  * the read, the write and the visibility follow the rules of the Antrag, so the switch
- * to an internal comment shows only with `application.manage`.
+ * to an internal comment shows only with `application.manage`. It is a directive on the
+ * chat and not a component around it, because the sheet of the detail sizes the chat
+ * itself, as in the Antrag.
  */
-@Component({
-  selector: 'app-order-comments',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ChatComponent],
-  template: `
-    <app-chat
-      [loading]="loading()"
-      [draftKey]="'application.' + applicationId()"
-      [messages]="messages()"
-      [visibilityOptions]="visibilities()"
-      [visibilityGuard]="guard"
-      [canAttach]="true"
-      [mentionables]="mentionables()"
-      [publicMentions]="false"
-      placeholder="applications.comments.placeholder"
-      (send)="send($event)"
-      (retry)="outbox.retry($event.id)"
-      (discard)="outbox.discard($event.id)"
-      (edit)="edit($event)"
-      (delete)="remove($event)"
-      (refresh)="refresh()"
-    />
-  `,
-})
-export class OrderCommentsComponent {
+@Directive({ selector: 'app-chat[appOrderComments]', standalone: true, exportAs: 'orderComments' })
+export class OrderCommentsDirective {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly apiBase = inject(API_BASE_URL);
 
-  readonly applicationId = input.required<Uuid>();
+  readonly applicationId = input.required<Uuid>({ alias: 'appOrderComments' });
 
-  protected readonly guard = VISIBILITY_GUARD;
-  protected readonly loading = signal(true);
-  protected readonly mentionables = signal<readonly ChatPerson[]>([]);
+  readonly guard = VISIBILITY_GUARD;
+  readonly loading = signal(true);
+  readonly mentionables = signal<readonly ChatPerson[]>([]);
   private readonly comments = signal<readonly ApplicationComment[]>([]);
   private readonly canManage = computed(() => this.auth.can('application.manage'));
 
-  protected readonly visibilities = computed<readonly ChatVisibility[]>(() =>
+  readonly visibilities = computed<readonly ChatVisibility[]>(() =>
     this.canManage() ? ['internal', 'public'] : [],
   );
 
-  protected readonly outbox = new ChatOutbox<ApplicationComment>(
+  readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) =>
       this.api.addComment(this.applicationId(), req.body, req.visibility ?? 'public', req, req.mentions),
     (created) => this.comments.update((list) => appendOnce(list, created)),
@@ -89,7 +66,7 @@ export class OrderCommentsComponent {
     draftDropper(this.api),
   );
 
-  protected readonly messages = computed<readonly ChatMessage[]>(() => [
+  readonly messages = computed<readonly ChatMessage[]>(() => [
     ...this.comments().map((c) => this.message(c)),
     ...this.outbox.messages(),
   ]);
@@ -115,11 +92,11 @@ export class OrderCommentsComponent {
   }
 
   /** Without `application.manage` the composer has no switch, so the comment is public. */
-  protected send(req: ChatSend): void {
+  send(req: ChatSend): void {
     this.outbox.send(this.canManage() ? { ...req } : withoutKey(req, 'visibility'));
   }
 
-  protected edit(change: ChatEdit): void {
+  edit(change: ChatEdit): void {
     this.api.updateComment(this.applicationId(), change.id, change.body, change.mentions).subscribe({
       next: (updated) =>
         this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c))),
@@ -130,7 +107,7 @@ export class OrderCommentsComponent {
     });
   }
 
-  protected remove(ref: ChatRef): void {
+  remove(ref: ChatRef): void {
     this.api.deleteComment(this.applicationId(), ref.id).subscribe({
       next: () => this.comments.update((list) => list.filter((c) => c.id !== ref.id)),
       error: () => this.toast.show(this.i18n.translate('applications.comments.error'), 'error'),
@@ -138,7 +115,7 @@ export class OrderCommentsComponent {
   }
 
   /** Read again for the scan states of the files; a failure keeps the thread. */
-  protected refresh(): void {
+  refresh(): void {
     this.api.comments(this.applicationId(), { quiet: true }).subscribe({
       next: (fresh) => this.comments.update((list) => withScanStates(list, fresh)),
       error: () => undefined,

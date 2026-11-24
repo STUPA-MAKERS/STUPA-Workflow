@@ -2,7 +2,7 @@
   [head]="head()"
   [state]="state()"
   [actions]="actions()"
-  [comments]="order()?.applicationId ? { open: commentsOpen, label: 'applications.comments.title' | t } : null"
+  [comments]="order()?.applicationId ? { open: false, beside: false, label: 'applications.comments.title' | t } : null"
   (action)="onAction($event.key)"
 >
   <ng-template screenBody>
@@ -64,7 +64,25 @@
   </ng-template>
   <ng-template screenComments>
     @if (order()?.applicationId; as applicationId) {
-      <app-order-comments [applicationId]="applicationId" />
+      <app-chat
+        #thread="orderComments"
+        [appOrderComments]="applicationId"
+        [loading]="thread.loading()"
+        [draftKey]="'application.' + applicationId"
+        [messages]="thread.messages()"
+        [visibilityOptions]="thread.visibilities()"
+        [visibilityGuard]="thread.guard"
+        [canAttach]="true"
+        [mentionables]="thread.mentionables()"
+        [publicMentions]="false"
+        placeholder="applications.comments.placeholder"
+        (send)="thread.send($event)"
+        (retry)="thread.outbox.retry($event.id)"
+        (discard)="thread.outbox.discard($event.id)"
+        (edit)="thread.edit($event)"
+        (delete)="thread.remove($event)"
+        (refresh)="thread.refresh()"
+      />
     }
   </ng-template>
 </app-detail-screen>

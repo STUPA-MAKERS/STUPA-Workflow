@@ -50,7 +50,8 @@ import {
 import { pageItemTitle } from '../../layout/page-title.service';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import { BudgetTreeApi, type Invoice } from '../budget/budget-tree.api';
-import { OrderCommentsComponent } from './order-comments.component';
+import { ChatComponent } from '@shared/ui';
+import { OrderCommentsDirective } from './order-comments.directive';
 import { OrderFilesComponent } from './order-files.component';
 import { OrdersRefresh } from './orders-refresh';
 import {
@@ -122,7 +123,8 @@ const HEAD_FACTS: readonly TranslationKey[] = [
     FieldGroupComponent,
     FieldRowComponent,
     NoteComponent,
-    OrderCommentsComponent,
+    OrderCommentsDirective,
+    ChatComponent,
     OrderFilesComponent,
     ScreenBodyDirective,
     ScreenCommentsDirective,
@@ -157,9 +159,6 @@ export class OrderDetailComponent {
   /** The transitions of the Antrag that the last status change offers. */
   protected readonly offered = signal<readonly Transition[]>([]);
   private id = '';
-  /** The comments start open where the window has room for them beside the detail. */
-  protected readonly commentsOpen =
-    typeof matchMedia === 'function' && matchMedia('(min-width: 1280px)').matches;
 
   protected readonly invoiceSearch = liveSearch<readonly Invoice[]>({
     run: (q) => {

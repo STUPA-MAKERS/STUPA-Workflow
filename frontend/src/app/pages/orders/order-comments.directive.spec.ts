@@ -1,10 +1,12 @@
+import { By } from '@angular/platform-browser';
 import { render } from '@testing-library/angular';
 import { Subject, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import type { ApplicationComment } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { OrderCommentsComponent } from './order-comments.component';
+import { ChatComponent } from '@shared/ui';
+import { OrderCommentsDirective } from './order-comments.directive';
 
 const comment = (over: Partial<ApplicationComment> = {}): ApplicationComment => ({
   id: 'c-1',
@@ -38,20 +40,21 @@ async function setup(manage = true) {
     deleteComment: jest.fn(() => of(undefined)),
     deleteDraftAttachment: jest.fn(() => of(undefined)),
   };
-  const view = await render(OrderCommentsComponent, {
-    inputs: { applicationId: 'a-1' },
+  const view = await render('<app-chat [appOrderComments]="id" draftKey="application.a-1" />', {
+    imports: [ChatComponent, OrderCommentsDirective],
+    componentProperties: { id: 'a-1' },
     providers: [
       { provide: ApiClient, useValue: api },
       { provide: AuthService, useValue: { can: () => manage } },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cmp = view.fixture.componentInstance as any;
+  const cmp = view.fixture.debugElement.query(By.directive(OrderCommentsDirective)).injector.get(OrderCommentsDirective) as any;
   const toast = jest.spyOn(view.fixture.debugElement.injector.get(ToastService), 'show');
   return { ...view, cmp, api, toast };
 }
 
-describe('OrderCommentsComponent', () => {
+describe('OrderCommentsDirective', () => {
   afterEach(() => localStorage.clear());
 
   /** §F/finance/orders/002935: the comments of the detail are the comments of the Antrag. */
@@ -127,16 +130,14 @@ describe('OrderCommentsComponent', () => {
   });
 
   it('shows an empty thread when the reads fail, and drops the answer of an older Antrag', async () => {
-    const { cmp, api, fixture } = await setup();
+    const { cmp, api, rerender } = await setup();
     const slow = new Subject<ApplicationComment[]>();
     api.comments.mockReturnValueOnce(slow as never);
-    fixture.componentRef.setInput('applicationId', 'a-2');
-    fixture.detectChanges();
+    await rerender({ componentProperties: { id: 'a-2' } });
     expect(cmp.loading()).toBe(true);
     api.comments.mockReturnValueOnce(throwError(() => ({ status: 500 })));
     api.mentionable.mockReturnValueOnce(throwError(() => ({ status: 500 })));
-    fixture.componentRef.setInput('applicationId', 'a-3');
-    fixture.detectChanges();
+    await rerender({ componentProperties: { id: 'a-3' } });
     slow.next([comment()]);
     expect(cmp.loading()).toBe(false);
     expect(cmp.messages()).toEqual([]);

@@ -80,7 +80,7 @@ page of its own; the Antrag detail has no section and no dialog for it.
   signed "Abweichung", the covered positions, the sum of the Antrag with the warning,
   `order-files`, "Verknüpft" (`app-todo-linked-list kind="order"`, built-in rows Antrag,
   invoice, bookings from `GET /orders/{id}/bookings`) and the comments of the Antrag
-  (`order-comments`, posts to the comment routes of the Antrag). After "Bestellt" or
+  (the directive `order-comments` on `app-chat`, in the sheet of the detail as in the Antrag, posts to the comment routes of the Antrag). After "Bestellt" or
   "Geliefert" it asks `GET /applications/{id}/transitions?orderStatus=` and offers the
   transitions in a dialog; nothing fires by itself.
 - `order-form` — kit `app-form-screen`. A new Bestellung takes the Antrag from

@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
-  - frontend/src/app/pages/orders/order-comments.component.ts
+  - frontend/src/app/pages/orders/order-comments.directive.ts
 scope:
   - frontend/src/app/pages/applications
   - backend/app/modules/applications
