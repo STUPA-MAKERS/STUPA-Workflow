@@ -399,3 +399,65 @@ async def test_the_pdf_carries_the_export_logo(monkeypatch: pytest.MonkeyPatch) 
         ),
         (None, {"logos": [], "footer_logos": [], "footer_graphic": ""}, None),
     ]
+
+
+def test_computed_values_show_in_their_format() -> None:
+    """Spec 002964: percent and money in the PDF, the stored value wins."""
+    offer = {"label": "A", "value": 1200, "preferred": True}
+    sections = (
+        FormSection(
+            "Finanzen",
+            (
+                _field(key="kosten", type="positions", label={"de": "Kosten"}),
+                _field(key="foerderhoehe", type="funding", label={"de": "Förderhöhe"}),
+                _field(
+                    key="quote",
+                    type="computed",
+                    label={"de": "Förderquote"},
+                    compute={"/": [{"var": "foerderhoehe"}, {"var": "costTotal"}]},
+                    format="percent",
+                ),
+                _field(
+                    key="eigen",
+                    type="computed",
+                    label={"de": "Eigenanteil"},
+                    compute={"-": [{"var": "costTotal"}, {"var": "foerderhoehe"}]},
+                    format="money",
+                ),
+                _field(
+                    key="leer",
+                    type="computed",
+                    label={"de": "Leer"},
+                    compute={"/": [1, {"var": "nichts"}]},
+                    format="percent",
+                ),
+                _field(
+                    key="ganz",
+                    type="computed",
+                    label={"de": "Ganz"},
+                    compute={"/": [1, 2]},
+                    format="percent",
+                ),
+            ),
+        ),
+    )
+    data: dict[str, object] = {
+        "kosten": [{"label": "Bus", "offers": [offer]}],
+        "foerderhoehe": 1000,
+        "eigen": 200.0,
+    }
+    md = build_application_document(_doc(sections=sections, data=data, decision=None))
+    assert row("Förderquote", "`83,3 %`") in md
+    assert row("Eigenanteil", "`200,00 €`") in md
+    assert row("Ganz", "`50 %`") in md
+    assert "Leer" not in md
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [(0.8333, "83,3 %"), (1, "100 %"), (-0.0001, "0 %"), ("x", None), (True, None)],
+)
+def test_percent_text(value: object, text: str | None) -> None:
+    from app.modules.documents.application_markdown import _percent
+
+    assert _percent(value) == text

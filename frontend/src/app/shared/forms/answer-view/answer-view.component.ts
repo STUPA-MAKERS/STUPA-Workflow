@@ -4,11 +4,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format';
 import { langAttr, resolvedI18nLang, resolveI18n } from '../i18n-text';
-import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
+import { isFieldVisible } from '../jsonlogic';
 import {
   PositionsViewComponent,
   type PositionFile,
 } from '../positions-view/positions-view.component';
+import { computedFormat, computeValues } from '../form-rules';
 import { runs } from '@shared/util/immutable';
 import { FieldGroupComponent, FieldRowComponent, SectionComponent } from '@stupa-makers/ui-kit';
 
@@ -66,7 +67,7 @@ type AnswerPiece =
 /** Field types that the detail never shows: display text, markers and files (the files
  *  have the block "Anhänge" with the scan state). */
 const NOT_SHOWN: ReadonlySet<FieldType> = new Set(['markdown', 'section', 'file']);
-/** Field types in the mono face. */
+/** Field types in the mono face. A computed `money` or `percent` value is mono too, as an amount. */
 const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
 /** Field types whose answer is the free text of the applicant, in the language of the application. */
 const FREE_TEXT: ReadonlySet<FieldType> = new Set(['text', 'textarea']);
@@ -128,7 +129,9 @@ export class AnswerViewComponent {
   readonly blocks = computed<readonly AnswerBlock[]>(() => {
     const lang = this.i18n.uiLocale();
     const data = this.data();
-    const ctx = { ...this.context(), ...data };
+    const fields = this.sections().flatMap((s) => s.fields);
+    const given = Object.fromEntries(Object.entries(data).filter(([, v]) => !isEmptyAnswer(v)));
+    const ctx = { ...this.context(), ...computeValues(fields, data, this.context()), ...given };
     const skip: ReadonlySet<string> = new Set(this.skipKeys());
     const known: ReadonlySet<string> = new Set(
       this.sections().flatMap((s) => s.fields.map((f) => f.key)),
@@ -175,7 +178,7 @@ export class AnswerViewComponent {
     ctx: Readonly<Record<string, unknown>>,
     lang: string,
   ): readonly AnswerPiece[] {
-    const raw = f.type === 'computed' ? this.computedValue(f, data, ctx) : data[f.key];
+    const raw = f.type === 'computed' ? this.computedValue(f, ctx) : data[f.key];
     if (isEmptyAnswer(raw)) return [];
     const label = resolveI18n(f.label, lang);
     const labelLang = langAttr(resolvedI18nLang(f.label, lang), lang);
@@ -220,7 +223,7 @@ export class AnswerViewComponent {
           ? `${label} · ${this.i18n.translate('forms.answers.computed')}`
           : label,
       value,
-      mono: MONO.has(f.type),
+      mono: MONO.has(f.type) || (f.type === 'computed' && computedFormat(f) !== 'number'),
       labelLang,
       valueLang: this.valueLang(f, raw, lang),
     };
@@ -237,18 +240,12 @@ export class AnswerViewComponent {
     return langAttr(resolvedI18nLang(option?.label, lang), lang);
   }
 
-  /** The stored value of a computed field, else the value of its rule. */
-  private computedValue(
-    f: FormFieldDef,
-    data: Readonly<Record<string, unknown>>,
-    ctx: Readonly<Record<string, unknown>>,
-  ): unknown {
-    if (!isEmptyAnswer(data[f.key]) || !f.compute) return data[f.key];
-    try {
-      return evalJsonLogic(f.compute, ctx);
-    } catch {
-      return null;
-    }
+  /**
+   * The stored value of a computed field, else its value as the server computes it
+   * (`computeValues`, spec 002960). `ctx` holds both, the stored value first.
+   */
+  private computedValue(f: FormFieldDef, ctx: Readonly<Record<string, unknown>>): unknown {
+    return ctx[f.key];
   }
 }
 

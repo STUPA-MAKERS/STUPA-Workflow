@@ -297,6 +297,24 @@ describe('FormEditorComponent', () => {
     expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
+  it('sets the display format of a computed field and hides it at the amount (spec 002963)', async () => {
+    const { fixture } = await setup(
+      draft([{ key: 'quote', type: 'computed', label: { de: 'Quote', en: '' }, compute: { var: 'x' } }]),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const v = editorOf(fixture);
+    expect(screen.getByText('Anzeigeformat')).toBeInTheDocument();
+    v.setFormat({ gi: 0, qi: 0 }, 'percent');
+    expect(c.groups()[0].fields[0].format).toBe('percent');
+    v.setFormat({ gi: 0, qi: 0 }, 'number');
+    expect(c.groups()[0].fields[0].format).toBeUndefined();
+    v.onAmountToggle({ gi: 0, qi: 0 }, true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(screen.queryByText('Anzeigeformat')).not.toBeInTheDocument();
+  });
+
   it('blocks saving a funding field without cost positions and names the problem', async () => {
     const { c } = await setup(
       draft([{ key: 'foerderung', type: 'funding', label: { de: 'Förderung', en: '' } }]),

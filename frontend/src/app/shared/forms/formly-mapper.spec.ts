@@ -124,7 +124,7 @@ describe('toFormlyFields', () => {
         key: 'total',
         type: 'computed',
         label: { de: 'Summe' },
-        compute: { '+': [{ var: 'amount' }, { var: 'cofunding' }] },
+        compute: { '+': [{ var: 'base' }, { var: 'cofunding' }] },
       },
     ];
     const [info, agree, total] = toFormlyFields(fields, 'de');
@@ -132,7 +132,39 @@ describe('toFormlyFields', () => {
     expect(info.props?.['text']).toBe('Hinweistext');
     expect(agree.type).toBe('checkbox');
     expect(total.props?.['computed']).toBe(true);
-    expect(callExpr(total, 'model.total', { amount: 100, cofunding: 50 })).toBe(150);
+    expect(callExpr(total, 'model.total', { base: 100, cofunding: 50 })).toBe(150);
+  });
+
+  it('reads the cost total in a computed expression and rounds it for its format (spec 002960)', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'kosten', type: 'positions', label: { de: 'Kosten' } },
+      { key: 'foerderhoehe', type: 'funding', label: { de: 'Förderhöhe' } },
+      {
+        key: 'quote',
+        type: 'computed',
+        label: { de: 'Förderquote' },
+        compute: { '/': [{ var: 'foerderhoehe' }, { var: 'costTotal' }] },
+        format: 'percent',
+      },
+    ];
+    const quote = toFormlyFields(fields, 'de')[2];
+    expect(quote.props?.['format']).toBe('percent');
+    const kosten = [{ label: 'Bus', offers: [{ label: 'A', value: 1200, preferred: true }] }];
+    expect(callExpr(quote, 'model.quote', { kosten, foerderhoehe: '1000' })).toBe(0.8333);
+    expect(callExpr(quote, 'model.quote', { kosten })).toBeNull();
+  });
+
+  it('reads a typed number in visibleIf and computes nothing without a model', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'n', type: 'number', label: { de: 'n' } },
+      { key: 'note', type: 'text', label: { de: 'Notiz' }, visibleIf: { '>': [{ var: 'n' }, 5] } },
+      { key: 'twice', type: 'computed', label: { de: '2n' }, compute: { '*': [{ var: 'n' }, 2] } },
+    ];
+    const [, note, twice] = toFormlyFields(fields, 'de');
+    expect(callExpr(note, 'hide', { n: '7' })).toBe(false);
+    expect(callExpr(note, 'hide', { n: '3' })).toBe(true);
+    const expr = twice.expressions?.['model.twice'] as (field: FormlyFieldConfig) => unknown;
+    expect(expr({} as FormlyFieldConfig)).toBeNull();
   });
 
   it('marks a computed amount field as money (spec 002842)', () => {
@@ -149,7 +181,7 @@ describe('toFormlyFields', () => {
       ],
       'de',
     );
-    expect(summe.props?.['money']).toBe(true);
+    expect(summe.props?.['format']).toBe('money');
   });
 
   it('reads a number that the input holds as a text in a computed expression', () => {
@@ -172,7 +204,7 @@ describe('toFormlyFields', () => {
         key: 'total',
         type: 'computed',
         label: { de: 'Summe' },
-        compute: { '+': [{ var: 'amount' }, { var: 'cofunding' }] },
+        compute: { '+': [{ var: 'base' }, { var: 'cofunding' }] },
       },
     ];
     const [total] = toFormlyFields(fields, 'de');

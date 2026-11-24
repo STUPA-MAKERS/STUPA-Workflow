@@ -233,6 +233,11 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
         return v
 
 
+#: How a ``computed`` field shows and rounds its value (spec 002962): ``number`` as it is,
+#: ``money`` in whole cents, ``percent`` as a fraction with four decimal places.
+ComputedFormat = Literal["number", "money", "percent"]
+
+
 class FormFieldDef(FrozenStrictCamelModel, frozen=True):
     """Definition of one form field."""
 
@@ -248,6 +253,7 @@ class FormFieldDef(FrozenStrictCamelModel, frozen=True):
     is_pii: bool = Field(default=False, alias="isPII")
     is_promoted: bool = Field(default=False, alias="isPromoted")
     promote_target: str | None = Field(default=None, alias="promoteTarget")
+    display_format: ComputedFormat | None = Field(default=None, alias="format")
 
     @field_validator("visible_if", "compute")
     @classmethod
@@ -269,6 +275,8 @@ class FormFieldDef(FrozenStrictCamelModel, frozen=True):
             raise ValueError(f"options are required for type {self.type!r}")
         if self.type == "computed" and self.compute is None:
             raise ValueError("compute is required for type 'computed'")
+        if self.display_format is not None and self.type != "computed":
+            raise ValueError("format is allowed only for type 'computed'")
         return self
 
 
