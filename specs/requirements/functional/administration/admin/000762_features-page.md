@@ -10,7 +10,7 @@ tests:
   - "backend/tests/integration/modules/features/test_features_api.py:test_a_save_writes_a_version_and_an_audit_entry_that_a_revert_sets_back"
   - "frontend/src/app/pages/admin/features/features.component.spec.ts:FeaturesComponent"
 implementation:
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/site_router.py
   - backend/app/modules/admin/site_config_service.py
   - backend/app/shared/permissions.py
   - backend/migrations/versions/3d95c7b1f9e6_admin_features_permission.py
