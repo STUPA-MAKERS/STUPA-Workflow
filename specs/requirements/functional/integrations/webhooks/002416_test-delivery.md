@@ -12,7 +12,7 @@ protocols:
   - "P/integrations/webhooks/000963"
 implementation:
   - backend/app/modules/admin/service/webhooks.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/webhooks_router.py
   - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:
   - backend/app/modules/webhooks

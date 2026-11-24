@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/webhooks_router.py
   - backend/app/modules/admin/service/webhooks.py
   - frontend/src/app/pages/admin/webhooks/webhooks.component.ts
 scope:

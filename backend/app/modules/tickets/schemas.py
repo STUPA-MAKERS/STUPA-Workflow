@@ -246,6 +246,8 @@ class TicketMailOut(FrozenCamelModel, frozen=True):
         state: The state of a sent mail: ``sending``, ``sent`` or ``failed``; null for
             an imported mail. A mail with ``failed`` takes ``POST …/resend``.
         error: The short cause code of the newest failed send.
+        sender_checked: An imported mail answers a mail that the Postfach sent to its
+            ``From`` address; the team sees ``Absender nicht geprüft`` on each other one.
     """
 
     id: UUID
@@ -256,6 +258,7 @@ class TicketMailOut(FrozenCamelModel, frozen=True):
     cc: tuple[str, ...] = Field(default_factory=tuple)
     subject: str | None = None
     automatic: bool = False
+    sender_checked: bool = Field(default=False, serialization_alias="senderChecked")
     source: Literal["clean", "infected", "closed", "gone"] = "gone"
     source_size: int = Field(default=0, serialization_alias="sourceSize")
     skipped: tuple[TicketSkippedFile, ...] = Field(default_factory=tuple)

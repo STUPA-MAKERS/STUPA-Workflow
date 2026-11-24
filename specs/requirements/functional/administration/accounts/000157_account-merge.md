@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-06
 implementation:
   - backend/app/modules/admin/principal_merge.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/principals_router.py
   - frontend/src/app/pages/admin/users/user-merge
 scope:
   - backend/app/modules/auth

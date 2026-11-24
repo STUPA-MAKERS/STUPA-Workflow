@@ -19,7 +19,11 @@ platform.
 
 The confirmation of a new ticket (§F/integrations/ticket-mail/002738) is a sent mail
 without a message and with the mark ``automatic``. It carries ``Auto-Submitted:
-auto-replied``.
+auto-replied``. Its subject and its text name only the number, never a value of the
+incoming mail (§F/integrations/ticket-mail/002814), and a Postfach sends at most
+``CONFIRM_CAP`` of them an hour over all addresses (§F/integrations/ticket-mail/002815),
+because the ``From`` of a mail is not checked: else a stranger could send a text of their
+own from the address of the Bereich to any address.
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from email.utils import format_datetime, formataddr
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import Principal as PrincipalRow
@@ -71,6 +75,10 @@ MAX_ATTEMPTS = 8
 FIRST_WAIT = timedelta(minutes=1)
 #: The time in which one address gets at most one confirmation.
 CONFIRM_WINDOW = timedelta(hours=1)
+#: The confirmations that one Postfach sends at most in ``CONFIRM_WINDOW``.
+CONFIRM_CAP = 30
+#: The subject of a confirmation, with the number of the ticket at the end.
+CONFIRM_SUBJECT = "Deine Nachricht ist eingegangen [{number}]"
 #: The placeholder of the writer in a signature.
 NAME_PLACEHOLDER = "{name}"
 #: The cause code of a file without a clean scan result.
@@ -318,13 +326,26 @@ async def queue_confirmation(
     """Store the confirmation of a new ticket from a mail, without a commit.
 
     Returns:
-        The stored mail, or None while the switch is off or when the address got a
+        The stored mail, or None while the switch is off, when the Postfach sent
+        ``CONFIRM_CAP`` confirmations in the last hour, or when the address got a
         confirmation in the last hour.
     """
     address = (ticket.reporter_email or "").strip().lower()
     if not box.confirm or not box.enabled or not address:
         return None
     moment = now or datetime.now(UTC)
+    sent = await session.scalar(
+        select(func.count())
+        .select_from(TicketMail)
+        .where(
+            TicketMail.mailbox_id == box.id,
+            TicketMail.direction == "out",
+            TicketMail.automatic.is_(True),
+            TicketMail.created_at > moment - CONFIRM_WINDOW,
+        )
+    )
+    if (sent or 0) >= CONFIRM_CAP:
+        return None
     recent = await session.scalar(
         select(TicketMail.id)
         .where(
@@ -348,7 +369,7 @@ async def queue_confirmation(
         from_address=own.strip().lower(),
         to_addresses=[address],
         cc=[],
-        subject=subject_of(ticket, answers=True),
+        subject=CONFIRM_SUBJECT.format(number=format_number(ticket.number)),
         automatic=True,
         state="sending",
         next_try_at=moment,

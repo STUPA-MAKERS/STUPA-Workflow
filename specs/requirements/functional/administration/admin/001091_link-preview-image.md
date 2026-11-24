@@ -13,7 +13,7 @@ tests:
 implementation:
   - backend/app/modules/site_config/brand_images.py
   - backend/app/modules/admin/page_head.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/branding_router.py
 scope:
   - backend/app/modules/site_config
   - backend/app/modules/admin

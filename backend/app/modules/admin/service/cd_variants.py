@@ -11,7 +11,7 @@ because the stored bytes are the bytes of the client: the upload does not encode
 them again. The allowlist adds
 SVG and PDF, because these bytes only ever reach the typst renderer. The
 download path therefore forces an attachment disposition and never answers with
-``image/svg+xml`` — see `app.modules.admin.router.get_cd_variant_logo_file`.
+``image/svg+xml`` — see `app.modules.admin.router.cd_variants_router.get_cd_variant_logo_file`.
 
 The square slot is the exception. Its upload accepts PNG, JPEG and WebP only and
 checks the pixel size (`cd_logos.check_square_logo`). A variant holds at most one

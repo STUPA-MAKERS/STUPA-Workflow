@@ -112,6 +112,7 @@ import {
   recipientsText,
   sentLine,
   skippedLine,
+  uncheckedLine,
   withSkipped,
   isOpen,
   reporterEventText,
@@ -563,7 +564,10 @@ export class TicketDetailComponent {
       id: BODY_ID,
       author: bodyAuthor(t.reporter),
       authorLabel: this.manager ? this.reporter() : null,
-      body: withSkipped(t.body, skippedLine(first, locale, this.t)),
+      body: withSkipped(
+        withSkipped(t.body, skippedLine(first, locale, this.t)),
+        uncheckedLine(first, this.t),
+      ),
       at: t.createdAt,
       own: !this.manager,
       canEdit: false,
@@ -584,7 +588,10 @@ export class TicketDetailComponent {
       id: n.id,
       author: n.author,
       body: withSkipped(
-        withSkipped(n.body, skippedLine(byNote.get(n.id), locale, this.t)),
+        withSkipped(
+          withSkipped(n.body, skippedLine(byNote.get(n.id), locale, this.t)),
+          uncheckedLine(byNote.get(n.id), this.t),
+        ),
         sentLine(byNote.get(n.id), this.t),
       ),
       ...mailChatState(byNote.get(n.id)),

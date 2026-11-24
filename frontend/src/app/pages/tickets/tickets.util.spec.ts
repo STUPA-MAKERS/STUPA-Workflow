@@ -16,6 +16,7 @@ import {
   reporterEventText,
   sentLine,
   skippedLine,
+  uncheckedLine,
   withSkipped,
 } from './tickets.util';
 import { personName } from '@shared/person-label.util';
@@ -207,11 +208,19 @@ describe('tickets.util', () => {
       cc: [],
       subject: 'Raumanfrage',
       automatic: false,
+      senderChecked: true,
       source: 'clean',
       sourceSize: 2048,
       skipped: [],
       at: '2026-11-23T10:00:00Z',
       ...over,
+    });
+
+    it('names an unchecked sender of an imported mail only (002816)', () => {
+      expect(uncheckedLine(mail({ senderChecked: false }), t)).toBe('Absender nicht geprüft');
+      expect(uncheckedLine(mail(), t)).toBe('');
+      expect(uncheckedLine(mail({ direction: 'out', senderChecked: false }), t)).toBe('');
+      expect(uncheckedLine(undefined, t)).toBe('');
     });
 
     it('names an automatic mail with its sender and its subject', () => {

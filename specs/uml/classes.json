@@ -7006,6 +7006,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "sender_checked",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "to_addresses",
           "nullable": false,
           "primaryKey": false,

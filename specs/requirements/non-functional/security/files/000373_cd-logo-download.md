@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-16
 implementation:
   - backend/app/modules/site_config/cd_logos.py
-  - backend/app/modules/admin/router.py
+  - backend/app/modules/admin/router/cd_variants_router.py
 scope:
   - backend/app/modules/admin
   - frontend/src/app/pages/admin

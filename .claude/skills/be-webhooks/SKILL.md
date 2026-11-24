@@ -16,7 +16,7 @@ description: Outbound event webhooks — a fixed event catalog, per-webhook even
 - `signing.py` — HMAC-SHA256 over `"{timestamp}.{body}"`, `canonical_body`, `build_headers`. Header names `X-Signature`/`X-Timestamp`/`X-Webhook-Event`
 - `queue.py` — `WebhookQueue` Protocol + `ArqWebhookQueue`. `WEBHOOK_TASK_NAME="deliver_webhook"`, job id `webhook:<delivery_id>` (coalesces duplicate enqueues)
 - `worker/webhook.py` (sibling, not in module dir) — arq task `deliver_webhook` and cron `enqueue_pending_webhooks`. Maps `retry`→`arq.Retry`, no-redirect httpx client
-- Models live in `app/modules/webhooks/models.py`. Schemas live in `app/modules/admin/schemas.py` (`WebhookSubscription` checks events and fields against the catalog). The CRUD router lives in `app/modules/admin/router.py`, the service in `app/modules/admin/service/webhooks.py`.
+- Models live in `app/modules/webhooks/models.py`. Schemas live in `app/modules/admin/schemas.py` (`WebhookSubscription` checks events and fields against the catalog). The CRUD router lives in `app/modules/admin/router/webhooks_router.py`, the service in `app/modules/admin/service/webhooks.py`.
 
 **Domain / data model:**
 - `Webhook` (table `webhook`): `name`, `url`, `secret` (LargeBinary, server-generated `secrets.token_bytes(32)`, never returned/logged), `active`, `subscriptions` (JSONB list of `{event, fields}`), `gremium_ids`, `type_ids` (JSONB UUID strings), `state_keys` (JSONB status keys of the target state of `application.transition`). An empty filter list lets every value pass; an event without the value passes too.
