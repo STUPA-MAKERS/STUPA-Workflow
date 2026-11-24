@@ -135,7 +135,7 @@
   "frontend/src/app/features/meetings/meeting-page-skeleton/meeting-page-skeleton.component.scss": 251,
   "frontend/src/app/features/meetings/meeting-page-skeleton/meeting-page-skeleton.component.ts": 1,
   "frontend/src/app/features/meetings/meeting-page/meeting-page.component.html": 24,
-  "frontend/src/app/features/meetings/meeting-page/meeting-page.component.scss": 309,
+  "frontend/src/app/features/meetings/meeting-page/meeting-page.component.scss": 306,
   "frontend/src/app/features/meetings/meeting-page/meeting-page.component.ts": 2,
   "frontend/src/app/features/meetings/meeting-settings-dialog/meeting-settings-dialog.component.html": 3,
   "frontend/src/app/features/meetings/meeting-settings-dialog/meeting-settings-dialog.component.scss": 5,

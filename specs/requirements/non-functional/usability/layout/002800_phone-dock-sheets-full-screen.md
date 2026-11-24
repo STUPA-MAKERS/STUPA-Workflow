@@ -2,11 +2,12 @@
 id: "002800"
 title: A sheet from the phone dock of a meeting opens over the whole screen
 kind: non-functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-24
 implementation:
   - frontend/src/app/features/meetings/meeting-page/meeting-page.component.scss
+  - frontend/vendor/ui-kit/src/styles/_frosted.scss
 scope:
   - frontend/src/app/features/meetings/meeting-page
 ---
