@@ -2,7 +2,7 @@
 id: "003038"
 title: A status in use is deleted only with a replacement
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

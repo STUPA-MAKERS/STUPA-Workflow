@@ -108,12 +108,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/002693](requirements/functional/administration/admin/002693_audit-log-search.md) | The Audit-Log searches on the server | approved |
 | [F/administration/admin/003017](requirements/functional/administration/admin/003017_permission-names.md) | Every global permission has a German and an English name | approved |
 | [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | approved |
-| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | draft |
-| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the phase open, done or void | draft |
+| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | approved |
+| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the phase open, done or void | approved |
 | [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | draft |
-| [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | draft |
-| [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | draft |
-| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The page Status & Phasen uses the editor of the plan steps | draft |
+| [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | approved |
+| [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | approved |
+| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The page Status & Phasen uses the editor of the plan steps | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -592,7 +592,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to at most one Antrag | approved |
 | [F/finance/orders/002851](requirements/functional/finance/orders/002851_order-fields.md) | A Bestellung holds these fields | approved |
 | [F/finance/orders/002852](requirements/functional/finance/orders/002852_order-kind.md) | A Bestellung is an order or an Auslage | approved |
-| [F/finance/orders/002853](requirements/functional/finance/orders/002853_order-status.md) | A Bestellung has a status of its status list | draft |
+| [F/finance/orders/002853](requirements/functional/finance/orders/002853_order-status.md) | A Bestellung has a status of its status list | approved |
 | [F/finance/orders/002855](requirements/functional/finance/orders/002855_order-number.md) | A new Bestellung gets a random number of eight characters | approved |
 | [F/finance/orders/002856](requirements/functional/finance/orders/002856_order-url.md) | The link of a Bestellung is an http or https address | approved |
 | [F/finance/orders/002857](requirements/functional/finance/orders/002857_order-moves-no-money.md) | A Bestellung moves no money | approved |
@@ -617,9 +617,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002878](requirements/functional/finance/orders/002878_order-booking-reference.md) | A booking can name a Bestellung | approved |
 | [F/finance/orders/002879](requirements/functional/finance/orders/002879_order-create-booking.md) | Buchung anlegen fills the booking form from the Bestellung | approved |
 | [F/finance/orders/002880](requirements/functional/finance/orders/002880_order-marks.md) | A Bestellung shows marks for its invoice and its bookings | approved |
-| [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | draft |
+| [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | approved |
 | [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | Bestellungen is a page of its own with a list and a detail | approved |
-| [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The segments of the page Bestellungen follow the phases | draft |
+| [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The segments of the page Bestellungen follow the phases | approved |
 | [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | approved |
 | [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | approved |
 | [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a link kind | approved |
@@ -628,7 +628,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002891](requirements/functional/finance/orders/002891_order-webhook-events.md) | The create and the status change of a Bestellung are webhook events | approved |
 | [F/finance/orders/002892](requirements/functional/finance/orders/002892_order-privacy.md) | The buyer of a Bestellung follows the privacy rules | approved |
 | [F/finance/orders/002930](requirements/functional/finance/orders/002930_order-created-by-hand.md) | Only a person creates a Bestellung | approved |
-| [F/finance/orders/002931](requirements/functional/finance/orders/002931_order-offers-antrag-transition.md) | A status change of a Bestellung offers a transition of the Antrag | draft |
+| [F/finance/orders/002931](requirements/functional/finance/orders/002931_order-offers-antrag-transition.md) | A status change of a Bestellung offers a transition of the Antrag | approved |
 | [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | approved |
 | [F/finance/orders/002934](requirements/functional/finance/orders/002934_orders-list-without-order.md) | The list shows the approved Anträge without a Bestellung | approved |
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | approved |
