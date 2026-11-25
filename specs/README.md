@@ -323,6 +323,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | approved |
 | [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | approved |
 | [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
+| [F/collaboration/events/003041](requirements/functional/collaboration/events/003041_event-bookings-collapsed.md) | Many bookings of an Event fold into one row | draft |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
