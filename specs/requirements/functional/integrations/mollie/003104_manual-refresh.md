@@ -14,13 +14,14 @@ scope:
 # The pages Buchungen and Veranstaltungen fetch the pretix and Mollie data on demand
 
 The ⋮ menu of the page `Buchungen` and of the page `Veranstaltungen` must have the action
-`Daten abrufen`. It must start at once the read of pretix (003085) and of Mollie (003094) and the
-bookings of 003086, 003097 and 003103, and must show the result when the run ends: the number of
+`Daten abrufen`. It must start at once the read of each integration that is on and configured
+(pretix: 003085, 003086; Mollie: 003094, 003097, 003103), and must show the result when the run ends: the number of
 new bookings and each failure with its cause. The action on `Buchungen` must need `budget.book`,
 the action on `Veranstaltungen` must need the write right on an Event. The action of the detail
 of an Event (003085) must also read the Mollie payments of that Event. A run must not start while
 a run is in progress, and the API must then answer 409 `sync_running`. The action must show only
-while the feature `pretix` or `mollie` is on.
+while at least one of the two integrations has its feature on (003081, 003093) and a
+connection with an address and a token, and it must read only these integrations.
 
 Reason: The worker reads on a timer. After a sale or a settlement, a person wants the bookings
 now and must not wait for the next run.
