@@ -30,7 +30,7 @@ every level: Haushalt, Titel and Kostenstelle.
 A Kostenstelle must count as Intern when its own switch is on or when the switch of a node
 above it is on. Below a node that is Intern, the switch must show on and must be disabled,
 because only the switch of the node above turns it off. A disabled switch that is on still looks
-on (003013). No hint text is shown under the switch (000206). The own
+on (003020). No hint text is shown under the switch (000206). The own
 value of the node below stays stored, so it applies again when the node above turns off.
 
 The switch must stay changeable in a Haushalt whose plan is in force, in the Budget tab and in
