@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { FeatureService } from '@core/features/feature.service';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -53,6 +54,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
 })
 export class TransitionDetailComponent {
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
   private readonly features = inject(FeatureService);
 
   readonly transition = input.required<TransitionDef>();
@@ -92,12 +94,12 @@ export class TransitionDetailComponent {
     return this.features.isOn('orders');
   }
 
-  /** The two statuses of a Bestellung that can offer a transition of the Antrag. */
+  /** The statuses of a Bestellung that can offer a transition of the Antrag (spec 002931). */
   protected orderOfferOptions(): SelectOption[] {
-    return [
-      { value: 'ordered', label: this.i18n.translate('orders.status.ordered') },
-      { value: 'delivered', label: this.i18n.translate('orders.status.delivered') },
-    ];
+    return this.statuses.list('order')().map((status) => ({
+      value: status.key,
+      label: this.statuses.name(status),
+    }));
   }
 
   protected actionOptions(): SelectOption[] {

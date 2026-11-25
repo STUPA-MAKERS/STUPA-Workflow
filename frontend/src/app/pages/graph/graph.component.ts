@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -47,7 +48,7 @@ import {
   mediaQuery,
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { LINK_ICON, LINK_KIND_LABEL, linkSub } from '../../features/todos/todos.util';
+import { LINK_ICON, LINK_KIND_LABEL, linkSub, type StatusName } from '../../features/todos/todos.util';
 import { LinkToDirective, isExternalUrl } from '../../shared/link-to.directive';
 import { type CanvasNode, GraphCanvasViewComponent } from '@stupa-makers/ui-kit/views/graph';
 import {
@@ -136,6 +137,8 @@ export class GraphComponent {
   private readonly api = inject(GraphApiService);
   private readonly renderer = inject(Renderer2);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
+  private readonly statusName: StatusName = (kind, key) => this.statuses.label(kind, key);
   private readonly features = inject(FeatureService);
   /** The links to Paperless are on for this person (§F/integrations/paperless/002768). */
   private readonly paperlessOn = toSignal(inject(PaperlessService).linksOn(), { initialValue: false });
@@ -367,7 +370,7 @@ export class GraphComponent {
 
   /** The line of facts of the chosen element: its kind and its state. */
   facts(row: GraphRow): string {
-    return linkSub(row.node, this.i18n.locale(), this.i18n.uiLocale(), this.t);
+    return linkSub(row.node, this.i18n.locale(), this.i18n.uiLocale(), this.t, this.statusName);
   }
 
   /** The date of the chosen element, unless the line of facts already has it. */

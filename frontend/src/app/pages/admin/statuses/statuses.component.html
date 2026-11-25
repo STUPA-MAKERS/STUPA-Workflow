@@ -1,0 +1,98 @@
+<app-settings-screen
+  [head]="{ title: 'admin.statuses.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [save]="{ dirty: form.dirty(), busy: form.saving(), disabled: !body() }"
+  (save)="save()"
+  (discard)="discard()"
+>
+  @for (kind of kinds(); track kind) {
+    <ng-template [screenGroup]="kind">
+      <form class="st__list" (submit)="$event.preventDefault(); save()">
+        <ol class="st__steps">
+          @for (row of rows(kind); track $index; let i = $index; let first = $first; let last = $last) {
+            <li class="st__step" [attr.data-testid]="'status-' + kind + '-' + i">
+              <span class="st__no mono" aria-hidden="true">{{ i + 1 }}</span>
+              <app-input
+                class="st__name"
+                [label]="'admin.statuses.name' | t: { number: i + 1 }"
+                [required]="true"
+                [error]="nameError(row)"
+                [ngModel]="name(row)"
+                (ngModelChange)="setName(kind, i, $event)"
+                [name]="kind + 'Name' + i"
+              />
+              <span class="st__actions">
+                <app-move-buttons [upDisabled]="first" [downDisabled]="last" (move)="move(kind, i, $event)" />
+                <app-button-group>
+                  <app-button
+                    variant="text"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.statuses.remove' | t: { number: i + 1 }"
+                    [title]="'admin.statuses.remove' | t: { number: i + 1 }"
+                    (click)="remove(kind, i)"
+                  >
+                    <app-icon name="trash" />
+                  </app-button>
+                </app-button-group>
+              </span>
+              <span class="st__selects" [class.st__selects--date]="kind === 'order'">
+                <app-select
+                  [label]="'admin.statuses.phase' | t: { number: i + 1 }"
+                  [clearable]="false"
+                  [options]="phaseOptions()"
+                  [error]="phaseError(kind, i)"
+                  [ngModel]="row.phase"
+                  (ngModelChange)="patch(kind, i, { phase: $event })"
+                  [name]="kind + 'Phase' + i"
+                />
+                <app-select
+                  [label]="'admin.statuses.tone' | t: { number: i + 1 }"
+                  [clearable]="false"
+                  [options]="toneOptions()"
+                  [ngModel]="row.tone"
+                  (ngModelChange)="patch(kind, i, { tone: $event })"
+                  [name]="kind + 'Tone' + i"
+                />
+                @if (kind === 'order') {
+                  <app-select
+                    [label]="'admin.statuses.date' | t: { number: i + 1 }"
+                    [clearable]="false"
+                    [options]="dateOptions()"
+                    [ngModel]="row.setsDate ?? ''"
+                    (ngModelChange)="patch(kind, i, { setsDate: $event || null })"
+                    [name]="kind + 'Date' + i"
+                  />
+                }
+              </span>
+            </li>
+          }
+        </ol>
+        @if (missing(kind); as text) {
+          <app-note kind="warn" icon="alert">{{ text }}</app-note>
+        }
+        @for (gone of removed(kind); track gone.key) {
+          <app-select
+            class="st__replace"
+            [label]="removedLabel(kind, gone)"
+            [required]="true"
+            [clearable]="false"
+            [placeholder]="'admin.statuses.replacePick' | t"
+            [options]="replacementOptions(kind)"
+            [ngModel]="replacement(kind, gone.key)"
+            (ngModelChange)="setReplacement(kind, gone.key, $event)"
+            [name]="kind + 'Replace' + gone.key"
+          />
+        }
+        @if (canAdd(kind)) {
+          <app-button-group>
+            <app-button class="st__add" variant="tonal" (click)="add(kind)"
+              ><app-icon name="plus" /> {{ 'admin.statuses.add' | t }}</app-button
+            >
+          </app-button-group>
+        }
+        <button type="submit" hidden></button>
+      </form>
+    </ng-template>
+  }
+</app-settings-screen>

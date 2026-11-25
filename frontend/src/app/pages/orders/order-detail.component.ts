@@ -11,6 +11,7 @@ import {
   type OrderStatus,
   OrdersApiService,
 } from '@core/api/orders.service';
+import { type StatusDef, StatusCatalog, nextStatus } from '@core/api/statuses.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -56,9 +57,8 @@ import { OrderFilesComponent } from './order-files.component';
 import { OrdersRefresh } from './orders-refresh';
 import {
   ORDER_KIND_LABEL,
-  ORDER_STATUS_KIND,
-  ORDER_STATUS_LABEL,
   type OrderAction,
+  STATUS_ACTION,
   type OrderFact,
   factRows,
   orderFacts,
@@ -66,24 +66,6 @@ import {
   orderPositions,
   priceDifference,
 } from './orders.util';
-
-/** The status that follows in the work of a purchase, or null at its end. */
-export function nextStatus(status: OrderStatus): 'ordered' | 'delivered' | null {
-  switch (status) {
-    case 'planned':
-      return 'ordered';
-    case 'ordered':
-      return 'delivered';
-    case 'delivered':
-    case 'cancelled':
-      return null;
-  }
-}
-
-const STEP_LABEL: Readonly<Record<'ordered' | 'delivered', TranslationKey>> = {
-  ordered: 'orders.menu.ordered',
-  delivered: 'orders.menu.delivered',
-};
 
 /** The facts that the head or a section of the detail shows already. */
 const HEAD_FACTS: readonly TranslationKey[] = [
@@ -96,17 +78,19 @@ const HEAD_FACTS: readonly TranslationKey[] = [
  * The detail of one Bestellung in the pane of the page "Bestellungen".
  *
  * The head holds the Bezeichnung, the number, the status and the marks of the invoice and
- * of the bookings. Below it, for a person with `order.manage`, the next status is the
- * main button and every other action is in the ⋮ menu. The body shows the fields with the
+ * of the bookings. Below it, for a person with `order.manage`, the next status of the
+ * status list (spec 003035) is the main button, and every other status and action is in
+ * the ⋮ menu. The body shows the fields with the
  * planned price, the real price and their signed difference, the positions of the Antrag
  * that the Bestellung covers, the sum of the Bestellungen of the Antrag against its
  * approved amount (a sum above it warns and blocks nothing), the files, the list
  * "Verknüpft" with the Antrag, the invoice and the bookings as built-in rows, and the
  * comments of the Antrag.
  *
- * After a change to "Bestellt" or "Geliefert" the detail offers each transition of the
- * Antrag that the flow marks for this status and that the person can fire. The person
- * fires it or closes the offer; nothing fires by itself.
+ * A change of a booked Bestellung to a status of the phase `void` asks first (002881).
+ * After a status change the detail offers each transition of the Antrag that the flow
+ * marks for this status and that the person can fire (002931). The person fires it or
+ * closes the offer; nothing fires by itself.
  */
 @Component({
   selector: 'app-order-detail',
@@ -145,6 +129,8 @@ export class OrderDetailComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly refresh = inject(OrdersRefresh);
+  private readonly catalog = inject(StatusCatalog);
+  private readonly statuses = this.catalog.list('order');
 
   protected readonly order = signal<Order | null>(null);
   private readonly failed = signal(false);
@@ -153,7 +139,8 @@ export class OrderDetailComponent {
   private readonly bookings = signal<readonly OrderBooking[]>([]);
   protected readonly busy = signal(false);
   protected readonly deleting = signal(false);
-  protected readonly cancelling = signal(false);
+  /** The status of the phase `void` that waits for the confirm of a booked Bestellung. */
+  protected readonly cancelling = signal<StatusDef | null>(null);
   protected readonly linking = signal(false);
   protected readonly invoiceRows = signal<readonly PickRow[] | null>(null);
   protected readonly invoicePick = signal<Uuid | null>(null);
@@ -199,8 +186,8 @@ export class OrderDetailComponent {
       title: order.title,
       kicker: order.number,
       status: {
-        label: this.i18n.translate(ORDER_STATUS_LABEL[order.status]),
-        kind: ORDER_STATUS_KIND[order.status],
+        label: this.catalog.label('order', order.status),
+        kind: this.catalog.tone('order', order.status),
       },
       meta: [
         ...(order.kind === 'outlay' ? [{ label: this.i18n.translate(ORDER_KIND_LABEL.outlay) }] : []),
@@ -210,11 +197,11 @@ export class OrderDetailComponent {
     };
   });
 
-  /** The next status of the work: the main button of the detail. */
+  /** The next status of the list: the main button of the detail. */
   protected readonly step = computed(() => {
     const order = this.order();
-    const next = order && this.canManage() ? nextStatus(order.status) : null;
-    return next ? { status: next, label: this.i18n.translate(STEP_LABEL[next]) } : null;
+    const next = order && this.canManage() ? nextStatus(this.statuses(), order.status) : null;
+    return next ? { status: next.key, label: this.toLabel(next) } : null;
   });
 
   protected readonly actions = computed<readonly Action[]>(() => {
@@ -222,15 +209,22 @@ export class OrderDetailComponent {
     if (!order || !this.canManage()) return [];
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const main = this.step()?.status ?? null;
-    const item = (key: OrderAction | 'invoiceUnlink', label: string, more: Partial<Action> = {}): Action => ({
+    const item = (key: OrderAction | 'invoiceUnlink' | `${typeof STATUS_ACTION}${string}`, label: string, more: Partial<Action> = {}): Action => ({
       key,
       label,
       priority: 'menu',
       ...more,
     });
-    const steps = (['ordered', 'delivered'] as const)
-      .filter((status) => status !== order.status && status !== main)
-      .map((status) => item(status, t(STEP_LABEL[status]), { icon: status === 'ordered' ? 'send' : 'check' }));
+    const steps = this.statuses()
+      .filter((status) => status.key !== order.status && status.key !== main && status.phase !== 'void')
+      .map((status) =>
+        item(`${STATUS_ACTION}${status.key}`, this.toLabel(status), {
+          icon: status.phase === 'done' ? 'check' : 'send',
+        }),
+      );
+    const voids = this.statuses()
+      .filter((status) => status.key !== order.status && status.phase === 'void')
+      .map((status) => item(`${STATUS_ACTION}${status.key}`, this.toLabel(status), { icon: 'x' }));
     const book = this.auth.can('budget.book');
     return [
       ...steps,
@@ -257,7 +251,7 @@ export class OrderDetailComponent {
         priority: 'head',
         route: { commands: ['/orders', order.id, 'edit'] },
       }),
-      ...(order.status === 'cancelled' ? [] : [item('cancelled', t('orders.menu.cancel'), { icon: 'x' })]),
+      ...voids,
       item('delete', t('action.delete'), { icon: 'trash', kind: 'danger' }),
     ];
   });
@@ -276,7 +270,9 @@ export class OrderDetailComponent {
       signed: true,
     });
     const actual = t('orders.field.actual');
-    return orderFacts(order, this.positions(), this.i18n.formatLocale(), this.currency(), t)
+    return orderFacts(order, this.positions(), this.i18n.formatLocale(), this.currency(), t, (key) =>
+      this.catalog.label('order', key),
+    )
       .filter((fact) => !hidden.has(fact.label))
       .flatMap((fact) =>
         fact.label === actual && difference
@@ -349,6 +345,15 @@ export class OrderDetailComponent {
     ];
   });
 
+  protected readonly cancelTitle = computed(() =>
+    this.i18n.translate('orders.cancel.title', { status: this.cancelLabelName() }),
+  );
+
+  protected readonly cancelLabel = computed(() => {
+    const status = this.cancelling();
+    return status ? this.toLabel(status) : '';
+  });
+
   protected readonly cancelBody = computed(() =>
     this.i18n.translate('orders.cancel.body', {
       title: this.order()?.title ?? '',
@@ -415,12 +420,8 @@ export class OrderDetailComponent {
   protected onAction(key: string): void {
     const order = this.order();
     if (!order) return;
+    if (key.startsWith(STATUS_ACTION)) return this.pickStatus(order, key.slice(STATUS_ACTION.length));
     switch (key as OrderAction | 'invoiceUnlink') {
-      case 'ordered':
-      case 'delivered':
-        return this.setStatus(key as OrderStatus);
-      case 'cancelled':
-        return Number(order.bookedAmount) > 0 ? this.cancelling.set(true) : this.setStatus('cancelled');
       case 'delete':
         return this.deleting.set(true);
       case 'invoiceLink':
@@ -437,9 +438,30 @@ export class OrderDetailComponent {
     }
   }
 
+  /** Set a status; one of the phase `void` asks first while the Bestellung has a booking. */
+  private pickStatus(order: Order, key: string): void {
+    const status = this.catalog.find('order', key);
+    if (status?.phase === 'void' && Number(order.bookedAmount) > 0) {
+      this.cancelling.set(status);
+      return;
+    }
+    this.setStatus(key);
+  }
+
   protected confirmCancel(): void {
-    this.cancelling.set(false);
-    this.setStatus('cancelled');
+    const status = this.cancelling();
+    this.cancelling.set(null);
+    if (status) this.setStatus(status.key);
+  }
+
+  /** "Als „Bestellt“ markieren": the label of the button that sets a status. */
+  private toLabel(status: StatusDef): string {
+    return this.i18n.translate('orders.menu.toStatus', { status: this.catalog.name(status) });
+  }
+
+  private cancelLabelName(): string {
+    const status = this.cancelling();
+    return status ? this.catalog.name(status) : '';
   }
 
   protected setStatus(status: OrderStatus): void {
@@ -449,14 +471,14 @@ export class OrderDetailComponent {
     this.api.setStatus(order.id, status, order.version ?? 1).subscribe({
       next: (saved) => {
         this.took(saved);
-        if (status === 'ordered' || status === 'delivered') this.offer(saved, status);
+        this.offer(saved, status);
       },
       error: (err: { error?: { code?: string } | null }) => this.fail(err),
     });
   }
 
   /** Ask the flow which transitions of the Antrag fit the new status. */
-  private offer(order: Order, status: 'ordered' | 'delivered'): void {
+  private offer(order: Order, status: OrderStatus): void {
     if (!order.applicationId) return;
     this.client.transitions(order.applicationId, { orderStatus: status }).subscribe({
       next: (transitions) => this.offered.set(transitions),

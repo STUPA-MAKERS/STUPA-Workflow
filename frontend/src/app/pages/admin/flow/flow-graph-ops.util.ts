@@ -273,7 +273,7 @@ export function setGuard(g: FlowGraph, index: number, guard: Guard | null): Flow
 /** Set the status of a Bestellung that offers the transition; an empty value takes it away. */
 export function setOrderOffer(g: FlowGraph, index: number, status: string): FlowGraph {
   return patchTransition(g, index, (t) =>
-    status === 'ordered' || status === 'delivered'
+    status
       ? { ...t, offerOnOrderStatus: status }
       : withoutKey(t, 'offerOnOrderStatus'),
   );

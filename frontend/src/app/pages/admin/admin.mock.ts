@@ -78,6 +78,7 @@ export const MOCK_PERMISSIONS: readonly string[] = [
   'application.export',
   'webhook.manage',
   'admin.calendars',
+  'admin.statuses',
   'audit.read',
   'audit.verify',
   'audit.revert',

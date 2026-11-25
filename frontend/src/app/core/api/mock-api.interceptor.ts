@@ -137,6 +137,7 @@ const MOCK_PRINCIPAL: Principal = {
     'flow.configure',
     'webhook.manage',
     'admin.calendars',
+    'admin.statuses',
     'admin.paperless',
     'admin.features',
     'admin.ticket_mail',

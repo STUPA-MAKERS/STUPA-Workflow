@@ -11,6 +11,7 @@ import {
   OrdersApiService,
   type PendingApplication,
 } from '@core/api/orders.service';
+import { StatusCatalog } from '@core/api/statuses.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -110,6 +111,7 @@ export class OrderFormComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly refresh = inject(OrdersRefresh);
+  private readonly statuses = inject(StatusCatalog);
 
   /** The Bestellung to change, or null for a new one. */
   protected readonly order = signal<Order | null>(null);
@@ -150,7 +152,11 @@ export class OrderFormComponent {
   protected readonly form = computed<FormDef>(() => {
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const known = new Set(this.positions().map((p) => p.id));
-    const taken = takenPositions(this.list()?.items ?? [], this.order()?.id ?? null);
+    const taken = takenPositions(
+      this.list()?.items ?? [],
+      this.order()?.id ?? null,
+      (key) => this.statuses.phase('order', key) === 'void',
+    );
     const gone = ((this.value()['positionIds'] as readonly string[] | undefined) ?? [])
       .filter((id) => !known.has(id))
       .map((id) => ({ value: id, label: t('orders.position.removed') }));

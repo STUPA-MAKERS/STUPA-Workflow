@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { Subject, of, throwError } from 'rxjs';
@@ -55,6 +56,7 @@ async function setup(options: Options = {}) {
   };
   const view = await render(OrdersPageComponent, {
     providers: [
+      provideTestStatuses(),
       provideRouter([]),
       { provide: OrdersApiService, useValue: api },
       { provide: BudgetTreeApi, useValue: budget },

@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { FeatureService, type FeatureKey } from '@core/features/feature.service';
 import { AuthService } from '@core/auth/auth.service';
 import { NgTemplateOutlet } from '@angular/common';
@@ -46,7 +47,7 @@ import {
   mediaQuery,
   trapTab,
 } from '@stupa-makers/ui-kit';
-import { LINK_ICON, linkSub } from '../todos.util';
+import { LINK_ICON, linkSub, type StatusName } from '../todos.util';
 
 type PickerKind = TodoLinkKind | 'all';
 
@@ -120,6 +121,8 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 export class TodoLinkPickerComponent {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
+  private readonly statusName: StatusName = (kind, key) => this.statuses.label(kind, key);
   private readonly features = inject(FeatureService);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
@@ -334,7 +337,7 @@ export class TodoLinkPickerComponent {
   }
 
   sub(hit: TodoLinkTarget): string {
-    return linkSub(hit, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
+    return linkSub(hit, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t, this.statusName);
   }
 
   isLinked(hit: TodoLinkTarget): boolean {

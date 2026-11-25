@@ -86,9 +86,10 @@ describe('todos.util', () => {
      * only the kind shows.
      */
     it('lists the facts of each kind below the title', () => {
-      const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
+      const sub = (l: Parameters<typeof linkSub>[0]) =>
+        linkSub(l, 'de-DE', 'de', t, (kind, key) => (kind === 'order' && key === 'ordered' ? 'Bestellt' : key));
       expect(sub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }))).toBe('Antrag · In Prüfung');
-      expect(linkSub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }), 'en-GB', 'en', t)).toBe(
+      expect(linkSub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }), 'en-GB', 'en', t, (_, key) => key)).toBe(
         'Antrag · In review',
       );
       expect(sub(link({ detail: {} }))).toBe('Antrag');
@@ -120,7 +121,8 @@ describe('todos.util', () => {
 
     /** A title that is the supplier names neither twice; without an amount the date shows. */
     it('lists the facts of a vote, a gremium, an invoice and a booking', () => {
-      const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
+      const sub = (l: Parameters<typeof linkSub>[0]) =>
+        linkSub(l, 'de-DE', 'de', t, (kind, key) => (kind === 'order' && key === 'ordered' ? 'Bestellt' : key));
       const eur = (v: string) => formatMoney(v, 'de-DE');
       expect(
         sub(link({ kind: 'vote', detail: { meetingTitle: '33. Sitzung', voteStatus: 'closed', voteResult: 'passed' } })),

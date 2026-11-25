@@ -100,7 +100,8 @@ export interface TodoLinkDetail {
   /** The name of the document type of a Paperless document. */
   readonly documentType?: string | null;
   /** The status of a Bestellung. */
-  readonly orderStatus?: 'planned' | 'ordered' | 'delivered' | 'cancelled' | null;
+  /** The key of a status of the list of the Bestellungen (spec 003035). */
+  readonly orderStatus?: string | null;
 }
 
 export interface TodoLink {

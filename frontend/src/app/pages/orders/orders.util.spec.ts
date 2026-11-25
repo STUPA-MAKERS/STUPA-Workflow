@@ -66,15 +66,16 @@ describe('orders.util', () => {
     expect(positionPrefill(positions)).toEqual({ plannedAmount: 112.5, url: '' });
   });
 
-  it('holds the positions of the other Bestellungen that are not cancelled', () => {
+  it('holds the positions of the other Bestellungen whose status is not in the phase void', () => {
     const orders = [
       order({ id: 'o-1', positionIds: ['p-1'] }),
       order({ id: 'o-2', positionIds: ['p-2'], status: 'cancelled' }),
       order({ id: 'o-3', positionIds: ['p-3'] }),
       order({ id: 'o-4', positionIds: undefined }),
     ];
-    expect([...takenPositions(orders, 'o-1')]).toEqual(['p-3']);
-    expect([...takenPositions(orders, null)]).toEqual(['p-1', 'p-3']);
+    const isVoid = (status: string): boolean => status === 'cancelled';
+    expect([...takenPositions(orders, 'o-1', isVoid)]).toEqual(['p-3']);
+    expect([...takenPositions(orders, null, isVoid)]).toEqual(['p-1', 'p-3']);
   });
 
   it('builds the body of the API from the form and reads a Bestellung into the form', () => {
@@ -144,7 +145,8 @@ describe('orders.util', () => {
       note: 'eilig',
       bookedAmount: '40.00',
     });
-    const facts = orderFacts(full, orderPositions(DATA), 'de-DE', 'EUR', t);
+    const facts = orderFacts(full, orderPositions(DATA), 'de-DE', 'EUR', t, (key) => `name:${key}`);
+    expect(facts[2].value).toBe('name:delivered');
     expect(facts.map((f) => f.label)).toEqual([
       'orders.field.number',
       'orders.field.kind',
@@ -178,7 +180,7 @@ describe('orders.util', () => {
       ['booked'],
     ]);
     expect(factRows([])).toEqual([]);
-    const bare = orderFacts({ ...order(), supplier: undefined, plannedAmount: undefined, positionIds: undefined }, [], 'de-DE', null, t);
+    const bare = orderFacts({ ...order(), supplier: undefined, plannedAmount: undefined, positionIds: undefined }, [], 'de-DE', null, t, (key) => key);
     expect(bare.map((f) => f.label)).toEqual(['orders.field.number', 'orders.field.kind', 'orders.field.status']);
   });
 

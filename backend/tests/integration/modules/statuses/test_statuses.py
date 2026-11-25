@@ -87,7 +87,7 @@ async def test_the_migration_creates_both_lists(
     assert member.get("/api/statuses/other").status_code == 422
     assert member.get("/api/admin/statuses/order").status_code == 403
     anonymous = _client(migrated, settings, monkeypatch, None)
-    assert anonymous.get("/api/statuses/order").status_code == 401
+    assert _shape(anonymous.get("/api/statuses/order").json()) == _ORDER_LIST
 
 
 async def test_admin_saves_a_list_and_refuses_a_wrong_one(

@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { render, screen } from '@testing-library/angular';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { TransitionDef } from '../admin.models';
@@ -28,6 +29,7 @@ const TREE: BudgetTreeNode[] = [
 
 async function setup(transition: TransitionDef, extra: Record<string, unknown> = {}) {
   const view = await render(TransitionDetailComponent, {
+    providers: [provideTestStatuses()],
     inputs: {
       transition,
       roleOptions: ROLES,
@@ -157,13 +159,15 @@ describe('TransitionDetailComponent', () => {
 
   /** Spec 000761: the editor offers no step of a feature that is off. */
   /** §F/finance/orders/002931: the setting "nach Bestellung anbieten" of a transition. */
-  it('offers the two statuses of a Bestellung and emits the choice', async () => {
+  it('offers every status of the list of the Bestellungen and emits the choice', async () => {
     const { c } = await setup({ from: 'a', to: 'b', actions: [], offerOnOrderStatus: 'ordered' });
     expect(c.ordersOn()).toBe(true);
     expect(document.querySelector('[data-testid="td-order-offer"]')).not.toBeNull();
     expect(c.orderOfferOptions()).toEqual([
+      { value: 'planned', label: 'Geplant' },
       { value: 'ordered', label: 'Bestellt' },
       { value: 'delivered', label: 'Geliefert' },
+      { value: 'cancelled', label: 'Storniert' },
     ]);
   });
 

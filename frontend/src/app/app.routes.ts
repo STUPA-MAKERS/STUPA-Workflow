@@ -778,6 +778,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'statuses',
+            data: { title: 'admin.statuses.title', permission: 'admin.statuses', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/statuses/statuses.component').then(
+                (m) => m.AdminStatusesComponent,
+              ),
+          },
+          {
             path: 'deadlines',
             data: { title: 'admin.deadlines.title', permission: 'admin.deadlines', parent: ['admin'] },
             canActivate: [authGuard],
