@@ -16,7 +16,7 @@ The form of an Event must have the field `Pretix-Veranstaltung`: a picker that l
 of the organizer of the connection by name and date. An Event must link at most one pretix
 event, and a pretix event must belong to at most one Event, else the API must answer 409
 `pretix_event_taken`. A person must set or remove the link only when the person writes the
-Event (003026) and holds `pretix.use` (003091). When the Event has no shop (003024), the link
+Event through its team (003026) and holds `pretix.use` (003091). When the Event has no shop (003024), the link
 must set the shop to the public address of the pretix event.
 
 Reason: The platform reads the sales of the shop that belongs to the Event. A person chooses the

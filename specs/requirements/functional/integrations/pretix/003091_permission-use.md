@@ -12,7 +12,8 @@ scope:
 ---
 # One permission gives the link to pretix
 
-The permission `pretix.use` (`Pretix nutzen`) must give the link of 003083, together with the write right on the Event. The read of the sales must need only the
+The permission `pretix.use` (`Pretix nutzen`) must give the link of 003083 to a person who also writes the Event through
+its team (003026). The read of the sales must need only the
 read right on the Event. No seeded role except the admin role must hold `pretix.use`.
 
 Reason: A link acts with the token of the platform in pretix. An admin gives this
