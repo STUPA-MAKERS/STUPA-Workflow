@@ -2,7 +2,7 @@
 id: "002850"
 title: A Bestellung belongs to at most one Antrag
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

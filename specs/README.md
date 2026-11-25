@@ -563,18 +563,18 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/invoices/001290](requirements/functional/finance/invoices/001290_booking-pays-invoice.md) | A new booking sets its invoice to paid | approved |
 | [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | approved |
 | [F/finance/invoices/001292](requirements/functional/finance/invoices/001292_invoice-menu-books.md) | The head menu of an invoice has "Buchung anlegen" | approved |
-| [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to at most one Antrag | draft |
+| [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to at most one Antrag | approved |
 | [F/finance/orders/002851](requirements/functional/finance/orders/002851_order-fields.md) | A Bestellung holds these fields | approved |
 | [F/finance/orders/002852](requirements/functional/finance/orders/002852_order-kind.md) | A Bestellung is an order or an Auslage | approved |
 | [F/finance/orders/002853](requirements/functional/finance/orders/002853_order-status.md) | A Bestellung has four statuses for the goods | approved |
 | [F/finance/orders/002855](requirements/functional/finance/orders/002855_order-number.md) | A new Bestellung gets a random number of eight characters | approved |
 | [F/finance/orders/002856](requirements/functional/finance/orders/002856_order-url.md) | The link of a Bestellung is an http or https address | approved |
 | [F/finance/orders/002857](requirements/functional/finance/orders/002857_order-moves-no-money.md) | A Bestellung moves no money | approved |
-| [F/finance/orders/002858](requirements/functional/finance/orders/002858_order-needs-approved-antrag.md) | A Bestellung of an Antrag needs an approved Antrag of a type with money | draft |
+| [F/finance/orders/002858](requirements/functional/finance/orders/002858_order-needs-approved-antrag.md) | A Bestellung of an Antrag needs an approved Antrag of a type with money | approved |
 | [F/finance/orders/002860](requirements/functional/finance/orders/002860_order-positions.md) | A Bestellung can name positions of the Kostenaufstellung | approved |
 | [F/finance/orders/002861](requirements/functional/finance/orders/002861_order-planned-amount-prefill.md) | The form fills the planned price and the link from the preferred offers | approved |
 | [F/finance/orders/002862](requirements/functional/finance/orders/002862_order-permission.md) | The write of a Bestellung needs order.manage | approved |
-| [F/finance/orders/002863](requirements/functional/finance/orders/002863_order-read.md) | A person who reads the Antrag reads its Bestellungen | draft |
+| [F/finance/orders/002863](requirements/functional/finance/orders/002863_order-read.md) | A person who reads the Antrag reads its Bestellungen | approved |
 | [F/finance/orders/002864](requirements/functional/finance/orders/002864_order-applicant-view.md) | The applicant reads the Bezeichnung and the status only | approved |
 | [F/finance/orders/002865](requirements/functional/finance/orders/002865_order-audit.md) | Each write of a Bestellung has an audit entry | approved |
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | approved |
