@@ -648,7 +648,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
 | [F/integrations/paperless/002516](requirements/functional/integrations/paperless/002516_file-final-protocol.md) | A final protocol is filed in Paperless | approved |
-| [F/integrations/paperless/002517](requirements/functional/integrations/paperless/002517_file-decided-antrag.md) | The PDF of an Antrag is filed at each decision | approved |
+| [F/integrations/paperless/002517](requirements/functional/integrations/paperless/002517_file-decided-antrag.md) | The PDF of an Antrag is filed at each decision | replaced |
 | [F/integrations/paperless/002518](requirements/functional/integrations/paperless/002518_file-plan-in-force.md) | A Haushaltsplan is filed when it comes into force | approved |
 | [F/integrations/paperless/002519](requirements/functional/integrations/paperless/002519_document-data.md) | A filed document carries type, date, Gremium and link | approved |
 | [F/integrations/paperless/002520](requirements/functional/integrations/paperless/002520_filed-once.md) | A file is filed only once | approved |
@@ -674,6 +674,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
 | [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | approved |
 | [F/integrations/paperless/002844](requirements/functional/integrations/paperless/002844_links-name-public-address.md) | A link to Paperless names the address for links | approved |
+| [F/integrations/paperless/003110](requirements/functional/integrations/paperless/003110_file-antrag-at-end-state.md) | The PDF of an Antrag is filed when the Antrag reaches an end state | approved |
+| [F/integrations/paperless/003111](requirements/functional/integrations/paperless/003111_no-second-upload.md) | An uploaded file is never uploaded again by a new try | approved |
 | [F/integrations/pretix/003080](requirements/functional/integrations/pretix/003080_connection-page.md) | An admin connects one pretix organizer | approved |
 | [F/integrations/pretix/003081](requirements/functional/integrations/pretix/003081_feature-switch.md) | Pretix has a feature switch | approved |
 | [F/integrations/pretix/003082](requirements/functional/integrations/pretix/003082_part-switches.md) | Each part of the pretix integration has its own switch | approved |

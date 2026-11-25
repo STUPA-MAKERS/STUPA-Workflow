@@ -4,7 +4,7 @@ title: An admin can file the final documents that exist
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-23
+updated: 2026-11-25
 tests:
   - "backend/tests/integration/modules/paperless/test_paperless.py:test_the_backfill_files_the_documents_from_before"
   - "frontend/src/app/pages/admin/paperless/paperless.component.spec.ts:PaperlessComponent"
@@ -20,8 +20,8 @@ scope:
 # An admin can file the final documents that exist
 
 The admin page `Paperless` must have the action `Bestehende Dokumente ablegen`. The action must
-start jobs for each final protocol, each decided Antrag and each Haushaltsplan in force that
-has no filed document. The action must start jobs only for a part whose switch is on (002512).
+start jobs for each final protocol, each Antrag in an end state (003110) and each Haushaltsplan
+in force that has no filed document. The action must start jobs only for a part whose switch is on (002512).
 
 Reason: The integration can go on after years of use. The archive must then also get the
 documents from before.
