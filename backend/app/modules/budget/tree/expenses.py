@@ -48,6 +48,7 @@ def _expense_changes(payload: ExpenseUpdate, target: Budget | None) -> dict[str,
         "payment_method",
         "category",
         "invoice_id",
+        "order_id",
     )
     return {
         **({"amount": payload.amount} if "amount" in fields and payload.amount is not None else {}),
@@ -114,6 +115,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             category=e.category,
             invoiceId=e.invoice_id,
             invoiceNumber=invoice_number,
+            orderId=e.order_id,
             parentExpenseId=e.parent_expense_id,
             childCount=child_count,
             createdAt=e.created_at,
@@ -146,6 +148,8 @@ class ExpenseOps(BudgetTreeServiceBase):
         With ``commit=False`` the caller bundles the booking and its follow-up mutations
         in one transaction.
         """
+        if payload.order_id is not None:
+            await self._require_order(payload.order_id, payload.application_id)
         node, fy_id, app_title = (
             await self._bound_target(payload.application_id)
             if payload.application_id is not None
@@ -169,6 +173,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             payment_method=payload.payment_method,
             category=payload.category,
             invoice_id=payload.invoice_id,
+            order_id=payload.order_id,
         )
         self.session.add(expense)
         paid_invoice = (
@@ -184,6 +189,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 "kind": payload.kind,
                 "amount": str(payload.amount),
                 "applicationId": (str(payload.application_id) if payload.application_id else None),
+                **({"orderId": str(payload.order_id)} if payload.order_id else {}),
                 **(
                     {"invoiceId": str(payload.invoice_id), "invoicePaid": True}
                     if paid_invoice
@@ -249,6 +255,35 @@ class ExpenseOps(BudgetTreeServiceBase):
         await self._refuse_not_leaf(node, year)
         return node, year, None
 
+    async def _require_order(self, order_id: UUID, application_id: UUID | None) -> None:
+        """Check the Bestellung that an expense names (F/finance/orders/002878).
+
+        The booking and the Bestellung name the same Antrag, or both name none.
+
+        The function reads the table ``purchase_order`` through the metadata, because the
+        module ``orders`` is in a layer above this one and its model cannot be imported
+        here.
+
+        Raises:
+            NotFoundError: No Bestellung has this id.
+            ValidationProblem: The booking does not name the Antrag of the Bestellung
+                (``order_application_mismatch``).
+        """
+        orders = BudgetExpense.metadata.tables["purchase_order"]
+        owner = (
+            await self.session.execute(
+                select(orders.c.application_id).where(orders.c.id == order_id)
+            )
+        ).first()
+        if owner is None:
+            raise NotFoundError(f"order {order_id} not found")
+        if owner[0] != application_id:
+            raise ValidationProblem(
+                "The booking must name the Antrag of the Bestellung.",
+                code="order_application_mismatch",
+                errors=[{"field": "orderId", "msg": "Antrag of the Bestellung differs"}],
+            )
+
     async def _pay_invoice(self, invoice_id: UUID) -> bool:
         """Set the invoice of a new booking to `paid` (spec 001290).
 
@@ -312,6 +347,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         The audit entry holds the prior and the new values of the patched fields. The
         revert uses the new values to detect a later edit and answers 409 instead of
         overwriting the changes of another user.
+
+        ``orderId`` sets the Bestellung under the rule of the create
+        (F/finance/orders/002878): 404 for an unknown one, 422
+        ``order_application_mismatch`` when the Antrag differs, and 422
+        ``income_without_order`` for an income.
         """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
@@ -344,6 +384,14 @@ class ExpenseOps(BudgetTreeServiceBase):
         if target is not None:
             await self._resolve_fiscal_year(target, expense.fiscal_year_id, kept=True)
             await self._refuse_not_leaf(target, expense.fiscal_year_id)
+        if "order_id" in fields and payload.order_id is not None:
+            if expense.kind == "income":
+                raise ValidationProblem(
+                    "An income cannot name a Bestellung.",
+                    code="income_without_order",
+                    errors=[{"field": "orderId", "msg": "income cannot name a Bestellung"}],
+                )
+            await self._require_order(payload.order_id, expense.application_id)
         for name, value in _expense_changes(payload, target).items():
             setattr(expense, name, value)
         if "invoice_id" in fields and payload.invoice_id is not None:

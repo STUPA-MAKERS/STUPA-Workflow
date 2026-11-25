@@ -49,7 +49,7 @@ def _hook(
 def test_catalog_matches_the_event_names() -> None:
     """The catalog holds exactly the events of the spec. §F/integrations/webhooks/002411."""
     assert tuple(EVENTS) == get_args(WebhookEventName)
-    assert len(EVENTS) == 16
+    assert len(EVENTS) == 18
     for spec in EVENTS.values():
         assert spec.id_keys
         assert len(spec.field_keys) == len(spec.fields)

@@ -34,6 +34,7 @@ from app.modules.flow.models import State
 from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.meetings.models import Meeting, MeetingAttendance
 from app.modules.notifications.push_models import PushSubscription
+from app.modules.orders.privacy import clear_buyer_names, erase_buyer, order_export
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket, TicketNote
@@ -152,6 +153,7 @@ class PrincipalService:
             self.session, principal_id, files=files, actor=actor, comment_ids=todo_comment_ids
         )
         await erase_appointments(self.session, principal_id)
+        await erase_buyer(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -254,6 +256,7 @@ async def erase_email(
     applications = ApplicationsService(session)
     for application_id in app_ids:
         await applications.anonymize(application_id, files=files, actor=actor, commit=False)
+        await clear_buyer_names(session, application_id)
         await audit_record(
             session,
             actor=actor,
@@ -441,6 +444,7 @@ class ErasureRequestService:
                 await ApplicationsService(self.session).anonymize(
                     application_id, files=files, actor=actor, commit=False
                 )
+                await clear_buyer_names(self.session, application_id)
                 await audit_record(
                     self.session,
                     actor=actor,
@@ -603,6 +607,9 @@ class AuskunftService:
         termine = await appointment_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
+        orders = await order_export(
+            self.session, [principal_row.id] if principal_row is not None else []
+        )
         blocks = [
             {
                 "kind": "principal" if b.principal_id is not None else "email",
@@ -640,6 +647,7 @@ class AuskunftService:
             "todo_comments": todos["comments"],
             "appointments": termine["appointments"],
             "appointment_answers": termine["answers"],
+            "orders": orders,
             "sender_blocks": blocks,
             "principal": principal,
         }
@@ -873,6 +881,7 @@ def build_auskunft_workbook(
     appointments: Sequence[Mapping[str, Any]] = (),
     appointment_answers: Sequence[Mapping[str, Any]] = (),
     paperless_documents: Sequence[Mapping[str, Any]] = (),
+    orders: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
@@ -886,7 +895,8 @@ def build_auskunft_workbook(
     their files), the sender blocks of the account or the address, the Termine that the
     subject created and the answers of the subject to Termine. An eleventh sheet names
     the Paperless documents that the platform filed for the Anträge of the subject, with
-    the number and the date of the filing (§F/administration/privacy/002533).
+    the number and the date of the filing (§F/administration/privacy/002533). A twelfth
+    sheet lists the Bestellungen that name the subject as the buyer.
     """
     from io import BytesIO
 
@@ -1067,6 +1077,22 @@ def build_auskunft_workbook(
         ],
     )
     _add_sheet(
+        "Bestellungen",
+        ["Nummer", "Titel", "Art", "Status", "Bestellt am", "Geliefert am", "Angelegt"],
+        [
+            [
+                o.get("number") or "",
+                o.get("title") or "",
+                _ORDER_KIND_LABELS.get(str(o.get("kind")), ""),
+                _ORDER_STATUS_LABELS.get(str(o.get("status")), ""),
+                _fmt_day(o.get("orderedOn"), None),
+                _fmt_day(o.get("deliveredOn"), None),
+                _fmt_dt(o.get("createdAt")),
+            ]
+            for o in orders
+        ],
+    )
+    _add_sheet(
         "Paperless-Dokumente",
         ["Antrag-ID", "Dokumentnummer", "Titel", "Abgelegt am"],
         [
@@ -1084,6 +1110,15 @@ def build_auskunft_workbook(
     wb.save(buf)
     return buf.getvalue()
 
+
+#: The kinds and the statuses of a Bestellung as the German UI names them.
+_ORDER_KIND_LABELS: dict[str, str] = {"order": "Bestellung", "outlay": "Auslage"}
+_ORDER_STATUS_LABELS: dict[str, str] = {
+    "planned": "Geplant",
+    "ordered": "Bestellt",
+    "delivered": "Geliefert",
+    "cancelled": "Storniert",
+}
 
 #: The answers to a Termin as the German UI names them.
 _ANSWER_LABELS: dict[str, str] = {

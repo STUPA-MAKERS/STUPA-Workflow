@@ -72,6 +72,9 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/applications/{application_id}/votes"): (
         "VotingService.assert_can_manage_group (manages_votes_in_gremium)"
     ),
+    ("GET", "/api/orders/{order_id}/attachments"): (
+        "orders.router._readable (resolve_app_read) and no applicant view"
+    ),
     ("GET", "/api/activity"): "ActivityService sources (resolve_app_read, BoardAccess.can_read, "
     "tickets.access.area_scope or own report, MeetingRules.assert_can_read)",
     ("GET", "/api/activity/status"): "ActivityService sources, as GET /api/activity",

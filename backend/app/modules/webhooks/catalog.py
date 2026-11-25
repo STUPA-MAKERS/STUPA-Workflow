@@ -31,6 +31,8 @@ WebhookEventName = Literal[
     "protocol.finalized",
     "booking.created",
     "invoice.created",
+    "order.created",
+    "order.status_changed",
     "ticket.created",
     "ticket.message",
     "ticket.status",
@@ -115,6 +117,18 @@ _TICKET_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("url", "https://example.org/tickets/" + _ID),
 )
 
+_ORDER_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("number", "B-7K3QX9MD"),
+    FieldSpec("title", "Beamer"),
+    FieldSpec("kind", "order"),
+    FieldSpec("status", "ordered"),
+    FieldSpec("supplier", "Technikhaus"),
+    FieldSpec("plannedAmount", "369.00"),
+    FieldSpec("actualAmount", None),
+    FieldSpec("applicationTitle", "Zuschuss Sommerfest"),
+    FieldSpec("url", "https://example.org/orders/" + _ID),
+)
+
 _CATALOG: tuple[EventSpec, ...] = (
     EventSpec("application.created", "applications", ("applicationId",), _APPLICATION_FIELDS),
     EventSpec("application.updated", "applications", ("applicationId",), _APPLICATION_FIELDS),
@@ -195,6 +209,13 @@ _CATALOG: tuple[EventSpec, ...] = (
             FieldSpec("costCentre", _ref("Kultur")),
             FieldSpec("url", "https://example.org/invoices?id=" + _ID),
         ),
+    ),
+    EventSpec("order.created", "budget", ("orderId", "applicationId"), _ORDER_FIELDS),
+    EventSpec(
+        "order.status_changed",
+        "budget",
+        ("orderId", "applicationId"),
+        (*_ORDER_FIELDS, FieldSpec("fromStatus", "planned")),
     ),
     EventSpec(
         "ticket.created",

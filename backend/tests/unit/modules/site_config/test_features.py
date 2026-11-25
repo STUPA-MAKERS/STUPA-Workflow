@@ -39,7 +39,11 @@ def test_an_unknown_feature_key_is_refused() -> None:
 def test_invoices_are_off_while_budget_is_off_and_keep_their_switch() -> None:
     switches = FeatureSwitches(budget=False)
     assert switches.invoices is True
-    assert enabled_features(switches) == ALL_FEATURES - {Feature.BUDGET, Feature.INVOICES}
+    assert enabled_features(switches) == ALL_FEATURES - {
+        Feature.BUDGET,
+        Feature.INVOICES,
+        Feature.ORDERS,
+    }
     back_on = switches.model_copy(update={"budget": True})
     assert Feature.INVOICES in enabled_features(back_on)
 
@@ -158,6 +162,10 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/expenses/export.xlsx", {Feature.BUDGET}),
         ("/api/applications/{application_id}/assign-budget", {Feature.BUDGET}),
         ("/api/invoices/{invoice_id}/file", {Feature.INVOICES}),
+        ("/api/invoices/{invoice_id}/orders", {Feature.INVOICES, Feature.ORDERS}),
+        ("/api/orders", {Feature.ORDERS}),
+        ("/api/orders/{order_id}/attachments/{attachment_id}", {Feature.ORDERS}),
+        ("/api/applications/{application_id}/orders", {Feature.ORDERS}),
         ("/api/tickets/mine", {Feature.TICKETS}),
         ("/api/activity", {Feature.ACTIVITY}),
         ("/api/activity/seen", {Feature.ACTIVITY}),
@@ -200,6 +208,9 @@ def test_every_route_of_the_app_is_in_the_expected_feature() -> None:
     }
     assert all(by_feature.values())
     assert all(p.startswith("/api/invoices") for p in by_feature[Feature.INVOICES])
+    assert all(
+        p.startswith("/api/orders") or p.endswith("/orders") for p in by_feature[Feature.ORDERS]
+    )
     assert all(p.startswith("/api/tickets") for p in by_feature[Feature.TICKETS])
     assert all(p.startswith("/api/activity") for p in by_feature[Feature.ACTIVITY])
     assert all(p.startswith("/api/graph") for p in by_feature[Feature.GRAPH])

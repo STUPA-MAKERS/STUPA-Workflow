@@ -642,6 +642,11 @@ class ExpenseUpdate(WireModel, frozen=True):
     paymentMethod: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None
     category: str | None = None
     invoiceId: str | None = Field(default=None, description="Linked invoice; null clears")
+    orderId: str | None = Field(
+        default=None,
+        description="The Bestellung that the booking names; null clears. The booking and "
+        "the Bestellung name the same Antrag, or both name none",
+    )
 
 
 class TransferCreate(WireModel, frozen=True):
@@ -1148,6 +1153,63 @@ class TicketPatch(WireModel, frozen=True):
         description="Only with status `done` or `rejected`: move every open linked to-do the "
         "caller can write into its done column",
     )
+
+
+OrderKind = Literal["order", "outlay"]
+OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
+
+
+class OrderCreate(WireModel, frozen=True):
+    """The body of a new Bestellung of an Antrag."""
+
+    title: str = Field(description="1 to 200 characters")
+    kind: OrderKind = Field(
+        default="order",
+        description="`order`: the Gremium buys. `outlay`: a person pays and gets the money back",
+    )
+    status: OrderStatus = "planned"
+    supplier: str | None = Field(default=None, description="Up to 200 characters")
+    url: str | None = Field(default=None, description="An http or https address of the offer")
+    orderNumber: str | None = Field(
+        default=None, description="The number that the supplier gave the order"
+    )
+    positionIds: list[str] = Field(
+        default_factory=list,
+        description="Ids of positions of the Kostenaufstellung of the Antrag; a position "
+        "belongs to at most one Bestellung that is not cancelled",
+    )
+    plannedAmount: str | None = Field(default=None, description="Euro, for example `129.90`")
+    actualAmount: str | None = Field(default=None, description="The real price in euro")
+    orderedOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    deliveredOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    buyerId: str | None = Field(default=None, description="The account of the buyer")
+    buyerName: str | None = Field(
+        default=None, description="The name of a buyer without an account"
+    )
+    note: str | None = Field(default=None, description="Up to 2000 characters")
+
+
+class OrderPatch(WireModel, frozen=True):
+    """A change of a Bestellung: only the fields that the caller sets change."""
+
+    version: int = Field(
+        description="The `version` of the Bestellung as last read; 409 on a mismatch"
+    )
+    title: str | None = None
+    kind: OrderKind | None = None
+    supplier: str | None = Field(default=None, description="Explicit null clears it")
+    url: str | None = Field(default=None, description="Explicit null clears it")
+    orderNumber: str | None = Field(default=None, description="Explicit null clears it")
+    positionIds: list[str] | None = Field(
+        default=None, description="The whole new list of position ids"
+    )
+    plannedAmount: str | None = Field(default=None, description="Explicit null clears it")
+    actualAmount: str | None = Field(default=None, description="Explicit null clears it")
+    orderedOn: str | None = Field(default=None, description="ISO date; explicit null clears it")
+    deliveredOn: str | None = Field(default=None, description="ISO date; explicit null clears it")
+    buyerId: str | None = Field(default=None, description="Explicit null clears it")
+    buyerName: str | None = Field(default=None, description="Explicit null clears it")
+    note: str | None = Field(default=None, description="Explicit null clears it")
 
 
 def dump_create(model: BaseModel) -> dict[str, Any]:

@@ -159,6 +159,7 @@ def _transition_out(
         allowsDecision=allows_decision,
         toTerminal=to_terminal,
         requiresAmount=requires_amount,
+        offerOnOrderStatus=t.offer_on_order_status,  # pyright: ignore[reportArgumentType]
     )
 
 

@@ -1,0 +1,32 @@
+<app-form-screen
+  [head]="{ title: title() }"
+  [icon]="editing() ? 'edit' : 'package'"
+  [subtitle]="order()?.number ?? ''"
+  [form]="form()"
+  [value]="value()"
+  [errors]="errors()"
+  [submit]="{ label: 'action.save' | t, busy: saving() }"
+  (valueChange)="onValue($event)"
+  (submit)="save($event)"
+  (cancel)="close()"
+/>
+<app-section [level]="2" [heading]="'orders.field.buyerAccount' | t">
+  @if (buyer(); as chosen) {
+    <app-chip
+      [removable]="true"
+      [removeLabel]="'orders.buyer.remove' | t: { name: chosen.name }"
+      (remove)="setBuyer(null)"
+    >
+      {{ chosen.name }}
+    </app-chip>
+  } @else {
+    <app-gremium-person-picker
+      [placeholder]="'orders.buyer.search' | t"
+      [persons]="findPeople"
+      (picked)="onPicked($event)"
+    />
+  }
+  @if (buyerError()) {
+    <app-error-text>{{ buyerError() }}</app-error-text>
+  }
+</app-section>

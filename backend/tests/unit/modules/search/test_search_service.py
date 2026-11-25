@@ -31,6 +31,7 @@ def _svc(**sources: Any) -> SearchService:
         "_meetings",
         "_invoices",
         "_expenses",
+        "_orders",
         "_budgets",
         "_gremien",
         "_principals",

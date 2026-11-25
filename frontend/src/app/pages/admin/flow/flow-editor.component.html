@@ -323,6 +323,7 @@
             [budgetTree]="budgetTree()"
             [targetBudgetVote]="targetIsBudgetVote(sel.t.to)"
             (guardChange)="setGuard(sel.index, $event)"
+            (orderOfferChange)="setOrderOffer(sel.index, $event)"
             (actionAdd)="addAction(sel.index, $event)"
             (actionRemove)="removeAction(sel.index, $event)"
             (actionParamChange)="setActionParam(sel.index, $event.ai, $event.key, $event.value)"

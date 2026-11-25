@@ -1,0 +1,50 @@
+<app-section [heading]="'orders.files.title' | t">
+  @if (canManage()) {
+    <app-button-group sectionAction>
+      <app-button variant="text" size="sm" [loading]="uploading()" (click)="picker.open()">
+        <app-icon name="upload" />
+        {{ 'applications.attachments.upload' | t }}
+      </app-button>
+    </app-button-group>
+  }
+  <app-file-picker #picker [multiple]="true" [disabled]="!canManage()" (picked)="upload($event)" />
+  @if (files().length) {
+    <app-field-group role="list">
+      @for (file of files(); track file.id) {
+        @let st = scan(file.scanState);
+        <app-list-item role="listitem" [title]="file.filename" (activate)="download(file)">
+          <app-icon lead name="clip" [size]="19" />
+          <app-meta-line sub>
+            <span>{{ size(file) }}</span>
+            <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+          </app-meta-line>
+          @if (canManage()) {
+            <app-button-group trail>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="('applications.attachments.delete' | t) + ': ' + file.filename"
+                [disabled]="busyId() !== null"
+                (click)="confirming.set(file)"
+              >
+                <app-icon name="trash" />
+              </app-button>
+            </app-button-group>
+          }
+        </app-list-item>
+      }
+    </app-field-group>
+  } @else {
+    <app-empty-state icon="clip" shape="file" rows="1" [heading]="'orders.files.empty' | t" />
+  }
+</app-section>
+
+<app-confirm-dialog
+  [open]="confirming() !== null"
+  [title]="'applications.attachments.deleteTitle' | t"
+  [body]="'applications.attachments.deleteConfirm' | t: { name: confirming()?.filename ?? '' }"
+  [busy]="busyId() !== null"
+  (confirm)="remove()"
+  (cancel)="confirming.set(null)"
+/>

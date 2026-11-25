@@ -52,13 +52,35 @@ describe('NavService', () => {
       'budget',
       'expenses',
       'invoices',
+      'orders',
       ...PUBLIC,
     ]);
   });
 
-  it('opens the tickets with ticket.manage, after the invoices', () => {
+  it('opens the tickets with ticket.manage, after the Bestellungen', () => {
     expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', ...PUBLIC, 'admin']);
-    expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'orders') + 1);
+  });
+
+  /** §F/finance/orders/002883: "Bestellungen" needs `order.manage` or a read permission of the Haushalt. */
+  it.each([
+    [['order.manage'], true],
+    [['budget.view'], true],
+    [['budget.structure'], true],
+    [['budget.book'], true],
+    [['finance.export'], false],
+    [[], false],
+  ])('opens the Bestellungen with order.manage or a budget read permission: %j', (permissions, open) => {
+    expect(keysFor({ ...BASE, permissions }).includes('orders')).toBe(open);
+  });
+
+  it('puts the Bestellungen after the invoices, with the routes of the list, the form and the detail', () => {
+    const item = NAV_ITEMS.find((i) => i.key === 'orders');
+    expect(item).toMatchObject({ path: '/orders', labelKey: 'nav.orders', feature: 'orders', place: 'main' });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'orders')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
+    const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'orders');
+    expect(route?.data).toMatchObject({ title: 'nav.orders', permission: ['order.manage', 'budget.view', 'budget.structure', 'budget.book'] });
+    expect(route?.children?.map((c) => c.path)).toEqual(['', 'new', ':id/edit', ':id']);
   });
 
   /** § F/collaboration/graph/001420 and 001421: the entry "Graph" needs `graph.view`. */
@@ -169,6 +191,7 @@ describe('NavService', () => {
       ['voting', ['voting']],
       ['budget', ['budget', 'expenses']],
       ['invoices', ['invoices']],
+      ['orders', ['orders']],
       ['tickets', ['tickets']],
       ['graph', ['graph']],
       ['public', ['protocols', 'decisions', 'publicCalendar']],

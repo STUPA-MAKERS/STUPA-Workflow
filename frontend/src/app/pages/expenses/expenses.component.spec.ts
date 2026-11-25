@@ -241,7 +241,7 @@ function build(
       { provide: TodosApiService, useValue: EVENTS_API },
       {
         provide: AuthService,
-        useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']),
+        useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'finance.export']),
       },
     ],
   });
@@ -321,7 +321,7 @@ describe('ExpensesComponent (unit)', () => {
   });
 
   it('canManage / canExport reflect AuthService permissions', () => {
-    const yes = build({ perms: ['budget.book', 'budget.export'] });
+    const yes = build({ perms: ['budget.book', 'finance.export'] });
     expect(yes.cmp.canManage()).toBe(true);
     expect(yes.cmp.canExport()).toBe(true);
     yes.http.verify();
@@ -3097,7 +3097,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(dlg(cmp).newCorrespondent()).toBe('Acme GmbH');
     expect(nav).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { new: null, invoice: null }, replaceUrl: true }),
+      expect.objectContaining({ queryParams: { new: null, invoice: null, order: null }, replaceUrl: true }),
     );
     nav.mockRestore();
   });
@@ -3120,6 +3120,150 @@ describe('ExpensesComponent (list/detail)', () => {
     http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [], total: 0, limit: 200, offset: 0 });
     flushList(http, page([]));
     expect(cmp.createOpen()).toBe(false);
+  });
+
+  /** §F/finance/orders/002879 */
+  it.each([
+    [
+      { kind: 'order', supplier: 'Technikhaus', buyerLabel: 'Lea Hoffmann', invoiceId: 'inv-1' },
+      { payee: 'Technikhaus', invoice: 'inv-1', app: 'Technik' },
+    ],
+    [
+      { kind: 'outlay', supplier: 'Technikhaus', buyerLabel: 'Lea Hoffmann', invoiceId: null, applicationTitle: null },
+      { payee: 'Lea Hoffmann', invoice: '', app: 'Antrag' },
+    ],
+  ])('fills the form of a new booking from a Bestellung %#', (over, want) => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['order', 'o-1']]) },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: TodosApiService, useValue: EVENTS_API },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [INVOICE], total: 1, limit: 200, offset: 0 });
+    flushList(http, page([]));
+    expect(cmp.createOpen()).toBe(true);
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush({
+      id: 'o-1',
+      number: 'B-7K3QX9MD',
+      title: 'Beamer',
+      status: 'delivered',
+      applicationId: 'app-1',
+      applicationTitle: 'Technik',
+      plannedAmount: '100.00',
+      actualAmount: '112.50',
+      bookedAmount: '40.00',
+      ...over,
+    });
+    const d = dlg(cmp);
+    expect(d.newOrder()).toEqual({ id: 'o-1', label: 'B-7K3QX9MD · Beamer' });
+    expect(d.newApplicationId()).toBe('app-1');
+    expect(d.appQuery()).toBe(want.app);
+    expect(d.newDescription()).toBe('Beamer');
+    expect(d.newAmount()).toBe('72.50');
+    expect(d.newCorrespondent()).toBe(want.payee);
+    expect(d.newInvoiceId()).toBe(want.invoice);
+
+    d.create(new Event('submit'));
+    const post = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST');
+    expect(post.request.body).toMatchObject({ applicationId: 'app-1', orderId: 'o-1', amount: '72.50' });
+    post.flush({ ...EXPENSE, orderId: 'o-1' });
+    http.match(() => true).forEach((req) => req.flush(req.request.url.endsWith('/budgets') ? [] : { items: [], total: 0, limit: 50, offset: 0 }));
+  });
+
+  /** §F/finance/orders/002879: the Bestellung goes with its Antrag. */
+  it('drops the Bestellung of a new booking with its Antrag and names a failed read', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    const toast = TestBed.inject(ToastService);
+    const error = jest.spyOn(toast, 'show');
+    d.openCreate({ orderId: 'o-1' });
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush(null, { status: 404, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith('Die Bestellung konnte nicht geladen werden.', 'error');
+    expect(d.newOrder()).toBeNull();
+
+    d.openCreate({ orderId: 'o-1' });
+    d.createOpen.set(false);
+    http.expectOne((r) => r.url.endsWith('/orders/o-1')).flush({ id: 'o-1', number: 'B-1', title: 'x', applicationId: 'app-1' });
+    expect(d.newOrder()).toBeNull();
+
+    d.openCreate();
+    d.pickApp({ id: 'app-1', title: 'Technik' });
+    d.newOrder.set({ id: 'o-1', label: 'B-1 · Beamer' });
+    d.pickApp({ id: 'app-1', title: 'Technik' });
+    expect(d.newOrder()).not.toBeNull();
+    d.pickApp({ id: 'app-2', title: 'Andere' });
+    expect(d.newOrder()).toBeNull();
+    d.newOrder.set({ id: 'o-1', label: 'B-1 · Beamer' });
+    d.clearApp();
+    expect(d.newOrder()).toBeNull();
+  });
+
+  /** §F/finance/orders/003014: a Bestellung without an Antrag fills the form and keeps the cost centre free. */
+  it('fills a new booking from a Bestellung without an Antrag', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    d.openCreate({ orderId: 'o-9' });
+    d.newBudgetId.set('b-1');
+    http.expectOne((r) => r.url.endsWith('/orders/o-9')).flush({ id: 'o-9', number: 'B-9', title: 'Altkauf', status: 'delivered', applicationId: null, actualAmount: '30.00', bookedAmount: '0.00' });
+    expect(d.newOrder()).toEqual({ id: 'o-9', label: 'B-9 · Altkauf' });
+    expect(d.newApplicationId()).toBe('');
+    expect(d.newBudgetId()).toBe('b-1');
+    expect(d.newAmount()).toBe('30.00');
+  });
+
+  /** §F/finance/orders/002878: the change of a booking sets and removes its Bestellung. */
+  it('offers the Bestellungen that a booking can name and saves the change', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    const orders = (url: string) => http.expectOne((r) => r.url.endsWith(url));
+    d.openEdit({ ...EXPENSE, applicationId: null, orderId: null });
+    const free = orders('/orders');
+    expect(free.request.params.get('withoutApplication')).toBe('true');
+    free.flush({ items: [{ id: 'o-9', number: 'B-9', title: 'Altkauf' }], total: 1 });
+    expect(d.editOrderOptions()).toEqual([{ value: 'o-9', label: 'B-9 · Altkauf' }]);
+    d.editOrderId.set('o-9');
+    d.saveEdit(new Event('submit'));
+    const patch = http.expectOne((r) => r.method === 'PATCH');
+    expect(patch.request.body).toMatchObject({ orderId: 'o-9' });
+    patch.flush({ ...EXPENSE, orderId: 'o-9' });
+    http.match(() => true).forEach((req) => req.flush({ items: [], total: 0, limit: 50, offset: 0 }));
+
+    d.openEdit({ ...EXPENSE, applicationId: 'app-1', orderId: 'o-gone' });
+    orders('/applications/app-1/orders').flush({ items: [{ id: 'o-1', number: 'B-1', title: 'Beamer' }] });
+    expect(d.editOrderOptions()).toEqual([
+      { value: 'o-gone', label: 'Bestellung' },
+      { value: 'o-1', label: 'B-1 · Beamer' },
+    ]);
+    d.editOrderId.set('');
+    d.saveEdit(new Event('submit'));
+    const loose = http.expectOne((r) => r.method === 'PATCH');
+    expect(loose.request.body).toMatchObject({ orderId: null });
+    loose.flush({ ...EXPENSE, orderId: null });
+    http.match(() => true).forEach((req) => req.flush({ items: [], total: 0, limit: 50, offset: 0 }));
+
+    d.openEdit({ ...EXPENSE, applicationId: null, orderId: null });
+    const late = orders('/orders');
+    d.openEdit({ ...EXPENSE, id: 'other', applicationId: null, orderId: null });
+    late.flush({ items: [{ id: 'o-9', number: 'B-9', title: 'Altkauf' }], total: 1 });
+    expect(d.editOrderOptions()).toEqual([]);
+    orders('/orders').flush(null, { status: 403, statusText: 'x' });
+    expect(d.editOrderOptions()).toEqual([]);
+    d.saveEdit(new Event('submit'));
+    expect(http.expectOne((r) => r.method === 'PATCH').request.body).not.toHaveProperty('orderId');
+
+    d.openEdit({ ...EXPENSE, kind: 'income' });
+    d.openEdit({ ...EXPENSE, parentExpenseId: 'p-1' });
+    localStorage.setItem('ap.features.off', JSON.stringify(['orders']));
+    http.expectNone((r) => r.url.endsWith('/orders'));
+    localStorage.removeItem('ap.features.off');
   });
 
   /** A transfer that is not loaded leaves the detail empty. */
@@ -3188,6 +3332,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.confirmDeleteTransfer()).toBe(TRANSFER);
     cmp.onTransferMenu({ id: 'other', label: '' }, TRANSFER);
     expect(cmp.transferMenu().length).toBe(2);
+    http.match((r) => r.url.endsWith('/orders'));
     http.verify();
 
     TestBed.resetTestingModule();
@@ -3235,7 +3380,7 @@ describe('ExpensesComponent (list/detail)', () => {
     setViewport(WIDE);
     const e2 = { ...EXPENSE, id: 'e-2', description: 'Plakate' };
     const { fixture, container } = await setup({
-      perms: ['budget.view', 'budget.book', 'budget.export'],
+      perms: ['budget.view', 'budget.book', 'finance.export'],
       page: page([EXPENSE, e2]),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3269,7 +3414,7 @@ describe('ExpensesComponent (list/detail)', () => {
 
   it('shows the bulk actions as icons in the bar one pane at a time', async () => {
     const { fixture } = await setup({
-      perms: ['budget.view', 'budget.book', 'budget.export'],
+      perms: ['budget.view', 'budget.book', 'finance.export'],
       page: page([EXPENSE]),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3377,6 +3522,7 @@ describe('ExpensesComponent (row swipe)', () => {
     cmp.onRowSwiped({ id: 'edit', label: 'x', icon: 'edit' }, EXPENSE);
     expect(cmp.editing()?.id).toBe('e-1');
     cmp.onRowSwiped({ id: 'other', label: 'x', icon: 'x' }, EXPENSE);
+    TestBed.inject(HttpTestingController).match((r) => r.url.endsWith('/orders'));
   });
 
   it('swipes to the left into the selection, with the booking already selected', () => {

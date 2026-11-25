@@ -78,6 +78,7 @@ HIT_URL: Mapping[SearchKind, str] = {
     "meeting": "/meetings/{id}",
     "invoice": "/invoices?id={id}",
     "expense": "/expenses?id={id}",
+    "order": "/orders/{id}",
     "budget": "/budget?costCentre={id}",
     "gremium": "/admin/committees/{id}/members",
     "principal": "/admin/users?q={id}",
@@ -90,6 +91,7 @@ HIT_URL: Mapping[SearchKind, str] = {
 SOURCE_FEATURE: Mapping[str, frozenset[Feature]] = {
     "meeting": frozenset({Feature.MEETINGS}),
     "invoice": frozenset({Feature.INVOICES}),
+    "order": frozenset({Feature.ORDERS}),
     "expense": frozenset({Feature.BUDGET}),
     "budget": frozenset({Feature.BUDGET}),
     "ticket": frozenset({Feature.TICKETS}),
@@ -142,6 +144,7 @@ class SearchService:
             "meeting": self._meetings,
             "invoice": self._invoices,
             "expense": self._expenses,
+            "order": self._orders,
             "budget": self._budgets,
             "gremium": self._gremien,
             "principal": self._principals,
@@ -253,6 +256,32 @@ class SearchService:
                 url=HIT_URL["expense"].format(id=e.id),
             )
             for e in page.items
+        ]
+
+    async def _orders(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
+        """Reuses `OrderListing.page`, the list of `GET /api/orders`.
+
+        The list holds the Bestellungen that the caller reads (F/finance/orders/002863),
+        so the search needs no permission of its own. A hit opens the Bestellung in the
+        pane of the page "Bestellungen".
+        """
+        from app.modules.orders.listing import OrderFilter, OrderListing
+        from app.modules.orders.numbers import format_number
+
+        rows, _ = await OrderListing(self.session).page(
+            principal, OrderFilter(q=q), limit=PER_KIND + 1, offset=0
+        )
+        return [
+            SearchHit(
+                kind="order",
+                id=str(row.id),
+                title=row.title,
+                subtitle=" · ".join(
+                    part for part in (format_number(row.number), row.supplier) if part
+                ),
+                url=HIT_URL["order"].format(id=row.id),
+            )
+            for row in rows
         ]
 
     async def _budgets(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:

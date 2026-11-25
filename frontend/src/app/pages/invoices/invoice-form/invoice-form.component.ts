@@ -56,6 +56,9 @@ export interface InvoiceFormHost {
   readonly attaching: Signal<boolean>;
   readonly statusOptions: Signal<readonly SelectOption[]>;
 
+  /** The Bestellung that gets the new invoice, when the form was opened from one. */
+  readonly forOrder?: Signal<{ readonly number: string; readonly title: string } | null>;
+
   readonly createOpen: WritableSignal<boolean>;
   readonly newNumber: WritableSignal<string>;
   readonly newSupplier: WritableSignal<string>;
@@ -162,6 +165,8 @@ export class InvoiceFormComponent {
       const i = this.host().editing();
       return i?.number ?? '';
     }
+    const order = this.host().forOrder?.() ?? null;
+    if (order) return this.i18n.translate('orders.invoice.forOrder', order);
     return this.host().importNotice() === 'parsed' ? this.i18n.translate('invoices.form.fromFile') : '';
   });
 

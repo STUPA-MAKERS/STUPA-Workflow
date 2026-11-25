@@ -14,7 +14,11 @@ from typing import Any
 
 from sqlalchemy import Row, select
 
-from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
+from app.modules.audit.actions import (
+    REVERTABLE_BUDGET_ACTIONS,
+    REVERTABLE_ORDER_ACTIONS,
+    AuditAction,
+)
 from app.modules.audit.models import (
     AuditEntry,
 )
@@ -122,6 +126,8 @@ def _revertable_without_revision(action: str, data: Mapping[str, Any]) -> bool:
         case AuditAction.STATUS_CHANGE:
             return bool(data.get("fromStateId") and data.get("toStateId"))
         case AuditAction.BUDGET_NODE_UPDATE | AuditAction.BUDGET_EXPENSE_UPDATE:
+            return bool(data.get("before"))
+        case action if action in REVERTABLE_ORDER_ACTIONS:
             return bool(data.get("before"))
         case AuditAction.BUDGET_ALLOCATION_SET:
             return "previousAllocated" in data

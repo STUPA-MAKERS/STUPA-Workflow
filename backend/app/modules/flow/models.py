@@ -107,6 +107,9 @@ class Transition(UUIDPkMixin, Base):
         branch: Result branch of a vote-state exit, `pass` or `fail`. NULL otherwise.
         requires_action: The firable transition counts as an open task. False marks an
             optional action.
+        offer_on_order_status: ``ordered`` or ``delivered``: the page offers the
+            transition to the person who sets a Bestellung of the Antrag to this status
+            (F/finance/orders/002931). NULL offers nothing. No code fires the transition.
     """
 
     __tablename__ = "transition"
@@ -124,6 +127,7 @@ class Transition(UUIDPkMixin, Base):
     automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)
     requires_action: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    offer_on_order_status: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_transition_flow_version_id_from_state_id", "flow_version_id", "from_state_id"),

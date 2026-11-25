@@ -868,6 +868,7 @@ def _flow_transition_row(from_id: Any, to_id: Any, **kw: Any) -> Any:
         "automatic": False,
         "branch": None,
         "requires_action": True,
+        "offer_on_order_status": None,
     }
     base.update(kw)
     return Row(**base)
@@ -1422,7 +1423,7 @@ def test_webhook_catalog_out() -> None:
     from app.modules.admin.service.webhooks import catalog_out
 
     events = catalog_out()
-    assert len(events) == 16
+    assert len(events) == 18
     ticket = next(e for e in events if e.name == "ticket.created")
     assert {f.key for f in ticket.fields if f.personal} == {"body", "reporterEmail"}
 

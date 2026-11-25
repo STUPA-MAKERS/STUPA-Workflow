@@ -87,3 +87,17 @@ def test_every_kind_has_a_date_read_and_every_relation_two_known_kinds() -> None
     for a_kind, b_kind, _ in builtin_reads():
         assert a_kind in LINK_KINDS
         assert b_kind in LINK_KINDS
+
+
+def test_a_bestellung_has_three_built_in_relations() -> None:
+    """§ F/finance/orders/002889: the Antrag, the invoice and the bookings, without a link."""
+    of_order = {
+        (a_kind, b_kind): str(stmt)
+        for a_kind, b_kind, stmt in builtin_reads()
+        if "order" in (a_kind, b_kind)
+    }
+    assert set(of_order) == {("application", "order"), ("order", "invoice"), ("order", "expense")}
+    assert "purchase_order.application_id" in of_order[("application", "order")]
+    assert "purchase_order.invoice_id" in of_order[("order", "invoice")]
+    assert "budget_expense.order_id" in of_order[("order", "expense")]
+    assert "link" not in " ".join(of_order.values())

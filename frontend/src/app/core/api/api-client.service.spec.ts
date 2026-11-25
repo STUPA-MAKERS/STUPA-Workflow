@@ -709,6 +709,14 @@ describe('ApiClient', () => {
     ]);
   });
 
+  /** §F/finance/orders/002931: the transitions that the flow offers after a status of a Bestellung. */
+  it('asks for the transitions of a status of a Bestellung', () => {
+    api.transitions('app-1', { orderStatus: 'delivered' }).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/applications/app-1/transitions');
+    expect(req.request.params.get('orderStatus')).toBe('delivered');
+    req.flush([]);
+  });
+
   it('maps the applicant transition list', (done) => {
     api.applicantTransitions('app-1').subscribe((ts) => {
       expect(ts[0].id).toBe('tr2');

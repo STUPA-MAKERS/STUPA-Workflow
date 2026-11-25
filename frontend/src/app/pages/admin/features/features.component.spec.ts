@@ -19,6 +19,7 @@ const ALL_ON: FeatureSwitches = {
   voting: true,
   budget: true,
   invoices: true,
+  orders: true,
   tickets: true,
   graph: true,
   public: true,
@@ -134,17 +135,19 @@ describe('FeaturesComponent', () => {
   });
 
   /** Spec 000760: a switch that needs a feature that is off is locked and says why. */
-  it('locks Rechnungen while Budget is off and keeps its stored switch', async () => {
+  it('locks Rechnungen and Bestellungen while Budget is off and keeps their stored switches', async () => {
     const { api, fixture } = await setup();
     await userEvent.click(sw('Haushalt'));
     fixture.detectChanges();
     expect(sw('Rechnungen')).toHaveAttribute('aria-checked', 'false');
     expect(sw('Rechnungen')).toBeDisabled();
-    expect(screen.getByText('Benötigt Haushalt')).toBeInTheDocument();
+    expect(sw('Bestellungen')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Bestellungen')).toBeDisabled();
+    expect(screen.getAllByText('Benötigt Haushalt')).toHaveLength(2);
     await userEvent.click(save());
     fixture.detectChanges();
     expect(api['putFeatures']).not.toHaveBeenCalled();
-    expect(screen.getByText(/Haushalt, Rechnungen/)).toBeInTheDocument();
+    expect(screen.getByText(/Haushalt, Rechnungen, Bestellungen/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ausschalten' }));
     expect(api['putFeatures']).toHaveBeenCalledWith({ ...ALL_ON, budget: false });
   });

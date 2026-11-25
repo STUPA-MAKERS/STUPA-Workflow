@@ -15,6 +15,9 @@ of its own module:
   ``can_view_gremium``: ``gremium.view_all`` or an active membership);
 * invoice, expense — the gate of ``GET /api/invoices`` and ``GET /api/expenses``
   (``budget.access.has_budget_read``);
+* order (a Bestellung) — the member read of its Antrag (F/finance/orders/002863): the
+  creator and an observer of the Antrag get the short view of the orders routes only, so
+  they do not link a Bestellung;
 * budget (a cost centre) — every reader of the card sees its name and path key (spec
   000552); the url to the cost centre page and the link picker follow the gate of the
   budget pages (``has_budget_read``), so only a budget reader links one;
@@ -69,6 +72,11 @@ from app.modules.calendar.models import Appointment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.orders.access import reads_all, reads_free
+from app.modules.orders.listing import OrderFilter, OrderListing
+from app.modules.orders.models import PurchaseOrder
+from app.modules.orders.numbers import format_number as format_order_number
+from app.modules.orders.rules import price as order_price
 from app.modules.paperless.client import SEARCH_LIMIT, PaperlessError
 from app.modules.paperless.links import (
     LINK_KIND as PAPERLESS,
@@ -120,6 +128,7 @@ LINK_FEATURE: dict[str, Feature] = {
     "vote": Feature.VOTING,
     "appointment": Feature.CALENDAR,
     "invoice": Feature.INVOICES,
+    "order": Feature.ORDERS,
     "expense": Feature.BUDGET,
     "budget": Feature.BUDGET,
     "ticket": Feature.TICKETS,
@@ -218,6 +227,22 @@ def _expense_target(exp: BudgetExpense, path_key: str | None) -> Resolved:
             cost_centre=path_key,
             counterparty=exp.correspondent,
             date=_iso(exp.payment_date or exp.invoice_date),
+        ),
+    )
+
+
+def _order_target(order: PurchaseOrder) -> Resolved:
+    """A Bestellung; it opens in the pane of the page "Bestellungen"."""
+    return Resolved(
+        accessible=True,
+        title=order.title,
+        url=f"/orders/{order.id}",
+        detail=TodoLinkDetail(
+            number=format_order_number(order.number),
+            amount=_money(order_price(order.actual_amount, order.planned_amount)),
+            counterparty=order.supplier,
+            date=_iso(order.ordered_on),
+            order_status=order.status,  # type: ignore[arg-type]
         ),
     )
 
@@ -376,6 +401,7 @@ class LinkResolver:
             "gremium": self._gremien,
             "invoice": self._invoices,
             "expense": self._expenses,
+            "order": self._orders,
             "budget": self._budgets,
             "ticket": self._tickets,
             "todo": self._todos,
@@ -737,6 +763,42 @@ class LinkResolver:
         ).all()
         return {exp.id: _expense_target(exp, path_key) for exp, path_key in rows}
 
+    async def _orders(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        """Resolve the Bestellungen whose Antrag the principal reads as a member.
+
+        A person of ``reads_all`` reads every Bestellung. A Bestellung without an Antrag
+        is readable for the persons of ``reads_free``.
+        """
+        every = reads_all(principal)
+        orders = (
+            await self.session.scalars(select(PurchaseOrder).where(PurchaseOrder.id.in_(ids)))
+        ).all()
+        readable = [
+            order
+            for order in orders
+            if order.id in open_ids
+            or every
+            or (
+                reads_free(principal)
+                if order.application_id is None
+                else await self._reads_as_member(order.application_id, principal)
+            )
+        ]
+        return {order.id: _order_target(order) for order in readable}
+
+    async def _reads_as_member(self, application_id: uuid.UUID, principal: Principal) -> bool:
+        """Tell whether the principal reads the Antrag in the member view."""
+        try:
+            access = await resolve_app_read(self.session, application_id, principal, None)
+        except ForbiddenError:
+            return False
+        return not access.is_applicant_view
+
     async def _budgets(
         self,
         ids: AbstractSet[uuid.UUID],
@@ -902,6 +964,8 @@ class LinkResolver:
                 return await self._invoice_candidates(term, principal)
             case "expense":
                 return await self._expense_candidates(term, principal)
+            case "order":
+                return await self._order_candidates(term, principal)
             case "budget":
                 return await self._budget_candidates(pattern, principal)
             case "ticket":
@@ -1018,6 +1082,13 @@ class LinkResolver:
             q=term, limit=PER_KIND, offset=0
         )
         return [e.id for e in page.items]
+
+    async def _order_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
+        """Reuses the list of ``GET /orders``: the Bestellungen of the member-read Anträge."""
+        rows, _ = await OrderListing(self.session).page(
+            principal, OrderFilter(q=term), limit=PER_KIND, offset=0
+        )
+        return [row.id for row in rows]
 
     async def _budget_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
         """Cost centres by name or path key, behind the gate of the budget pages."""

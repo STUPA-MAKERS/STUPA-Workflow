@@ -77,7 +77,7 @@ _ALL_PERMS = (
     "budget.structure",
     "budget.book",
     "budget.view",
-    "budget.export",
+    "finance.export",
     "application.manage",
 )
 
@@ -602,7 +602,7 @@ def test_find_subtree_direct() -> None:
 
 def test_export_without_node_filter(fake: _FakeService) -> None:
     """Without `node` the router sets `node_id` to None and exports the whole filtered tree."""
-    resp = _client(fake, ("budget.export",)).get(
+    resp = _client(fake, ("finance.export",)).get(
         "/api/budget/export.xlsx", params={"gremium": str(_GID)}
     )
     assert resp.status_code == 200
@@ -613,7 +613,7 @@ def test_export_without_node_filter(fake: _FakeService) -> None:
 
 
 def test_export_with_node_filter_found(fake: _FakeService) -> None:
-    resp = _client(fake, ("budget.export",)).get(
+    resp = _client(fake, ("finance.export",)).get(
         "/api/budget/export.xlsx", params={"node": str(_BID), "fiscalYear": str(_FYID)}
     )
     assert resp.status_code == 200
@@ -627,7 +627,7 @@ def test_export_with_node_filter_found(fake: _FakeService) -> None:
 def test_export_with_node_filter_missing(fake: _FakeService) -> None:
     """A `node` without a match gives an empty export, not a 500."""
     other_node = uuid.uuid4()
-    resp = _client(fake, ("budget.export",)).get(
+    resp = _client(fake, ("finance.export",)).get(
         "/api/budget/export.xlsx", params={"node": str(other_node)}
     )
     assert resp.status_code == 200
@@ -670,7 +670,7 @@ def test_create_transfer(fake: _FakeService) -> None:
 
 def test_export_expenses_xlsx(fake: _FakeService) -> None:
     """The router calls list_expenses_paged with limit 10_000."""
-    resp = _client(fake, ("budget.export",)).get(
+    resp = _client(fake, ("finance.export",)).get(
         "/api/expenses/export.xlsx",
         params={
             "budget": str(_BID),
@@ -699,7 +699,7 @@ def test_export_expenses_ids_filter(fake: _FakeService) -> None:
     A matching id keeps the booking, so the export has one row. A foreign id leaves no
     row.
     """
-    client = _client(fake, ("budget.export",))
+    client = _client(fake, ("finance.export",))
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(_EID)})
     assert resp.status_code == 200
     assert fake.session.entries[-1].data["rows"] == 1
@@ -801,6 +801,38 @@ def test_update_invoice_requires_book(fake: _FakeService) -> None:
         f"/api/invoices/{_IID}", json={"status": "paid"}
     )
     assert resp.status_code == 403
+
+
+_PDF_FILE = {"file": ("beleg.pdf", b"%PDF-1.4 fake", "application/pdf")}
+_INVOICE_WRITES: tuple[tuple[str, str, dict[str, Any]], ...] = (
+    ("post", "/api/invoices", {"json": {"grossAmount": "119.00", "number": "R-1"}}),
+    ("patch", f"/api/invoices/{_IID}", {"json": {"status": "paid"}}),
+    ("delete", f"/api/invoices/{_IID}", {}),
+    ("post", "/api/invoices/file", {"files": _PDF_FILE}),
+    ("post", "/api/invoices/parse", {"files": _PDF_FILE}),
+)
+
+
+@pytest.mark.parametrize(("method", "url", "body"), _INVOICE_WRITES)
+def test_invoice_write_needs_invoice_manage_or_book(
+    fake: _FakeService, method: str, url: str, body: dict[str, Any]
+) -> None:
+    """§ 003015: `invoice.manage` or `budget.book` writes an invoice, no other permission."""
+    for perms in (("invoice.manage",), ("budget.book",)):
+        assert _client(fake, perms).request(method, url, **body).status_code < 300
+    denied = _client(fake, ("budget.view", "budget.structure", "order.manage"))
+    assert denied.request(method, url, **body).status_code == 403
+
+
+def test_invoice_manage_gives_no_booking_and_no_read(fake: _FakeService) -> None:
+    """§ 003015: the permission moves no money and reads no invoice."""
+    keeper = _client(fake, ("invoice.manage",))
+    booked = keeper.post(
+        "/api/expenses",
+        json={"budgetId": str(_BID), "fiscalYearId": str(_FYID), "amount": "1.00"},
+    )
+    assert booked.status_code == 403
+    assert keeper.get("/api/invoices").status_code == 403
 
 
 def test_delete_invoice(fake: _FakeService) -> None:

@@ -7,6 +7,9 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
+import { OrdersApiService } from '@core/api/orders.service';
+import { NO_ORDERS, order } from '../../../testing/order-fixtures';
+import { throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 
@@ -75,11 +78,19 @@ const FILE_RES: InvoiceFileResult = {
   fileMime: 'application/pdf',
 };
 
-/** Fake auth with a switch. The component maps `canManage()` to can('budget.book'). */
+/**
+ * Fake auth with a switch. The component maps `canManage()` to `invoice.manage` or
+ * `budget.book` and `canBook()` to `budget.book`. `only` names the permissions that a
+ * person holds; without it the switch answers for every permission.
+ */
 class FakeAuth {
   allowed = true;
-  can(_perm: string): boolean {
-    return this.allowed;
+  only: readonly string[] | null = null;
+  can(perm: string): boolean {
+    return this.only ? this.only.includes(perm) : this.allowed;
+  }
+  canAny(...perms: string[]): boolean {
+    return perms.some((perm) => this.can(perm));
   }
 }
 
@@ -90,6 +101,8 @@ interface SetupOpts {
   /** Fail the initial GET instead of flushing it. */
   error?: boolean;
   canManage?: boolean;
+  /** The permissions of the person, instead of the switch. */
+  only?: readonly string[];
   /** Query params on the page URL, as a global-search hit or a bookmark carries them. */
   queryParams?: Record<string, string>;
 }
@@ -99,6 +112,12 @@ async function setup(opts: SetupOpts = {}) {
   localStorage.setItem('ap.locale', 'de');
   const auth = new FakeAuth();
   auth.allowed = opts.canManage ?? true;
+  auth.only = opts.only ?? null;
+  const orders = {
+    ofInvoice: jest.fn(() => of({ items: [], total: '0' })),
+    get: jest.fn(() => of(order({ id: 'o-1', supplier: 'Technikhaus', version: 4 }))),
+    setInvoice: jest.fn(() => of(order({ id: 'o-1' }))),
+  };
 
   const view = await render(InvoicesComponent, {
     providers: [
@@ -108,6 +127,7 @@ async function setup(opts: SetupOpts = {}) {
       { provide: USE_MOCK_API, useValue: false },
       NO_LINKED_TODOS,
       { provide: AuthService, useValue: auth },
+      { provide: OrdersApiService, useValue: orders },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -131,7 +151,7 @@ async function setup(opts: SetupOpts = {}) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c = view.fixture.componentInstance as any;
-  return { ...view, http, toast, c, auth };
+  return { ...view, http, toast, c, auth, orders };
 }
 
 function lastInvoicesReq(http: HttpTestingController) {
@@ -189,6 +209,7 @@ describe('InvoicesComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         NO_LINKED_TODOS,
+        NO_ORDERS,
         { provide: AuthService, useValue: new FakeAuth() },
         {
           provide: ActivatedRoute,
@@ -835,6 +856,84 @@ describe('InvoicesComponent', () => {
   });
 
   /** Every optional field stays blank, and there is no importToken. */
+  /** §F/finance/orders/002876 */
+  it('opens the form from a Bestellung and makes the new invoice its invoice', async () => {
+    const { c, http, toast, orders } = await setup({ queryParams: { new: 'invoice', order: 'o-1' } });
+    const success = jest.spyOn(kindSpies(toast), 'success');
+    expect(c.createOpen()).toBe(true);
+    expect(orders.get).toHaveBeenCalledWith('o-1');
+    expect(c.forOrder()).toEqual({ id: 'o-1', number: 'B-7K3QX9MD', title: 'Beamer' });
+    expect(c.newSupplier()).toBe('Technikhaus');
+    expect(screen.getByText('Für die Bestellung B-7K3QX9MD · Beamer')).toBeInTheDocument();
+
+    c.onFilesDropped([new File(['x'], 'r.pdf', { type: 'application/pdf' })]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+    expect(c.forOrder()?.id).toBe('o-1');
+    expect(c.newSupplier()).toBe('Parsed Supplier');
+
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST').flush(inv({ id: 'new' }));
+    expect(orders.setInvoice).toHaveBeenCalledWith('o-1', 'new', 4);
+    expect(success).toHaveBeenCalledWith('Die Rechnung ist mit der Bestellung B-7K3QX9MD verknüpft.');
+    expect(c.forOrder()).toBeNull();
+    lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
+  });
+
+  /** §F/finance/orders/002876: an import without ZUGFeRD keeps the Bestellung too. */
+  it('keeps the Bestellung over a manual import and says when the link fails', async () => {
+    const { c, http, toast, orders } = await setup({ queryParams: { new: 'invoice', order: 'o-1' } });
+    const error = jest.spyOn(kindSpies(toast), 'error');
+    c.newSupplier.set('Typed');
+    orders.get.mockReturnValueOnce(of({ ...order({ id: 'o-1', supplier: null }), version: undefined }));
+    c.takeOrder('o-1');
+    expect(c.newSupplier()).toBe('Typed');
+    c.newSupplier.set('');
+    c.takeOrder('o-1');
+    c.takeOrder('o-1');
+    c.onFilesDropped([new File(['x'], 'r.pdf', { type: 'application/pdf' })]);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
+      .flush({ code: 'invoice_not_zugferd' }, { status: 422, statusText: 'Unprocessable' });
+    http.expectOne((r) => r.url.endsWith('/api/invoices/file')).flush(FILE_RES);
+    expect(c.forOrder()?.id).toBe('o-1');
+
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
+    c.newGross.set('5');
+    orders.setInvoice.mockReturnValueOnce(throwError(() => ({ status: 409 })));
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST').flush(inv({ id: 'new' }));
+    expect(error).toHaveBeenCalledWith('Die Rechnung ist gespeichert, aber nicht mit der Bestellung verknüpft.');
+    lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
+  });
+
+  it('drops the Bestellung with a new form, a closed form and a failed read', async () => {
+    const { c, http, toast, orders } = await setup({ queryParams: { new: 'invoice' } });
+    const error = jest.spyOn(kindSpies(toast), 'error');
+    expect(c.createOpen()).toBe(true);
+    expect(orders.get).not.toHaveBeenCalled();
+    orders.get.mockReturnValueOnce(throwError(() => ({ status: 404 })));
+    c.takeOrder('o-1');
+    expect(error).toHaveBeenCalledWith('Die Bestellung konnte nicht geladen werden.');
+    c.takeOrder('o-1');
+    expect(c.forOrder()?.id).toBe('o-1');
+    c.createOpen.set(false);
+    c.takeOrder('o-2');
+    expect(c.forOrder()?.id).toBe('o-1');
+    c.onFilesDropped([new File(['x'], 'r.pdf', { type: 'application/pdf' })]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+    expect(c.forOrder()).toBeNull();
+    c.forOrder.set({ id: 'o-1', number: 'B-1', title: 'x' });
+    c.openCreate();
+    expect(c.forOrder()).toBeNull();
+  });
+
+  it('ignores the create link for a reader', async () => {
+    const { c, orders } = await setup({ canManage: false, queryParams: { new: 'invoice', order: 'o-1' } });
+    expect(c.createOpen()).toBe(false);
+    expect(orders.get).not.toHaveBeenCalled();
+  });
+
   it('create() sends nulls for blank optional fields and no file handle', async () => {
     const { c, http } = await setup();
     c.openCreate();
@@ -1181,6 +1280,9 @@ describe('InvoicesComponent infinite-scroll effect', () => {
     can(): boolean {
       return true;
     }
+    canAny(): boolean {
+      return true;
+    }
   }
 
   let lastCb: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
@@ -1472,6 +1574,19 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
     open.mockRestore();
     navigate.mockRestore();
+  });
+
+  /** §F/finance/invoices/003015: `invoice.manage` keeps the invoices and books nothing. */
+  it('gives a person with invoice.manage the invoice actions without "Buchung anlegen"', async () => {
+    const { c } = await setup({ only: ['invoice.manage'] });
+    expect(c.canManage()).toBe(true);
+    expect(c.canBook()).toBe(false);
+    expect(c.rowMenu(inv()).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual([
+      'edit',
+      'paid',
+      'file',
+      'delete',
+    ]);
   });
 
   it('offers a reader only the receipt in the row menu', async () => {

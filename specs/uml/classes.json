@@ -155,6 +155,13 @@
       "to": "Application"
     },
     {
+      "column": "application_id",
+      "from": "ApplicationOrderEvent",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
       "column": "group_id",
       "from": "ApplicationType",
       "multiplicity": "*",
@@ -202,6 +209,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Comment"
+    },
+    {
+      "column": "order_id",
+      "from": "Attachment",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "PurchaseOrder"
     },
     {
       "column": "ticket_id",
@@ -307,6 +321,13 @@
       "multiplicity": "*",
       "onDelete": "SET NULL",
       "to": "Invoice"
+    },
+    {
+      "column": "order_id",
+      "from": "BudgetExpense",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "PurchaseOrder"
     },
     {
       "column": "fiscal_year_id",
@@ -783,6 +804,34 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Vote"
+    },
+    {
+      "column": "application_id",
+      "from": "PurchaseOrder",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Application"
+    },
+    {
+      "column": "invoice_id",
+      "from": "PurchaseOrder",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Invoice"
+    },
+    {
+      "column": "buyer_id",
+      "from": "PurchaseOrder",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "order_id",
+      "from": "PurchaseOrderPosition",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "PurchaseOrder"
     },
     {
       "column": "principal_id",
@@ -1803,6 +1852,62 @@
     {
       "attributes": [
         {
+          "name": "application_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "order_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "actor",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "created",
+            "status",
+            "deleted"
+          ]
+        },
+        {
+          "name": "payload",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "ApplicationOrderEvent",
+      "module": "applications",
+      "name": "ApplicationOrderEvent",
+      "path": "backend/app/modules/applications/models.py",
+      "table": "purchase_order_event"
+    },
+    {
+      "attributes": [
+        {
           "name": "gremium_id",
           "nullable": true,
           "primaryKey": false,
@@ -2041,6 +2146,12 @@
         },
         {
           "name": "todo_comment_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "order_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
@@ -2632,6 +2743,12 @@
         },
         {
           "name": "invoice_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "order_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
@@ -4337,6 +4454,7 @@
             "gremium",
             "invoice",
             "expense",
+            "order",
             "budget",
             "ticket",
             "todo",
@@ -4363,6 +4481,7 @@
             "gremium",
             "invoice",
             "expense",
+            "order",
             "budget",
             "ticket",
             "todo",
@@ -6108,6 +6227,172 @@
       "name": "ProtocolVoteRef",
       "path": "backend/app/modules/meetings/protocol_models.py",
       "table": "protocol_vote_ref"
+    },
+    {
+      "attributes": [
+        {
+          "name": "number",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "application_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "order",
+            "outlay"
+          ]
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "planned",
+            "ordered",
+            "delivered",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "supplier",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "order_number",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "planned_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "actual_amount",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "ordered_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "delivered_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "buyer_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "buyer_name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "note",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "invoice_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PurchaseOrder",
+      "module": "orders",
+      "name": "PurchaseOrder",
+      "path": "backend/app/modules/orders/models.py",
+      "table": "purchase_order"
+    },
+    {
+      "attributes": [
+        {
+          "name": "order_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "position_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        }
+      ],
+      "id": "PurchaseOrderPosition",
+      "module": "orders",
+      "name": "PurchaseOrderPosition",
+      "path": "backend/app/modules/orders/models.py",
+      "table": "purchase_order_position"
     },
     {
       "attributes": [
@@ -8005,6 +8290,12 @@
           "nullable": false,
           "primaryKey": false,
           "type": "BOOLEAN"
+        },
+        {
+          "name": "offer_on_order_status",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
         },
         {
           "name": "id",

@@ -76,6 +76,11 @@ export interface TransitionDef {
   /** "Requires action": counts as an open task in the tasks tab.
    *  Absent ⇒ `true`. `false` = a purely optional action. */
   readonly requiresAction?: boolean;
+  /**
+   * The platform offers the transition to the person who sets a Bestellung of the Antrag
+   * to this status. It never fires the transition by itself.
+   */
+  readonly offerOnOrderStatus?: 'ordered' | 'delivered' | null;
 }
 
 /** Visual node group. Only the editor renders it and the engine ignores it. On the

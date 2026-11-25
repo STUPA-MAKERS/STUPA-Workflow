@@ -411,6 +411,8 @@ async def test_revertable_flags_classifies_actions() -> None:
         AuditEntry(id=9, action="budget_allocation_set", data={"allocated": "5"}),
         AuditEntry(id=10, action="budget_expense_delete", data={}),
         AuditEntry(id=11, action="login", data={}),
+        AuditEntry(id=12, action="order_update", data={"before": {"title": "x"}}),
+        AuditEntry(id=13, action="order_status", data={}),
     ]
     db = fake_session(result((rev_a, prev_a), (rev_b, None)))
     flags = await AuditLogService(db).revertable_flags(entries)
@@ -426,6 +428,8 @@ async def test_revertable_flags_classifies_actions() -> None:
         9: False,
         10: False,
         11: False,
+        12: True,
+        13: False,
     }
 
 

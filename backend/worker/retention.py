@@ -29,6 +29,7 @@ from app.modules.auth.models import AuthSession, EmailLoginLink
 from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage, build_object_storage
 from app.modules.flow.models import State
+from app.modules.orders.privacy import clear_buyer_names
 from app.modules.privacy.models import PrivacySettings
 from app.settings import Settings, load_settings
 
@@ -108,6 +109,7 @@ async def _anonymize_one(
                 actor=_RETENTION_ACTOR,
                 commit=False,
             )
+            await clear_buyer_names(session, application_id)
             await audit_record(
                 session,
                 actor=_RETENTION_ACTOR,
@@ -122,9 +124,7 @@ async def _anonymize_one(
     return True
 
 
-async def _purge_expired(
-    maker: async_sessionmaker[AsyncSession], now: datetime
-) -> tuple[int, int]:
+async def _purge_expired(maker: async_sessionmaker[AsyncSession], now: datetime) -> tuple[int, int]:
     """Delete the expired sessions and the used or expired login links.
 
     The login links are the magic links of one Antrag and the e-mail login links. An
@@ -138,9 +138,7 @@ async def _purge_expired(
     async with maker() as session:
         sessions = cast(
             "CursorResult[Any]",
-            await session.execute(
-                delete(AuthSession).where(AuthSession.expires_at < now)
-            ),
+            await session.execute(delete(AuthSession).where(AuthSession.expires_at < now)),
         )
         links = cast(
             "CursorResult[Any]",
@@ -176,7 +174,4 @@ async def process_retention(ctx: dict[str, Any]) -> str:
     storage = build_object_storage(settings)
     anonymized = await _anonymize_due(maker, storage)
     purged_sessions, purged_links = await _purge_expired(maker, now)
-    return (
-        f"anonymized={anonymized} sessions_purged={purged_sessions} "
-        f"links_purged={purged_links}"
-    )
+    return f"anonymized={anonymized} sessions_purged={purged_sessions} links_purged={purged_links}"

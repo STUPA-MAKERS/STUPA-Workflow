@@ -310,6 +310,7 @@ async def auskunft(
             "todos": len(data["todos"]),
             "todoComments": len(data["todo_comments"]),
             "appointments": len(data["appointments"]),
+            "orders": len(data["orders"]),
             "paperlessDocuments": len(paperless_documents),
             "hasPrincipal": data["principal"] is not None,
         },

@@ -160,6 +160,7 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     forceReason: wire.forceReason ?? null,
     outsideDecision: wire.outsideDecision ?? null,
     amountChange: wire.amountChange ?? null,
+    order: wire.order ?? null,
   };
 }
 

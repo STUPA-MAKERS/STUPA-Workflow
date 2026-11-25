@@ -57,8 +57,9 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 Groups of ``OPTIONAL_PRINCIPAL_ROUTES`` and who checks the caller:
 
 - Application, its form, timeline, versions, comments, transitions, erasure request,
-  attachments, links, Vorgänger, prefill and observers: a staff session or the magic-link session
-  of the applicant; the applications and files services refuse a caller with neither.
+  attachments, links, Bestellungen, Vorgänger, prefill and observers: a staff session or
+  the magic-link session of the applicant; the applications and files services refuse a
+  caller with neither.
   The prefill also refuses the magic-link session, and a Vorgänger change needs the
   edit right on both applications. A new version needs the applicant or
   ``application.manage``.
@@ -185,6 +186,8 @@ OPTIONAL_PRINCIPAL_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("POST", "/api/applications/{application_id}/applicant-transition"),
         ("GET", "/api/applications/{application_id}/attachments"),
         ("GET", "/api/applications/{application_id}/links"),
+        ("GET", "/api/applications/{application_id}/orders"),
+        ("GET", "/api/orders/{order_id}"),
         ("PUT", "/api/applications/{application_id}/predecessor"),
         ("DELETE", "/api/applications/{application_id}/predecessor"),
         ("GET", "/api/applications/{application_id}/prefill"),

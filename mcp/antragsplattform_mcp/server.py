@@ -117,6 +117,16 @@ TYPICAL FLOWS:
   `link_add(a, b)`, `link_list(kind, target_id)`, `link_remove(link_id)`, `link_view`
   (the other end of a card link). A link has no direction; the caller reads both ends
   and changes at least one (403 `link_forbidden`).
+- Bestellungen of an Antrag: `order_list(application_id)`, `order_get`, `order_create`
+  (`application_id` null: a Bestellung without an Antrag),
+  `order_update` (needs `version`), `order_set_status`, `order_delete`,
+  `order_set_invoice` (the invoice of a Bestellung), `invoice_orders`, and the files of
+  a Bestellung `order_attachments`, `order_attachment_upload`, `order_attachment_delete`.
+  The list of every Antrag: `order_list_all` (segment and filters),
+  `order_pending_applications` (approved Anträge without a Bestellung), `order_bookings`
+  and `export_orders_xlsx`.
+  Only a person creates a Bestellung, for an approved Antrag of a type with money. A
+  write needs `order.manage`.
 - Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
   `gremium_attendance`, `get_gremium_info`/`set_gremium_info`; `calendar_entries`,
   `create_appointment` (a Termin with invitations), `answer_appointment`.

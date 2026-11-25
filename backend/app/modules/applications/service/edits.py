@@ -14,6 +14,7 @@ from app.modules.application_types.models import ApplicationType
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import MagicLink, SubmissionVersion
+from app.modules.applications.position_ids import with_position_ids
 from app.modules.applications.schemas import (
     ActorOut,
     ApplicationOut,
@@ -106,7 +107,9 @@ class EditOps(ApplicationsServiceBase):
         pii_keys = await self._pii_keys_for_type(app.type_id) if preserve_pii else set[str]()
         sent = _with_stored_pii(data, app.data or {}, pii_keys) if preserve_pii else data
         context = {"has_budget": app_type.has_budget if app_type is not None else False}
-        clean = with_computed(fields, _whitelist(fields, sent), context)
+        clean = with_position_ids(
+            with_computed(fields, _whitelist(fields, sent), context), app.data or {}
+        )
         try:
             validate_answers(fields, clean, context)
         except AnswerValidationError as exc:

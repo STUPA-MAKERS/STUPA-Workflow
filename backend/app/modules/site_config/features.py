@@ -31,6 +31,7 @@ class Feature(StrEnum):
     VOTING = "voting"
     BUDGET = "budget"
     INVOICES = "invoices"
+    ORDERS = "orders"
     TICKETS = "tickets"
     GRAPH = "graph"
     PUBLIC = "public"
@@ -40,8 +41,11 @@ class Feature(StrEnum):
 
 #: The features a feature needs (§F/administration/admin/000760). A feature is off while
 #: one of them is off. An invoice books on a Kostenstelle, so `Rechnungen` needs `Budget`.
+#: A Bestellung belongs to an Antrag of a type with money and its bookings name a
+#: Kostenstelle, so `Bestellungen` needs `Budget` too (§F/finance/orders/003013).
 REQUIRES: Mapping[Feature, frozenset[Feature]] = {
     Feature.INVOICES: frozenset({Feature.BUDGET}),
+    Feature.ORDERS: frozenset({Feature.BUDGET}),
 }
 
 ALL_FEATURES: frozenset[Feature] = frozenset(Feature)
@@ -62,6 +66,7 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     voting: bool = Field(default=True)
     budget: bool = Field(default=True)
     invoices: bool = Field(default=True)
+    orders: bool = Field(default=True)
     tickets: bool = Field(default=True)
     graph: bool = Field(default=True)
     public: bool = Field(default=True)

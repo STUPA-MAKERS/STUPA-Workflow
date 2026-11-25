@@ -20,6 +20,7 @@ SearchKind = Literal[
     "meeting",
     "invoice",
     "expense",
+    "order",
     "budget",
     "gremium",
     "principal",

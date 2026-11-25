@@ -14,12 +14,14 @@ from app.modules.applications.models import (
     Applicant,
     Application,
     ApplicationDecision,
+    ApplicationOrderEvent,
     StatusEvent,
 )
 from app.modules.applications.schemas import (
     ActorOut,
     AmountChangeOut,
     ApplicationOut,
+    OrderEventOut,
     OutsideDecisionOut,
     StateOut,
     TimelineDecisionOut,
@@ -186,7 +188,34 @@ class ReadOps(ApplicationsServiceBase):
         changes = await self._amount_changes(
             app, applicant_view=applicant_view, magic_link_view=magic_link_view
         )
-        return sorted([*events, *changes], key=lambda e: e.at)
+        orders = await self._order_events(
+            app, applicant_view=applicant_view, magic_link_view=magic_link_view
+        )
+        return sorted([*events, *changes, *orders], key=lambda e: e.at)
+
+    async def _order_events(
+        self, app: Application, *, applicant_view: bool, magic_link_view: bool
+    ) -> list[TimelineEventOut]:
+        """Build the entries of the Bestellungen of the Antrag (F/finance/orders/002866)."""
+        rows = (
+            await self.session.scalars(
+                select(ApplicationOrderEvent).where(ApplicationOrderEvent.application_id == app.id)
+            )
+        ).all()
+        if not rows or app.current_state_id is None:
+            return []
+        actors = await self._resolve_actors(
+            app,
+            (row.actor for row in rows),
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
+        current = app.current_state_id
+        state = await self._state_out_resolved(await self._get_state(current))
+        return [
+            _order_event_out(current, row, state, actors.get(row.actor) if row.actor else None)
+            for row in rows
+        ]
 
     async def _outside_names(
         self, stored: list[dict[str, Any] | None], *, applicant_view: bool
@@ -287,6 +316,34 @@ def _outside_out(
         abstain=stored.get("abstain"),
         meetingId=meeting_id,
         meetingTitle=names.get(str(meeting_id)) if meeting_id else None,
+    )
+
+
+def _order_event_out(
+    current: UUID, row: ApplicationOrderEvent, state: StateOut | None, info: ActorOut | None
+) -> TimelineEventOut:
+    """Build the timeline entry of an event of a Bestellung.
+
+    The entry changes no state, so both state ids name the current state. The payload
+    holds no price, so the applicant reads the same entry.
+    """
+    payload = row.payload or {}
+    return TimelineEventOut(
+        fromStateId=current,
+        toStateId=current,
+        toState=state,
+        actor=info.legacy(row.actor) if info and row.actor else None,
+        actorInfo=info,
+        at=row.created_at,
+        kind="order",
+        order=OrderEventOut(
+            orderId=row.order_id,
+            number=str(payload.get("number") or ""),
+            title=str(payload.get("title") or ""),
+            change=row.kind,  # pyright: ignore[reportArgumentType]
+            fromStatus=payload.get("from"),
+            toStatus=payload.get("to"),
+        ),
     )
 
 
