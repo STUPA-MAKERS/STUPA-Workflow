@@ -363,9 +363,13 @@ async def update_agenda_item(
     application item inherits its title. Requires write access to the meeting: session.manage
     or protocol.write in its gremium, the assigned minute-taker, or admin.
 
-    The `body` needs a live meeting, or a closed meeting whose protocol is still a
-    draft (409 `meeting_not_started` or `protocol_final` otherwise). The `title`
-    needs a planned or live meeting (409 `meeting_closed` otherwise).
+    The `body` and the `title` change while the meeting is planned or live, and
+    after the close until the protocol is final (409 `protocol_final` then). The
+    minute-taker can write the text before the start, so change the text in place:
+    a delete and a new item moves the item to the end of the agenda. In a live
+    meeting with a minute-taker, only the minute-taker writes the `body` (403
+    `not_protokollant`). Only a text change after the close writes an audit entry,
+    because the live minutes save on every pause in typing.
     """
     return await api().patch(
         f"/meetings/{meeting_id}/agenda/{item_id}",
