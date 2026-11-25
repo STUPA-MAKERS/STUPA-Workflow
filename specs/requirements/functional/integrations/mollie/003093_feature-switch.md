@@ -2,7 +2,7 @@
 id: "003093"
 title: Mollie has a feature switch
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null
