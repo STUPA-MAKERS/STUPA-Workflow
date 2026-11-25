@@ -2,7 +2,7 @@
 id: "003025"
 title: An Event has a status of its status list
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

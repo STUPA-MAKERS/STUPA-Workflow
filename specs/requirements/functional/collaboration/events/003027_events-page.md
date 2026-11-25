@@ -2,7 +2,7 @@
 id: "003027"
 title: Veranstaltungen is a page of its own with a list and a detail
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

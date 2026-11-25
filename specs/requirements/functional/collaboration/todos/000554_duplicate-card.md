@@ -2,7 +2,7 @@
 id: "000554"
 title: A card can be duplicated
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

@@ -2,7 +2,7 @@
 id: "003029"
 title: The detail of an Event shows its money, decisions and series
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

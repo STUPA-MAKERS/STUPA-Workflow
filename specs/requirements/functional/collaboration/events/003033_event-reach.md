@@ -2,7 +2,7 @@
 id: "003033"
 title: An Event is a link kind, a search source and a calendar entry
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

@@ -2,7 +2,7 @@
 id: "003028"
 title: The page Veranstaltungen has four segments
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

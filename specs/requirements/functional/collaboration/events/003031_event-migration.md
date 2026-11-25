@@ -2,7 +2,7 @@
 id: "003031"
 title: The migration makes an Event of each event card
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

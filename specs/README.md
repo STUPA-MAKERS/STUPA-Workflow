@@ -310,19 +310,19 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
-| [F/collaboration/events/003022](requirements/functional/collaboration/events/003022_event-element.md) | An Event is an element of its own | draft |
-| [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | draft |
-| [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | draft |
-| [F/collaboration/events/003025](requirements/functional/collaboration/events/003025_event-status.md) | An Event has a status of its status list | draft |
-| [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | draft |
-| [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | draft |
-| [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | draft |
-| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | draft |
-| [F/collaboration/events/003030](requirements/functional/collaboration/events/003030_event-next-edition.md) | Folgeveranstaltung anlegen copies the plan | draft |
-| [F/collaboration/events/003031](requirements/functional/collaboration/events/003031_event-migration.md) | The migration makes an Event of each event card | draft |
-| [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | draft |
-| [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | draft |
-| [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | draft |
+| [F/collaboration/events/003022](requirements/functional/collaboration/events/003022_event-element.md) | An Event is an element of its own | approved |
+| [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | approved |
+| [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | approved |
+| [F/collaboration/events/003025](requirements/functional/collaboration/events/003025_event-status.md) | An Event has a status of its status list | approved |
+| [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | approved |
+| [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | approved |
+| [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | approved |
+| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | approved |
+| [F/collaboration/events/003030](requirements/functional/collaboration/events/003030_event-next-edition.md) | Folgeveranstaltung anlegen copies the plan | approved |
+| [F/collaboration/events/003031](requirements/functional/collaboration/events/003031_event-migration.md) | The migration makes an Event of each event card | approved |
+| [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | approved |
+| [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | approved |
+| [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -435,7 +435,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000551](requirements/functional/collaboration/todos/000551_meeting-gremium-linked.md) | A meeting shows its links and a Gremium its board | approved |
 | [F/collaboration/todos/000552](requirements/functional/collaboration/todos/000552_cost-centre-link.md) | A card can link a cost centre | approved |
 | [F/collaboration/todos/000553](requirements/functional/collaboration/todos/000553_card-to-agenda.md) | A card is put on the agenda from the card | approved |
-| [F/collaboration/todos/000554](requirements/functional/collaboration/todos/000554_duplicate-card.md) | A card can be duplicated | draft |
+| [F/collaboration/todos/000554](requirements/functional/collaboration/todos/000554_duplicate-card.md) | A card can be duplicated | approved |
 | [F/collaboration/todos/000555](requirements/functional/collaboration/todos/000555_item-to-card.md) | A checklist item becomes a card | approved |
 | [F/collaboration/todos/000573](requirements/functional/collaboration/todos/000573_card-links-both-ways.md) | A link between two cards shows on both cards | replaced |
 | [F/collaboration/todos/000735](requirements/functional/collaboration/todos/000735_termin-link.md) | A card can link a Termin | approved |
