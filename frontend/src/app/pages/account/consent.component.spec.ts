@@ -112,6 +112,26 @@ describe('OAuthConsentComponent', () => {
     expect(held.checked).toBe(true);
   });
 
+  it('starts a held opt-in scope unticked (spec 002920)', async () => {
+    const api = makeApi({
+      consentRequest: jest.fn(() =>
+        of({
+          ...clone(REQ),
+          requestedScopes: [
+            { key: 'read', held: true },
+            { key: 'paperless:use', held: true, optIn: true },
+          ],
+        }),
+      ),
+    });
+    await setup(api);
+    const optIn = screen.getByRole('checkbox', {
+      name: /^Paperless-Dokumente verknüpfen/,
+    }) as HTMLInputElement;
+    expect(optIn.checked).toBe(false);
+    expect(screen.queryByText(/Du besitzt dieses Recht aktuell nicht/)).not.toBeInTheDocument();
+  });
+
   it('shows an unknown scope by its key', async () => {
     const api = makeApi({
       consentRequest: jest.fn(() =>

@@ -2362,10 +2362,14 @@ export interface McpSetup {
   readonly note: string;
 }
 
-/** A scope row in the consent screen. `held` means the user holds the permission. */
+/**
+ * A scope row in the consent screen. `held` means the user holds the permission. `optIn`
+ * marks a scope that starts unticked even when held (`paperless:use`, spec 002920).
+ */
 export interface ConsentScope {
   readonly key: string;
   readonly held: boolean;
+  readonly optIn?: boolean;
 }
 
 /** Pending authorize request for the consent screen. */

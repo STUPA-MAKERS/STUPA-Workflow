@@ -1,6 +1,6 @@
 """§ 002922: the link tools name a Paperless end by its document number.
 
-§ 002920: the default scope of the package leaves out the opt-in scope `paperless:use`.
+§ 002920: the default scope of the package asks for the opt-in scope `paperless:use`.
 """
 
 from __future__ import annotations
@@ -83,6 +83,6 @@ def test_a_paperless_end_refuses_an_id_that_is_no_number(fake_api: _FakeApi) -> 
     assert links.document_number(_REF_41) == 41
 
 
-def test_the_default_scope_leaves_out_paperless() -> None:
-    """The package asks for `paperless:use` only when the user names it."""
-    assert "paperless:use" not in DEFAULT_SCOPE.split()
+def test_the_default_scope_asks_for_paperless() -> None:
+    """The package asks for `paperless:use` without a setting; the consent page gates it."""
+    assert "paperless:use" in DEFAULT_SCOPE.split()

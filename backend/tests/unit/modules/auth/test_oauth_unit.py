@@ -18,7 +18,7 @@ def _challenge(verifier: str) -> str:
 
 def test_parse_scope_default_and_dedup() -> None:
     """Parse an empty scope to the full default set, split into tokens, and dedup it."""
-    default = [k for k in oauth.SCOPES if k not in oauth.OPT_IN_SCOPES]
+    default = list(oauth.SCOPES)
     assert oauth.parse_scope(None) == default
     assert oauth.parse_scope("   ") == default
     assert oauth.parse_scope("read read votes:write") == ["read", "votes:write"]

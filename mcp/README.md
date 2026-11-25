@@ -37,10 +37,11 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 - `ANTRAGSPLATTFORM_URL` (required) — the platform base URL.
 - `ANTRAGSPLATTFORM_SCOPE` (optional) — space-separated OAuth scopes. The default is the
   full curated set (`read applications:write votes:write budget:write meetings:write
-  tickets:write todos:write committees:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
+  tickets:write todos:write committees:write paperless:use forms:write flows:write
+  admin:write`). Narrow it to limit what the agent can do.
   The scope `paperless:use` (links with Paperless documents and the address of a filed
-  document) is not in the default: add it by name, and the consent page offers it only to a
-  person with the permission `paperless.use`.
+  document) is an opt-in scope: the consent page offers it only to a person with the
+  permission `paperless.use`, and it starts unticked, so tick it to give it to the agent.
 
 The platform must have OIDC configured. It must also register the public client id of
 this server (`antragsplattform-mcp`, set with `OAUTH_MCP_CLIENT_ID`). The platform accepts
