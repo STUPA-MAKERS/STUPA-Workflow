@@ -15,7 +15,6 @@ from app.modules.audit.actions import AuditAction
 from app.modules.budget.tree.service_base import (
     BudgetTreeServiceBase,
     _applied,
-    _day_or_entry,
     _json_safe,
     _set_invoice_status,
     _subtree_ids,
@@ -475,10 +474,10 @@ class ExpenseOps(BudgetTreeServiceBase):
         Without ``q`` the count query adds no join. With a search the most relevant hit
         comes first, and the normal ordering is a deterministic tiebreak.
 
-        The sort column comes from a whitelist, and the default is newest first. An empty
-        invoice date goes last in both directions. A booking without a payment date sorts
-        by the day of its entry, because the list puts it under that month (spec 003021).
-        The entry time and the id break ties, so the pages do not overlap.
+        The sort column comes from a whitelist, and the default is newest first. Empty
+        values of the nullable date columns go last in both directions, where the list
+        shows them in their own group (spec 003021). The entry time and the id break ties,
+        so the pages do not overlap.
         """
         node = await self._get_node(budget_id) if budget_id is not None else None
         search = (
@@ -527,11 +526,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         sort_map = {
             "amount": BudgetExpense.amount,
             "invoiceDate": BudgetExpense.invoice_date,
-            "paymentDate": _day_or_entry(BudgetExpense.payment_date, BudgetExpense.created_at),
+            "paymentDate": BudgetExpense.payment_date,
         }
         sort_col = sort_map.get(sort or "", BudgetExpense.created_at)
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
-        ordering = direction.nulls_last() if sort == "invoiceDate" else direction
+        ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
         count_base = select(func.count()).select_from(BudgetExpense)
         count_stmt = (

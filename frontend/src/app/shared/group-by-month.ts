@@ -6,7 +6,7 @@ export interface MonthGroup<T> {
   /** `YYYY-MM` of the rows, also the track key. `''` for the rows without a date, `all`
    *  for the single group of a list that is not by date. */
   readonly key: string;
-  /** "September 2026", or empty without a month. */
+  /** "September 2026", the `undatedLabel` for the rows without a date, or empty. */
   readonly label: string;
   readonly items: T[];
 }
@@ -19,6 +19,11 @@ export interface GroupByMonthOptions {
    * same day the date column shows.
    */
   readonly utc?: boolean;
+  /**
+   * The heading of the rows without a date, such as "Ohne Rechnungsdatum". Without it that
+   * group has no heading. A row without a date never borrows another date (spec 003021).
+   */
+  readonly undatedLabel?: string;
 }
 
 /** The `YYYY-MM` month of a value, or `''` for no or an invalid value. */
@@ -51,7 +56,7 @@ export function groupByMonth<T>(
   const keyed = rows.map((row) => ({ row, key: monthKey(dateOf(row), options.utc ?? false) }));
   return runs(keyed, (a, b) => a.key === b.key).map(([first, ...rest]) => ({
     key: first.key,
-    label: first.key ? monthYear(first.key, locale) : '',
+    label: first.key ? monthYear(first.key, locale) : (options.undatedLabel ?? ''),
     items: [first, ...rest].map((x) => x.row),
   }));
 }

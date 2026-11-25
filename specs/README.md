@@ -569,7 +569,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | approved |
 | [F/finance/invoices/001292](requirements/functional/finance/invoices/001292_invoice-menu-books.md) | The head menu of an invoice has "Buchung anlegen" | approved |
 | [F/finance/invoices/003015](requirements/functional/finance/invoices/003015_invoice-permission.md) | The write of an invoice needs invoice.manage or budget.book | approved |
-| [F/finance/invoices/003021](requirements/functional/finance/invoices/003021_month-groups-sort-key.md) | A list by month sorts by the same date that its month headings read | draft |
+| [F/finance/invoices/003021](requirements/functional/finance/invoices/003021_month-groups-sort-key.md) | A row without the date of its list goes to its own group, not to its entry month | draft |
 | [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to at most one Antrag | approved |
 | [F/finance/orders/002851](requirements/functional/finance/orders/002851_order-fields.md) | A Bestellung holds these fields | approved |
 | [F/finance/orders/002852](requirements/functional/finance/orders/002852_order-kind.md) | A Bestellung is an order or an Auslage | approved |

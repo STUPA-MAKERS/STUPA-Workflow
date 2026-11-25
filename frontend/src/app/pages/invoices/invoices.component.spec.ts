@@ -1439,6 +1439,19 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(screen.getByText('Keine Rechnung geöffnet')).toBeInTheDocument();
   });
 
+  it('puts the invoices without an invoice date under "Ohne Rechnungsdatum", not their entry month (spec 003021)', async () => {
+    setViewport('min-width: 1200px');
+    const { container } = await setup({
+      initial: [
+        inv({ issueDate: '2026-03-16' }),
+        inv({ id: 'i-2', issueDate: '2026-02-09' }),
+        inv({ id: 'i-3', issueDate: null, createdAt: '2026-11-25T10:00:00Z' }),
+      ],
+    });
+    const months = [...container.querySelectorAll('app-list-group h2')].map((h) => h.textContent?.trim());
+    expect(months).toEqual(['März 2026', 'Februar 2026', 'Ohne Rechnungsdatum']);
+  });
+
   it('names a row without supplier and number, and shows the empty sheet of an empty list', async () => {
     setViewport('min-width: 1200px');
     const { c, container, fixture, http } = await setup({ initial: [] });

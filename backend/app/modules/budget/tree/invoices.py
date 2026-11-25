@@ -14,11 +14,7 @@ from sqlalchemy import ColumnElement, case, exists, func, not_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.invoice_import import parse_zugferd_pdf
-from app.modules.budget.tree.service_base import (
-    BudgetTreeServiceBase,
-    _applied,
-    _day_or_entry,
-)
+from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _applied
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.budget.tree_schemas import (
     InvoiceBookingOut,
@@ -215,8 +211,9 @@ class InvoiceOps(BudgetTreeServiceBase):
         filter predicates live in one shared `filters` list. That list goes into
         the count query and into the row query, so the total and the hits do not
         drift on infinite scroll. With `q` the trigram rank orders the hits by
-        relevance before the usual "newest issue date first". An invoice without an issue date
-        sorts by the day of its entry, the same day that its month heading reads (spec 003021).
+        relevance before the usual "newest issue date first". The invoices without an issue date
+        come last, in their own group of the list. The entry time and the id break ties, so
+        the pages of the infinite scroll do not overlap (spec 003021).
 
         ``visible_gremium_ids`` filters only ``linkedBookings``, not the invoices.
         An invoice is not bound to a cost centre.
@@ -270,7 +267,7 @@ class InvoiceOps(BudgetTreeServiceBase):
 
         total = await self.session.scalar(select(func.count()).select_from(Invoice).where(*filters))
         ordering = (
-            _day_or_entry(Invoice.issue_date, Invoice.created_at).desc(),
+            Invoice.issue_date.desc().nulls_last(),
             Invoice.created_at.desc(),
             Invoice.id.desc(),
         )

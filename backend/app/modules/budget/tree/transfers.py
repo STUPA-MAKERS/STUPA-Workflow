@@ -17,12 +17,7 @@ from sqlalchemy.orm import aliased
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
 from app.modules.budget.tree.expenses import ExpenseOps
-from app.modules.budget.tree.service_base import (
-    _applied,
-    _day_or_entry,
-    _json_safe,
-    _subtree_ids,
-)
+from app.modules.budget.tree.service_base import _applied, _json_safe, _subtree_ids
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_schemas import (
     TransferCreate,
@@ -199,9 +194,9 @@ class TransferOps(ExpenseOps):
         description and the note.
 
         The subtree filter matches through the transfer id, because either leg may sit
-        in the subtree. The sort ``paymentDate`` reads the payment date, and the day of the
-        entry without one, because the list puts a transfer under that month (spec 003021).
-        The entry time and the id break ties, so the pages do not overlap.
+        in the subtree. The sort ``paymentDate`` puts the transfers without a payment date
+        last, where the list shows them in their own group (spec 003021). The entry time and
+        the id break ties, so the pages do not overlap.
         """
         node = await self._get_node(budget_id) if budget_id is not None else None
         leg = aliased(BudgetExpense)
@@ -243,11 +238,11 @@ class TransferOps(ExpenseOps):
         sort_map = {
             "amount": BudgetExpense.amount,
             "invoiceDate": BudgetExpense.invoice_date,
-            "paymentDate": _day_or_entry(BudgetExpense.payment_date, BudgetExpense.created_at),
+            "paymentDate": BudgetExpense.payment_date,
         }
         sort_col = sort_map.get(sort or "", BudgetExpense.created_at)
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
-        ordering = direction.nulls_last() if sort == "invoiceDate" else direction
+        ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
         order_by = (
             (rank_expr.desc(), ordering, BudgetExpense.created_at.desc(), BudgetExpense.id.desc())
             if rank_expr is not None

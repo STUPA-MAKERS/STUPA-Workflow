@@ -519,25 +519,32 @@ export class ExpensesComponent implements OnDestroy {
     return !!this.selectedId();
   });
 
-  /** The list groups by month while it sorts by a date. */
+  /**
+   * The list groups by month while it sorts by a date. A row without the sorted date comes
+   * last from the server and goes to the group "Ohne Rechnungsdatum" or "Ohne Zahlungsdatum",
+   * never to the month of its entry (spec 003021).
+   */
   readonly groups = computed(() => {
     const field = this.sortField();
     const shown = this.items();
-    const date = (e: Expense): string | null =>
-      field === 'invoiceDate'
-        ? e.invoiceDate
-        : field === 'createdAt'
-          ? e.createdAt
-          : (e.paymentDate ?? e.createdAt);
     if (field === 'amount') {
       return shown.length ? [{ key: 'all', label: '', items: shown }] : [];
     }
-    return groupByMonth(shown, date, this.i18n.formatLocale(), { utc: true });
+    const locale = this.i18n.formatLocale();
+    if (field === 'createdAt') return groupByMonth(shown, (e) => e.createdAt, locale, { utc: true });
+    const byInvoice = field === 'invoiceDate';
+    const undated = byInvoice ? 'expenses.group.noInvoiceDate' : 'expenses.group.noPaymentDate';
+    return groupByMonth(shown, (e: Expense) => (byInvoice ? e.invoiceDate : e.paymentDate), locale, {
+      utc: true,
+      undatedLabel: this.i18n.translate(undated),
+    });
   });
 
+  /** The transfers by the month of their payment date, the date they sort by (spec 003021). */
   readonly transferGroups = computed(() =>
-    groupByMonth(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.formatLocale(), {
+    groupByMonth(this.transferItems(), (t) => t.paymentDate, this.i18n.formatLocale(), {
       utc: true,
+      undatedLabel: this.i18n.translate('expenses.group.noPaymentDate'),
     }),
   );
 

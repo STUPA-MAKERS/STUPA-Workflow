@@ -19,6 +19,15 @@ describe('groupByMonth', () => {
     expect(groups[0].items).toEqual([rows[0], rows[1]]);
   });
 
+  it('names the group of the rows without a date with the undated label', () => {
+    const rows = [at('2026-10-02'), at(null)];
+    const groups = groupByMonth(rows, (r) => r.at, 'de-DE', { utc: true, undatedLabel: 'Ohne Rechnungsdatum' });
+    expect(groups.map((g) => [g.key, g.label])).toEqual([
+      ['2026-10', 'Oktober 2026'],
+      ['', 'Ohne Rechnungsdatum'],
+    ]);
+  });
+
   it('puts a run of rows without a date into a group of its own', () => {
     const rows = [at('2026-10-02'), at(null), at('kaputt'), at('2026-10-03')];
     const groups = groupByMonth(rows, (r) => r.at, 'en-GB');

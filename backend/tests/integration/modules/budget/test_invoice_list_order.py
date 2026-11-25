@@ -1,8 +1,9 @@
 """Integration (real Postgres): the order of the invoice list (spec 003021).
 
-The list sorts newest first by the invoice date, and an invoice without one by the day of
-its entry, because the frontend puts it under that month. So each month is one run of rows,
-and the pages of the infinite scroll neither overlap nor skip a row.
+The list sorts newest first by the invoice date. The invoices without one come last, where
+the frontend shows them in their own group "Ohne Rechnungsdatum", never under the month of
+their entry. The entry time and the id break ties, so the pages of the infinite scroll
+neither overlap nor skip a row.
 """
 
 from __future__ import annotations
@@ -31,12 +32,12 @@ async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[As
     await eng.dispose()
 
 
-async def test_undated_invoice_sorts_by_its_entry_day(session: AsyncSession) -> None:
-    """An invoice without an invoice date sorts by the day of its entry, not at the end.
+async def test_undated_invoices_come_last(session: AsyncSession) -> None:
+    """An invoice without an invoice date comes after every dated one, newest entry first.
 
     The invoices share a gross amount that no other test uses, so the amount filter
     isolates them. The entry day of each invoice is today, which lies after every
-    invoice date of the test.
+    invoice date of the test, so a sort by the entry day would put the undated ones first.
     """
     svc = BudgetTreeService(session)
     gross = Decimal(random.randint(10_000_000, 90_000_000)) + Decimal("0.37")
@@ -55,8 +56,7 @@ async def test_undated_invoice_sorts_by_its_entry_day(session: AsyncSession) -> 
 
     page = await svc.list_invoices_paged(gross_min=gross, gross_max=gross, limit=50)
     ids = [str(i.id) for i in page.items]
-    assert ids[:2] == [undated_b, undated_a]
-    assert ids[2:] == [jun, mar, feb]
+    assert ids == [jun, mar, feb, undated_b, undated_a]
 
     paged: list[str] = []
     for offset in range(0, 5, 2):
