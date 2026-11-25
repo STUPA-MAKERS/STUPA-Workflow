@@ -79,7 +79,7 @@ describe('InvoiceOrdersComponent', () => {
     expect(screen.getByTestId('io-sum')).toHaveTextContent(/Summe der Bestellungen\s*72,50\s€ von 150,00\s€/);
   });
 
-  /** §F/finance/orders/003011: while `Bestellungen` is off the invoice asks for none. */
+  /** §F/finance/orders/003013: while `Bestellungen` is off the invoice asks for none. */
   it('reads nothing while the feature is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['orders']));
     const { api, fixture } = await setup();

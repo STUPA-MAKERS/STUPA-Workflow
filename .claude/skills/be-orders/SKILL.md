@@ -156,7 +156,7 @@ page of its own; the Antrag detail has no section and no dialog for it.
 **Related:** `be-applications`, `be-files`, `be-budget`, `be-audit`, `be-privacy`, `mcp`,
 `frontend`.
 
-**Feature switch** (§F/finance/orders/003011): `Feature.ORDERS` (`orders`, needs `budget`) in
+**Feature switch** (§F/finance/orders/003013): `Feature.ORDERS` (`orders`, needs `budget`) in
 `site_config/features.py`; `feature_routes.py` closes `/orders`, the Bestellungen of an Antrag and
 of an invoice with 404 `feature_disabled`; the link kind and the search source follow it
 (`LINK_FEATURE`, `SOURCE_FEATURE`). Frontend: `featureMatch('orders')`, the nav entry, the

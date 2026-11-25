@@ -42,7 +42,7 @@ class Feature(StrEnum):
 #: The features a feature needs (§F/administration/admin/000760). A feature is off while
 #: one of them is off. An invoice books on a Kostenstelle, so `Rechnungen` needs `Budget`.
 #: A Bestellung belongs to an Antrag of a type with money and its bookings name a
-#: Kostenstelle, so `Bestellungen` needs `Budget` too (§F/finance/orders/003011).
+#: Kostenstelle, so `Bestellungen` needs `Budget` too (§F/finance/orders/003013).
 REQUIRES: Mapping[Feature, frozenset[Feature]] = {
     Feature.INVOICES: frozenset({Feature.BUDGET}),
     Feature.ORDERS: frozenset({Feature.BUDGET}),

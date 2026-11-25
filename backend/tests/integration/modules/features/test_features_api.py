@@ -62,7 +62,7 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
         ("GET", "/api/expenses"),
     ),
     Feature.INVOICES: (("GET", "/api/invoices"), ("POST", "/api/invoices/parse")),
-    #: §F/finance/orders/003011. The Bestellungen of an invoice close with `Rechnungen` too.
+    #: §F/finance/orders/003013. The Bestellungen of an invoice close with `Rechnungen` too.
     Feature.ORDERS: (
         ("GET", "/api/orders"),
         ("GET", "/api/orders/pending-applications"),
@@ -190,7 +190,7 @@ async def test_invoices_go_off_with_budget_and_return_to_their_state(
 async def test_orders_go_off_with_budget_and_with_their_own_switch(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    """§F/finance/orders/003011."""
+    """§F/finance/orders/003013."""
     await _admin(api, maker)
     by_invoice = f"/api/invoices/{uuid.uuid4()}/orders"
     with TestClient(api.app) as client:
