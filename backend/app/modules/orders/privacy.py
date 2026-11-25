@@ -58,11 +58,11 @@ async def order_export(
         One row per Bestellung, the oldest first, ready for the workbook.
     """
     if not principal_ids:
-        names = {
-            status.key: str(status.name.get("de") or status.key)
-            for status in await StatusReader(session).rows("order")
-        }
-    return []
+        return []
+    names = {
+        status.key: str(status.name.get("de") or status.key)
+        for status in await StatusReader(session).rows("order")
+    }
     rows = (
         await session.scalars(
             select(PurchaseOrder)
