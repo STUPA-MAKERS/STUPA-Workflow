@@ -2,7 +2,7 @@
 id: "003011"
 title: A Kostenstelle can be marked Intern, and the Kostenstellen below it are Intern too
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:
@@ -28,9 +28,9 @@ Kostenstelle and for every Kostenstelle that exists before this rule. The switch
 every level: Haushalt, Titel and Kostenstelle.
 
 A Kostenstelle must count as Intern when its own switch is on or when the switch of a node
-above it is on. Below a node that is Intern, the switch must show on, must be disabled and must
-say under it that the level above makes it Intern, because only the switch of the node above
-turns it off. The own
+above it is on. Below a node that is Intern, the switch must show on and must be disabled,
+because only the switch of the node above turns it off. A disabled switch that is on still looks
+on (003013). No hint text is shown under the switch (000206). The own
 value of the node below stays stored, so it applies again when the node above turns off.
 
 The switch must stay changeable in a Haushalt whose plan is in force, in the Budget tab and in

@@ -31,7 +31,6 @@
     [id]="'cc-internal-' + n.id"
     [checked]="internalInherited() || internal()"
     [disabled]="internalInherited()"
-    [hint]="internalInherited() ? ('budget.tree.internalInherited' | t) : ''"
     (checkedChange)="saveInternal($event)"
   >
     <span>{{ 'budget.tree.internal' | t }}</span>

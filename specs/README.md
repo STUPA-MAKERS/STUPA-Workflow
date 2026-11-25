@@ -557,8 +557,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001872](requirements/functional/finance/budget/001872_view-bookings-filtered.md) | Buchungen ansehen opens the bookings of the cost centre and the year | approved |
 | [F/finance/budget/001873](requirements/functional/finance/budget/001873_cost-centre-items-two-links.md) | The cost centre card lists Anträge and bookings and links to both lists | approved |
 | [F/finance/budget/001874](requirements/functional/finance/budget/001874_bookings-fiscal-year-filter.md) | The bookings list filters by Haushaltsjahr | approved |
-| [F/finance/budget/003011](requirements/functional/finance/budget/003011_internal-cost-centre.md) | A Kostenstelle can be marked Intern, and the Kostenstellen below it are Intern too | draft |
-| [F/finance/budget/003012](requirements/functional/finance/budget/003012_internal-cost-centre-not-in-form.md) | The form does not offer an internal Kostenstelle | draft |
+| [F/finance/budget/003011](requirements/functional/finance/budget/003011_internal-cost-centre.md) | A Kostenstelle can be marked Intern, and the Kostenstellen below it are Intern too | approved |
+| [F/finance/budget/003012](requirements/functional/finance/budget/003012_internal-cost-centre-not-in-form.md) | The form does not offer an internal Kostenstelle | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |

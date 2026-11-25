@@ -2,7 +2,7 @@
 id: "003012"
 title: The form does not offer an internal Kostenstelle
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:

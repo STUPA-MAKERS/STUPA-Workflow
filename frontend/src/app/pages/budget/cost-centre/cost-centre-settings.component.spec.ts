@@ -176,7 +176,6 @@ describe('CostCentreSettingsComponent', () => {
     const internal = screen.getByRole('switch', { name: 'Intern' });
     expect(internal).toHaveAttribute('aria-checked', 'true');
     expect(internal).toBeDisabled();
-    expect(screen.getByText('Gilt durch die Ebene darüber.')).toBeInTheDocument();
     view.fixture.componentInstance.saveInternal(false);
     expect(view.api.updateNode).not.toHaveBeenCalled();
   });

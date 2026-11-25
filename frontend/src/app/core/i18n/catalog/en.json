@@ -1574,7 +1574,6 @@
   "budget.tree.colorClear": "Remove the colour",
   "budget.tree.active": "Active",
   "budget.tree.internal": "Internal",
-  "budget.tree.internalInherited": "Applies through the level above.",
   "budget.tree.deleteTitle": "Delete the cost centre?",
   "budget.tree.deleteConfirm": "“{name}” ({path}) is deleted. This cannot be undone.",
   "budget.tree.deleteBlocked": "A cost centre with sub cost centres or allocations cannot be deleted.",
