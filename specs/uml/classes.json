@@ -2547,6 +2547,12 @@
           "type": "BOOLEAN"
         },
         {
+          "name": "internal",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
           "name": "id",
           "nullable": false,
           "primaryKey": true,
