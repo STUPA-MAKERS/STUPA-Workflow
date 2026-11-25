@@ -2,7 +2,7 @@
 id: "003097"
 title: The Mollie fees are one booking per settlement
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

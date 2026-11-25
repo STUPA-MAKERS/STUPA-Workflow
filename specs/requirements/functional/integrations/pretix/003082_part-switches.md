@@ -2,7 +2,7 @@
 id: "003082"
 title: Each part of the pretix integration has its own switch
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null
