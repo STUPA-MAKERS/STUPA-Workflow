@@ -14,8 +14,10 @@ scope:
 
 # Every team has its own board
 
-Every team must have exactly one own board. The board of an inherent team must be the board
-that the Gremium has today, so its cards, columns and links stay. Each member of the team must
+Every team must have exactly one own board. A board must be linked to its team, never to a
+Gremium: the board row must store the team and must not store a Gremium. The data migration must
+link the board of each Gremium to the inherent team of that Gremium, so its cards, columns and
+links stay. Code that needs the Gremium of a board must find it through the team. Each member of the team must
 edit the board, and each manager of the team must manage it. The extra entries of the board must
 add their roles as today. This replaces 001078.
 
