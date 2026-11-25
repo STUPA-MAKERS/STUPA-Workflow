@@ -126,8 +126,40 @@ describe('AdminRolesComponent', () => {
     }
     expect(within(screen.getByRole('group', { name: 'Weitere' })).getByRole('checkbox', { name: 'x.new' })).toBeInTheDocument();
     expect(screen.queryByText('vote.cast')).toBeNull();
-    expect(screen.getByRole('checkbox', { name: 'budget.view' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'application.read' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Haushalt lesen' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Anträge lesen' })).not.toBeChecked();
+  });
+
+  /** F/administration/admin/003018: the name labels the box, the key describes it. */
+  describe('permission names', () => {
+    async function openReferent(locale: string) {
+      localStorage.setItem('ap.locale', locale);
+      const api = makeApi({ listPermissions: jest.fn(() => of(['budget.plan.set_state', 'x.new'])) });
+      const { fixture, inst } = await setup(api);
+      await userEvent.click(screen.getByRole('button', { name: /^Referent|^Officer/ }));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return inst;
+    }
+
+    it('labels a box with the name and describes it with the key', async () => {
+      await openReferent('de');
+      const box = screen.getByRole('checkbox', { name: 'Status des Haushaltsplans setzen' });
+      expect(box).toHaveAccessibleDescription('budget.plan.set_state');
+    });
+
+    it('uses the name of the UI language', async () => {
+      const inst = await openReferent('en');
+      expect(inst.permName('budget.plan.set_state')).toBe('Set the budget plan status');
+      expect(screen.getByRole('checkbox', { name: 'Set the budget plan status' })).toBeInTheDocument();
+    });
+
+    it('shows a key without a name as the label, without a key line', async () => {
+      const inst = await openReferent('de');
+      expect(inst.permName('x.new')).toBeNull();
+      const box = screen.getByRole('checkbox', { name: 'x.new' });
+      expect(box).not.toHaveAccessibleDescription();
+    });
   });
 
   /** ngModel writes the value and the disabled state in a microtask. */

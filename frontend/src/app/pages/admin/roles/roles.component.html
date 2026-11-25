@@ -65,16 +65,21 @@
             <app-section [heading]="sec.title | t">
               <div class="ar__grid">
                 @for (perm of sec.keys; track perm) {
+                  @let name = permName(perm);
                   <app-checkbox
                     [ngModel]="isLocked(r) || r.permissions.includes(perm)"
                     [disabled]="isLocked(r)"
                     (ngModelChange)="togglePerm(r, perm, $event)"
                     [name]="r.id + '-' + perm"
-                    ><span class="ar__perm mono" [title]="perm"
+                    [hint]="name ? perm : ''"
+                    >@if (name) {
+                      {{ name }}
+                    } @else {
+                      <span class="ar__perm mono" [title]="perm"
+                        ><span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
+                        ><span class="sr-only">{{ perm }}</span></span
                       >
-                      <span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
-                      ><span class="sr-only">{{ perm }}</span></span
-                    ></app-checkbox
+                    }</app-checkbox
                   >
                 }
               </div>
