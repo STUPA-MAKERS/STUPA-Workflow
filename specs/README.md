@@ -609,7 +609,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | approved |
 | [F/finance/orders/002937](requirements/functional/finance/orders/002937_order-form-in-pane.md) | The form of a Bestellung opens in the pane of the page | approved |
 | [F/finance/orders/003013](requirements/functional/finance/orders/003013_orders-feature-switch.md) | Bestellungen have a feature switch | approved |
-| [F/finance/orders/003014](requirements/functional/finance/orders/003014_order-without-antrag.md) | A Bestellung can have no Antrag | draft |
+| [F/finance/orders/003014](requirements/functional/finance/orders/003014_order-without-antrag.md) | A Bestellung can have no Antrag | approved |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |
