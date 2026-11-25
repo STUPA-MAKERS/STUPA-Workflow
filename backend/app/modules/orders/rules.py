@@ -11,7 +11,8 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
+#: The key of a status of the list of the Bestellungen (F/administration/admin/003035).
+OrderStatus = str
 OrderKind = Literal["order", "outlay"]
 #: The segments of the page "Bestellungen" that hold a Bestellung (F/finance/orders/002884).
 Segment = Literal["open", "delivered", "done"]
@@ -38,18 +39,18 @@ def buyer_missing(kind: str, buyer_id: object, buyer_name: str | None) -> bool:
 
 
 def status_dates(
-    status: str, ordered_on: date | None, delivered_on: date | None, today: date
+    sets_date: str | None, ordered_on: date | None, delivered_on: date | None, today: date
 ) -> tuple[date | None, date | None]:
-    """Return the two dates after a change to ``status``.
+    """Return the two dates after a change to a status with the setting ``sets_date``.
 
-    "Bestellt" sets the empty order date and "Geliefert" sets the empty delivery date to
-    ``today``. A date that a person set stays, because it is more exact than the day of
-    the click.
+    A status sets the date that it names (``orderedOn`` or ``deliveredOn``) to ``today``
+    when the date is empty (F/administration/admin/003037). A date that a person set
+    stays, because it is more exact than the day of the click.
     """
-    match status:
-        case "ordered":
+    match sets_date:
+        case "orderedOn":
             return (ordered_on or today, delivered_on)
-        case "delivered":
+        case "deliveredOn":
             return (ordered_on, delivered_on or today)
         case _:
             return (ordered_on, delivered_on)
@@ -61,15 +62,16 @@ def price(actual: Decimal | None, planned: Decimal | None) -> Decimal | None:
 
 
 def orders_sum(rows: Iterable[tuple[str, Decimal | None, Decimal | None]]) -> Decimal:
-    """Sum the prices of the Bestellungen that are not cancelled.
+    """Sum the prices of the Bestellungen that are not in the phase ``void``.
 
-    Each row is ``(status, actual, planned)``. A cancelled Bestellung bought nothing.
+    Each row is ``(phase, actual, planned)``. A Bestellung in the phase ``void`` bought
+    nothing (F/administration/admin/003036).
     """
     return sum(
         (
             price(actual, planned) or Decimal(0)
-            for status, actual, planned in rows
-            if status != "cancelled"
+            for phase, actual, planned in rows
+            if phase != "void"
         ),
         Decimal(0),
     )
@@ -91,18 +93,19 @@ def price_from_invoice(actual: Decimal | None, gross: Decimal, others: int) -> D
     return gross if actual is None and others == 0 else actual
 
 
-def segment_of(status: str, cost: Decimal | None, booked: Decimal) -> Segment:
+def segment_of(phase: str, cost: Decimal | None, booked: Decimal) -> Segment:
     """Return the segment of a Bestellung on the page "Bestellungen" (F/finance/orders/002884).
 
-    ``cost`` is the price of the Bestellung (`price`) and ``booked`` the sum of its
-    bookings. A delivered Bestellung waits in "Geliefert" until its price is booked in
+    ``phase`` is the phase of its status (F/administration/admin/003036), ``cost`` the
+    price of the Bestellung (`price`) and ``booked`` the sum of its bookings. A
+    Bestellung in the phase ``done`` waits in "Geliefert" until its price is booked in
     full. Without a price it usually waits for its invoice, so it stays there until a
     person books it. `OrderListing` holds the same rule as SQL.
     """
-    match status:
-        case "planned" | "ordered":
+    match phase:
+        case "open":
             return "open"
-        case "cancelled":
+        case "void":
             return "done"
         case _:
             waits = booked < cost if cost is not None else booked == 0

@@ -783,3 +783,34 @@ async def get_latest_audit_verification() -> dict | None:
 def register(mcp: FastMCP) -> None:
     """Register the admin tool group."""
     group.register(mcp)
+
+
+@group.tool
+async def status_list(kind: S.StatusListKind) -> dict:
+    """Read the status list of Bestellungen (`order`) or Events (`event`) in its order.
+
+    Each status has a key, a name, a tone, a phase (`open`, `done`, `void`), the start
+    flag and, for `order`, the date it sets. Any signed-in person can read it.
+    """
+    return await api().get(f"/statuses/{kind}")
+
+
+@group.tool
+async def admin_status_list(kind: S.StatusListKind) -> dict:
+    """Read a status list with `used`, the number of elements per status.
+
+    Requires admin.statuses.
+    """
+    return await api().get(f"/admin/statuses/{kind}")
+
+
+@group.tool
+async def admin_set_status_list(kind: S.StatusListKind, payload: S.StatusListSet) -> dict:
+    """Replace a status list as a whole (Verwaltung > Status & Phasen). Requires admin.statuses.
+
+    Keep the keys of the statuses that stay. 422 `status_list_invalid` for a wrong list.
+    A removed status that elements have needs a replacement in `replacements`, else 409
+    `status_in_use`. 409 `status_in_flow` when a transition of the flow names the status.
+    Audited as a config change, and the version history can restore it.
+    """
+    return await api().put(f"/admin/statuses/{kind}", json=dump_create(payload))

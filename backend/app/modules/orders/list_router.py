@@ -30,6 +30,7 @@ from app.modules.orders.router import ServiceDep, order_out
 from app.modules.orders.rules import OrderKind, Segment
 from app.modules.orders.schemas import OrderOut, PendingApplicationOut
 from app.modules.orders.service import OrderService
+from app.modules.statuses.service import StatusReader
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["orders"])
@@ -47,12 +48,6 @@ ReaderDep = Annotated[Principal, Depends(require_any_permission(*PAGE_PERMISSION
 ExporterDep = Annotated[Principal, Depends(require_principal(EXPORT_PERMISSION))]
 
 _KIND_LABEL = {"order": "Bestellung", "outlay": "Auslage"}
-_STATUS_LABEL = {
-    "planned": "Geplant",
-    "ordered": "Bestellt",
-    "delivered": "Geliefert",
-    "cancelled": "Storniert",
-}
 _HEADERS: tuple[str, ...] = (
     "Nummer",
     "Bezeichnung",
@@ -163,6 +158,9 @@ async def export_orders_xlsx(
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook
 
     rows, _ = await OrderListing(db).page(principal, wanted, limit=EXPORT_MAX_ROWS, offset=0)
+    names = {
+        row.key: str(row.name.get("de") or row.key) for row in await StatusReader(db).rows("order")
+    }
     data = build_table_workbook(
         title="Bestellungen",
         head=(),
@@ -172,7 +170,7 @@ async def export_orders_xlsx(
                 item.number,
                 item.title,
                 _KIND_LABEL[item.kind],
-                _STATUS_LABEL[item.status],
+                names.get(item.status, item.status),
                 item.application_title or "",
                 item.supplier or "",
                 item.order_number or "",

@@ -118,6 +118,10 @@ Keys that need a note:
   the page /admin/paperless. The holder gives the server an address to call and a token,
   so the key is separate from `admin.site`. No OAuth scope carries it, so an agent token
   never changes the connection.
+- `admin.statuses`: edit the status lists of the Bestellungen and the Veranstaltungen on
+  the page "Status & Phasen" (/admin/statuses, F/administration/admin/003035). A change
+  moves elements to another status, so the key is separate from `admin.site`. No OAuth
+  scope carries it.
 - `admin.ticket_mail`: set the Postfach of a Bereich (/admin/help-tickets): its address,
   the IMAP and the SMTP account, and its switch. The holder gives the server two hosts to
   call and the password of a mail account, so the key is separate from `admin.site`
@@ -189,5 +193,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "graph.view",
     "admin.paperless",
     "admin.ticket_mail",
+    "admin.statuses",
     "paperless.use",
 )

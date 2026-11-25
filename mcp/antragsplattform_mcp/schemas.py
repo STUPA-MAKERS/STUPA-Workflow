@@ -12,9 +12,9 @@ files (state 2026-10-07).
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
 class FrozenModel(BaseModel, frozen=True):
@@ -1156,7 +1156,8 @@ class TicketPatch(WireModel, frozen=True):
 
 
 OrderKind = Literal["order", "outlay"]
-OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
+#: The key of a status of the list `order`; `status_list` with kind `order` lists them.
+OrderStatus = Annotated[str, StringConstraints(max_length=40, pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 class OrderCreate(WireModel, frozen=True):
@@ -1167,7 +1168,9 @@ class OrderCreate(WireModel, frozen=True):
         default="order",
         description="`order`: the Gremium buys. `outlay`: a person pays and gets the money back",
     )
-    status: OrderStatus = "planned"
+    status: OrderStatus | None = Field(
+        default=None, description="A key of the list `order`; empty for its start status"
+    )
     supplier: str | None = Field(default=None, description="Up to 200 characters")
     url: str | None = Field(default=None, description="An http or https address of the offer")
     orderNumber: str | None = Field(
@@ -1220,3 +1223,33 @@ def dump_create(model: BaseModel) -> dict[str, Any]:
 def dump_patch(model: BaseModel) -> dict[str, Any]:
     """Dump a patch body with only the keys that the caller set, for a partial update."""
     return model.model_dump(by_alias=True, exclude_unset=True)
+
+
+StatusListKind = Literal["order", "event"]
+
+
+class StatusIn(WireModel, frozen=True):
+    """One status of a status list (Verwaltung > Status & Phasen)."""
+
+    key: str = Field(description="Stable key: lower case, digits and `_`, up to 40 characters")
+    name: I18nMap = Field(description="The shown name per language, for example {de, en}")
+    tone: Literal["neutral", "accent", "warn", "error", "muted"] = "neutral"
+    phase: Literal["open", "done", "void"] = Field(
+        description="`open`: in work. `done`: finished. `void`: does not count to the sum"
+    )
+    start: bool = Field(
+        default=False, description="Exactly one status is the start, in the phase `open`"
+    )
+    setsDate: Literal["orderedOn", "deliveredOn"] | None = Field(
+        default=None, description="Only list `order`: the date that the status sets when empty"
+    )
+
+
+class StatusListSet(WireModel, frozen=True):
+    """The whole status list in its order, with a replacement for each removed key in use."""
+
+    statuses: list[StatusIn] = Field(description="3 to 30 statuses, every phase at least once")
+    replacements: dict[str, str] = Field(
+        default_factory=dict,
+        description="Removed key -> kept key; the elements of the removed status move there",
+    )

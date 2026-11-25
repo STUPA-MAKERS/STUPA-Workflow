@@ -43,6 +43,7 @@ from app.modules.admin.router import (
     rbac_router,
     settings_router,
     site_router,
+    statuses_router,
     types_router,
     webhooks_router,
 )
@@ -72,6 +73,7 @@ for _area in (
     webhooks_router,
     settings_router,
     site_router,
+    statuses_router,
 ):
     router.include_router(_area.router)
 

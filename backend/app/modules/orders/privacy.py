@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number
+from app.modules.statuses.service import StatusReader
 
 
 async def erase_buyer(session: AsyncSession, principal_id: UUID) -> None:
@@ -57,7 +58,11 @@ async def order_export(
         One row per Bestellung, the oldest first, ready for the workbook.
     """
     if not principal_ids:
-        return []
+        names = {
+            status.key: str(status.name.get("de") or status.key)
+            for status in await StatusReader(session).rows("order")
+        }
+    return []
     rows = (
         await session.scalars(
             select(PurchaseOrder)
@@ -71,6 +76,7 @@ async def order_export(
             "title": row.title,
             "kind": row.kind,
             "status": row.status,
+            "statusName": names.get(row.status, row.status),
             "orderedOn": row.ordered_on,
             "deliveredOn": row.delivered_on,
             "createdAt": row.created_at,

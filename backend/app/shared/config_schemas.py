@@ -404,8 +404,9 @@ class TransitionDef(FrozenStrictCamelModel, frozen=True):
         branch: Result branch of a vote state (pass or fail).
         requires_action: The transition counts as an open task of the actor (Tasks
             tab). False marks a purely optional action.
-        offer_on_order_status: The status of a Bestellung at which the page offers the
-            transition (F/finance/orders/002931), else None.
+        offer_on_order_status: The key of the status of a Bestellung at which the page
+            offers the transition (F/finance/orders/002931), else None. The key names a
+            status of the list of the Bestellungen (F/administration/admin/003035).
     """
 
     from_: str = Field(alias="from")
@@ -418,8 +419,8 @@ class TransitionDef(FrozenStrictCamelModel, frozen=True):
     automatic: bool = False
     branch: TransitionBranch | None = None
     requires_action: bool = Field(default=True, alias="requiresAction")
-    offer_on_order_status: Literal["ordered", "delivered"] | None = Field(
-        default=None, alias="offerOnOrderStatus"
+    offer_on_order_status: str | None = Field(
+        default=None, alias="offerOnOrderStatus", max_length=40, pattern=r"^[a-z][a-z0-9_]*$"
     )
 
 

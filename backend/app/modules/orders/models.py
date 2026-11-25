@@ -37,8 +37,6 @@ from app.modules.orders.numbers import draw_number
 
 #: The kinds of a Bestellung: an order of the organization or an Auslage of a person.
 ORDER_KINDS: tuple[str, ...] = ("order", "outlay")
-#: The statuses of a Bestellung, in the order of the usual way.
-ORDER_STATUSES: tuple[str, ...] = ("planned", "ordered", "delivered", "cancelled")
 
 
 def _in(values: tuple[str, ...]) -> str:
@@ -53,7 +51,7 @@ class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
         number: The eight random characters of the number, unique on the platform.
         application_id: The Antrag, else NULL; it never changes.
         kind: ``order`` or ``outlay``.
-        status: ``planned``, ``ordered``, ``delivered`` or ``cancelled``.
+        status: The key of a status of the list ``order`` (F/administration/admin/003035).
         title: The Bezeichnung.
         supplier: The Händler.
         url: The link to the shop or the article, http or https only.
@@ -74,7 +72,7 @@ class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     kind: Mapped[str] = mapped_column(Text, server_default="order")
-    status: Mapped[str] = mapped_column(Text, server_default="planned")
+    status: Mapped[str] = mapped_column(Text)
     title: Mapped[str] = mapped_column(Text)
     supplier: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -96,7 +94,6 @@ class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(ORDER_KINDS)})", name="kind"),
-        CheckConstraint(f"status IN ({_in(ORDER_STATUSES)})", name="status"),
         CheckConstraint("planned_amount IS NULL OR planned_amount >= 0", name="planned_amount"),
         CheckConstraint("actual_amount IS NULL OR actual_amount >= 0", name="actual_amount"),
         Index("ix_purchase_order_application_id", "application_id"),

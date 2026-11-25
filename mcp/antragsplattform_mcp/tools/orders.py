@@ -83,10 +83,10 @@ async def order_update(order_id: str, patch: S.OrderPatch) -> dict:
 async def order_set_status(order_id: str, status: S.OrderStatus, version: int) -> dict:
     """Set the status of a Bestellung; any status follows any other. Requires `order.manage`.
 
-    `ordered` sets an empty `orderedOn` to the current day and `delivered` an empty
-    `deliveredOn`. Both need a buyer (422 `order_buyer_required`). 409
-    `order_version_conflict` on an old `version`. The timeline of the Antrag shows the
-    change. Audited.
+    `status` is a key of the list `order` (`status_list`); 422 `status_unknown` for
+    another. A status with `setsDate` sets that empty date to the current day. A status in
+    the phase `void` frees the positions. 409 `order_version_conflict` on an old
+    `version`. The timeline of the Antrag shows the change. Audited.
     """
     return await api().post(
         f"/orders/{order_id}/status", json={"status": status, "version": version}

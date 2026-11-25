@@ -101,6 +101,7 @@ from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.push_actions.router import router as push_actions_router
 from app.modules.search.router import router as search_router
+from app.modules.statuses.router import router as statuses_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.todos.links_router import router as links_router
 from app.modules.todos.router import router as todos_router
@@ -156,6 +157,7 @@ api_router.include_router(calendar_admin_router)
 api_router.include_router(public_calendar_router)
 api_router.include_router(paperless_router)
 api_router.include_router(paperless_admin_router)
+api_router.include_router(statuses_router)
 api_router.include_router(avatars_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)

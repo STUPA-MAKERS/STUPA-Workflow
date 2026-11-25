@@ -24,6 +24,7 @@ from app.modules.config_revision.service import (
     ENTITY_FLOW,
     ENTITY_FORM,
     ENTITY_SITE_CONFIG,
+    ENTITY_STATUS_LIST,
     ConfigRevisionService,
 )
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
@@ -42,6 +43,7 @@ _RESTORE_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
     ENTITY_SITE_CONFIG: "admin.site",
+    ENTITY_STATUS_LIST: "admin.statuses",
 }
 
 
