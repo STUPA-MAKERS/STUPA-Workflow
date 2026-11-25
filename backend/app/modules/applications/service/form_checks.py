@@ -84,23 +84,29 @@ async def check_internal_cost_centres(
     Raises:
         ValidationProblem: 422 ``cost_centre_internal`` with the fields.
     """
-    picked: dict[uuid.UUID, list[str]] = {}
-    for section in effective.sections:
-        for f in section.fields:
-            if f.type != "budget_select" or (changed is not None and f.key not in changed):
-                continue
-            try:
-                picked.setdefault(uuid.UUID(str(data.get(f.key))), []).append(f.key)
-            except ValueError:
-                continue
-    internal = await internal_ids(session, picked)
+    picked = tuple(
+        (bid, f.key)
+        for section in effective.sections
+        for f in section.fields
+        if f.type == "budget_select" and (changed is None or f.key in changed)
+        if (bid := _uuid_or_none(data.get(f.key))) is not None
+    )
+    internal = await internal_ids(session, (bid for bid, _key in picked))
     if internal:
         raise ValidationProblem(
             "The cost centre is internal.",
             code=COST_CENTRE_INTERNAL,
             errors=[
                 {"field": key, "msg": "the cost centre is internal"}
-                for bid in sorted(internal, key=str)
-                for key in picked[bid]
+                for bid, key in picked
+                if bid in internal
             ],
         )
+
+
+def _uuid_or_none(value: object) -> uuid.UUID | None:
+    """Return the answer as a UUID, or None when it is empty or no UUID."""
+    try:
+        return uuid.UUID(str(value))
+    except ValueError:
+        return None
