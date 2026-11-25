@@ -34,8 +34,12 @@ describe('veryHighContrastApp (§ui-kit:000614)', () => {
 
 describe('surfaceEdges (§ui-kit:000605)', () => {
   it('draws the white edge around the calendar grid and the pane of the start page and the audit chain check', () => {
-    expect(RULES).toMatch(/\.dash--wide \.dash__today, \.al__verify,[^{]*\.wz__sheet,[^{]*\.fe__panel,[^{]*\.br__list \{\s*border: var\(--vh-edge\) !important;/);
+    expect(RULES).toMatch(/\.dash--wide \.dash__today, \.al__verify,[^{]*\.wz__sheet,[^{]*\.fe__panel,[^{]*\.br__list,[^{]*\.pos__card, \.pos__total, \.pv__total \{\s*border: var\(--vh-edge\) !important;/);
     expect(RULES).toMatch(/\.cal__grid::after \{[^}]*border: var\(--vh-edge\);/);
+  });
+
+  it('draws the white edge around each position and the sum row of a cost breakdown', () => {
+    expect(RULES).toMatch(/\.pos__card, \.pos__total, \.pv__total \{\s*border: var\(--vh-edge\) !important;/);
   });
 
   it('draws no edge around the day column of the calendar, a plain row group (001770)', () => {

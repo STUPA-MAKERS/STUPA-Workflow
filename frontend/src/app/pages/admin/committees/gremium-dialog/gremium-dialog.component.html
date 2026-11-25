@@ -210,6 +210,16 @@
           </label>
         </div>
 
+        <app-textarea [label]="'admin.gremien.protocolSignatures' | t">
+          <textarea
+            rows="3"
+            name="protocolSignatures"
+            [ngModel]="form().protocolSignatures"
+            (ngModelChange)="patch('protocolSignatures', $event)"
+            [placeholder]="'admin.gremien.protocolSignaturesPlaceholder' | t"
+          ></textarea>
+        </app-textarea>
+
         <div class="gd__public">
           <div class="rowgroup rowgroup--settings">
             <app-switch

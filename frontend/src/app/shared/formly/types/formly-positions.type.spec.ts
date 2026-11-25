@@ -1,9 +1,9 @@
 import { FormControl } from '@angular/forms';
 import { render } from '@testing-library/angular';
-import { Component, input } from '@angular/core';
 import type { Provider } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
-import { POSITION_FILES } from '@shared/forms/position-files';
+import type { FormFieldDef } from '@core/api/models';
+import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { FormlyPositionsType } from './formly-positions.type';
 
 interface Offer {
@@ -804,78 +804,39 @@ describe('FormlyPositionsType — comparison-offer opt-out (noOffers)', () => {
   });
 });
 
-/** A files block that only shows its inputs. */
-@Component({
-  selector: 'app-files-stub',
-  standalone: true,
-  template: `<span class="stub">{{ fieldKey() }}/{{ positionId() }}/{{ heading() }}</span>`,
-})
-class FilesStubComponent {
-  readonly fieldKey = input('');
-  readonly positionId = input('');
-  readonly heading = input('');
-}
-
-/** The text of the cost line, with plain spaces. */
-function lineOf(host: HTMLElement): string | undefined {
-  return host.querySelector('.pos__line')?.textContent?.replace(/\s+/g, ' ').trim();
-}
-
-describe('FormlyPositionsType — cost line (specs 001630, 001631)', () => {
-  const fields = [
-    { key: 'kosten', type: 'positions', label: { de: 'K' } },
-    { key: 'foerderung', type: 'funding', label: { de: 'F' } },
-    { key: 'n', type: 'number', label: { de: 'N' }, validation: { participants: true } },
-  ];
-  const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
-
-  it('shows the total as the requested amount without a funding', async () => {
-    const model: Record<string, unknown> = { kosten };
-    const { host } = await setup({
-      key: 'kosten',
-      value: kosten,
-      model,
-      props: { costLine: true, costFields: fields },
-    });
-    expect(lineOf(host)).toBe(
-      'Gesamtkosten 1.200,00 €, davon beantragt 1.200,00 €',
-    );
-  });
-
-  it('shows the funding and the amount per person, and follows the form', async () => {
-    const model: Record<string, unknown> = { kosten, foerderung: 800, n: 3 };
-    const { host, control, detect } = await setup({
-      key: 'kosten',
-      value: kosten,
-      model,
-      props: { costLine: true, costFields: fields },
-    });
-    expect(lineOf(host)).toBe(
-      'Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 266,67 € pro Person',
-    );
-    model['n'] = 0;
-    control.setValue(kosten);
-    detect();
-    expect(lineOf(host)).toBe(
-      'Gesamtkosten 1.200,00 €, davon beantragt 800,00 €',
-    );
-  });
-
-  it('shows no line on a field without costLine', async () => {
-    const { host } = await setup({ key: 'kosten', value: kosten, props: { costFields: fields } });
-    expect(host.querySelector('.pos__line')).toBeNull();
+describe('FormlyPositionsType — sum row (spec 003008)', () => {
+  it('sumRow: shows the sum as a row below the positions and none in the head', async () => {
+    const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
+    const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten } });
+    const row = host.querySelector('.pos__total');
+    expect(row?.querySelector('app-icon')?.getAttribute('ng-reflect-name') ?? row?.firstElementChild?.tagName.toLowerCase()).toMatch(/sigma|app-icon/);
+    expect(row?.children[1]?.textContent?.trim()).toBe('Gesamt');
+    expect(row?.lastElementChild?.textContent?.replace(/\s/g, ' ').trim()).toBe('1.200,00 €');
+    const cards = host.querySelectorAll('.pos__card');
+    const add = cards[cards.length - 1]?.nextElementSibling;
+    expect(add?.tagName.toLowerCase()).toBe('app-add-row');
+    expect(add?.nextElementSibling).toBe(row);
+    expect(host.querySelector('.pos__legend')?.nextElementSibling).toBe(host.querySelector('.pos__inner'));
   });
 });
 
-describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', () => {
+const HINTS = {
+  placeholderValue: { de: 'Wie ein Platzhalter.' },
+  placeholderLabel: { de: 'Weniger als 3 Zeichen.' },
+  placeholderDuplicate: { de: 'Steht schon bei einem anderen Angebot.' },
+  useNoOffers: { de: 'Gibt es keine Vergleichsangebote, schalte „{noOffersSwitch}“ ein.' },
+};
+
+describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641, 003010)', () => {
   const offers = [
     { label: 'x', value: 1, preferred: true },
     { label: 'Thomann', value: 50, preferred: false },
     { label: ' thomann', value: 60, preferred: false },
   ];
+  const props = { hints: HINTS, hintLang: 'de' };
 
   it('names the reasons under the field they belong to', async () => {
-    const { cmp, control } = await setup({ value: [{ label: 'P', offers }] });
+    const { cmp, control } = await setup({ value: [{ label: 'P', offers }], props });
     const p = (control.value as Position[])[0];
     expect(prot(cmp).offerWarning(p, 0, 'value')).toBe('Wie ein Platzhalter.');
     expect(prot(cmp).offerWarning(p, 0, 'label')).toBe('Weniger als 3 Zeichen.');
@@ -885,7 +846,7 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
   });
 
   it('marks the field and links the warning to its input', async () => {
-    const { cmp, host, detect } = await setup({ value: [{ label: 'P', offers }] });
+    const { cmp, host, detect } = await setup({ value: [{ label: 'P', offers }], props });
     prot(cmp).toggleOpen(0);
     detect();
     const warned = host.querySelectorAll('.pf--warn');
@@ -896,7 +857,7 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
   });
 
   it('names the switch for no comparison offers once below the offers', async () => {
-    const { cmp, control, host, detect } = await setup({ value: [{ label: 'P', offers }] });
+    const { cmp, control, host, detect } = await setup({ value: [{ label: 'P', offers }], props });
     prot(cmp).toggleOpen(0);
     detect();
     const p = (control.value as Position[])[0];
@@ -910,46 +871,75 @@ describe('FormlyPositionsType — placeholder warnings (specs 001640, 001641)', 
   it('does not name the switch when the field does not offer it', async () => {
     const { cmp, control } = await setup({
       value: [{ label: 'P', offers }],
-      props: { allowNoOffers: false },
+      props: { ...props, allowNoOffers: false },
     });
     const p = (control.value as Position[])[0];
     expect(prot(cmp).switchHint(p)).toBe('');
     expect(prot(cmp).switchHint({ ...p, noOffers: true })).toBe('');
   });
 
+  it('hints: shows no warning, no ring and no switch hint without texts (spec 003010)', async () => {
+    const { cmp, control, host, detect } = await setup({ value: [{ label: 'P', offers }] });
+    prot(cmp).toggleOpen(0);
+    detect();
+    const p = (control.value as Position[])[0];
+    expect(prot(cmp).offerWarning(p, 0, 'value')).toBe('');
+    expect(prot(cmp).switchHint(p)).toBe('');
+    expect(host.querySelectorAll('.pf--warn')).toHaveLength(0);
+    expect(host.querySelectorAll('.pos__warn')).toHaveLength(0);
+  });
+
   it('keeps a complete position with a warning valid', async () => {
     const { control } = await setup({
       value: [{ label: 'P', offers }],
-      props: { minOffers: 3 },
+      props: { ...props, minOffers: 3 },
     });
     await Promise.resolve();
     expect(control.errors).toBeNull();
   });
 });
 
-describe('FormlyPositionsType — files per position (spec 001730)', () => {
+describe('FormlyPositionsType — hints from the config (spec 003010)', () => {
+  const kosten = [{ label: 'Bus', offers: [{ label: 'Reisen AG', value: 1200, preferred: true }] }];
+
+  it('hints: shows no text below the total without a config text', async () => {
+    const { host } = await setup({ key: 'kosten', value: kosten, model: { kosten } });
+    expect(host.querySelector('.pos__line')).toBeNull();
+    expect(host.textContent).not.toContain('Gesamtkosten');
+  });
+
+  it('fills the placeholders of the text below the total', async () => {
+    const fields: FormFieldDef[] = [
+      {
+        key: 'kosten',
+        type: 'positions',
+        label: { de: 'K' },
+        validation: { hints: { below: { de: 'Summe {costTotal}, beantragt {foerderung}, {unbekannt}.' } } },
+      },
+      { key: 'foerderung', type: 'funding', label: { de: 'F' } },
+    ];
+    const props = (toFormlyFields(fields, 'de')[0].props ?? {}) as Record<string, unknown>;
+    const model: Record<string, unknown> = { kosten, foerderung: 800 };
+    const { host } = await setup({ key: 'kosten', value: kosten, model, props });
+    expect(host.querySelector('.pos__line')?.textContent?.replace(/\s/g, ' ').trim()).toBe(
+      'Summe 1.200,00 €, beantragt 800,00 €, .',
+    );
+  });
+
+  it('shows the text for a position without comparison offers', async () => {
+    const value = [{ label: 'Bus', noOffers: true, offers: [{ label: 'A', value: 5, preferred: true }] }];
+    const { host } = await setup({
+      value,
+      props: { hints: { noOffers: { de: 'Begründe es.' } }, hintLang: 'de' },
+    });
+    expect(host.textContent).toContain('Begründe es.');
+  });
+});
+
+describe('FormlyPositionsType — position ids', () => {
   it('gives a new position an id', async () => {
     const { cmp, control } = await setup({ props: { minOffers: 1 } });
     cmp.addPosition();
     expect((control.value as { id?: string }[])[0].id).toMatch(/^p-/);
-  });
-
-  it('shows the files block of the page and reports a removed position', async () => {
-    const removed = jest.fn();
-    const { cmp, control, host } = await setup({
-      key: 'kosten',
-      value: [{ label: '', offers: [] }],
-      providers: [{ provide: POSITION_FILES, useValue: { component: FilesStubComponent, removed } }],
-    });
-    const id = (control.value as { id?: string }[])[0].id;
-    expect(id).toMatch(/^p-/);
-    expect(host.querySelector('.stub')?.textContent).toBe(`kosten/${id}/Dateien zur Position`);
-    cmp.removePosition(0);
-    expect(removed).toHaveBeenCalledWith('kosten', id);
-  });
-
-  it('has no files block without the page token', async () => {
-    const { host } = await setup({ value: [{ id: 'p-1', label: '', offers: [] }] });
-    expect(host.querySelector('.stub')).toBeNull();
   });
 });

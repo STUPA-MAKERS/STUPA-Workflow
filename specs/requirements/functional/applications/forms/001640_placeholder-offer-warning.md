@@ -31,6 +31,8 @@ When the field allows the opt-out (`allowNoOffers`, 000134), a line below the of
 `Für diese Position sind keine Vergleichsangebote möglich`
 (`No comparison offers are possible for this position`).
 
+The text of each line is a hint of 003010. Without its text the form shows neither the ring nor the line.
+
 Reason: Prod data holds 8 Anträge with offers such as `x`, `000` or `wird nachgereicht`. The applicants did not use the opt-out.
 
 Test: A frontend unit test checks each condition and the text with and without `allowNoOffers`.

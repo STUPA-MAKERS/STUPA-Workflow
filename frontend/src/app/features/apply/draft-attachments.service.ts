@@ -21,8 +21,6 @@ export interface PendingUpload {
   readonly filename: string;
   readonly size: number;
   readonly fieldKey: string | null;
-  /** The position of a `positions` field the file belongs to (spec 001730), or null. */
-  readonly positionId?: string | null;
 }
 
 /** A file the wizard could not upload, with the reason as a translation key. */
@@ -148,16 +146,6 @@ export class DraftAttachmentsService {
     return this.files().filter((f) => f.fieldKey === fieldKey);
   }
 
-  /** The files of one position of a `positions` field (spec 001730). */
-  filesOfPosition(fieldKey: string, positionId: string): readonly DraftFile[] {
-    return this.files().filter((f) => f.fieldKey === fieldKey && f.positionId === positionId);
-  }
-
-  /** Remove the files of a position that the applicant removed. */
-  async dropPosition(fieldKey: string, positionId: string): Promise<void> {
-    await Promise.all(this.filesOfPosition(fieldKey, positionId).map((f) => this.remove(f.id)));
-  }
-
   /**
    * Upload files one after the other. A file over a limit stays here with its reason;
    * the others go on. Resolves the uploaded files and the failures.
@@ -171,10 +159,9 @@ export class DraftAttachmentsService {
    */
   upload(
     files: readonly File[],
-    opts: { fieldKey?: string | null; positionId?: string | null } = {},
+    opts: { fieldKey?: string | null } = {},
   ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const fieldKey = opts.fieldKey ?? null;
-    const positionId = fieldKey ? (opts.positionId ?? null) : null;
     const generation = this.generation;
     const queued = files.map((file) => ({
       file,
@@ -183,11 +170,10 @@ export class DraftAttachmentsService {
         filename: file.name,
         size: file.size,
         fieldKey,
-        positionId,
       } satisfies PendingUpload,
     }));
     if (queued.length) this.pending.update((list) => [...list, ...queued.map((q) => q.pending)]);
-    const run = this.queue.then(() => this.runUploads(queued, fieldKey, positionId, generation));
+    const run = this.queue.then(() => this.runUploads(queued, fieldKey, generation));
     this.queue = run;
     return run;
   }
@@ -195,7 +181,6 @@ export class DraftAttachmentsService {
   private async runUploads(
     queued: readonly { file: File; pending: PendingUpload }[],
     fieldKey: string | null,
-    positionId: string | null,
     generation: number,
   ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const uploaded: DraftFile[] = [];
@@ -211,7 +196,7 @@ export class DraftAttachmentsService {
           continue;
         }
         try {
-          const draft = await this.send(file, fieldKey, positionId, generation);
+          const draft = await this.send(file, fieldKey, generation);
           if (!draft) continue;
           if (!this.inScope(draft)) {
             void this.deleteQuietly([draft.id]);
@@ -375,15 +360,14 @@ export class DraftAttachmentsService {
   private async send(
     file: File,
     fieldKey: string | null,
-    positionId: string | null,
     generation: number,
   ): Promise<DraftFile | null> {
     try {
-      return await this.sendOnce(file, fieldKey, positionId, generation);
+      return await this.sendOnce(file, fieldKey, generation);
     } catch (err) {
       if (!(err instanceof HttpErrorResponse) || problemCode(err) !== TOKEN_INVALID) throw err;
       this.markFailed({ code: TOKEN_INVALID } as ProblemDetail);
-      return this.sendOnce(file, fieldKey, positionId, generation);
+      return this.sendOnce(file, fieldKey, generation);
     }
   }
 
@@ -391,13 +375,12 @@ export class DraftAttachmentsService {
   private async sendOnce(
     file: File,
     fieldKey: string | null,
-    positionId: string | null,
     generation: number,
   ): Promise<DraftFile | null> {
     const token = this._token();
     const altcha = !token && !this.auth.isAuthenticated() ? await this.altcha.solve() : null;
     const res = await firstValueFrom(
-      this.api.uploadDraftAttachment(file, { token, altcha, fieldKey, positionId }),
+      this.api.uploadDraftAttachment(file, { token, altcha, fieldKey }),
     );
     if (generation !== this.generation) {
       void this.deleteQuietly([res.attachment.id], res.draftToken);
@@ -405,7 +388,7 @@ export class DraftAttachmentsService {
     }
     this._token.set(res.draftToken);
     this.expiresAt = res.draftExpiresAt;
-    return { ...res.attachment, fieldKey, ...(positionId ? { positionId } : {}) };
+    return { ...res.attachment, fieldKey };
   }
 
   private store(): void {

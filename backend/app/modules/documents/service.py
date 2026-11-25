@@ -154,12 +154,20 @@ class ApplicationPdfService:
         )
         return resolve_i18n(names, LANG) if isinstance(names, dict) else None
 
-    async def _signs(self, type_id: uuid.UUID) -> bool:
-        """Tell whether the Antrag PDF of the type ends with the signature section."""
-        return bool(
-            await self.session.scalar(
-                select(ApplicationType.pdf_signatures).where(ApplicationType.id == type_id)
-            )
+    async def _signs(self, type_id: uuid.UUID) -> tuple[tuple[str, str], ...]:
+        """Return the signature rows that end the Antrag PDF of the type (specs 003005, 003009).
+
+        Every status and the Anlage of a protocol get the rows; an empty list gives none.
+        """
+        rows = await self.session.scalar(
+            select(ApplicationType.signature_rows).where(ApplicationType.id == type_id)
+        )
+        if not isinstance(rows, list):
+            return ()
+        return tuple(
+            (str(r["label"]), str(r["signer"]))
+            for r in rows
+            if isinstance(r, dict) and r.get("label") and r.get("signer")
         )
 
     async def _gremium(self, gremium_id: uuid.UUID | None) -> Gremium | None:
@@ -282,7 +290,8 @@ class ApplicationPdfService:
         """Build the document of one frozen version for the protocol Anlage.
 
         `version=None` takes the current version. The document has no status and no
-        decision. The public variant prints the ``isPII`` answers, the files of the
+        decision, and ends with the signature rows of its Antragsart (spec 003009). The
+        public variant prints the ``isPII`` answers, the files of the
         ``isPII`` fields and the applicant as a black bar.
 
         Returns:
@@ -335,6 +344,7 @@ class ApplicationPdfService:
             redacted_keys=pii,
             redact_applicant=public,
             files=await self._file_names(app.id, data, pii),
+            signatures=await self._signs(app.type_id),
         )
 
     async def frozen_version(self, item: MeetingAgendaItem) -> int | None:

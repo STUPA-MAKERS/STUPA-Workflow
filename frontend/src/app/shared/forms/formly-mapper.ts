@@ -185,21 +185,25 @@ function costTotal(field: FormlyFieldConfig, costKeys: readonly string[]): numbe
   return costKeys.reduce((sum, key) => sum + positionsTotal(normalizePositions(model[key])), 0);
 }
 
+/** A UI text in the locale of the form. */
+function uiText(key: TranslationKey, lang: Lang): string {
+  return CATALOG[baseLocale(lang)]?.[key] ?? de[key];
+}
+
 /** A UI text with `{total}` filled in, in the locale of the form. */
 function totalText(key: TranslationKey, lang: Lang, total: number): string {
-  const text = CATALOG[baseLocale(lang)]?.[key] ?? de[key];
-  return text.replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
+  return uiText(key, lang).replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
 }
 
 /**
- * The requested funding: the hint shows the cost total, and a value above the total is
- * an error with its own text. The server checks the same rule (`_check_funding_total`).
+ * The requested funding: the hint is the help of the field and nothing else (specs 002990,
+ * 003006). While the setting `capAtCost` is on, a value above the cost total is an error that
+ * names the total (spec 003004). The server checks the same rule (`_check_funding_total`).
  *
  * The cap is checked again when any answer changes, because the cost positions are other controls.
  */
 function withFunding(
   config: FormlyFieldConfig,
-  help: string | undefined,
   lang: Lang,
   costKeys: readonly string[],
 ): FormlyFieldConfig {
@@ -223,10 +227,6 @@ function withFunding(
     },
     expressions: {
       ...config.expressions,
-      'props.description': (field: FormlyFieldConfig) => {
-        const hint = totalText('forms.funding.hint', lang, costTotal(field, costKeys));
-        return help ? `${help} ${hint}` : hint;
-      },
       'props.errorText': (field: FormlyFieldConfig) =>
         over(field) ? totalText('forms.funding.max', lang, costTotal(field, costKeys)) : undefined,
     },
@@ -251,18 +251,17 @@ function choiceProps(f: FormFieldDef, lang: Lang): Readonly<Record<string, unkno
 }
 
 /**
- * The `positions` limits that the form sets. The last `positions` field of the form also
- * gets the fields of the form (`costFields`) and `costLine`: it shows the line with the
- * total cost, the requested amount and the amount per person (specs 001630, 001631).
+ * The `positions` limits that the form sets, and its hint texts (spec 003010) with the
+ * language of the form and the fields of the form, which the placeholders of a text read.
  */
 function positionsProps(
   f: FormFieldDef,
   all: readonly FormFieldDef[],
+  lang: Lang,
 ): Readonly<Record<string, unknown>> {
   const v = f.validation;
-  const last = all.filter((x) => x.type === 'positions').at(-1);
   return {
-    ...(last?.key === f.key ? { costLine: true, costFields: all } : {}),
+    ...(v?.hints ? { hints: v.hints, hintLang: lang, formFields: all } : {}),
     ...(v?.minOffers !== undefined ? { minOffers: v.minOffers } : {}),
     ...(v?.minPositions !== undefined ? { minPositions: v.minPositions } : {}),
     ...(v?.allowNoOffers !== undefined ? { allowNoOffers: v.allowNoOffers } : {}),
@@ -286,7 +285,7 @@ function displayProps(
         text: CATALOG[baseLocale(lang)]?.['forms.table.pending'] ?? de['forms.table.pending'],
       };
     case 'positions':
-      return positionsProps(f, all);
+      return positionsProps(f, all, lang);
     default:
       return {};
   }
@@ -329,7 +328,9 @@ function mapField(
     props,
     ...(expressions ? { expressions } : {}),
   };
-  return f.type === 'funding' ? withFunding(config, help, lang, costKeys) : config;
+  return f.type === 'funding' && f.validation?.capAtCost !== false
+    ? withFunding(config, lang, costKeys)
+    : config;
 }
 
 /** The Formly props of the `validation` limits of a field. */

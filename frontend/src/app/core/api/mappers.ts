@@ -247,7 +247,6 @@ export function mapAttachment(wire: AttachmentOutWire): Attachment {
     scanned: wire.scanned,
     scanState: wire.scanned ? 'clean' : 'scanning',
     ...(wire.fieldKey ? { fieldKey: wire.fieldKey } : {}),
-    ...(wire.positionId ? { positionId: wire.positionId } : {}),
   };
 }
 

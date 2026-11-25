@@ -17,7 +17,9 @@ scope:
 # A submit without a file asks for a confirmation
 
 When the applicant submits an Antrag with a `positions` field and the Antrag has no attachment,
-the form must show a warning. The applicant must be able to confirm the warning and submit.
+the form must show a warning. The applicant must be able to confirm the warning and submit. The
+title and the text of the warning are the hints `noFileTitle` and `noFileBody` of 003010; without
+both texts the form asks nothing.
 
 Reason: Most Anträge need an offer or a receipt, but some offers come later.
 

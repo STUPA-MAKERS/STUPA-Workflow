@@ -246,6 +246,15 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
         created.id, GremiumUpdate(name="AStA neu"), _ACTOR
     )
     assert updated.name == "AStA neu"
+    assert updated.protocol_signatures == []
+    signed = await svc.update_gremium(
+        created.id,
+        GremiumUpdate.model_validate({"protocolSignatures": [" Kasse ", "Vorsitz"]}),
+        _ACTOR,
+    )
+    assert signed.protocol_signatures == ["Kasse", "Vorsitz"]
+    kept = await svc.update_gremium(created.id, GremiumUpdate(name="AStA"), _ACTOR)
+    assert kept.protocol_signatures == ["Kasse", "Vorsitz"]
 
 
 async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:
@@ -315,13 +324,17 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
     )
     assert updated.has_budget is False
     assert updated.active_form_version is None
-    assert updated.pdf_signatures is False
-    signed = await svc.update_application_type(
-        created.id, ApplicationTypeUpdate(pdfSignatures=True), _ACTOR
-    )
-    assert signed.pdf_signatures is True
     listed = {t.id: t for t in await svc.list_application_types()}
-    assert listed[created.id].pdf_signatures is True
+    assert listed[created.id].signature_rows == []
+    rows = [{"label": "Geprüft", "signer": "Kasse"}, {"label": "Frei", "signer": "Vorsitz"}]
+    with_rows = await svc.update_application_type(
+        created.id, ApplicationTypeUpdate.model_validate({"signatureRows": rows}), _ACTOR
+    )
+    assert [r.model_dump() for r in with_rows.signature_rows] == rows
+    kept = await svc.update_application_type(
+        created.id, ApplicationTypeUpdate(hasBudget=False), _ACTOR
+    )
+    assert len(kept.signature_rows) == 2
 
 
 async def test_application_type_list_gives_the_active_form_version(

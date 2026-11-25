@@ -369,7 +369,6 @@ async def upload_attachment(
     access: Annotated[Access, Depends(require_app_edit)],
     file: Annotated[UploadFile, File()],
     field_key: Annotated[str | None, Form(max_length=256)] = None,
-    position_id: Annotated[str | None, Form(max_length=64)] = None,
 ) -> AttachmentOut:
     """Upload an attachment.
 
@@ -386,7 +385,6 @@ async def upload_attachment(
         data=data,
         by=access.actor,
         field_key=field_key,
-        position_id=position_id,
     )
 
 
@@ -580,7 +578,6 @@ async def upload_draft_attachment(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     file: Annotated[UploadFile, File()],
     field_key: Annotated[str | None, Form(max_length=256)] = None,
-    position_id: Annotated[str | None, Form(max_length=64)] = None,
     altcha: Annotated[str | None, Form(max_length=4096)] = None,
     draft_token: Annotated[str | None, Header(alias=DRAFT_TOKEN_HEADER, max_length=128)] = None,
 ) -> DraftAttachmentOut:
@@ -620,7 +617,6 @@ async def upload_draft_attachment(
         data=data,
         by=principal.sub if principal is not None else "applicant",
         field_key=field_key,
-        position_id=position_id,
     )
 
 

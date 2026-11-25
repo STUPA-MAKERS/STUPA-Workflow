@@ -189,6 +189,7 @@ def gremium_row(**kw: Any) -> Any:
         "guests_may_vote": False,
         "term_start_month": 10,
         "protocols_public": False,
+        "protocol_signatures": [],
         "protocol_recipients": [],
     }
     base.update(kw)
@@ -202,7 +203,7 @@ def type_row(**kw: Any) -> Any:
         "key": "antrag",
         "name_i18n": {"de": "Antrag"},
         "has_budget": False,
-        "pdf_signatures": False,
+        "signature_rows": [],
         "attachment_required": False,
         "comparison_offers": None,
         "retention_months": None,
