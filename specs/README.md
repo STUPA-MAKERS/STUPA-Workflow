@@ -633,15 +633,15 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | approved |
 | [F/integrations/mcp/002921](requirements/functional/integrations/mcp/002921_no-paperless-copy-by-token.md) | A token does not copy documents into or out of Paperless | approved |
 | [F/integrations/mcp/002922](requirements/functional/integrations/mcp/002922_paperless-link-end-by-number.md) | An MCP link tool names a Paperless end by its document number | approved |
-| [F/integrations/mcp/003102](requirements/functional/integrations/mcp/003102_pretix-mollie-read-only.md) | A token reads the pretix and Mollie sums only through the Event | approved |
-| [F/integrations/mollie/003092](requirements/functional/integrations/mollie/003092_connection-page.md) | An admin connects one Mollie account | approved |
-| [F/integrations/mollie/003093](requirements/functional/integrations/mollie/003093_feature-switch.md) | Mollie has a feature switch | approved |
-| [F/integrations/mollie/003094](requirements/functional/integrations/mollie/003094_read-payments.md) | The worker reads the Mollie payments | approved |
-| [F/integrations/mollie/003095](requirements/functional/integrations/mollie/003095_assign-to-event.md) | A Mollie payment belongs to the Event of its pretix shop | approved |
-| [F/integrations/mollie/003096](requirements/functional/integrations/mollie/003096_money-in-detail.md) | The detail of an Event shows the Mollie money | approved |
-| [F/integrations/mollie/003097](requirements/functional/integrations/mollie/003097_book-settlements.md) | Each Mollie settlement is booked automatically | approved |
-| [F/integrations/mollie/003098](requirements/functional/integrations/mollie/003098_only-money.md) | The platform keeps only the money data of Mollie | approved |
-| [F/integrations/mollie/003099](requirements/functional/integrations/mollie/003099_no-change-in-mollie.md) | The platform changes nothing in Mollie | approved |
+| [F/integrations/mcp/003102](requirements/functional/integrations/mcp/003102_pretix-mollie-read-only.md) | A token reads the pretix and Mollie sums only through the Event | draft |
+| [F/integrations/mollie/003092](requirements/functional/integrations/mollie/003092_connection-page.md) | An admin connects one Mollie account | draft |
+| [F/integrations/mollie/003093](requirements/functional/integrations/mollie/003093_feature-switch.md) | Mollie has a feature switch | draft |
+| [F/integrations/mollie/003094](requirements/functional/integrations/mollie/003094_read-payments.md) | The worker reads the Mollie payments | draft |
+| [F/integrations/mollie/003095](requirements/functional/integrations/mollie/003095_assign-to-event.md) | A Mollie payment belongs to the Event of its pretix shop | draft |
+| [F/integrations/mollie/003096](requirements/functional/integrations/mollie/003096_money-in-detail.md) | The detail of an Event shows the Mollie money | draft |
+| [F/integrations/mollie/003097](requirements/functional/integrations/mollie/003097_book-settlements.md) | Each Mollie settlement is booked automatically | draft |
+| [F/integrations/mollie/003098](requirements/functional/integrations/mollie/003098_only-money.md) | The platform keeps only the money data of Mollie | draft |
+| [F/integrations/mollie/003099](requirements/functional/integrations/mollie/003099_no-change-in-mollie.md) | The platform changes nothing in Mollie | draft |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
 | [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
@@ -672,17 +672,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/paperless/002768](requirements/functional/integrations/paperless/002768_link-graph.md) | The graph shows linked Paperless documents | approved |
 | [F/integrations/paperless/002813](requirements/functional/integrations/paperless/002813_address-change-needs-token.md) | A change of the Paperless address needs the token again | approved |
 | [F/integrations/paperless/002844](requirements/functional/integrations/paperless/002844_links-name-public-address.md) | A link to Paperless names the address for links | approved |
-| [F/integrations/pretix/003080](requirements/functional/integrations/pretix/003080_connection-page.md) | An admin connects one pretix organizer | approved |
-| [F/integrations/pretix/003081](requirements/functional/integrations/pretix/003081_feature-switch.md) | Pretix has a feature switch | approved |
-| [F/integrations/pretix/003082](requirements/functional/integrations/pretix/003082_part-switches.md) | Each part of the pretix integration has its own switch | approved |
-| [F/integrations/pretix/003083](requirements/functional/integrations/pretix/003083_event-link.md) | An Event links one pretix event | approved |
-| [F/integrations/pretix/003084](requirements/functional/integrations/pretix/003084_sales-in-detail.md) | The detail of an Event shows the pretix sales | approved |
-| [F/integrations/pretix/003085](requirements/functional/integrations/pretix/003085_refresh-in-worker.md) | The worker reads the pretix sales | approved |
-| [F/integrations/pretix/003086](requirements/functional/integrations/pretix/003086_book-sales.md) | The pretix sales are booked automatically | approved |
-| [F/integrations/pretix/003088](requirements/functional/integrations/pretix/003088_only-sums.md) | The platform keeps only sums of pretix orders | approved |
-| [F/integrations/pretix/003089](requirements/functional/integrations/pretix/003089_no-change-in-pretix.md) | The platform changes nothing in pretix | approved |
-| [F/integrations/pretix/003090](requirements/functional/integrations/pretix/003090_audit.md) | The pretix actions write audit entries | approved |
-| [F/integrations/pretix/003091](requirements/functional/integrations/pretix/003091_permission-use.md) | One permission gives the link to pretix | approved |
+| [F/integrations/pretix/003080](requirements/functional/integrations/pretix/003080_connection-page.md) | An admin connects one pretix organizer | draft |
+| [F/integrations/pretix/003081](requirements/functional/integrations/pretix/003081_feature-switch.md) | Pretix has a feature switch | draft |
+| [F/integrations/pretix/003082](requirements/functional/integrations/pretix/003082_part-switches.md) | Each part of the pretix integration has its own switch | draft |
+| [F/integrations/pretix/003083](requirements/functional/integrations/pretix/003083_event-link.md) | An Event links one pretix event | draft |
+| [F/integrations/pretix/003084](requirements/functional/integrations/pretix/003084_sales-in-detail.md) | The detail of an Event shows the pretix sales | draft |
+| [F/integrations/pretix/003085](requirements/functional/integrations/pretix/003085_refresh-in-worker.md) | The worker reads the pretix sales | draft |
+| [F/integrations/pretix/003086](requirements/functional/integrations/pretix/003086_book-sales.md) | The pretix sales are booked automatically | draft |
+| [F/integrations/pretix/003088](requirements/functional/integrations/pretix/003088_only-sums.md) | The platform keeps only sums of pretix orders | draft |
+| [F/integrations/pretix/003089](requirements/functional/integrations/pretix/003089_no-change-in-pretix.md) | The platform changes nothing in pretix | draft |
+| [F/integrations/pretix/003090](requirements/functional/integrations/pretix/003090_audit.md) | The pretix actions write audit entries | draft |
+| [F/integrations/pretix/003091](requirements/functional/integrations/pretix/003091_permission-use.md) | One permission gives the link to pretix | draft |
 | [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
 | [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
 | [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
@@ -1033,8 +1033,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/security/network/002745](requirements/non-functional/security/network/002745_ticket-mail-tls.md) | The platform talks to a mail server only through TLS | approved |
 | [NF/security/network/002746](requirements/non-functional/security/network/002746_ticket-mail-password.md) | No read returns the password of a Postfach | approved |
 | [NF/security/network/002817](requirements/non-functional/security/network/002817_push-token-not-logged.md) | An access log holds no token of a path | approved |
-| [NF/security/network/003100](requirements/non-functional/security/network/003100_pretix-mollie-hosts.md) | The pretix and Mollie clients call only allowed hosts | approved |
-| [NF/security/network/003101](requirements/non-functional/security/network/003101_pretix-mollie-tokens.md) | The pretix and Mollie tokens never leave the server | approved |
+| [NF/security/network/003100](requirements/non-functional/security/network/003100_pretix-mollie-hosts.md) | The pretix and Mollie clients call only allowed hosts | draft |
+| [NF/security/network/003101](requirements/non-functional/security/network/003101_pretix-mollie-tokens.md) | The pretix and Mollie tokens never leave the server | draft |
 | [NF/usability/controls/000668](requirements/non-functional/usability/controls/000668_fiscal-year-chip.md) | The fiscal year is chosen with a chip | approved |
 | [NF/usability/controls/000676](requirements/non-functional/usability/controls/000676_tickets-word-in-admin.md) | Verwaltung says "Tickets" | approved |
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |

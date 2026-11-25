@@ -2,7 +2,7 @@
 id: "003096"
 title: The detail of an Event shows the Mollie money
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

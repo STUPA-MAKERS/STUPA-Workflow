@@ -2,7 +2,7 @@
 id: "003086"
 title: The pretix sales are booked automatically
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

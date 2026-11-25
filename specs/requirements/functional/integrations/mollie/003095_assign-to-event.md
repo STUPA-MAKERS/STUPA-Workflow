@@ -2,7 +2,7 @@
 id: "003095"
 title: A Mollie payment belongs to the Event of its pretix shop
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

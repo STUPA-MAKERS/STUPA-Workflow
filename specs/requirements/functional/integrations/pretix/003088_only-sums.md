@@ -2,7 +2,7 @@
 id: "003088"
 title: The platform keeps only sums of pretix orders
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

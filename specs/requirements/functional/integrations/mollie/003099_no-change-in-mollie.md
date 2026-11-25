@@ -2,7 +2,7 @@
 id: "003099"
 title: The platform changes nothing in Mollie
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

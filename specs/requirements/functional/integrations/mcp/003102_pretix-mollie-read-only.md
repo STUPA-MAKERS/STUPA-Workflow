@@ -2,7 +2,7 @@
 id: "003102"
 title: A token reads the pretix and Mollie sums only through the Event
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

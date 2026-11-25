@@ -2,7 +2,7 @@
 id: "003098"
 title: The platform keeps only the money data of Mollie
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

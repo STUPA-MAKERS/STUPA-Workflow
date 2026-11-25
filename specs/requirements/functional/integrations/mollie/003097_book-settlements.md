@@ -2,7 +2,7 @@
 id: "003097"
 title: Each Mollie settlement is booked automatically
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

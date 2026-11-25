@@ -2,7 +2,7 @@
 id: "003089"
 title: The platform changes nothing in pretix
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null
