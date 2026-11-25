@@ -47,7 +47,11 @@ def test_order_create_without_an_antrag_posts_to_the_orders(fake_api: _FakeApi) 
     """§F/finance/orders/003014: no Antrag sends the create to ``POST /orders``."""
     asyncio.run(orders.order_create(None, S.OrderCreate(title="Beamer")))
     assert fake_api.calls == [
-        ("POST", "/orders", {"title": "Beamer", "kind": "order", "status": "planned"}),
+        (
+            "POST",
+            "/orders",
+            {"title": "Beamer", "kind": "order", "status": "planned", "positionIds": []},
+        ),
     ]
 
 
