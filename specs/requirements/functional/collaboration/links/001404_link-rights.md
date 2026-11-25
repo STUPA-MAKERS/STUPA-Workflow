@@ -2,9 +2,9 @@
 id: "001404"
 title: A person links what the person reads and writes on one end
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-19
+updated: 2026-11-25
 implementation:
   - backend/app/modules/todos/link_rights.py
 scope:
@@ -23,7 +23,8 @@ change at least one of them. The change right of each kind must be:
 | vote | `vote.manage` or `session.manage` in the Gremium of the vote |
 | Termin | the creator, or `calendar.manage` |
 | Gremium | `admin.gremien` |
-| invoice, Buchung | `budget.book` |
+| invoice | `budget.book` or `invoice.manage` (F/finance/invoices/003015) |
+| Buchung | `budget.book` |
 | cost centre | `budget.structure` |
 | ticket | `ticket.manage` |
 | card | `todo.write` on the board of the card |
