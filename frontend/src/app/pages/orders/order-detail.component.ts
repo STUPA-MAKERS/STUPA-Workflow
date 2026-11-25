@@ -385,12 +385,21 @@ export class OrderDetailComponent {
     });
   }
 
-  /** A read that fails leaves its part of the detail out. */
+  /**
+   * A read that fails leaves its part of the detail out. A Bestellung without an Antrag
+   * has only its bookings around it.
+   */
   private loadAround(order: Order): void {
     const id = this.id;
+    const mine = (): boolean => id === this.id;
+    if (this.auth.canAny(...BUDGET_PERMISSIONS)) {
+      this.api.bookings(order.id).subscribe({
+        next: (bookings) => mine() && this.bookings.set(bookings),
+        error: () => undefined,
+      });
+    }
     const applicationId = order.applicationId;
     if (!applicationId) return;
-    const mine = (): boolean => id === this.id;
     this.api.list(applicationId).subscribe({
       next: (list) => mine() && this.list.set(list),
       error: () => undefined,
@@ -398,12 +407,6 @@ export class OrderDetailComponent {
     if (!this.application()) {
       this.client.getApplication(applicationId, { quiet: true }).subscribe({
         next: (application) => mine() && this.application.set(application),
-        error: () => undefined,
-      });
-    }
-    if (this.auth.canAny(...BUDGET_PERMISSIONS)) {
-      this.api.bookings(order.id).subscribe({
-        next: (bookings) => mine() && this.bookings.set(bookings),
         error: () => undefined,
       });
     }

@@ -48,6 +48,8 @@ class OrderFilter:
         kind: ``order`` or ``outlay``.
         buyer_id: The account of the buyer.
         q: The search in the number, the Bezeichnung, the Händler and the Bestellnummer.
+        free: Only the Bestellungen without an Antrag, for the field "Bestellung" of a
+            booking without an Antrag.
     """
 
     segment: Segment | None = None
@@ -57,6 +59,7 @@ class OrderFilter:
     kind: OrderKind | None = None
     buyer_id: UUID | None = None
     q: str | None = None
+    free: bool = False
 
 
 def _booked() -> ColumnElement[Decimal]:
@@ -191,6 +194,7 @@ class OrderListing:
             PurchaseOrder.kind == wanted.kind if wanted.kind is not None else None,
             PurchaseOrder.buyer_id == wanted.buyer_id if wanted.buyer_id is not None else None,
             search[0] if search is not None else None,
+            PurchaseOrder.application_id.is_(None) if wanted.free else None,
         )
         filters = [
             await self._scope(principal, wanted),

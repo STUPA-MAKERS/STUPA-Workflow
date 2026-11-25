@@ -1,6 +1,8 @@
 import { computed, inject, signal } from '@angular/core';
+import { map } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
-import { OrdersApiService } from '@core/api/orders.service';
+import { type Order, OrdersApiService } from '@core/api/orders.service';
+import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { liveSearch, type SelectOption, ToastService } from '@stupa-makers/ui-kit';
@@ -25,6 +27,9 @@ import { formatMoney } from '@shared/format-money';
 import { EventLinkState } from '../../features/todos/event-link.state';
 import { bookingPayee, bookingRest } from '../orders/orders.util';
 
+/** How many Bestellungen without an Antrag the field "Bestellung" of a booking offers. */
+const OFFERED_ORDERS = 200;
+
 /** The fiscal year that holds today, else the only active one, else null. */
 export function currentFiscalYear(
   fys: readonly FiscalYear[],
@@ -47,6 +52,7 @@ export class ExpenseDialogsState {
   private readonly files = inject(FileOpenService);
   private readonly apps = inject(ApiClient);
   private readonly orders = inject(OrdersApiService);
+  private readonly features = inject(FeatureService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
@@ -109,6 +115,9 @@ export class ExpenseDialogsState {
   readonly editPaymentMethod = signal('');
   readonly editCategory = signal('');
   readonly editNote = signal('');
+  /** The Bestellung that the booking names, and the Bestellungen it can name. */
+  readonly editOrderId = signal('');
+  readonly editOrderOptions = signal<readonly SelectOption[]>([]);
   readonly confirmDelete = signal<Expense | null>(null);
 
   /** The invoices to link. One invoice can back many bookings. */
@@ -293,18 +302,20 @@ export class ExpenseDialogsState {
 
   /**
    * Fill the new booking from a Bestellung: the Bestellung, its Antrag (which gives the
-   * cost centre and the fiscal year), its invoice, the Bezeichnung as the description, the
+   * cost centre and the fiscal year; without an Antrag the person picks both), its invoice, the Bezeichnung as the description, the
    * payee, and the price minus the amounts already booked. Each value stays editable.
    */
   private preselectOrder(id: string): void {
     this.orders.get(id).subscribe({
       next: (order) => {
-        if (!this.createOpen() || !order.applicationId) return;
-        this.newBudgetId.set('');
-        this.pickApp({
-          id: order.applicationId,
-          title: order.applicationTitle || this.i18n.translate('expenses.col.application'),
-        });
+        if (!this.createOpen()) return;
+        if (order.applicationId) {
+          this.newBudgetId.set('');
+          this.pickApp({
+            id: order.applicationId,
+            title: order.applicationTitle || this.i18n.translate('expenses.col.application'),
+          });
+        }
         this.newOrder.set({ id: order.id, label: `${order.number} · ${order.title}` });
         this.newDescription.set(order.title);
         this.newAmount.set(bookingRest(order).toFixed(2));
@@ -460,7 +471,7 @@ export class ExpenseDialogsState {
         description: this.newDescription().trim(),
         kind: this.newKind(),
         applicationId: linked ? this.newApplicationId() : null,
-        orderId: linked ? (this.newOrder()?.id ?? null) : null,
+        orderId: this.newOrder()?.id ?? null,
         budgetId: linked ? null : this.newBudgetId() || null,
         fiscalYearId: linked ? null : this.newFiscalYearId() || null,
         invoiceId: this.newInvoiceId() || null,
@@ -511,6 +522,36 @@ export class ExpenseDialogsState {
     this.editPaymentMethod.set(e.paymentMethod ?? '');
     this.editCategory.set(e.category ?? '');
     this.editNote.set(e.note ?? '');
+    this.editOrderId.set(e.orderId ?? '');
+    this.loadEditOrders(e);
+  }
+
+  /**
+   * The Bestellungen that the booking can name: those of its Antrag, else those without
+   * an Antrag, because both name the same Antrag or none. An income and a sub-booking
+   * name none. A failed read leaves the field out.
+   */
+  private loadEditOrders(e: Expense): void {
+    this.editOrderOptions.set([]);
+    if (e.kind === 'income' || e.parentExpenseId || !this.features.isOn('orders')) return;
+    const rows = e.applicationId
+      ? this.orders.list(e.applicationId).pipe(map((list) => list.items))
+      : this.orders
+          .page({ withoutApplication: true, limit: OFFERED_ORDERS })
+          .pipe(map((page) => page.items));
+    rows.subscribe({
+      next: (items) => {
+        if (this.editing()?.id !== e.id) return;
+        const options = items.map((o: Order) => ({ value: o.id, label: `${o.number} · ${o.title}` }));
+        const missing = !!e.orderId && !options.some((o) => o.value === e.orderId);
+        this.editOrderOptions.set(
+          missing
+            ? [{ value: e.orderId ?? '', label: this.i18n.translate('orders.booking.order') }, ...options]
+            : options,
+        );
+      },
+      error: () => undefined,
+    });
   }
 
   /**
@@ -532,6 +573,7 @@ export class ExpenseDialogsState {
         description: this.editDescription().trim(),
         ...(budgetChanged ? { budgetId: this.editBudgetId() } : {}),
         invoiceId: this.editInvoiceId() || null,
+        ...(this.editOrderId() !== (e.orderId ?? '') ? { orderId: this.editOrderId() || null } : {}),
         invoiceDate: this.editInvoiceDate() || null,
         paymentDate: this.editPaymentDate() || null,
         correspondent: this.editCorrespondent().trim() || null,

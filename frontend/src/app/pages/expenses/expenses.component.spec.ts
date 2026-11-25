@@ -3206,6 +3206,66 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(d.newOrder()).toBeNull();
   });
 
+  /** §F/finance/orders/003014: a Bestellung without an Antrag fills the form and keeps the cost centre free. */
+  it('fills a new booking from a Bestellung without an Antrag', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    d.openCreate({ orderId: 'o-9' });
+    d.newBudgetId.set('b-1');
+    http.expectOne((r) => r.url.endsWith('/orders/o-9')).flush({ id: 'o-9', number: 'B-9', title: 'Altkauf', status: 'delivered', applicationId: null, actualAmount: '30.00', bookedAmount: '0.00' });
+    expect(d.newOrder()).toEqual({ id: 'o-9', label: 'B-9 · Altkauf' });
+    expect(d.newApplicationId()).toBe('');
+    expect(d.newBudgetId()).toBe('b-1');
+    expect(d.newAmount()).toBe('30.00');
+  });
+
+  /** §F/finance/orders/002878: the change of a booking sets and removes its Bestellung. */
+  it('offers the Bestellungen that a booking can name and saves the change', () => {
+    const { cmp, http } = build({});
+    const d = dlg(cmp);
+    const orders = (url: string) => http.expectOne((r) => r.url.endsWith(url));
+    d.openEdit({ ...EXPENSE, applicationId: null, orderId: null });
+    const free = orders('/orders');
+    expect(free.request.params.get('withoutApplication')).toBe('true');
+    free.flush({ items: [{ id: 'o-9', number: 'B-9', title: 'Altkauf' }], total: 1 });
+    expect(d.editOrderOptions()).toEqual([{ value: 'o-9', label: 'B-9 · Altkauf' }]);
+    d.editOrderId.set('o-9');
+    d.saveEdit(new Event('submit'));
+    const patch = http.expectOne((r) => r.method === 'PATCH');
+    expect(patch.request.body).toMatchObject({ orderId: 'o-9' });
+    patch.flush({ ...EXPENSE, orderId: 'o-9' });
+    http.match(() => true).forEach((req) => req.flush({ items: [], total: 0, limit: 50, offset: 0 }));
+
+    d.openEdit({ ...EXPENSE, applicationId: 'app-1', orderId: 'o-gone' });
+    orders('/applications/app-1/orders').flush({ items: [{ id: 'o-1', number: 'B-1', title: 'Beamer' }] });
+    expect(d.editOrderOptions()).toEqual([
+      { value: 'o-gone', label: 'Bestellung' },
+      { value: 'o-1', label: 'B-1 · Beamer' },
+    ]);
+    d.editOrderId.set('');
+    d.saveEdit(new Event('submit'));
+    const loose = http.expectOne((r) => r.method === 'PATCH');
+    expect(loose.request.body).toMatchObject({ orderId: null });
+    loose.flush({ ...EXPENSE, orderId: null });
+    http.match(() => true).forEach((req) => req.flush({ items: [], total: 0, limit: 50, offset: 0 }));
+
+    d.openEdit({ ...EXPENSE, applicationId: null, orderId: null });
+    const late = orders('/orders');
+    d.openEdit({ ...EXPENSE, id: 'other', applicationId: null, orderId: null });
+    late.flush({ items: [{ id: 'o-9', number: 'B-9', title: 'Altkauf' }], total: 1 });
+    expect(d.editOrderOptions()).toEqual([]);
+    orders('/orders').flush(null, { status: 403, statusText: 'x' });
+    expect(d.editOrderOptions()).toEqual([]);
+    d.saveEdit(new Event('submit'));
+    expect(http.expectOne((r) => r.method === 'PATCH').request.body).not.toHaveProperty('orderId');
+
+    d.openEdit({ ...EXPENSE, kind: 'income' });
+    d.openEdit({ ...EXPENSE, parentExpenseId: 'p-1' });
+    localStorage.setItem('ap.features.off', JSON.stringify(['orders']));
+    http.expectNone((r) => r.url.endsWith('/orders'));
+    localStorage.removeItem('ap.features.off');
+  });
+
   /** A transfer that is not loaded leaves the detail empty. */
   it('opens the transfers from ?view=transfers with the open transfer', () => {
     TestBed.configureTestingModule({
@@ -3272,6 +3332,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(cmp.confirmDeleteTransfer()).toBe(TRANSFER);
     cmp.onTransferMenu({ id: 'other', label: '' }, TRANSFER);
     expect(cmp.transferMenu().length).toBe(2);
+    http.match((r) => r.url.endsWith('/orders'));
     http.verify();
 
     TestBed.resetTestingModule();
@@ -3461,6 +3522,7 @@ describe('ExpensesComponent (row swipe)', () => {
     cmp.onRowSwiped({ id: 'edit', label: 'x', icon: 'edit' }, EXPENSE);
     expect(cmp.editing()?.id).toBe('e-1');
     cmp.onRowSwiped({ id: 'other', label: 'x', icon: 'x' }, EXPENSE);
+    TestBed.inject(HttpTestingController).match((r) => r.url.endsWith('/orders'));
   });
 
   it('swipes to the left into the selection, with the booking already selected', () => {

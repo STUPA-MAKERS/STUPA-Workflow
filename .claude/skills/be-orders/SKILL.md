@@ -161,3 +161,17 @@ page of its own; the Antrag detail has no section and no dialog for it.
 of an invoice with 404 `feature_disabled`; the link kind and the search source follow it
 (`LINK_FEATURE`, `SOURCE_FEATURE`). Frontend: `featureMatch('orders')`, the nav entry, the
 Antrag detail and `invoice-orders` read nothing while it is off.
+
+## A Bestellung without an Antrag (spec 003014)
+
+`purchase_order.application_id` is nullable. `POST /api/orders` creates a Bestellung without an
+Antrag (`order.manage`), for a purchase from the time before the platform. It has no positions
+(422 `positions_need_application`), no approved amount, no sum, no comments and no timeline
+entry, because all of these come from the Antrag. `orders/access.py` (`reads_free`) is its read
+rule: `order.manage` or `budget.view`, the permissions of the page. `OrderListing._free_filters`
+finds it by the Kostenstelle and the Haushaltsjahr of its bookings; the Gremium filter leaves it
+out. `GET /api/orders?withoutApplication=true` lists only these. The Antrag of a Bestellung
+never changes after the create. A booking sets and removes its Bestellung at the create and at
+the change (`ExpenseUpdate.order_id`, spec 002878): both name the same Antrag, or both name none.
+Frontend: the first field of the form offers "Ohne Antrag" (`NO_APPLICATION`), and the edit form
+of a booking has the field "Bestellung" (`ExpenseDialogsState.loadEditOrders`).

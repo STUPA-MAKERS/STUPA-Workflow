@@ -190,6 +190,8 @@ export interface ExpenseUpdate extends ExpenseMetadata {
   readonly description?: string;
   /** Rebook to another cost center. The fiscal year stays fixed. */
   readonly budgetId?: Uuid;
+  /** Set or remove the Bestellung; it names the Antrag of the booking, or both name none. */
+  readonly orderId?: Uuid | null;
 }
 
 /** Manually create a sub-booking. It carries only its own fields. The parent gives the rest. */

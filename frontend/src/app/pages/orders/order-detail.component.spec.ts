@@ -182,6 +182,15 @@ describe('OrderDetailComponent', () => {
     expect(client.fireTransition).not.toHaveBeenCalled();
   });
 
+  /** §F/finance/orders/003014: a Bestellung without an Antrag shows the bookings that name it. */
+  it('lists the bookings of a Bestellung without an Antrag', async () => {
+    const { cmp, api } = await setup({ first: order({ applicationId: null, applicationTitle: null }) });
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.bookings).toHaveBeenCalledWith('o-1');
+    expect(cmp.linked().map((row: { title: string }) => row.title)).toEqual(['Beamer bezahlt', 'Buchung']);
+    expect(cmp.sumLine()).toBe('');
+  });
+
   it('shows the sum alone without an approved amount, and an untitled Antrag', async () => {
     const { cmp, api } = await setup({
       first: order({ applicationTitle: '' }),

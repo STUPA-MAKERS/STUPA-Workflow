@@ -7,7 +7,7 @@ import type { Application } from '@core/api/models';
 import { type Order, type OrderList, OrdersApiService } from '@core/api/orders.service';
 import { type FieldDef, ToastService } from '@stupa-makers/ui-kit';
 import { NO_ORDER_LIST, order } from '../../../testing/order-fixtures';
-import { OrderFormComponent } from './order-form.component';
+import { NO_APPLICATION, OrderFormComponent } from './order-form.component';
 import { OrdersRefresh } from './orders-refresh';
 
 const APPLICATION = {
@@ -108,6 +108,7 @@ describe('OrderFormComponent', () => {
       required: true,
       search: true,
       options: [
+        { value: 'none', label: 'Ohne Antrag' },
         { value: 'a-1', label: 'Technik · StuPa' },
         { value: 'a-2', label: 'Ohne Titel' },
       ],
@@ -133,11 +134,29 @@ describe('OrderFormComponent', () => {
     expect(screen.getByRole('heading', { name: 'Bestellung anlegen' })).toBeInTheDocument();
   });
 
+  /** §F/finance/orders/003014: "Ohne Antrag" is a choice of the person and has no positions. */
+  it('saves a Bestellung without an Antrag after the choice "Ohne Antrag"', async () => {
+    const { cmp, api, client, field, navigate } = await setup();
+    expect(cmp.value()['applicationId'] ?? '').toBe('');
+    cmp.onValue({ ...cmp.value(), applicationId: 'a-1' });
+    cmp.onValue({ ...cmp.value(), positionIds: ['p-1'] });
+    expect(cmp.value()).toMatchObject({ plannedAmount: 100 });
+    cmp.onValue({ ...cmp.value(), applicationId: NO_APPLICATION, title: 'Altkauf' });
+    expect(cmp.value()['positionIds']).toEqual([]);
+    expect(field('positionIds').visible).toBe(false);
+    expect(field('sum')).toBeUndefined();
+    cmp.save(cmp.value());
+    expect(api.create).toHaveBeenCalledWith(null, expect.objectContaining({ title: 'Altkauf', positionIds: [] }));
+    expect(navigate).toHaveBeenCalledWith(['/orders', 'o-new'], LEAVE);
+    cmp.onValue({ ...cmp.value(), applicationId: 'a-1' });
+    expect(client.getApplication).toHaveBeenCalledTimes(2);
+  });
+
   it('leaves the choice empty when the Anträge do not load', async () => {
     const view = await setup();
     view.api.pending.mockReturnValueOnce(throwError(() => ({ status: 500 })));
     view.paramMap.next(convertToParamMap({}));
-    expect(view.field('applicationId').options).toHaveLength(2);
+    expect(view.field('applicationId').options).toHaveLength(3);
   });
 
   /** §F/finance/orders/002937: `?application=<id>` fixes the Antrag, and the save creates for it. */
@@ -210,7 +229,7 @@ describe('OrderFormComponent', () => {
     expect(cmp.buyer()).toEqual({ id: 'p-9', name: '' });
     expect(api.list).not.toHaveBeenCalled();
     cmp.save(cmp.value());
-    expect(api.update).not.toHaveBeenCalled();
+    expect(api.update).toHaveBeenCalledWith('o-1', 1, expect.objectContaining({ buyerId: 'p-9' }));
   });
 
   /** The pick of an account in the form of an existing Bestellung saves at once. */

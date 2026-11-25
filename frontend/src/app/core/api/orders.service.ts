@@ -2,7 +2,8 @@
  * API of the Bestellungen (`/api/applications/{id}/orders`, `/api/orders`).
  *
  * A Bestellung is one purchase at one supplier for an approved Antrag of a type with
- * money. Only a person creates one. A person who reads the Antrag reads its Bestellungen;
+ * money, or without an Antrag for a purchase from the time before the platform. Only a
+ * person creates one. A person who reads the Antrag reads its Bestellungen;
  * the applicant reads the number, the Bezeichnung, the kind, the status and the two dates
  * only. Each write needs `order.manage`. The client only binds the data; the server
  * stays authoritative.
@@ -44,7 +45,8 @@ export interface Order {
   /** The name of the account of the buyer, else the typed name. */
   readonly buyerLabel?: string | null;
   readonly note?: string | null;
-  readonly applicationId?: Uuid;
+  /** Null for a Bestellung without an Antrag. */
+  readonly applicationId?: Uuid | null;
   readonly applicationTitle?: string | null;
   /** The invoice of the purchase; one invoice can belong to many Bestellungen. */
   readonly invoiceId?: Uuid | null;
@@ -115,6 +117,8 @@ export interface OrderQuery {
   readonly kind?: string;
   readonly buyer?: string;
   readonly q?: string;
+  /** Only the Bestellungen without an Antrag. */
+  readonly withoutApplication?: boolean;
   readonly limit?: number;
   readonly offset?: number;
 }
@@ -211,9 +215,13 @@ export class OrdersApiService {
     });
   }
 
-  /** 409 `application_not_approved`, 422 `application_type_without_budget`. */
-  create(applicationId: Uuid, body: OrderInput): Observable<Order> {
-    return this.http.post<Order>(`${this.base}/applications/${applicationId}/orders`, body);
+  /**
+   * 409 `application_not_approved`, 422 `application_type_without_budget`. Without an
+   * Antrag the Bestellung has none, and 422 `positions_need_application` refuses positions.
+   */
+  create(applicationId: Uuid | null, body: OrderInput): Observable<Order> {
+    const path = applicationId ? `/applications/${applicationId}/orders` : '/orders';
+    return this.http.post<Order>(`${this.base}${path}`, body);
   }
 
   /** 409 `order_version_conflict` when `version` is not the stored one. */

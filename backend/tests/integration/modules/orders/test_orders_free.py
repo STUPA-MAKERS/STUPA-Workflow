@@ -159,6 +159,7 @@ async def test_the_page_finds_it_by_its_bookings(
         return sorted(item["title"] for item in answer.json()["items"])
 
     assert titles() == ["Altkauf", "Regal"]
+    assert titles(withoutApplication="true") == ["Altkauf"]
     assert titles(_client(migrated, settings, monkeypatch, _LEDGER)) == ["Altkauf"]
     assert _client(migrated, settings, monkeypatch, _READER).get("/api/orders").status_code == 403
     assert titles(gremium=str(uuid.uuid4())) == []

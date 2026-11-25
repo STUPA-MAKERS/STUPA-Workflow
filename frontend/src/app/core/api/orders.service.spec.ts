@@ -35,6 +35,11 @@ describe('OrdersApiService', () => {
     expect(create.request.body).toEqual({ title: 'Beamer' });
     create.flush(order());
 
+    svc.create(null, { title: 'Altkauf' }).subscribe();
+    const free = http.expectOne('/api/orders');
+    expect(free.request.method).toBe('POST');
+    free.flush(order());
+
     svc.update('o-1', 3, { note: 'x' }).subscribe();
     const update = http.expectOne('/api/orders/o-1');
     expect(update.request.method).toBe('PATCH');

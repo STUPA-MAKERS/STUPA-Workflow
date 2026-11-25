@@ -64,6 +64,9 @@ const NO_AUTO: Auto = { plannedAmount: null, url: '' };
 /** How many Anträge the choice of the empty form offers. */
 const OFFERED_APPLICATIONS = 200;
 
+/** The value of the choice "Ohne Antrag" in the field of the Antrag. */
+export const NO_APPLICATION = 'none';
+
 const sameIds = (a: unknown, b: unknown): boolean =>
   Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((id) => b.includes(id));
 
@@ -71,7 +74,9 @@ const sameIds = (a: unknown, b: unknown): boolean =>
  * "Bestellung anlegen" and "Bestellung bearbeiten" in the pane of the page "Bestellungen".
  *
  * A new Bestellung belongs to an approved Antrag of a type with money: the address names
- * it (`?application=<id>`), or the person picks it in the first field. When the person
+ * it (`?application=<id>`), or the person picks it in the first field. The first field
+ * offers "Ohne Antrag" too, for a purchase from the time before the platform; the form
+ * never sets it by itself, and such a Bestellung has no positions. When the person
  * picks positions of the Kostenaufstellung, the form sets the planned price to the sum of
  * their preferred offers and, with exactly one position, the link to the first address in
  * the text of its preferred offer. A value that the person typed stays. A position that
@@ -129,11 +134,14 @@ export class OrderFormComponent {
     this.i18n.translate(this.editing() ? 'orders.dialog.edit' : 'orders.dialog.create'),
   );
 
+  /** The choice of the first field: an Antrag, "Ohne Antrag", or nothing yet. */
+  private readonly picked = computed(() => String(this.value()['applicationId'] ?? ''));
+
   private readonly applicationId = computed<Uuid | null>(
     () =>
       this.order()?.applicationId ??
       this.fixedApplication() ??
-      (String(this.value()['applicationId'] ?? '') || null),
+      (this.picked() === NO_APPLICATION ? null : this.picked() || null),
   );
 
   private readonly positions = computed(() => orderPositions(this.application()?.data));
@@ -170,10 +178,13 @@ export class OrderFormComponent {
               label: t('orders.field.application'),
               required: true,
               search: true,
-              options: this.applications().map((a) => ({
-                value: a.id,
-                label: [a.title || t('applications.list.untitled'), a.gremiumName].filter(Boolean).join(' · '),
-              })),
+              options: [
+                { value: NO_APPLICATION, label: t('orders.field.noApplication') },
+                ...this.applications().map((a) => ({
+                  value: a.id,
+                  label: [a.title || t('applications.list.untitled'), a.gremiumName].filter(Boolean).join(' · '),
+                })),
+              ],
             },
           ];
     return {
@@ -289,6 +300,14 @@ export class OrderFormComponent {
     this.buyerError.set('');
     this.errors.set({});
     const picked = String(next['applicationId'] ?? '');
+    if (picked === NO_APPLICATION) {
+      this.loadedFor = null;
+      this.application.set(null);
+      this.list.set(null);
+      this.auto.set(NO_AUTO);
+      this.value.set({ ...next, positionIds: [] });
+      return;
+    }
     if (picked && picked !== this.loadedFor && !this.editing()) this.loadApplication(picked);
     if (sameIds(next['positionIds'], this.value()['positionIds'])) {
       this.value.set(next);
@@ -333,8 +352,9 @@ export class OrderFormComponent {
 
   protected save(value: FormValue): void {
     const applicationId = this.applicationId();
-    if (this.saving() || !applicationId) return;
     const order = this.order();
+    const free = order ? !order.applicationId : this.picked() === NO_APPLICATION && !this.fixedApplication();
+    if (this.saving() || (!applicationId && !free)) return;
     const body = orderBody(value, this.buyer()?.id ?? null);
     this.saving.set(true);
     const request = order

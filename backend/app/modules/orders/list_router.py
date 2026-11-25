@@ -78,6 +78,7 @@ def _wanted(
     kind: Annotated[OrderKind | None, Query()] = None,
     buyer_id: Annotated[UUID | None, Query(alias="buyer")] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
+    free: Annotated[bool, Query(alias="withoutApplication")] = False,
 ) -> OrderFilter:
     """Read the filter of the page from the query (F/finance/orders/002885)."""
     return OrderFilter(
@@ -88,6 +89,7 @@ def _wanted(
         kind=kind,
         buyer_id=buyer_id,
         q=q,
+        free=free,
     )
 
 
@@ -117,7 +119,8 @@ async def list_all_orders(
     """List the Bestellungen of the readable Anträge, the newest change first.
 
     ``segment`` is ``open``, ``delivered`` or ``done`` (F/finance/orders/002884).
-    ``budget`` covers the subtree of the Kostenstelle.
+    ``budget`` covers the subtree of the Kostenstelle. ``withoutApplication`` keeps only
+    the Bestellungen without an Antrag (F/finance/orders/003014).
     """
     rows, total = await OrderListing(db).page(
         principal, wanted, limit=page.limit, offset=page.offset
