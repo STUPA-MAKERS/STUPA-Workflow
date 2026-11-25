@@ -263,7 +263,7 @@ export class BudgetDashboardComponent {
     });
   }
 
-  readonly canExport = computed(() => this.auth.can('budget.export'));
+  readonly canExport = computed(() => this.auth.can('finance.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */
   readonly canSeeBookings = computed(() => this.auth.canAny(...BUDGET_PERMISSIONS));
   /** Only a reader with `budget.structure` can open /admin/budgets and add a year. */

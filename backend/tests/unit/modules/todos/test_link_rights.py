@@ -30,6 +30,7 @@ def _rights(session: ScriptedSession, **kw: Any) -> LinkRights:
     [
         ("gremium", "admin.gremien"),
         ("invoice", "budget.book"),
+        ("invoice", "invoice.manage"),
         ("expense", "budget.book"),
         ("order", "order.manage"),
         ("budget", "budget.structure"),

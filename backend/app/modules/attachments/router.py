@@ -49,7 +49,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import AttachmentOwner, application_id_of
-from app.modules.orders.access import reads_free
+from app.modules.orders.access import reads_all, reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.tickets.access import works_on_ticket
 from app.modules.tickets.models import TicketNote
@@ -324,13 +324,15 @@ async def _assert_order_reader(
     """Apply the read rule of the files of a Bestellung (see ``_assert_owner_reader``).
 
     Raises:
-        NotFoundError: ``missing``, when the caller does not read the Antrag of the
-            Bestellung as a member, or a Bestellung without an Antrag
-            (F/finance/orders/002863).
+        NotFoundError: ``missing``, when the caller has no read permission of the
+            Haushalt and does not read the Antrag of the Bestellung as a member, or a
+            Bestellung without an Antrag (F/finance/orders/002863).
     """
     order = await db.get(PurchaseOrder, owner.id)
     if order is None:
         raise missing
+    if reads_all(principal):
+        return
     application_id = order.application_id
     if application_id is None:
         if not reads_free(principal):

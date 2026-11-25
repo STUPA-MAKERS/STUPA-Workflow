@@ -5299,7 +5299,6 @@
   "orders.booking.none": "No order",
   "orders.booking.remove": "Remove order",
   "orders.ofInvoice.title": "Orders",
-  "orders.ofInvoice.noAccess": "Order (no access)",
   "orders.ofInvoice.sum": "Sum of the orders",
   "orders.ofInvoice.sumOfGross": "{total} of {gross}",
   "orders.ofInvoice.noPrice": "Price open",

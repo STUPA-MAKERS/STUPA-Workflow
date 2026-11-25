@@ -131,7 +131,7 @@
 
       @if (i.linkedBookings !== undefined) {
         <app-section class="fd__sec id__secBookings" [heading]="'invoices.col.bookings' | t">
-          @if (canManage()) {
+          @if (canBook()) {
             <app-button-group ngProjectAs="[sectionAction]">
               <app-button sectionAction variant="tonal" size="sm" (click)="createBooking.emit()">
                 <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>

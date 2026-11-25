@@ -35,7 +35,7 @@ interface Options {
 
 async function setup(options: Options = {}) {
   localStorage.setItem('ap.locale', 'de');
-  const permissions = options.permissions ?? ['order.manage'];
+  const permissions = options.permissions ?? ['order.manage', 'finance.export'];
   const fail = () => throwError(() => ({ status: 500 }));
   const api = {
     page: jest.fn(() => of(PAGE)),
@@ -250,6 +250,16 @@ describe('OrdersPageComponent', () => {
     cmp.onAction('export');
     expect(api.exportXlsx).toHaveBeenLastCalledWith({});
     expect(show).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.', 'error');
+  });
+
+  /** §F/finance/orders/002886: the export needs `finance.export`, not `order.manage`. */
+  it.each([
+    [['order.manage'], ['new']],
+    [['budget.view', 'finance.export'], ['export']],
+    [['budget.view'], []],
+  ])('offers the actions of the permissions %j', async (permissions, keys) => {
+    const { cmp } = await setup({ permissions });
+    expect(cmp.actions().map((a: { key: string }) => a.key)).toEqual(keys);
   });
 
   it('reads the list again when the pane changed a Bestellung', async () => {

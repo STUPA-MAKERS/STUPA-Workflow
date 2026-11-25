@@ -215,7 +215,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly split = this.listDetail.split;
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
-  readonly canExport = computed(() => this.auth.can('budget.export'));
+  readonly canExport = computed(() => this.auth.can('finance.export'));
 
   readonly budgetTree = this.list.budgetTree;
   readonly items = this.list.items;

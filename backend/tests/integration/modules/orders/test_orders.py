@@ -3,7 +3,8 @@
 § F/finance/orders/002850 a Bestellung belongs to one Antrag and goes with it. § 002858 the
 create needs an approved Antrag of a type with money. § 002853 each status from each other
 status, with the dates. § 002860 a position belongs to at most one Bestellung that is not
-cancelled. § 002862 only ``order.manage`` writes. § 002863 the read follows the Antrag.
+cancelled. § 002862 only ``order.manage`` writes. § 002863 the read follows the Antrag
+or a read permission of the Haushalt.
 § 002864 the applicant view. § 002865 the audit entries and the revert. § 002866 the
 timeline. § 002867 the version. § 002868 the sum. § 002930 no migration creates a Bestellung.
 § 002873 at most one invoice, § 002874 the real price from the invoice, § 002877 the
@@ -62,7 +63,7 @@ _BOOKER = Principal(
 _FINANCE = Principal(
     sub="finance-sub",
     roles=["member"],
-    permissions={*_READ, "order.manage", "budget.book"},
+    permissions={*_READ, "order.manage", "budget.book", "finance.export"},
 )
 _LEDGER = Principal(sub="ledger-sub", roles=["member"], permissions={"budget.view"})
 _BLIND = Principal(sub="blind-sub", roles=["member"], permissions={"order.manage"})
@@ -683,27 +684,24 @@ async def test_the_invoice_of_a_bestellung(
     of_invoice = api.get(f"/api/invoices/{invoice_id}/orders").json()
     assert of_invoice["total"] == "72.50"
     assert [
-        (item["accessible"], item["number"], item["title"], item["actualAmount"])
+        (item["number"], item["title"], item["actualAmount"])
         for item in of_invoice["items"]
-    ] == [(True, regal["number"], "Regal", "72.50"), (True, stuhl["number"], "Stuhl", None)]
+    ] == [(regal["number"], "Regal", "72.50"), (stuhl["number"], "Stuhl", None)]
     assert of_invoice["items"][0]["applicationTitle"] == "Büroausstattung"
     ledger = _client(migrated, settings, monkeypatch, _LEDGER)
-    hidden = ledger.get(f"/api/invoices/{invoice_id}/orders").json()
-    assert hidden == {
-        "items": [
-            {
-                "accessible": False,
-                "id": None,
-                "number": None,
-                "title": None,
-                "applicationId": None,
-                "applicationTitle": None,
-                "actualAmount": None,
-            }
-        ]
-        * 2,
-        "total": "72.50",
-    }
+    seen = ledger.get(f"/api/invoices/{invoice_id}/orders").json()
+    assert [item["title"] for item in seen["items"]] == ["Regal", "Stuhl"]
+    for permission in ("budget.view", "budget.structure", "budget.book"):
+        holder = _client(
+            migrated,
+            settings,
+            monkeypatch,
+            Principal(sub=f"{permission}-sub", roles=["member"], permissions={permission}),
+        )
+        assert holder.get(f"/api/orders/{regal['id']}").json()["title"] == "Regal"
+        assert holder.get(f"/api/orders/{regal['id']}/attachments").json() == []
+        assert holder.get(f"/api/orders/{regal['id']}/bookings").json() == []
+        assert holder.get("/api/orders").json()["total"] >= 2
     assert no_read.get(f"/api/invoices/{invoice_id}/orders").status_code == 403
     assert api.get(f"/api/invoices/{uuid.uuid4()}/orders").status_code == 404
 

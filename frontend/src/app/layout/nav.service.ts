@@ -15,7 +15,7 @@ export const VOTING_GREMIUM_PERMISSIONS = ['vote.cast', 'vote.manage', 'session.
 export const BUDGET_PERMISSIONS = ['budget.view', 'budget.structure', 'budget.book'];
 
 /** The global permissions of the page "Bestellungen". */
-export const ORDER_PERMISSIONS = ['order.manage', 'budget.view'];
+export const ORDER_PERMISSIONS = ['order.manage', ...BUDGET_PERMISSIONS];
 
 /**
  * Every permission of an admin page. Each one opens the admin overview and shows the

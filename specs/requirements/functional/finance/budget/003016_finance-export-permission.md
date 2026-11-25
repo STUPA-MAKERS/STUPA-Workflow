@@ -2,7 +2,7 @@
 id: "003016"
 title: The export of finance data needs finance.export
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

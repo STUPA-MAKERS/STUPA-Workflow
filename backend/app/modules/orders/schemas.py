@@ -163,17 +163,11 @@ class OrdersOut(FrozenCamelModel, frozen=True):
 
 
 class InvoiceOrderOut(FrozenCamelModel, frozen=True):
-    """One Bestellung in the detail of its invoice (F/finance/orders/002877).
+    """One Bestellung in the detail of its invoice (F/finance/orders/002877)."""
 
-    Attributes:
-        accessible: The reader reads the Antrag of the Bestellung. Else the row holds
-            no other value, and the page shows "Bestellung (kein Zugriff)".
-    """
-
-    accessible: bool
-    id: UUID | None = None
-    number: str | None = None
-    title: str | None = None
+    id: UUID
+    number: str
+    title: str
     application_id: UUID | None = Field(default=None, alias="applicationId")
     application_title: str | None = Field(default=None, alias="applicationTitle")
     actual_amount: Decimal | None = Field(default=None, alias="actualAmount")

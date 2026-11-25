@@ -86,6 +86,8 @@ export class OrdersPageComponent {
   private readonly toast = inject(ToastService);
 
   protected readonly canManage = computed(() => this.auth.can('order.manage'));
+  /** `finance.export`: the XLSX file of the list (spec 002886). */
+  protected readonly canExport = computed(() => this.auth.can('finance.export'));
 
   private readonly orders = signal<readonly Order[]>([]);
   private readonly waiting = signal<readonly PendingApplication[]>([]);
@@ -129,8 +131,8 @@ export class OrdersPageComponent {
     ];
   });
 
-  protected readonly actions = computed<readonly Action[]>(() =>
-    this.canManage()
+  protected readonly actions = computed<readonly Action[]>(() => [
+    ...(this.canManage()
       ? [
           {
             key: 'new',
@@ -138,16 +140,20 @@ export class OrdersPageComponent {
             icon: 'plus',
             priority: 'fab',
             route: { commands: ['/orders', 'new'] },
-          },
+          } as const,
+        ]
+      : []),
+    ...(this.canExport()
+      ? [
           {
             key: 'export',
             label: this.i18n.translate('orders.page.export'),
             icon: 'download',
             priority: 'menu',
-          },
+          } as const,
         ]
-      : [],
-  );
+      : []),
+  ]);
 
   protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
     const pending = this.segment() === 'pending';

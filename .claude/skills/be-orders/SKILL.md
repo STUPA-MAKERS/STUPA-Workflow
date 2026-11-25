@@ -64,7 +64,8 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
 
 **Frontend** (`frontend/src/app/pages/orders/`, API in `core/api/orders.service.ts`): the
 page "Bestellungen" at `/orders` (nav entry after Rechnungen, feature `orders`,
-`ORDER_PERMISSIONS` = `order.manage` or `budget.view`). A Bestellung is an element with a
+`ORDER_PERMISSIONS` = `order.manage` or one of `budget.view`/`.structure`/`.book`; the export
+action needs `finance.export`). A Bestellung is an element with a
 page of its own; the Antrag detail has no section and no dialog for it.
 - `orders-page` — kit `app-list-detail-screen`. The first chip is the segment ("Ohne
   Bestellung" = `GET /orders/pending-applications`, "Offen" (default), "Geliefert",
@@ -123,8 +124,8 @@ page of its own; the Antrag detail has no section and no dialog for it.
   `invoiceId` or null and `version`) sets or removes the one invoice of a Bestellung.
   `rules.price_from_invoice` fills an empty real price with the gross amount when no other
   Bestellung names the invoice. The delete of an invoice clears the reference (FK
-  `SET NULL`). `GET /api/invoices/{id}/orders` lists the Bestellungen of an invoice; a row
-  of an Antrag that the reader does not read has `accessible: false` and no value.
+  `SET NULL`). `GET /api/invoices/{id}/orders` lists the Bestellungen of an invoice; every row
+  has its values, because a reader of the invoices reads every Bestellung (002863).
 - A booking names a Bestellung with `budget_expense.order_id` (`orderId` of
   `POST /api/expenses`). `budget` is a layer below `orders`, so
   `budget/tree/expenses.py` reads the table `purchase_order` through the metadata and
@@ -167,8 +168,12 @@ Antrag detail and `invoice-orders` read nothing while it is off.
 `purchase_order.application_id` is nullable. `POST /api/orders` creates a Bestellung without an
 Antrag (`order.manage`), for a purchase from the time before the platform. It has no positions
 (422 `positions_need_application`), no approved amount, no sum, no comments and no timeline
-entry, because all of these come from the Antrag. `orders/access.py` (`reads_free`) is its read
-rule: `order.manage` or `budget.view`, the permissions of the page. `OrderListing._free_filters`
+entry, because all of these come from the Antrag. `orders/access.py` holds the read rules by
+permission (002863): `reads_all` (`budget.view`/`.structure`/`.book`, the read permissions of
+the bookings and the invoices) reads every Bestellung, with and without an Antrag, in the
+detail, the list, the files, the links and the search; `reads_free` (these or `order.manage`,
+the permissions of the page) reads a Bestellung without an Antrag. Every other read goes
+through the Antrag. `GET /api/orders/export.xlsx` needs `finance.export` (002886). `OrderListing._free_filters`
 finds it by the Kostenstelle and the Haushaltsjahr of its bookings; the Gremium filter leaves it
 out. `GET /api/orders?withoutApplication=true` lists only these. The Antrag of a Bestellung
 never changes after the create. A booking sets and removes its Bestellung at the create and at

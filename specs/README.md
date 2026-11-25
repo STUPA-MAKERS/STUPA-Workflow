@@ -315,7 +315,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/links/001401](requirements/functional/collaboration/links/001401_no-direction.md) | A link has no direction | approved |
 | [F/collaboration/links/001402](requirements/functional/collaboration/links/001402_one-row-two-ends.md) | A link is one row with two typed ends | approved |
 | [F/collaboration/links/001403](requirements/functional/collaboration/links/001403_card-links-move.md) | The card links move to the new table | approved |
-| [F/collaboration/links/001404](requirements/functional/collaboration/links/001404_link-rights.md) | A person links what the person reads and writes on one end | draft |
+| [F/collaboration/links/001404](requirements/functional/collaboration/links/001404_link-rights.md) | A person links what the person reads and writes on one end | approved |
 | [F/collaboration/links/001405](requirements/functional/collaboration/links/001405_only-card-grants.md) | Only a card gives read access to its links | approved |
 | [F/collaboration/links/001406](requirements/functional/collaboration/links/001406_predecessor-stays.md) | The Vorgänger stays its own relation | approved |
 | [F/collaboration/links/001407](requirements/functional/collaboration/links/001407_one-linked-section.md) | Each element shows all its links in Verknüpft | approved |
@@ -559,14 +559,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/budget/001874](requirements/functional/finance/budget/001874_bookings-fiscal-year-filter.md) | The bookings list filters by Haushaltsjahr | approved |
 | [F/finance/budget/003011](requirements/functional/finance/budget/003011_internal-cost-centre.md) | A Kostenstelle can be marked Intern, and the Kostenstellen below it are Intern too | approved |
 | [F/finance/budget/003012](requirements/functional/finance/budget/003012_internal-cost-centre-not-in-form.md) | The form does not offer an internal Kostenstelle | approved |
-| [F/finance/budget/003016](requirements/functional/finance/budget/003016_finance-export-permission.md) | The export of finance data needs finance.export | draft |
+| [F/finance/budget/003016](requirements/functional/finance/budget/003016_finance-export-permission.md) | The export of finance data needs finance.export | approved |
 | [F/finance/invoices/000260](requirements/functional/finance/invoices/000260_invoice-bookings.md) | An invoice is a document with many bookings | approved |
 | [F/finance/invoices/000261](requirements/functional/finance/invoices/000261_paid-by-user.md) | Only a user sets an invoice to paid | replaced |
 | [F/finance/invoices/000263](requirements/functional/finance/invoices/000263_zugferd-import.md) | A ZUGFeRD invoice fills the form | approved |
 | [F/finance/invoices/001290](requirements/functional/finance/invoices/001290_booking-pays-invoice.md) | A new booking sets its invoice to paid | approved |
 | [F/finance/invoices/001291](requirements/functional/finance/invoices/001291_revert-reopens-invoice.md) | The revert of a booking sets the invoice it paid back to open | approved |
 | [F/finance/invoices/001292](requirements/functional/finance/invoices/001292_invoice-menu-books.md) | The head menu of an invoice has "Buchung anlegen" | approved |
-| [F/finance/invoices/003015](requirements/functional/finance/invoices/003015_invoice-permission.md) | The write of an invoice needs invoice.manage or budget.book | draft |
+| [F/finance/invoices/003015](requirements/functional/finance/invoices/003015_invoice-permission.md) | The write of an invoice needs invoice.manage or budget.book | approved |
 | [F/finance/orders/002850](requirements/functional/finance/orders/002850_order-belongs-to-antrag.md) | A Bestellung belongs to at most one Antrag | approved |
 | [F/finance/orders/002851](requirements/functional/finance/orders/002851_order-fields.md) | A Bestellung holds these fields | approved |
 | [F/finance/orders/002852](requirements/functional/finance/orders/002852_order-kind.md) | A Bestellung is an order or an Auslage | approved |
@@ -578,7 +578,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002860](requirements/functional/finance/orders/002860_order-positions.md) | A Bestellung can name positions of the Kostenaufstellung | approved |
 | [F/finance/orders/002861](requirements/functional/finance/orders/002861_order-planned-amount-prefill.md) | The form fills the planned price and the link from the preferred offers | approved |
 | [F/finance/orders/002862](requirements/functional/finance/orders/002862_order-permission.md) | The write of a Bestellung needs order.manage | approved |
-| [F/finance/orders/002863](requirements/functional/finance/orders/002863_order-read.md) | A person who reads the Haushalt or the Antrag reads the Bestellungen | draft |
+| [F/finance/orders/002863](requirements/functional/finance/orders/002863_order-read.md) | A person who reads the Haushalt or the Antrag reads the Bestellungen | approved |
 | [F/finance/orders/002864](requirements/functional/finance/orders/002864_order-applicant-view.md) | The applicant reads the Bezeichnung and the status only | approved |
 | [F/finance/orders/002865](requirements/functional/finance/orders/002865_order-audit.md) | Each write of a Bestellung has an audit entry | approved |
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | approved |
@@ -596,10 +596,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002879](requirements/functional/finance/orders/002879_order-create-booking.md) | Buchung anlegen fills the booking form from the Bestellung | approved |
 | [F/finance/orders/002880](requirements/functional/finance/orders/002880_order-marks.md) | A Bestellung shows marks for its invoice and its bookings | approved |
 | [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | approved |
-| [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | Bestellungen is a page of its own with a list and a detail | draft |
+| [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | Bestellungen is a page of its own with a list and a detail | approved |
 | [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The page Bestellungen has three segments | approved |
 | [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | approved |
-| [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | draft |
+| [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | approved |
 | [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a link kind | approved |
 | [F/finance/orders/002889](requirements/functional/finance/orders/002889_order-builtin-relations.md) | The relations of a Bestellung show without a link | approved |
 | [F/finance/orders/002890](requirements/functional/finance/orders/002890_order-search-source.md) | The global search finds Bestellungen | approved |

@@ -63,6 +63,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
       invoice: INVOICE,
       costCentres: new Map<string, CostCentreLabel>([['cc', { name: 'Maschinenbau', path: 'VS-200-220', color: '#f28c28' }]]),
       canManage: true,
+      canBook: true,
       split: true,
       ...inputs,
     },
@@ -147,6 +148,7 @@ describe('InvoiceDetailComponent', () => {
         linkedBookings: [],
       },
       canManage: false,
+      canBook: false,
     });
     expect(screen.getByRole('heading', { name: 'Rechnung ohne Lieferant' })).toBeInTheDocument();
     expect(screen.getByText('USt.')).toBeInTheDocument();
@@ -184,6 +186,16 @@ describe('InvoiceDetailComponent', () => {
     expect(remove).toHaveBeenCalled();
   });
 
+  /** §F/finance/invoices/003015: without `budget.book` the detail offers no booking. */
+  it('keeps the invoice actions and hides "Buchung anlegen" without the booking right', async () => {
+    const { user } = await setup({ canBook: false });
+    expect(screen.getByRole('button', { name: 'Rechnung bearbeiten' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Buchung anlegen' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+    expect(screen.queryByRole('menuitem', { name: 'Buchung anlegen' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Löschen' })).toBeInTheDocument();
+  });
+
   it('puts the receipt into the menu and shows a labelled edit on a phone', async () => {
     const { view, edit, openFile, user } = await setup({ phone: true });
     await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
@@ -193,6 +205,7 @@ describe('InvoiceDetailComponent', () => {
     expect(openFile).toHaveBeenCalled();
     view.fixture.componentInstance.onMenu({ id: 'other', label: '' });
     view.fixture.componentRef.setInput('canManage', false);
+    view.fixture.componentRef.setInput('canBook', false);
     view.fixture.componentRef.setInput('invoice', { ...INVOICE, hasFile: false });
     view.fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).toBeNull();

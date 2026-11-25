@@ -185,7 +185,10 @@ export class InvoicesComponent implements InvoiceFormHost {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly canManage = computed(() => this.auth.can('budget.book'));
+  /** `invoice.manage` or `budget.book`: create, edit, delete, mark paid (spec 003015). */
+  readonly canManage = computed(() => this.auth.canAny('invoice.manage', 'budget.book'));
+  /** `budget.book`: "Buchung anlegen" of an invoice. */
+  readonly canBook = computed(() => this.auth.can('budget.book'));
   /** The Bestellung that gets the new invoice ("Rechnung anlegen" at a Bestellung). */
   readonly forOrder = signal<{ id: string; number: string; title: string } | null>(null);
 
@@ -1041,7 +1044,7 @@ export class InvoicesComponent implements InvoiceFormHost {
     const items: RowMenuItem[] = [
       ...(manage ? [edit] : []),
       ...(manage && i.status === 'open' ? [paid] : []),
-      ...(manage ? [book] : []),
+      ...(this.canBook() ? [book] : []),
       ...(i.hasFile ? [file] : []),
     ];
     const remove: RowMenuSection = {

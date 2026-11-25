@@ -78,11 +78,19 @@ const FILE_RES: InvoiceFileResult = {
   fileMime: 'application/pdf',
 };
 
-/** Fake auth with a switch. The component maps `canManage()` to can('budget.book'). */
+/**
+ * Fake auth with a switch. The component maps `canManage()` to `invoice.manage` or
+ * `budget.book` and `canBook()` to `budget.book`. `only` names the permissions that a
+ * person holds; without it the switch answers for every permission.
+ */
 class FakeAuth {
   allowed = true;
-  can(_perm: string): boolean {
-    return this.allowed;
+  only: readonly string[] | null = null;
+  can(perm: string): boolean {
+    return this.only ? this.only.includes(perm) : this.allowed;
+  }
+  canAny(...perms: string[]): boolean {
+    return perms.some((perm) => this.can(perm));
   }
 }
 
@@ -93,6 +101,8 @@ interface SetupOpts {
   /** Fail the initial GET instead of flushing it. */
   error?: boolean;
   canManage?: boolean;
+  /** The permissions of the person, instead of the switch. */
+  only?: readonly string[];
   /** Query params on the page URL, as a global-search hit or a bookmark carries them. */
   queryParams?: Record<string, string>;
 }
@@ -102,6 +112,7 @@ async function setup(opts: SetupOpts = {}) {
   localStorage.setItem('ap.locale', 'de');
   const auth = new FakeAuth();
   auth.allowed = opts.canManage ?? true;
+  auth.only = opts.only ?? null;
   const orders = {
     ofInvoice: jest.fn(() => of({ items: [], total: '0' })),
     get: jest.fn(() => of(order({ id: 'o-1', supplier: 'Technikhaus', version: 4 }))),
@@ -1269,6 +1280,9 @@ describe('InvoicesComponent infinite-scroll effect', () => {
     can(): boolean {
       return true;
     }
+    canAny(): boolean {
+      return true;
+    }
   }
 
   let lastCb: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
@@ -1560,6 +1574,19 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
     open.mockRestore();
     navigate.mockRestore();
+  });
+
+  /** §F/finance/invoices/003015: `invoice.manage` keeps the invoices and books nothing. */
+  it('gives a person with invoice.manage the invoice actions without "Buchung anlegen"', async () => {
+    const { c } = await setup({ only: ['invoice.manage'] });
+    expect(c.canManage()).toBe(true);
+    expect(c.canBook()).toBe(false);
+    expect(c.rowMenu(inv()).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual([
+      'edit',
+      'paid',
+      'file',
+      'delete',
+    ]);
   });
 
   it('offers a reader only the receipt in the row menu', async () => {

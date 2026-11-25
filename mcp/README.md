@@ -54,7 +54,7 @@ clients.
 | `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), gremien (incl. `gremium.view_all`), every gremium and team to-do board (`todo.read_all`, read only), audit, exports |
 | `applications:write` | comment / transition / manage applications, capture an application on behalf of an applicant (`application.create_on_behalf`) |
 | `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
-| `budget:write` | book expenses, manage cost centers & invoices |
+| `budget:write` | book expenses, manage cost centers, invoices (`invoice.manage`) & Bestellungen |
 | `todos:write` | read and write the to-do boards through the gremium rights `todo.write` and `todo.configure` (or the personal board, or a team board's permission), and every gremium and team board through the global `todo.all` (cards only, never the configuration) |
 | `tickets:write` | read and work on the tickets (`ticket.manage`) |
 | `meetings:write` | the gremium rights `session.manage` (meetings & agendas, and every vote of the gremium: the votes of its meetings and the application votes that no meeting holds), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |

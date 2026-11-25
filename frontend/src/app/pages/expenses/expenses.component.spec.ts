@@ -241,7 +241,7 @@ function build(
       { provide: TodosApiService, useValue: EVENTS_API },
       {
         provide: AuthService,
-        useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']),
+        useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'finance.export']),
       },
     ],
   });
@@ -321,7 +321,7 @@ describe('ExpensesComponent (unit)', () => {
   });
 
   it('canManage / canExport reflect AuthService permissions', () => {
-    const yes = build({ perms: ['budget.book', 'budget.export'] });
+    const yes = build({ perms: ['budget.book', 'finance.export'] });
     expect(yes.cmp.canManage()).toBe(true);
     expect(yes.cmp.canExport()).toBe(true);
     yes.http.verify();
@@ -3380,7 +3380,7 @@ describe('ExpensesComponent (list/detail)', () => {
     setViewport(WIDE);
     const e2 = { ...EXPENSE, id: 'e-2', description: 'Plakate' };
     const { fixture, container } = await setup({
-      perms: ['budget.view', 'budget.book', 'budget.export'],
+      perms: ['budget.view', 'budget.book', 'finance.export'],
       page: page([EXPENSE, e2]),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3414,7 +3414,7 @@ describe('ExpensesComponent (list/detail)', () => {
 
   it('shows the bulk actions as icons in the bar one pane at a time', async () => {
     const { fixture } = await setup({
-      perms: ['budget.view', 'budget.book', 'budget.export'],
+      perms: ['budget.view', 'budget.book', 'finance.export'],
       page: page([EXPENSE]),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

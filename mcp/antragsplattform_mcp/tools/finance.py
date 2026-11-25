@@ -110,7 +110,7 @@ async def create_invoice(invoice: S.InvoiceCreate) -> dict:
     """Create an invoice.
 
     The field `grossAmount` is required. A `fileToken` from `parse_invoice` or
-    `upload_invoice_file` links the stored original PDF. Requires budget.book.
+    `upload_invoice_file` links the stored original PDF. Requires invoice.manage or budget.book.
     """
     return await api().post("/invoices", json=dump_create(invoice))
 
@@ -119,14 +119,14 @@ async def create_invoice(invoice: S.InvoiceCreate) -> dict:
 async def update_invoice(invoice_id: str, patch: S.InvoiceUpdate) -> dict:
     """Patch the amount, status, dates, supplier or note of an invoice.
 
-    Requires budget.book.
+    Requires invoice.manage or budget.book.
     """
     return await api().patch(f"/invoices/{invoice_id}", json=dump_patch(patch))
 
 
 @group.tool
 async def delete_invoice(invoice_id: str) -> dict:
-    """Delete an invoice. Requires budget.book."""
+    """Delete an invoice. Requires invoice.manage or budget.book."""
     return await api().delete(f"/invoices/{invoice_id}")
 
 
@@ -134,7 +134,7 @@ async def delete_invoice(invoice_id: str) -> dict:
 async def parse_invoice(file_path: str) -> dict:
     """Parse a local ZUGFeRD or Factur-X PDF and store the original.
 
-    The call reads the header fields out of the file. Requires budget.book.
+    The call reads the header fields out of the file. Requires invoice.manage or budget.book.
 
     Returns:
         The parsed fields and a `fileToken` to pass to `create_invoice`.
@@ -146,7 +146,7 @@ async def parse_invoice(file_path: str) -> dict:
 async def upload_invoice_file(file_path: str) -> dict:
     """Upload a local invoice document.
 
-    The document does not have to be a ZUGFeRD file. Requires budget.book.
+    The document does not have to be a ZUGFeRD file. Requires invoice.manage or budget.book.
 
     Returns:
         A `fileToken` to pass to `create_invoice`.

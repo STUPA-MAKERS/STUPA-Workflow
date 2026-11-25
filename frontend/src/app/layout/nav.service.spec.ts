@@ -52,6 +52,7 @@ describe('NavService', () => {
       'budget',
       'expenses',
       'invoices',
+      'orders',
       ...PUBLIC,
     ]);
   });
@@ -61,12 +62,15 @@ describe('NavService', () => {
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'orders') + 1);
   });
 
-  /** §F/finance/orders/002883: the entry "Bestellungen" needs `order.manage` or `budget.view`. */
+  /** §F/finance/orders/002883: "Bestellungen" needs `order.manage` or a read permission of the Haushalt. */
   it.each([
     [['order.manage'], true],
     [['budget.view'], true],
+    [['budget.structure'], true],
+    [['budget.book'], true],
+    [['finance.export'], false],
     [[], false],
-  ])('opens the Bestellungen with order.manage or budget.view: %j', (permissions, open) => {
+  ])('opens the Bestellungen with order.manage or a budget read permission: %j', (permissions, open) => {
     expect(keysFor({ ...BASE, permissions }).includes('orders')).toBe(open);
   });
 
@@ -75,7 +79,7 @@ describe('NavService', () => {
     expect(item).toMatchObject({ path: '/orders', labelKey: 'nav.orders', feature: 'orders', place: 'main' });
     expect(NAV_ITEMS.findIndex((i) => i.key === 'orders')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
     const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'orders');
-    expect(route?.data).toMatchObject({ title: 'nav.orders', permission: ['order.manage', 'budget.view'] });
+    expect(route?.data).toMatchObject({ title: 'nav.orders', permission: ['order.manage', 'budget.view', 'budget.structure', 'budget.book'] });
     expect(route?.children?.map((c) => c.path)).toEqual(['', 'new', ':id/edit', ':id']);
   });
 

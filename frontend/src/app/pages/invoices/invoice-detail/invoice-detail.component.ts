@@ -64,8 +64,10 @@ export class InvoiceDetailComponent {
 
   readonly invoice = input.required<Invoice>();
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
-  /** `budget.book`: edit, delete, mark paid, add a booking. */
+  /** `invoice.manage` or `budget.book`: edit, delete, mark paid. */
   readonly canManage = input(false);
+  /** `budget.book`: add a booking. */
+  readonly canBook = input(false);
   readonly split = input(false);
   readonly phone = input(false);
   /** "Als bezahlt markieren" runs. */
@@ -137,7 +139,7 @@ export class InvoiceDetailComponent {
       ],
     };
     const items: RowMenuItem[] = [
-      ...(this.canManage() ? [book] : []),
+      ...(this.canBook() ? [book] : []),
       ...(this.phone() && i.hasFile ? [file] : []),
     ];
     return [

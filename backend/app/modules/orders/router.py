@@ -4,10 +4,13 @@
   reads the Antrag. An applicant and an observer get the short view
   (F/finance/orders/002864).
 - ``POST /applications/{id}/orders``, ``PATCH /orders/{id}``, ``POST /orders/{id}/status``
-  and ``DELETE /orders/{id}`` need ``order.manage`` and the read of the Antrag.
+  and ``DELETE /orders/{id}`` need ``order.manage`` and the read of the Bestellung.
 - ``POST /orders`` creates a Bestellung without an Antrag and needs ``order.manage``
-  (F/finance/orders/003014). The persons with ``order.manage`` or ``budget.view`` read
-  such a Bestellung, because no Antrag gives a read rule.
+  (F/finance/orders/003014). The persons with ``order.manage`` read such a Bestellung,
+  because no Antrag gives a read rule.
+- A person with ``budget.view``, ``budget.structure`` or ``budget.book`` reads every
+  Bestellung, because these permissions read the bookings and the invoices that name it
+  (F/finance/orders/002863).
 - ``GET /orders/{id}/attachments`` lists the files of a Bestellung for a member who reads
   its Antrag. ``POST /orders/{id}/attachments`` and
   ``DELETE /orders/{id}/attachments/{attachment_id}`` need ``order.manage``
@@ -43,7 +46,7 @@ from app.modules.files.body import read_capped
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut
 from app.modules.files.service import FilesService, attachment_out
-from app.modules.orders.access import reads_free
+from app.modules.orders.access import reads_all, reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import orders_sum, over_by
@@ -163,8 +166,11 @@ async def _view(service: OrderService, row: PurchaseOrder) -> OrderOut:
 async def _reads(db: DbSession, application_id: UUID | None, principal: Principal) -> bool:
     """Tell whether the caller reads the Bestellungen of the Antrag as a member.
 
-    Without an Antrag the permissions of the page "Bestellungen" decide.
+    A read permission of the Haushalt reads every Bestellung. Without an Antrag the
+    permissions of the page "Bestellungen" decide.
     """
+    if reads_all(principal):
+        return True
     if application_id is None:
         return reads_free(principal)
     try:
@@ -186,13 +192,16 @@ async def _readable(
     """Return the Bestellung and whether the caller gets the short view of an applicant.
 
     A Bestellung without an Antrag has no applicant, so its readers always get the
-    member view.
+    member view. A caller with a read permission of the Haushalt reads every Bestellung
+    in the member view.
 
     Raises:
         NotFoundError: No Bestellung has this id, or the caller does not read it.
         UnauthorizedError: The request carries no identity.
     """
     row = await service.get(order_id)
+    if reads_all(principal):
+        return row, False
     if row.application_id is None:
         if not reads_free(principal):
             raise NotFoundError("Bestellung not found.")
@@ -369,17 +378,15 @@ async def list_invoice_orders(
 ) -> InvoiceOrdersOut:
     """List the Bestellungen that name an invoice (F/finance/orders/002877).
 
-    A Bestellung of an Antrag that the caller does not read is a row without values.
-    The sum covers every row, because it tells how much of the gross amount the
-    Bestellungen cover.
+    The caller reads the invoice with a read permission of the Haushalt, and this
+    permission reads every Bestellung (F/finance/orders/002863), so each row has its
+    values. The sum tells how much of the gross amount the Bestellungen cover.
     """
     rows = await service.of_invoice(invoice_id)
     titles = await service.application_titles([row.application_id for row in rows])
-    readable = [await _reads(db, row.application_id, principal) for row in rows]
     return InvoiceOrdersOut(
         items=tuple(
             InvoiceOrderOut(
-                accessible=True,
                 id=row.id,
                 number=format_number(row.number),
                 title=row.title,
@@ -387,9 +394,7 @@ async def list_invoice_orders(
                 applicationTitle=titles.get(row.application_id),
                 actualAmount=row.actual_amount,
             )
-            if reads
-            else InvoiceOrderOut(accessible=False)
-            for row, reads in zip(rows, readable, strict=True)
+            for row in rows
         ),
         total=sum((row.actual_amount or Decimal(0) for row in rows), Decimal(0)),
     )
@@ -408,12 +413,10 @@ async def list_order_bookings(
 ) -> list[OrderBookingOut]:
     """List the bookings that name a Bestellung, for the list "Verknüpft".
 
-    The caller needs a budget read permission, like the list of the bookings, and the
-    member read of the Antrag.
+    The caller needs a budget read permission, like the list of the bookings. This
+    permission reads the Bestellung too (F/finance/orders/002863).
     """
-    _, short = await _readable(db, service, order_id, principal, None, observers=False)
-    if short:
-        raise NotFoundError("Bestellung not found.")
+    await service.get(order_id)
     return [
         OrderBookingOut(id=row.id, description=row.description, amount=row.amount)
         for row in await service.bookings(order_id)

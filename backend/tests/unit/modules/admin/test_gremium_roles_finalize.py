@@ -78,3 +78,14 @@ async def test_update_role_keeps_protocol_finalize() -> None:
     )
     assert out.permissions == ["protocol.finalize"]
     assert role.permissions == ["protocol.finalize"]
+
+
+def test_the_finance_export_key_replaces_the_budget_export_key() -> None:
+    """§ 003016: the catalogue and the scopes know `finance.export` only."""
+    from app.modules.auth.oauth import SCOPES
+
+    assert "finance.export" in PERMISSION_CATALOGUE
+    assert "budget.export" not in PERMISSION_CATALOGUE
+    assert "finance.export" in SCOPES["read"]
+    assert all("budget.export" not in keys for keys in SCOPES.values())
+    assert "invoice.manage" in SCOPES["budget:write"]

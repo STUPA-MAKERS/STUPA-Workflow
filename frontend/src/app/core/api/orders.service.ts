@@ -59,12 +59,11 @@ export interface Order {
   readonly createdAt?: IsoDateTime;
 }
 
-/** One Bestellung in the detail of its invoice. Without `accessible` it has no values. */
+/** One Bestellung in the detail of its invoice. */
 export interface InvoiceOrder {
-  readonly accessible: boolean;
-  readonly id: Uuid | null;
-  readonly number: string | null;
-  readonly title: string | null;
+  readonly id: Uuid;
+  readonly number: string;
+  readonly title: string;
   readonly applicationId: Uuid | null;
   readonly applicationTitle: string | null;
   readonly actualAmount: string | null;
@@ -161,7 +160,7 @@ export class OrdersApiService {
     });
   }
 
-  /** The Bestellungen of every Antrag that the person reads; `order.manage` or `budget.view`. */
+  /** The Bestellungen that the person reads; `order.manage` or a read permission of the Haushalt. */
   page(query: OrderQuery = {}): Observable<OrderPage> {
     return this.http.get<OrderPage>(`${this.base}/orders`, {
       params: httpParams({ ...query }),
@@ -180,7 +179,7 @@ export class OrdersApiService {
     });
   }
 
-  /** The Bestellungen of a filter as an XLSX file; needs `order.manage`. */
+  /** The Bestellungen of a filter as an XLSX file; needs `finance.export`. */
   exportXlsx(query: OrderQuery = {}): Observable<Blob> {
     return this.http.get(`${this.base}/orders/export.xlsx`, {
       params: httpParams({ ...query, limit: undefined, offset: undefined }),

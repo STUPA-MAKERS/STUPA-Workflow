@@ -25,20 +25,19 @@ import {
 interface Row {
   readonly key: string;
   readonly title: string;
-  /** The title of the Antrag; empty for a row without access. */
+  /** The title of the Antrag; empty without an Antrag. */
   readonly sub: string;
-  /** The real price, or "Ohne tatsächlichen Preis"; empty for a row without access. */
+  /** The real price; empty without one. */
   readonly price: string;
-  /** The Antrag of the Bestellung; null for a row without access. */
-  readonly link: readonly string[] | null;
+  /** The address of the Bestellung on the page "Bestellungen". */
+  readonly link: readonly string[];
 }
 
 /**
  * The Bestellungen that name an invoice, in the detail of the invoice.
  *
  * Each row has the number, the Bezeichnung, the Antrag and the real price of a
- * Bestellung, and opens its Antrag. A Bestellung of an Antrag that the reader does not
- * read shows as "Bestellung (kein Zugriff)" without a value. The line below the rows
+ * Bestellung, and opens the Bestellung. The line below the rows
  * gives the sum of the real prices beside the gross amount of the invoice: on an invoice
  * for several purchases it tells how much of the gross amount the Bestellungen cover.
  *
@@ -71,28 +70,18 @@ export class InvoiceOrdersComponent {
   private readonly list = signal<InvoiceOrders | null>(null);
 
   protected readonly rows = computed<readonly Row[]>(() =>
-    (this.list()?.items ?? []).map((item, index) =>
-      item.accessible && item.id && item.applicationId
-        ? {
-            key: item.id,
-            title: [item.number, item.title].filter(Boolean).join(' · '),
-            sub: [
-              item.applicationTitle,
-              item.actualAmount ? null : this.i18n.translate('orders.ofInvoice.noPrice'),
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            price: this.money(item.actualAmount),
-            link: ['/orders', item.id],
-          }
-        : {
-            key: `hidden-${index}`,
-            title: this.i18n.translate('orders.ofInvoice.noAccess'),
-            sub: '',
-            price: '',
-            link: null,
-          },
-    ),
+    (this.list()?.items ?? []).map((item) => ({
+      key: item.id,
+      title: [item.number, item.title].filter(Boolean).join(' · '),
+      sub: [
+        item.applicationTitle,
+        item.actualAmount ? null : this.i18n.translate('orders.ofInvoice.noPrice'),
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      price: this.money(item.actualAmount),
+      link: ['/orders', item.id],
+    })),
   );
 
   /** "72,50 € von 150,00 €": the sum of the real prices beside the gross amount. */

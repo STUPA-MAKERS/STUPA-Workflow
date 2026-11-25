@@ -122,9 +122,7 @@ async def invoice_orders(invoice_id: str) -> dict:
     """List the Bestellungen that name an invoice. Requires the read of the invoices.
 
     The answer has `items` and `total` (the sum of the real prices). An item has
-    `accessible`, `id`, `number`, `title`, `applicationId`, `applicationTitle` and
-    `actualAmount`. An item of an Antrag that the caller does not read has
-    `accessible` false and no other value.
+    `id`, `number`, `title`, `applicationId`, `applicationTitle` and `actualAmount`.
     """
     return await api().get(f"/invoices/{invoice_id}/orders")
 
@@ -191,9 +189,10 @@ async def order_list_all(
     limit: int | None = None,
     offset: int | None = None,
 ) -> dict:
-    """List the Bestellungen of every Antrag that the caller reads, the newest change first.
+    """List the Bestellungen that the caller reads, the newest change first.
 
-    Requires `order.manage` or `budget.view`. `segment` is `open` (planned or ordered),
+    Requires `order.manage` or a read permission of the Haushalt, and a read permission of
+    the Haushalt lists every Bestellung. `segment` is `open` (planned or ordered),
     `delivered` (delivered and not fully booked) or `done`. `fiscal_year`, `budget`
     (a Kostenstelle with its subtree), `gremium` and `buyer` are ids. `q` searches the
     number, the title, the supplier and the order number of the supplier. The answer is
@@ -221,7 +220,8 @@ async def order_pending_applications(
 ) -> dict:
     """List the approved Anträge of a type with money that have no Bestellung.
 
-    Requires `order.manage` or `budget.view`. A cancelled Bestellung does not count.
+    Requires `order.manage` or a read permission of the Haushalt. A cancelled Bestellung
+    does not count.
     `with_orders` lists the Anträge that have a Bestellung too: each Antrag that can
     take a new one. Each item has `id`, `title`, `gremiumId`, `gremiumName` and
     `approvedAmount`. The platform never creates a Bestellung for them.
@@ -256,7 +256,7 @@ async def export_orders_xlsx(
     q: str | None = None,
     overwrite: bool = False,
 ) -> dict:
-    """Export the order list as `.xlsx` to a local file. Requires `order.manage`.
+    """Export the order list as `.xlsx` to a local file. Requires `finance.export`.
 
     The filters work as in `order_list_all`.
     """

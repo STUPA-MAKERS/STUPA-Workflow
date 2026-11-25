@@ -162,7 +162,8 @@ async def test_the_page_finds_it_by_its_bookings(
 
     assert titles() == ["Altkauf", "Regal"]
     assert titles(withoutApplication="true") == ["Altkauf"]
-    assert titles(_client(migrated, settings, monkeypatch, _LEDGER)) == ["Altkauf"]
+    assert titles(_client(migrated, settings, monkeypatch, _LEDGER)) == ["Altkauf", "Regal"]
+    assert titles(_client(migrated, settings, monkeypatch, _OWNER))[:1] == ["Altkauf"]
     assert _client(migrated, settings, monkeypatch, _READER).get("/api/orders").status_code == 403
     assert titles(gremium=str(uuid.uuid4())) == []
     assert titles(fiscalYear=str(year_id)) == []
@@ -221,11 +222,11 @@ async def test_the_page_finds_it_by_its_bookings(
         assert kept.order_id == uuid.UUID(free["id"])
 
     listed = api.get(f"/api/invoices/{invoice_id}/orders").json()["items"]
-    assert [(row["accessible"], row["applicationId"]) for row in listed] == [(True, None)]
-    blind = _client(migrated, settings, monkeypatch, _BOOK_ONLY)
+    assert [(row["title"], row["applicationId"]) for row in listed] == [("Altkauf", None)]
+    booker = _client(migrated, settings, monkeypatch, _BOOK_ONLY)
     assert [
-        row["accessible"] for row in blind.get(f"/api/invoices/{invoice_id}/orders").json()["items"]
-    ] == [False]
+        row["title"] for row in booker.get(f"/api/invoices/{invoice_id}/orders").json()["items"]
+    ] == ["Altkauf"]
 
     loose = api.patch(booking, json={"orderId": None})
     assert (loose.status_code, loose.json()["orderId"]) == (200, None)

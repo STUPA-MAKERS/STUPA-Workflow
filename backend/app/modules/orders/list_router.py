@@ -1,11 +1,11 @@
 """Routes of the page "Bestellungen" (F/finance/orders/002883).
 
-- ``GET /orders`` lists the Bestellungen of the Anträge that the caller reads as a member,
-  the newest change first. It needs ``order.manage`` or ``budget.view``.
+- ``GET /orders`` lists the Bestellungen that the caller reads (F/finance/orders/002863),
+  the newest change first. It needs ``order.manage`` or a read permission of the Haushalt.
 - ``GET /orders/pending-applications`` lists the approved Anträge without a Bestellung
   (F/finance/orders/002934), with the same permissions.
 - ``GET /orders/export.xlsx`` gives the Bestellungen of the filter as a file and needs
-  ``order.manage`` (F/finance/orders/002886).
+  ``finance.export`` (F/finance/orders/002886).
 
 The app includes this router before the router of one Bestellung, because the path
 ``/orders/{order_id}`` would else take the fixed paths.
@@ -18,16 +18,18 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from app.deps import DbSession, require_any_permission
+from app.deps import DbSession, require_any_permission, require_principal
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import EXPORT_PERMISSION
+from app.modules.orders.access import FREE_READ_PERMISSIONS
 from app.modules.orders.listing import OrderFilter, OrderListing
 from app.modules.orders.models import PurchaseOrder
-from app.modules.orders.router import ManagerDep, ServiceDep, order_out
+from app.modules.orders.router import ServiceDep, order_out
 from app.modules.orders.rules import OrderKind, Segment
 from app.modules.orders.schemas import OrderOut, PendingApplicationOut
-from app.modules.orders.service import MANAGE_PERMISSION, OrderService
+from app.modules.orders.service import OrderService
 from app.shared.paging import Page, PageParams
 
 router = APIRouter(tags=["orders"])
@@ -37,11 +39,12 @@ _ERRORS: dict[int | str, dict[str, object]] = {
 }
 
 #: The permissions of which one opens the page (F/finance/orders/002883).
-PAGE_PERMISSIONS: tuple[str, ...] = (MANAGE_PERMISSION, "budget.view")
+PAGE_PERMISSIONS: tuple[str, ...] = FREE_READ_PERMISSIONS
 #: The most rows of one export.
 EXPORT_MAX_ROWS = 10_000
 
 ReaderDep = Annotated[Principal, Depends(require_any_permission(*PAGE_PERMISSIONS))]
+ExporterDep = Annotated[Principal, Depends(require_principal(EXPORT_PERMISSION))]
 
 _KIND_LABEL = {"order": "Bestellung", "outlay": "Auslage"}
 _STATUS_LABEL = {
@@ -116,7 +119,7 @@ async def list_all_orders(
     wanted: FilterDep,
     page: Annotated[PageParams, Depends()],
 ) -> Page[OrderOut]:
-    """List the Bestellungen of the readable Anträge, the newest change first.
+    """List the Bestellungen that the caller reads, the newest change first.
 
     ``segment`` is ``open``, ``delivered`` or ``done`` (F/finance/orders/002884).
     ``budget`` covers the subtree of the Kostenstelle. ``withoutApplication`` keeps only
@@ -154,7 +157,7 @@ async def list_pending_applications(
 
 @router.get("/orders/export.xlsx", responses=_ERRORS)
 async def export_orders_xlsx(
-    db: DbSession, service: ServiceDep, principal: ManagerDep, wanted: FilterDep
+    db: DbSession, service: ServiceDep, principal: ExporterDep, wanted: FilterDep
 ) -> Response:
     """Export the Bestellungen of the filter as ``.xlsx`` with the amounts as numbers."""
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_table_workbook

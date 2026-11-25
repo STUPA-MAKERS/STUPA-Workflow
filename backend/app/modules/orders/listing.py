@@ -1,8 +1,10 @@
 """The page "Bestellungen": the Bestellungen of all Anträge and the Anträge without one.
 
 Both lists hold only the Anträge that the caller reads as a member
-(F/finance/orders/002883). The filters read the Kostenstelle, the Haushaltsjahr and the
-Gremium of the Antrag, because a Bestellung has none of its own (F/finance/orders/002885).
+(F/finance/orders/002883). A caller with a read permission of the Haushalt reads the
+Bestellungen of every Antrag in the first list (F/finance/orders/002863). The filters
+read the Kostenstelle, the Haushaltsjahr and the Gremium of the Antrag, because a
+Bestellung has none of its own (F/finance/orders/002885).
 A Bestellung without an Antrag is in the first list for the persons of
 `access.reads_free`. The filters read the Kostenstelle and the Haushaltsjahr of its
 bookings, and the Gremium filter leaves it out, because no Gremium owns it.
@@ -28,7 +30,7 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
-from app.modules.orders.access import reads_free
+from app.modules.orders.access import reads_all, reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.rules import OrderKind, Segment
 from app.modules.orders.schemas import PendingApplicationOut
@@ -99,11 +101,15 @@ class OrderListing:
     session: AsyncSession
 
     async def _application_filters(
-        self, principal: Principal, wanted: OrderFilter
+        self, principal: Principal, wanted: OrderFilter, *, scoped: bool = True
     ) -> list[ColumnElement[bool]]:
-        """Build the clauses on the Antrag: the read scope and the filters."""
+        """Build the clauses on the Antrag: the read scope and the filters.
+
+        ``scoped`` is false for a caller who reads every Bestellung, so the read scope
+        of the Anträge drops out and the filters stay.
+        """
         apps = ApplicationsService(self.session)
-        scope = await apps.member_scope_for(principal)
+        scope = await apps.member_scope_for(principal) if scoped else None
         optional = (
             scope,
             (
@@ -153,8 +159,14 @@ class OrderListing:
         ]
 
     async def _scope(self, principal: Principal, wanted: OrderFilter) -> ColumnElement[bool]:
-        """Build the read scope with the filters on the Antrag or on the bookings."""
-        with_application = and_(*(await self._application_filters(principal, wanted)))
+        """Build the read scope with the filters on the Antrag or on the bookings.
+
+        A caller with a read permission of the Haushalt reads the Bestellungen of every
+        Antrag (F/finance/orders/002863).
+        """
+        with_application = and_(
+            *(await self._application_filters(principal, wanted, scoped=not reads_all(principal)))
+        )
         return (
             or_(with_application, and_(*(await self._free_filters(wanted))))
             if reads_free(principal)

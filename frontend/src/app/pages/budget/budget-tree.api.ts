@@ -771,7 +771,7 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/invoices/${id}/file`, { responseType: 'blob' });
   }
 
-  /** Filtered bookings as ``.xlsx`` (P(``budget.export``)). The content matches the
+  /** Filtered bookings as ``.xlsx`` (P(``finance.export``)). The content matches the
    *  list. Optional ``ids`` exports exactly the selected bookings
    *  (#expenses-ux: bulk export). */
   exportExpensesXlsx(
@@ -793,7 +793,7 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/expenses/export.xlsx`, { params, responseType: 'blob' });
   }
 
-  /** Budget tree as ``.xlsx`` (P(``budget.export``)), filtered like the dashboard. */
+  /** Budget tree as ``.xlsx`` (P(``finance.export``)), filtered like the dashboard. */
   exportXlsx(
     opts: { node?: string; fiscalYear?: string; gremium?: string } = {},
   ): Observable<Blob> {

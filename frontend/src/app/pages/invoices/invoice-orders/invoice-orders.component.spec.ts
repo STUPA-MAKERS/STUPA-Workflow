@@ -7,7 +7,6 @@ import { InvoiceOrdersComponent } from './invoice-orders.component';
 const LIST: InvoiceOrders = {
   items: [
     {
-      accessible: true,
       id: 'o-1',
       number: 'B-7K3QX9MD',
       title: 'Beamer',
@@ -16,20 +15,10 @@ const LIST: InvoiceOrders = {
       actualAmount: '72.50',
     },
     {
-      accessible: true,
       id: 'o-2',
       number: 'B-2M4N6P8Q',
       title: 'Kabel',
       applicationId: 'a-2',
-      applicationTitle: null,
-      actualAmount: null,
-    },
-    {
-      accessible: false,
-      id: null,
-      number: null,
-      title: null,
-      applicationId: null,
       applicationTitle: null,
       actualAmount: null,
     },
@@ -70,11 +59,10 @@ describe('InvoiceOrdersComponent', () => {
     expect(rows[0]).toContain('Technik für den Sitzungssaal');
     expect(rows[0]).toMatch(/72,50\s€/);
     expect(rows[1]).toContain('Preis offen');
-    expect(rows[2]).toBe('Bestellung (kein Zugriff)');
+    expect(rows).toHaveLength(2);
     expect(cmp.rows().map((row: { link: unknown }) => row.link)).toEqual([
       ['/orders', 'o-1'],
       ['/orders', 'o-2'],
-      null,
     ]);
     expect(screen.getByTestId('io-sum')).toHaveTextContent(/Summe der Bestellungen\s*72,50\s€ von 150,00\s€/);
   });

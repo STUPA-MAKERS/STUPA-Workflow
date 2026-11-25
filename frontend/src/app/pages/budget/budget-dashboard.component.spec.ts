@@ -135,7 +135,7 @@ const TREE: BudgetTreeNode[] = [
 const app = itemApp;
 const booking = itemBooking;
 
-const ALL_PERMS = ['budget.view', 'budget.structure', 'budget.book', 'budget.export'];
+const ALL_PERMS = ['budget.view', 'budget.structure', 'budget.book', 'finance.export'];
 
 function authStub(perms: string[] = ALL_PERMS): AuthService {
   const can = (p: string): boolean => perms.includes(p);

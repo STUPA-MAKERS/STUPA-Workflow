@@ -2,7 +2,7 @@
 id: "001404"
 title: A person links what the person reads and writes on one end
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

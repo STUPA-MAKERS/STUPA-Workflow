@@ -2,7 +2,7 @@
 id: "003015"
 title: The write of an invoice needs invoice.manage or budget.book
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

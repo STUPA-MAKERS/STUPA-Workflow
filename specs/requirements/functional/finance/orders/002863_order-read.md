@@ -2,7 +2,7 @@
 id: "002863"
 title: A person who reads the Haushalt or the Antrag reads the Bestellungen
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

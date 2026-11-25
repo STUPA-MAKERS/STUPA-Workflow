@@ -261,7 +261,7 @@ class SearchService:
     async def _orders(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Reuses `OrderListing.page`, the list of `GET /api/orders`.
 
-        The list holds the Bestellungen of the Anträge that the caller reads as a member,
+        The list holds the Bestellungen that the caller reads (F/finance/orders/002863),
         so the search needs no permission of its own. A hit opens the Bestellung in the
         pane of the page "Bestellungen".
         """

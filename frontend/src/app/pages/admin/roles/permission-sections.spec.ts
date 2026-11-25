@@ -32,9 +32,9 @@ describe('permissionSections', () => {
   });
 
   it('puts the right of the Bestellungen with the budget', () => {
-    const out = permissionSections(['budget.book', 'order.manage']);
+    const out = permissionSections(['budget.book', 'order.manage', 'invoice.manage', 'finance.export']);
     expect(out.map((s) => s.key)).toEqual(['budget']);
-    expect(out[0].keys).toEqual(['budget.book', 'order.manage']);
+    expect(out[0].keys).toEqual(['budget.book', 'order.manage', 'invoice.manage', 'finance.export']);
   });
 
   it('gives nothing for an empty catalogue', () => {

@@ -130,11 +130,13 @@ async def test_the_page_lists_filters_and_exports(
     blind = _client(migrated, settings, monkeypatch, _BLIND)
     assert blind.get("/api/orders").json()["total"] == 0
     assert blind.get("/api/orders/pending-applications").json()["total"] == 0
-    assert _client(migrated, settings, monkeypatch, _LEDGER).get("/api/orders").json()["total"] == 0
+    assert _client(migrated, settings, monkeypatch, _LEDGER).get("/api/orders").json()["total"] == 3
     assert _client(migrated, settings, monkeypatch, _READER).get("/api/orders").status_code == 403
     viewer = _client(migrated, settings, monkeypatch, _VIEWER)
     assert viewer.get("/api/orders").json()["total"] == 3
     assert viewer.get("/api/orders/export.xlsx").status_code == 403
+    manager = _client(migrated, settings, monkeypatch, _MANAGER)
+    assert manager.get("/api/orders/export.xlsx").status_code == 403
     assert (
         _client(migrated, settings, monkeypatch, _MANAGER)
         .get(f"/api/orders/{drucker['id']}/bookings")
