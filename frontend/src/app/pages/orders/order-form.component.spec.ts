@@ -236,7 +236,7 @@ describe('OrderFormComponent', () => {
   it('saves the account of the buyer at once in an existing Bestellung', async () => {
     const { cmp, api, touched, toast } = await setup({ id: 'o-1' });
     expect(cmp.buyer()).toBeNull();
-    cmp.onPicked({ kind: 'gremium', id: 'g-1', name: 'StuPa', logoUrl: null });
+    cmp.onPicked({ kind: 'team', id: 'g-1', name: 'StuPa', logoUrl: null });
     expect(api.update).not.toHaveBeenCalled();
     cmp.onPicked({ kind: 'person', id: 'p-9', name: 'Ada' });
     expect(api.update).toHaveBeenCalledWith('o-1', 1, { buyerId: 'p-9' });

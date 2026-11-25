@@ -438,7 +438,7 @@ export class CalendarComponent implements OnDestroy {
   /** A saved Termin shows at once on its day, then the page reads the entries again. */
   onSaved(a: Appointment): void {
     this.formOpen.set(false);
-    this.items.update((list) => mergeEntries(list, [entryOf(a, a.gremien, a.myAnswer)]));
+    this.items.update((list) => mergeEntries(list, [entryOf(a, a.teams, a.myAnswer)]));
     if (!this.phone()) this.selectDay(a.startsOn);
     this.reload();
   }

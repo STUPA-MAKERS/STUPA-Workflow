@@ -147,7 +147,7 @@ export function formError(form: AppointmentForm): FormError | null {
 /** The request body of a form with its invitations. */
 export function toInput(
   form: AppointmentForm,
-  gremiumIds: readonly string[],
+  teamIds: readonly string[],
   principalIds: readonly string[],
 ): AppointmentInput {
   return {
@@ -160,7 +160,7 @@ export function toInput(
     description: form.description.trim() || null,
     forAll: form.forAll,
     public: form.public,
-    gremiumIds,
+    teamIds,
     principalIds,
   };
 }
@@ -173,7 +173,7 @@ export function answerKey(answer: AnswerKey): TranslationKey {
 /** The entry of the grid that stands for a Termin, so a save shows without a second read. */
 export function entryOf(
   a: Spanned & { readonly id: string; readonly title: string; readonly place: string | null },
-  gremien: readonly { readonly id: string; readonly name: string }[],
+  teams: readonly { readonly id: string; readonly name: string; readonly gremiumId?: string | null }[],
   myAnswer: AnswerKey | null,
 ): CalendarEntry {
   return {
@@ -185,8 +185,8 @@ export function entryOf(
     startTime: a.startTime,
     endTime: a.endTime,
     place: a.place,
-    source: gremien[0]?.name ?? null,
-    gremiumIds: gremien.map((g) => g.id),
+    source: teams[0]?.name ?? null,
+    gremiumIds: teams.flatMap((t) => (t.gremiumId ? [t.gremiumId] : [])),
     mine: true,
     myAnswer,
   };

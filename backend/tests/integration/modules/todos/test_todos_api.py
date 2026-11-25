@@ -179,12 +179,12 @@ async def test_gremium_boards_follow_the_gremium_roles(
     lead, lead_id = await add_person(maker, "Lena")
     outsider, _ = await add_person(maker, "Olaf")
     await add_member(maker, gid, writer_id, "todo.write")
-    await add_member(maker, gid, lead_id, "todo.write", "todo.configure")
+    await add_member(maker, gid, lead_id, "todo.write", "todo.configure", "team.manage")
     with TestClient(api.app) as client:
         api.login(outsider)
         assert client.get(f"/api/todos/boards/{bid}").status_code == 404
         api.login(writer)
-        summary = [b for b in _ok(client.get("/api/todos/boards")) if b["kind"] == "gremium"]
+        summary = [b for b in _ok(client.get("/api/todos/boards")) if b["kind"] == "team"]
         assert summary[0]["canConfigure"] is False
         assert client.patch(f"/api/todos/boards/{bid}", json={"name": "X"}).status_code == 403
         members = _ok(client.get(f"/api/todos/boards/{bid}/members"))
@@ -249,7 +249,7 @@ async def test_team_boards_follow_the_permission(
         assert client.get(f"/api/todos/boards/{bid}").status_code == 404
         api.login(Principal(sub=me.sub, permissions={"platform.manage"}))
         kinds = [b["kind"] for b in _ok(client.get("/api/todos/boards"))]
-        assert kinds == ["personal", "team"]
+        assert kinds == ["personal", "permission"]
         assert _ok(client.get(f"/api/todos/boards/{bid}"))["canConfigure"] is True
 
 

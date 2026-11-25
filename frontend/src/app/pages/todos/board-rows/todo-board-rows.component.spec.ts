@@ -46,7 +46,7 @@ function team(over: Partial<TodoAssignedBoard> = {}): TodoAssignedBoard {
   return {
     id: 'b-9',
     name: 'Plattform',
-    kind: 'team',
+    kind: 'permission',
     gremiumId: null,
     canWrite: false,
     columns: [
@@ -550,7 +550,7 @@ describe('TodoBoardRowsComponent', () => {
     const own = byId.get(rowDropId('p-1'))!;
     const shared = byId.get(rowDropId('c-1'))!;
     expect(own.element.nativeElement.dataset['boardKind']).toBe('personal');
-    expect(shared.element.nativeElement.dataset['boardKind']).toBe('gremium');
+    expect(shared.element.nativeElement.dataset['boardKind']).toBe('team');
     const from = (list: CdkDropList) => ({ dropContainer: list }) as unknown as CdkDrag;
     expect(own.enterPredicate(from(shared), own)).toBe(false);
     expect(own.enterPredicate(from(own), own)).toBe(true);
@@ -866,7 +866,7 @@ describe('TodoBoardRowsComponent', () => {
         press('Raum buchen');
         expect(on.menu).toHaveBeenCalledTimes(1);
         const req = on.menu.mock.calls[0][0];
-        expect(req).toMatchObject({ boardId: 'b-1', boardKind: 'gremium', card: { id: 'k-1' } });
+        expect(req).toMatchObject({ boardId: 'b-1', boardKind: 'team', card: { id: 'k-1' } });
         expect(req.columns.map((c: { name: string }) => c.name)).toEqual(['Offen', 'In Arbeit', 'Wartet', 'Erledigt']);
         expect(on.openCard).not.toHaveBeenCalled();
         press('Ticket prüfen');

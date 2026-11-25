@@ -1,9 +1,9 @@
 /**
  * API of the to-dos (`/api/todos`): boards, cards and their links.
  *
- * A board is a gremium board (its members, plus its entries), a free board (its entries:
- * Gremien and persons with a role, spec 001060-001078), a personal board (the owner) or a
- * team board (holders of its permission). A board or a card the caller may not read
+ * A board is a team board (the members of its team, plus its entries, spec 003067), a
+ * free board (its entries: teams and persons with a role, spec 001060-001078), a personal
+ * board (the owner) or a permission board (holders of its permission, spec 003073). A board or a card the caller may not read
  * answers 404. The client only binds the data; the server stays authoritative.
  */
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
@@ -17,7 +17,7 @@ import { detailContext } from '@core/cache/cache.interceptor';
 import type { TicketStatus } from './tickets.service';
 import { httpParams } from './http-params';
 
-export type TodoBoardKind = 'gremium' | 'free' | 'personal' | 'team';
+export type TodoBoardKind = 'team' | 'free' | 'personal' | 'permission';
 /** The role of a member entry of a board: read, write, or write and manage. */
 export type TodoEntryRole = 'read' | 'edit' | 'manage';
 export type TodoLabelColor = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'gray';
@@ -42,6 +42,9 @@ export interface TodoBoardSummary {
   readonly id: Uuid;
   readonly name: string;
   readonly kind: TodoBoardKind;
+  /** The own team of a team board, else null. */
+  readonly teamId?: Uuid | null;
+  /** The Gremium of the own team when it is inherent, else null. */
   readonly gremiumId: Uuid | null;
   readonly canWrite: boolean;
   readonly canConfigure: boolean;
@@ -247,6 +250,9 @@ export interface TodoBoard {
   readonly id: Uuid;
   readonly name: string;
   readonly kind: TodoBoardKind;
+  /** The own team of a team board, else null. */
+  readonly teamId?: Uuid | null;
+  /** The Gremium of the own team when it is inherent, else null. */
   readonly gremiumId: Uuid | null;
   readonly archiveAfterDays: number | null;
   readonly canWrite: boolean;
@@ -388,6 +394,9 @@ export interface TodoAssignedBoard {
   readonly id: Uuid;
   readonly name: string;
   readonly kind: TodoBoardKind;
+  /** The own team of a team board, else null. */
+  readonly teamId?: Uuid | null;
+  /** The Gremium of the own team when it is inherent, else null. */
   readonly gremiumId: Uuid | null;
   readonly canWrite: boolean;
   readonly columns: readonly TodoColumn[];
@@ -415,29 +424,40 @@ export interface TodoBoardPatch {
   readonly archiveAfterDays?: number | null;
 }
 
-/** A member entry of a board: a Gremium or a person with a role (spec 001062). */
+/** A member entry of a board: a team or a person with a role (spec 001062, 003068). */
 export interface TodoBoardEntry {
-  /** Null for the own Gremium of a Gremium board, which has no row. */
+  /** Null for the own team of a team board, which has no row. */
   readonly id: Uuid | null;
-  readonly kind: 'gremium' | 'person';
+  readonly kind: 'team' | 'person';
   readonly targetId: Uuid;
   readonly name: string;
   readonly role: TodoEntryRole;
-  /** The own Gremium of a Gremium board: it cannot change or go (spec 001077). */
+  /** The own team of a team board: it cannot change or go (spec 001077). */
   readonly fixed: boolean;
+  /** The Gremium of an inherent team, else null. */
+  readonly gremiumId?: Uuid | null;
   readonly logoUrl?: string | null;
 }
 
-/** A new member entry: exactly one of `gremiumId` and `principalId`. */
+/** A new member entry: exactly one of `teamId` and `principalId`. */
 export interface TodoBoardEntryIn {
-  readonly gremiumId?: Uuid;
+  readonly teamId?: Uuid;
   readonly principalId?: Uuid;
   readonly role: TodoEntryRole;
 }
 
-/** The hits of the shared picker (`GET /todos/entry-options`, spec 001074). */
+/** A team of the shared picker: `gremiumId` and `logoUrl` of an inherent team. */
+export interface TodoEntryTeam {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly gremiumId: Uuid | null;
+  readonly parentName: string | null;
+  readonly logoUrl: string | null;
+}
+
+/** The hits of the shared picker (`GET /todos/entry-options`, spec 001074, 003071). */
 export interface TodoEntryOptions {
-  readonly gremien: readonly { readonly id: Uuid; readonly name: string; readonly logoUrl: string | null }[];
+  readonly teams: readonly TodoEntryTeam[];
   readonly persons: readonly { readonly id: Uuid; readonly name: string }[];
 }
 
@@ -504,7 +524,7 @@ export class TodosApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
-  /** The boards of the caller: personal, the gremium boards by name, team. */
+  /** The boards of the caller: personal, the team boards by name, free, permission. */
   boards(gremiumId?: Uuid | null): Observable<TodoBoardSummary[]> {
     const params = httpParams({ gremiumId: gremiumId || undefined });
     return this.http.get<TodoBoardSummary[]>(`${this.base}/todos/boards`, {
@@ -569,7 +589,7 @@ export class TodosApiService {
     });
   }
 
-  /** The member entries of a board: the own Gremium first, then Gremien and persons. */
+  /** The member entries of a board: the own team first, then teams and persons. */
   entries(boardId: Uuid): Observable<TodoBoardEntry[]> {
     return this.http.get<TodoBoardEntry[]>(`${this.base}/todos/boards/${boardId}/entries`, {
       context: skipLoading(),
@@ -594,7 +614,7 @@ export class TodosApiService {
     });
   }
 
-  /** The Gremien and persons of the shared picker (spec 001074). */
+  /** The teams and persons of the shared picker (spec 001074, 003071). */
   entryOptions(q = ''): Observable<TodoEntryOptions> {
     return this.http.get<TodoEntryOptions>(`${this.base}/todos/entry-options`, {
       params: httpParams({ q: q || undefined }),

@@ -37,7 +37,7 @@ describe('TodoBoardPickerComponent', () => {
     const current = screen.getByRole('button', { name: /^Studierendenparlament/ });
     expect(current).toHaveAttribute('aria-current', 'true');
     expect(document.activeElement).toBe(current);
-    expect(BOARD_ICON.team).toBe('ticket');
+    expect(BOARD_ICON.permission).toBe('ticket');
   });
 
   /** § 001067, 001061, 001068: the free boards after the Gremien, the actions with their rights. */

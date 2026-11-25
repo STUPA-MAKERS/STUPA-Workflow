@@ -214,7 +214,7 @@ def test_tickets_update_unassigns_with_null(fake_api: _FakeApi) -> None:
 
 def test_free_board_tools_send_one_request_each(fake_api: _FakeApi) -> None:
     """Create a free board, manage its entries, archive, restore and delete it."""
-    entry = S.TodoBoardEntryIn(gremiumId="g1", role="read")
+    entry = S.TodoBoardEntryIn(teamId="t1", role="read")
     asyncio.run(todos.todo_boards(archived=True))
     asyncio.run(todos.todo_board_create("Ersti", [entry]))
     asyncio.run(todos.todo_board_entries("b1"))
@@ -229,7 +229,7 @@ def test_free_board_tools_send_one_request_each(fake_api: _FakeApi) -> None:
         (
             "POST",
             "/todos/boards",
-            {"name": "Ersti", "entries": [{"gremiumId": "g1", "role": "read"}]},
+            {"name": "Ersti", "entries": [{"teamId": "t1", "role": "read"}]},
         ),
         ("GET", "/todos/boards/b1/entries", None),
         ("POST", "/todos/boards/b1/entries", {"principalId": "p1", "role": "edit"}),

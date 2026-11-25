@@ -123,12 +123,12 @@ export class TodoBoardSettingsComponent {
   readonly moveTo = signal<Uuid>('');
   /** An empty column that "Spalte löschen?" asks about. */
   readonly confirmEmpty = signal<TodoColumn | null>(null);
-  /** The member entries of a Gremium board or a free board. */
+  /** The member entries of a team board or a free board. */
   readonly entries = signal<readonly TodoBoardEntry[]>([]);
   /** "Board archivieren?" asks. */
   readonly confirmArchive = signal(false);
 
-  readonly hasEntries = computed(() => this.board().kind === 'gremium' || this.board().kind === 'free');
+  readonly hasEntries = computed(() => this.board().kind === 'team' || this.board().kind === 'free');
   readonly isFree = computed(() => this.board().kind === 'free');
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
@@ -153,7 +153,7 @@ export class TodoBoardSettingsComponent {
         this.confirmEmpty.set(null);
         this.confirmArchive.set(false);
         this.entries.set([]);
-        if (b.kind === 'gremium' || b.kind === 'free') this.loadEntries(b.id);
+        if (b.kind === 'team' || b.kind === 'free') this.loadEntries(b.id);
       });
     });
   }
@@ -189,7 +189,7 @@ export class TodoBoardSettingsComponent {
 
   addEntry(event: { readonly hit: PickerHit; readonly role: TodoEntryRole }): void {
     const { hit, role } = event;
-    const body = hit.kind === 'gremium' ? { gremiumId: hit.id, role } : { principalId: hit.id, role };
+    const body = hit.kind === 'team' ? { teamId: hit.id, role } : { principalId: hit.id, role };
     this.runEntries(this.api.addEntry(this.board().id, body));
   }
 

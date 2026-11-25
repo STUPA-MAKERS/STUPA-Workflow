@@ -11,7 +11,7 @@ async function setup(taken: readonly string[] = []) {
   const picked = jest.fn<void, [PickerHit]>();
   const persons = jest.fn((q: string) => of(q === 'as' ? [{ id: 'p-1', name: 'Astrid Berg' }] : []));
   const view = await render(GremiumPersonPickerComponent, {
-    inputs: { placeholder: 'Gremium oder Person einladen', gremien: GREMIEN, persons, taken },
+    inputs: { placeholder: 'Gremium oder Person einladen', teams: GREMIEN, persons, taken },
     on: { picked },
   });
   const field = screen.getByLabelText('Gremium oder Person einladen') as HTMLInputElement;
@@ -33,7 +33,7 @@ describe('GremiumPersonPickerComponent', () => {
     fireEvent.keyDown(options[0], { key: 'ArrowUp' });
     expect(document.activeElement).toBe(view.field);
     fireEvent.click(options[0]);
-    expect(view.picked).toHaveBeenCalledWith({ kind: 'gremium', id: 'g-1', name: 'AStA', logoUrl: '/api/committees/g-1/logo' });
+    expect(view.picked).toHaveBeenCalledWith({ kind: 'team', id: 'g-1', name: 'AStA', logoUrl: '/api/committees/g-1/logo', parentName: null });
     view.detect();
     expect(screen.queryByRole('listbox')).toBeNull();
   });
@@ -57,7 +57,7 @@ describe('GremiumPersonPickerComponent', () => {
       fireEvent.input(view.field, { target: { value: 'ast' } });
       view.detect();
       fireEvent.keyDown(view.field, { key: 'Enter' });
-      expect(view.picked).toHaveBeenCalledWith(expect.objectContaining({ kind: 'gremium', id: 'g-1' }));
+      expect(view.picked).toHaveBeenCalledWith(expect.objectContaining({ kind: 'team', id: 'g-1' }));
       fireEvent.input(view.field, { target: { value: 'zz' } });
       jest.advanceTimersByTime(300);
       view.detect();
@@ -117,7 +117,7 @@ describe('GremiumPersonPickerComponent', () => {
 
   it('offers no persons without a person search and closes when the field leaves the view', async () => {
     const view = await render(GremiumPersonPickerComponent, {
-      inputs: { placeholder: 'Gremium', gremien: GREMIEN },
+      inputs: { placeholder: 'Gremium', teams: GREMIEN },
     });
     const field = screen.getByLabelText('Gremium') as HTMLInputElement;
     fireEvent.input(field, { target: { value: 'a' } });

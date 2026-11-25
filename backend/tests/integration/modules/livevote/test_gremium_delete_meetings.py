@@ -149,7 +149,8 @@ async def test_gremium_delete_removes_the_files_of_its_to_do_comments(
     """The board cascade drops the rows; the delete removes the objects with them."""
     from app.modules.auth.models import Principal as PrincipalRow
     from app.modules.files.models import Attachment
-    from app.modules.todos.boards import ensure_gremium_board
+    from app.modules.teams.members import ensure_gremium_team
+    from app.modules.todos.boards import ensure_team_board
     from app.modules.todos.models import TodoBoard, TodoCard, TodoColumn, TodoComment
     from tests._support.memory_storage import MemoryStorage
 
@@ -158,12 +159,13 @@ async def test_gremium_delete_removes_the_files_of_its_to_do_comments(
     key = f"attachments/{uuid.uuid4()}/beleg.pdf"
     await storage.put(key, b"data", "application/pdf")
     async with maker() as session:
-        await ensure_gremium_board(session, s.gremium_id, "G")
+        team_id = await ensure_gremium_team(session, s.gremium_id)
+        await ensure_team_board(session, team_id, "G")
         author = PrincipalRow(sub=f"a-{uuid.uuid4().hex[:8]}", display_name="A")
         session.add(author)
         await session.flush()
         board = await session.scalar(
-            select(TodoBoard.id).where(TodoBoard.gremium_id == s.gremium_id)
+            select(TodoBoard.id).where(TodoBoard.team_id == team_id)
         )
         column = await session.scalar(select(TodoColumn.id).where(TodoColumn.board_id == board))
         assert board is not None and column is not None

@@ -92,12 +92,12 @@
       <div class="apd__field" role="group" aria-labelledby="apd-invited">
         <span class="apd__cap" id="apd-invited">{{ 'calendar.field.invited' | t }}</span>
         <div class="apd__chips">
-          @for (g of gremien(); track g.id) {
+          @for (g of teams(); track g.id) {
             <app-chip
               removeSize="sm"
               [removable]="true"
               [removeLabel]="'calendar.dialog.remove' | t: { name: g.name }"
-              (remove)="removeGremium(g.id)"
+              (remove)="removeTeam(g.id)"
             >
               <app-gremium-logo size="xs" [name]="g.name" [logoUrl]="logoOf(g.id)" /><span>{{
                 g.name
@@ -122,7 +122,7 @@
         </div>
         <app-gremium-person-picker
           [placeholder]="'calendar.dialog.invite' | t"
-          [gremien]="known()"
+          [teams]="known()"
           [persons]="findPeople"
           [taken]="taken()"
           (picked)="addHit($event)"

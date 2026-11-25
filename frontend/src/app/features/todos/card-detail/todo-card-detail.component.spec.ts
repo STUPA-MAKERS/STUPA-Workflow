@@ -1577,7 +1577,7 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
   });
 
   it('hides "Auf Tagesordnung setzen" off a Gremium board', async () => {
-    const { cmp, files } = await setup({ meetings, card: detail({ boardKind: 'team' }) });
+    const { cmp, files } = await setup({ meetings, card: detail({ boardKind: 'permission' }) });
     expect(files.listMeetings).not.toHaveBeenCalled();
     expect(ids(cmp)).not.toContain('agenda');
   });

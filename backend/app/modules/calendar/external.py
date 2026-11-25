@@ -1,10 +1,10 @@
 """The external calendars: the admin writes, the fetch of the worker and the reads.
 
 An external calendar is an ICS feed that a holder of ``admin.calendars`` subscribed, for
-all persons or for one Gremium. The entries of a calendar for all are readable by each
-signed-in person. The entries of a calendar of a Gremium are readable by the persons who
-read the meetings of that Gremium (`MeetingRules.meeting_read_scope`), so the Kalender
-and the meeting list agree.
+all persons or for one team. The entries of a calendar for all are readable by each
+signed-in person. The entries of a calendar of a team are readable by the members of the
+team (F/collaboration/teams/003070), and by a person who reads the meetings of every
+Gremium.
 
 The API never fetches. A create, a change of the address and "Jetzt abrufen" set
 ``due_at`` to now, and the worker (`worker/calendars.py`) fetches every calendar whose
@@ -16,7 +16,7 @@ No function here commits. The router and the worker own the transaction.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
@@ -34,16 +34,22 @@ from app.modules.calendar.schemas import (
     ExternalCalendarOut,
     ExternalEntryOut,
 )
-from app.modules.gremien.models import Gremium
 from app.modules.meetings.rules import MeetingRules
+from app.modules.teams.members import member_team_ids, team_names
+from app.modules.teams.models import Team
 from app.shared.errors import NotFoundError, ValidationProblem
 
 #: The most calendars that one run of the worker fetches.
 BATCH = 20
 
 
-def external_entry(entry: ExternalEntry, calendar: ExternalCalendar) -> EntryOut:
-    """An external entry as an entry of the Kalender. Its source is the calendar name."""
+def external_entry(
+    entry: ExternalEntry, calendar: ExternalCalendar, gremium_of: Mapping[UUID, UUID]
+) -> EntryOut:
+    """An external entry as an entry of the Kalender. Its source is the calendar name.
+
+    ``gremium_of`` maps an inherent team to its Gremium, for the Gremium filter.
+    """
     return EntryOut(
         kind="external",
         id=entry.id,
@@ -54,7 +60,11 @@ def external_entry(entry: ExternalEntry, calendar: ExternalCalendar) -> EntryOut
         end_time=entry.end_time,
         place=entry.place,
         source=calendar.name,
-        gremium_ids=(calendar.gremium_id,) if calendar.gremium_id is not None else (),
+        gremium_ids=(
+            (gremium_of[calendar.team_id],)
+            if calendar.team_id is not None and calendar.team_id in gremium_of
+            else ()
+        ),
     )
 
 
@@ -90,21 +100,14 @@ class ExternalCalendarService:
                 .group_by(ExternalEntry.calendar_id)
             )
         }
-        names: dict[UUID, str] = {
-            found[0]: found[1]
-            for found in await self.session.execute(
-                select(Gremium.id, Gremium.name).where(
-                    Gremium.id.in_([row.gremium_id for row in rows if row.gremium_id])
-                )
-            )
-        }
+        names = await team_names(self.session, {row.team_id for row in rows if row.team_id})
         return tuple(
             ExternalCalendarOut(
                 id=row.id,
                 name=row.name,
                 url=row.url,
-                gremium_id=row.gremium_id,
-                gremium_name=names.get(row.gremium_id) if row.gremium_id else None,
+                team_id=row.team_id,
+                team_name=names.get(row.team_id) if row.team_id else None,
                 interval_minutes=row.interval_minutes,
                 last_attempt_at=row.last_attempt_at,
                 last_success_at=row.last_success_at,
@@ -124,9 +127,9 @@ class ExternalCalendarService:
             raise NotFoundError("Unknown calendar.")
         return row
 
-    async def _check_gremium(self, gremium_id: UUID | None) -> None:
-        if gremium_id is not None and await self.session.get(Gremium, gremium_id) is None:
-            raise ValidationProblem("Unknown Gremium.", code="calendar_gremium_unknown")
+    async def _check_team(self, team_id: UUID | None) -> None:
+        if team_id is not None and await self.session.get(Team, team_id) is None:
+            raise ValidationProblem("Unknown team.", code="calendar_team_unknown")
 
     async def listing(self) -> tuple[ExternalCalendarOut, ...]:
         """Every external calendar by name, with the state of its newest fetch."""
@@ -151,15 +154,15 @@ class ExternalCalendarService:
         """Subscribe a calendar. It is due at once, so the worker fetches it next.
 
         Raises:
-            ValidationProblem: The Gremium does not exist.
+            ValidationProblem: The team does not exist.
         """
-        await self._check_gremium(data.gremium_id)
+        await self._check_team(data.team_id)
         calendar_id = await self.session.scalar(
             insert(ExternalCalendar)
             .values(
                 name=data.name.strip(),
                 url=data.url,
-                gremium_id=data.gremium_id,
+                team_id=data.team_id,
                 interval_minutes=data.interval_minutes,
             )
             .returning(ExternalCalendar.id)
@@ -171,17 +174,17 @@ class ExternalCalendarService:
 
         Raises:
             NotFoundError: No calendar has the id.
-            ValidationProblem: The Gremium does not exist.
+            ValidationProblem: The team does not exist.
         """
         row = await self._row(calendar_id)
-        await self._check_gremium(data.gremium_id)
+        await self._check_team(data.team_id)
         await self.session.execute(
             update(ExternalCalendar)
             .where(ExternalCalendar.id == calendar_id)
             .values(
                 name=data.name.strip(),
                 url=data.url,
-                gremium_id=data.gremium_id,
+                team_id=data.team_id,
                 interval_minutes=data.interval_minutes,
                 due_at=func.now() if data.url != row.url else ExternalCalendar.due_at,
             )
@@ -276,16 +279,19 @@ class ExternalCalendarService:
     # ----- reads -----
 
     async def _scope(self, principal: Principal) -> tuple[ColumnElement[bool], ...]:
+        """A calendar of a team shows to its members (F/collaboration/teams/003070).
+
+        A person who reads the meetings of every Gremium reads every calendar, as before.
+        """
         visible, _ = await MeetingRules(self.session).meeting_read_scope(principal)
+        if visible is None:
+            return ()
+        teams = await member_team_ids(self.session, principal)
         return (
-            ()
-            if visible is None
-            else (
-                or_(
-                    ExternalCalendar.gremium_id.is_(None),
-                    ExternalCalendar.gremium_id.in_(visible),
-                ),
-            )
+            or_(
+                ExternalCalendar.team_id.is_(None),
+                ExternalCalendar.team_id.in_(teams),
+            ),
         )
 
     async def _entries(

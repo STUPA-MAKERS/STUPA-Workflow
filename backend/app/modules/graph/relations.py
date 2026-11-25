@@ -24,6 +24,7 @@ from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessDocument
+from app.modules.teams.models import Team
 from app.modules.tickets.models import Ticket
 from app.modules.todos.models import Link, TodoCard
 from app.modules.voting.models import Vote
@@ -60,7 +61,13 @@ def builtin_reads() -> tuple[Builtin, ...]:
         ("agenda_item", "todo", select(item.id, item.todo_id)),
         ("invoice", "expense", select(BudgetExpense.invoice_id, BudgetExpense.id)),
         ("expense", "budget", select(BudgetExpense.id, BudgetExpense.budget_id)),
-        ("appointment", "gremium", select(Invitation.appointment_id, Invitation.gremium_id)),
+        (
+            "appointment",
+            "gremium",
+            select(Invitation.appointment_id, Team.gremium_id)
+            .join(Team, Team.id == Invitation.team_id)
+            .where(Team.gremium_id.is_not(None)),
+        ),
     )
 
 

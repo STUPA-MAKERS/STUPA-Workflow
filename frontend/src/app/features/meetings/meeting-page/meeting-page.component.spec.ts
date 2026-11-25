@@ -360,7 +360,7 @@ describe('MeetingPageComponent', () => {
       );
       http
         .expectOne((r) => r.url.endsWith('/api/todos/boards'))
-        .flush([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true }]);
+        .flush([{ id: 'b-1', name: 'StuPa', kind: 'team', gremiumId: 'g-1', canWrite: true }]);
       fixture.detectChanges();
       const sheet = await screen.findByRole('dialog', { name: 'Verknüpft' });
       expect(
@@ -1399,7 +1399,7 @@ describe('MeetingPageComponent', () => {
         .match((r) => r.url.endsWith('/api/todos/boards'))
         .forEach((req) =>
           req.flush([
-            { id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: true },
+            { id: 'b-1', name: 'StuPa', kind: 'team', gremiumId: 'g-1', canWrite: true },
           ]),
         );
       fixture.detectChanges();

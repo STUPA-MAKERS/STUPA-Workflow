@@ -13,6 +13,7 @@ import type {
   CalendarEntry,
   CalendarGremium,
   CalendarPerson,
+  CalendarTeam,
   ExternalCalendar,
   ExternalCalendarInput,
   ExternalEntry,
@@ -29,6 +30,11 @@ export interface MockCalendarReply {
 const STUPA: CalendarGremium = { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' };
 const HHA: CalendarGremium = { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' };
 const GREMIEN: readonly CalendarGremium[] = [STUPA, HHA];
+
+/** The inherent team of a Gremium; the mock gives it the id of its Gremium. */
+function teamOf(g: CalendarGremium): CalendarTeam {
+  return { id: g.id, name: g.name, gremiumId: g.id };
+}
 
 const ME: CalendarPerson = { id: 'p0000000-0000-0000-0000-000000000001', name: 'Dana Meier' };
 const PEOPLE: readonly CalendarPerson[] = [
@@ -64,7 +70,7 @@ function appointment(
     forAll: false,
     public: false,
     creator: ME,
-    gremien: [],
+    teams: [],
     persons: [],
     answers: [],
     unanswered: [],
@@ -81,7 +87,7 @@ function initialAppointments(): readonly Appointment[] {
       place: 'AStA-Büro',
       description: 'Abstimmung der offenen Buchungen und der Anträge für die nächste Sitzung.',
       creator: PEOPLE[1],
-      gremien: [HHA],
+      teams: [teamOf(HHA)],
       answers: [
         { principalId: PEOPLE[1].id, name: PEOPLE[1].name, answer: 'accept' },
         { principalId: PEOPLE[2].id, name: PEOPLE[2].name, answer: 'tentative' },
@@ -90,7 +96,7 @@ function initialAppointments(): readonly Appointment[] {
       invited: true,
       canEdit: false,
     }),
-    appointment(2, 'Klausurtagung', 6, 8, null, { place: 'Jugendherberge Tübingen', gremien: [STUPA], invited: true }),
+    appointment(2, 'Klausurtagung', 6, 8, null, { place: 'Jugendherberge Tübingen', teams: [teamOf(STUPA)], invited: true }),
     appointment(3, 'Sprechstunde', -1, -1, ['09:30', '11:00'], { place: 'AStA-Büro' }),
     appointment(4, 'Gespräch mit dem Rektorat', -6, -6, ['10:00', '11:00'], {
       place: 'Gebäude 3, Raum 101',
@@ -124,8 +130,8 @@ function entryOf(a: Appointment): CalendarEntry {
     startTime: a.startTime,
     endTime: a.endTime,
     place: a.place,
-    source: a.gremien[0]?.name ?? null,
-    gremiumIds: a.gremien.map((g) => g.id),
+    source: a.teams[0]?.name ?? null,
+    gremiumIds: a.teams.flatMap((t) => (t.gremiumId ? [t.gremiumId] : [])),
     mine: a.invited || a.creator?.id === ME.id,
     myAnswer: a.myAnswer,
   };
@@ -185,8 +191,8 @@ function initialCalendars(): readonly ExternalCalendar[] {
       id: 'c0000000-0000-0000-0000-000000000001',
       name: 'Hochschulkalender',
       url: 'https://www.reutlingen-university.de/termine/semester.ics',
-      gremiumId: null,
-      gremiumName: null,
+      teamId: null,
+      teamName: null,
       intervalMinutes: 1440,
       lastAttemptAt: ago(55),
       lastSuccessAt: ago(55),
@@ -197,8 +203,8 @@ function initialCalendars(): readonly ExternalCalendar[] {
       id: 'c0000000-0000-0000-0000-000000000002',
       name: 'Senatstermine',
       url: 'https://cloud.example.org/remote.php/dav/public-calendars/k3Qz/?export',
-      gremiumId: STUPA.id,
-      gremiumName: STUPA.name,
+      teamId: STUPA.id,
+      teamName: STUPA.name,
       intervalMinutes: 60,
       lastAttemptAt: ago(12),
       lastSuccessAt: ago(12),
@@ -209,8 +215,8 @@ function initialCalendars(): readonly ExternalCalendar[] {
       id: 'c0000000-0000-0000-0000-000000000003',
       name: 'Raumbelegung AStA-Büro',
       url: 'https://raum.example.org/asta/belegung.ics',
-      gremiumId: HHA.id,
-      gremiumName: HHA.name,
+      teamId: HHA.id,
+      teamName: HHA.name,
       intervalMinutes: 15,
       lastAttemptAt: ago(4),
       lastSuccessAt: ago(60 * 53),
@@ -273,8 +279,8 @@ function calendarFrom(id: string, body: ExternalCalendarInput, before: ExternalC
     id,
     name: body.name.trim(),
     url: body.url,
-    gremiumId: body.gremiumId,
-    gremiumName: GREMIEN.find((g) => g.id === body.gremiumId)?.name ?? null,
+    teamId: body.teamId,
+    teamName: GREMIEN.find((g) => g.id === body.teamId)?.name ?? null,
     intervalMinutes: body.intervalMinutes,
     lastAttemptAt: before?.lastAttemptAt ?? null,
     lastSuccessAt: before?.lastSuccessAt ?? null,
@@ -345,7 +351,7 @@ function fromInput(id: string, body: AppointmentInput, before: Appointment | nul
     forAll: body.forAll,
     public: body.public,
     creator: before?.creator ?? ME,
-    gremien: GREMIEN.filter((g) => body.gremiumIds.includes(g.id)),
+    teams: GREMIEN.filter((g) => body.teamIds.includes(g.id)).map(teamOf),
     persons: PEOPLE.filter((p) => body.principalIds.includes(p.id)),
     answers: moved ? [] : (before?.answers ?? []),
     unanswered: before?.unanswered ?? [],

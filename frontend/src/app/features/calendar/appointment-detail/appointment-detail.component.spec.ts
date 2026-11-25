@@ -59,7 +59,7 @@ describe('AppointmentDetailComponent', () => {
 
   it('leaves out what a Termin does not have', async () => {
     await setup(
-      appointment({ place: null, description: null, creator: null, gremien: [], persons: [], answers: [], unanswered: [], invited: false, canEdit: false }),
+      appointment({ place: null, description: null, creator: null, teams: [], persons: [], answers: [], unanswered: [], invited: false, canEdit: false }),
     );
     const dialog = screen.getByRole('dialog', { name: 'Jour fixe' });
     expect(within(dialog).queryByText('Ort')).toBeNull();

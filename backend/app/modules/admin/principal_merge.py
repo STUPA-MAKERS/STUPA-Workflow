@@ -135,6 +135,7 @@ from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
+from app.modules.teams.models import TeamMember
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
@@ -271,6 +272,7 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     DelegationSubstitute.substitute_principal_id,
     TodoAssignee.principal_id,
     TodoBoardEntry.principal_id,
+    TeamMember.principal_id,
     TicketSenderBlock.principal_id,
     CalendarInvitation.principal_id,
     CalendarAnswer.principal_id,
@@ -822,6 +824,16 @@ class PrincipalMergeService:
             old,
             new,
             exists().where(tbe.principal_id == new, tbe.board_id == TodoBoardEntry.board_id),
+            tally,
+            apply=apply,
+        )
+        tm = aliased(TeamMember)
+        await self._combine(
+            "todos",
+            TeamMember.principal_id,
+            old,
+            new,
+            exists().where(tm.principal_id == new, tm.team_id == TeamMember.team_id),
             tally,
             apply=apply,
         )

@@ -13,7 +13,7 @@ external entries stay, because neither has a person that it belongs to.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, time
 from typing import cast
 from uuid import UUID
@@ -25,8 +25,9 @@ from app.modules.auth.principal import Principal
 from app.modules.calendar import rules
 from app.modules.calendar.appointments import AppointmentService, Loaded, my_answer
 from app.modules.calendar.external import ExternalCalendarService, external_entry
+from app.modules.calendar.models import ExternalCalendar
 from app.modules.calendar.rules import Viewer
-from app.modules.calendar.schemas import EntryOut
+from app.modules.calendar.schemas import EntryOut, TeamRefOut
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.rules import MeetingRules
@@ -56,7 +57,9 @@ def meeting_entry(meeting: Meeting, gremium_name: str) -> EntryOut:
     )
 
 
-def card_entry(card: TodoCard, board: TodoBoard, mine: bool) -> EntryOut:
+def card_entry(
+    card: TodoCard, board: TodoBoard, mine: bool, gremium_of: Mapping[UUID, UUID]
+) -> EntryOut:
     """An open card as an entry on its due date."""
     due = cast(date, card.due_date)
     return EntryOut(
@@ -66,12 +69,18 @@ def card_entry(card: TodoCard, board: TodoBoard, mine: bool) -> EntryOut:
         starts_on=due,
         ends_on=due,
         source=board.name,
-        gremium_ids=_board_gremien(board),
+        gremium_ids=_board_gremien(board, gremium_of),
         mine=mine,
     )
 
 
-def event_entry(card: TodoCard, board: TodoBoard, event: TodoCardEvent, mine: bool) -> EntryOut:
+def event_entry(
+    card: TodoCard,
+    board: TodoBoard,
+    event: TodoCardEvent,
+    mine: bool,
+    gremium_of: Mapping[UUID, UUID],
+) -> EntryOut:
     """An Event as an entry from its start to its end, with its times.
 
     An Event without an end takes a day. An end time shows only with a start time.
@@ -87,18 +96,19 @@ def event_entry(card: TodoCard, board: TodoBoard, event: TodoCardEvent, mine: bo
         end_time=event.end_time if event.start_time is not None else None,
         place=event.place,
         source=board.name,
-        gremium_ids=_board_gremien(board),
+        gremium_ids=_board_gremien(board, gremium_of),
         mine=mine,
     )
 
 
-def appointment_entry(viewer: Viewer, item: Loaded, gremium_names: dict[UUID, str]) -> EntryOut:
-    """A Termin as an entry. Its source is the first invited Gremium by name."""
+def appointment_entry(viewer: Viewer, item: Loaded, teams: Mapping[UUID, TeamRefOut]) -> EntryOut:
+    """A Termin as an entry. Its source is the first invited team by name.
+
+    Its ``gremiumIds`` are the Gremien of the invited inherent teams.
+    """
     row = item.row
-    names = sorted(
-        (gremium_names[gid] for gid in item.targets.gremium_ids if gid in gremium_names),
-        key=str.casefold,
-    )
+    invited = [teams[tid] for tid in item.targets.team_ids if tid in teams]
+    names = sorted((t.name for t in invited), key=str.casefold)
     return EntryOut(
         kind="appointment",
         id=row.id,
@@ -109,14 +119,21 @@ def appointment_entry(viewer: Viewer, item: Loaded, gremium_names: dict[UUID, st
         end_time=row.end_time,
         place=row.place,
         source=names[0] if names else None,
-        gremium_ids=tuple(sorted(item.targets.gremium_ids, key=str)),
+        gremium_ids=tuple(
+            sorted((t.gremium_id for t in invited if t.gremium_id is not None), key=str)
+        ),
         mine=rules.is_creator(viewer, row.creator_id) or rules.is_invited(viewer, item.targets),
         my_answer=my_answer(viewer, item),
     )
 
 
-def _board_gremien(board: TodoBoard) -> tuple[UUID, ...]:
-    return (board.gremium_id,) if board.gremium_id is not None else ()
+def _board_gremien(board: TodoBoard, gremium_of: Mapping[UUID, UUID]) -> tuple[UUID, ...]:
+    """The Gremium of the own team of a board, when that team is inherent."""
+    return (
+        (gremium_of[board.team_id],)
+        if board.team_id is not None and board.team_id in gremium_of
+        else ()
+    )
 
 
 def by_day(entries: Sequence[EntryOut]) -> tuple[EntryOut, ...]:
@@ -183,8 +200,21 @@ class CalendarEntries:
     async def _appointment_entries(
         self, viewer: Viewer, loaded: Sequence[Loaded]
     ) -> list[EntryOut]:
-        names = await self.appointments.gremium_names(loaded)
-        return [appointment_entry(viewer, item, names) for item in loaded]
+        teams = await self.appointments.invited_teams(loaded)
+        return [appointment_entry(viewer, item, teams) for item in loaded]
+
+    async def _gremium_of(
+        self,
+        boards: Sequence[TodoBoard],
+        calendars: Sequence[ExternalCalendar],
+    ) -> Mapping[UUID, UUID]:
+        """The Gremium of each inherent team of the boards and the external calendars."""
+        return await self.appointments.gremium_of(
+            {
+                *(b.team_id for b in boards if b.team_id is not None),
+                *(c.team_id for c in calendars if c.team_id is not None),
+            }
+        )
 
     async def between(
         self, principal: Principal, start: date, end: date, *, only_mine: bool = False
@@ -214,13 +244,20 @@ class CalendarEntries:
         )
         termine = await self.appointments.between(viewer, start, end, only_mine=only_mine)
         external = await ExternalCalendarService(self.session).between(principal, start, end)
+        gremium_of = await self._gremium_of(
+            [*(b for _c, b, _m in cards), *(b for _c, b, _e, _m in events)],
+            [c for _e, c in external],
+        )
         return by_day(
             [
                 *meetings,
-                *(card_entry(card, board, mine) for card, board, mine in cards),
-                *(event_entry(card, board, event, mine) for card, board, event, mine in events),
+                *(card_entry(card, board, mine, gremium_of) for card, board, mine in cards),
+                *(
+                    event_entry(card, board, event, mine, gremium_of)
+                    for card, board, event, mine in events
+                ),
                 *(await self._appointment_entries(viewer, termine)),
-                *(external_entry(entry, calendar) for entry, calendar in external),
+                *(external_entry(entry, calendar, gremium_of) for entry, calendar in external),
             ]
         )
 
@@ -254,13 +291,20 @@ class CalendarEntries:
         external = await ExternalCalendarService(self.session).matching(
             principal, pattern, PER_KIND
         )
+        gremium_of = await self._gremium_of(
+            [*(b for _c, b, _m in cards), *(b for _c, b, _e, _m in events)],
+            [c for _e, c in external],
+        )
         return nearest(
             [
                 *meetings,
-                *(card_entry(card, board, mine) for card, board, mine in cards),
-                *(event_entry(card, board, event, mine) for card, board, event, mine in events),
+                *(card_entry(card, board, mine, gremium_of) for card, board, mine in cards),
+                *(
+                    event_entry(card, board, event, mine, gremium_of)
+                    for card, board, event, mine in events
+                ),
                 *(await self._appointment_entries(viewer, termine)),
-                *(external_entry(entry, calendar) for entry, calendar in external),
+                *(external_entry(entry, calendar, gremium_of) for entry, calendar in external),
             ],
             today,
             SEARCH_LIMIT,

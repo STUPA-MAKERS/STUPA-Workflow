@@ -32,7 +32,7 @@ const BODY: AppointmentInput = {
   description: null,
   forAll: false,
   public: false,
-  gremiumIds: ['g0000000-0000-0000-0000-000000000001'],
+  teamIds: ['g0000000-0000-0000-0000-000000000001'],
   principalIds: ['p0000000-0000-0000-0000-000000000002'],
 };
 
@@ -73,7 +73,7 @@ describe('mockCalendar (demo data)', () => {
     expect(made.status).toBe(201);
     const a = made.body as Appointment;
     expect(a).toMatchObject({ title: 'Neu', canEdit: true, invited: false, myAnswer: null });
-    expect(a.gremien.map((g) => g.name)).toEqual(['Studierendenparlament']);
+    expect(a.teams.map((g) => g.name)).toEqual(['Studierendenparlament']);
     expect(a.persons.map((p) => p.name)).toEqual(['Jonas Weber']);
     const path = `/api/calendar/appointments/${a.id}`;
     expect(mockCalendar('GET', path, NONE, null)!.body).toEqual(a);
@@ -122,13 +122,13 @@ describe('mockCalendar (demo data)', () => {
     const body: ExternalCalendarInput = {
       name: ' Neu ',
       url: 'https://example.org/a.ics',
-      gremiumId: 'g0000000-0000-0000-0000-000000000001',
+      teamId: 'g0000000-0000-0000-0000-000000000001',
       intervalMinutes: 360,
     };
     const made = mockCalendar('POST', base, NONE, body)!;
     const fresh = made.body as ExternalCalendar;
     expect(made.status).toBe(201);
-    expect([fresh.name, fresh.gremiumName, fresh.lastAttemptAt, fresh.entryCount]).toEqual([
+    expect([fresh.name, fresh.teamName, fresh.lastAttemptAt, fresh.entryCount]).toEqual([
       'Neu',
       'Studierendenparlament',
       null,
@@ -137,9 +137,9 @@ describe('mockCalendar (demo data)', () => {
     const failed = list()[2];
     const fetched = mockCalendar('POST', `${base}/${failed.id}/fetch`, NONE, null)!.body as ExternalCalendar;
     expect([fetched.lastError, fetched.entryCount]).toEqual([null, 17]);
-    const changed = mockCalendar('PUT', `${base}/${failed.id}`, NONE, { ...body, gremiumId: null })!
+    const changed = mockCalendar('PUT', `${base}/${failed.id}`, NONE, { ...body, teamId: null })!
       .body as ExternalCalendar;
-    expect([changed.gremiumName, changed.entryCount, changed.intervalMinutes]).toEqual([null, 17, 360]);
+    expect([changed.teamName, changed.entryCount, changed.intervalMinutes]).toEqual([null, 17, 360]);
     expect(mockCalendar('DELETE', `${base}/${failed.id}`, NONE, null)!.status).toBe(204);
     expect(list().map((c) => c.name)).toEqual(['Hochschulkalender', 'Senatstermine', 'Neu']);
     expect(mockCalendar('DELETE', base, NONE, null)).toBeNull();

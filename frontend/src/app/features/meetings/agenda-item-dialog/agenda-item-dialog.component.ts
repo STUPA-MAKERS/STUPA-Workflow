@@ -344,7 +344,7 @@ export class AgendaItemDialogComponent {
       .boards(gremiumId)
       .pipe(
         switchMap((boards) => {
-          const own = boards.find((b) => b.kind === 'gremium' && b.gremiumId === gremiumId);
+          const own = boards.find((b) => b.kind === 'team' && b.gremiumId === gremiumId);
           if (!own) throw new Error('no gremium board');
           return this.todosApi.board(own.id);
         }),

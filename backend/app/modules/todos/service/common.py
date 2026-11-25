@@ -38,7 +38,7 @@ EXCERPT_LENGTH = 200
 MailKind = Literal["assigned", "mentioned", "board_added"]
 
 
-_KIND_ORDER = {"personal": 0, "gremium": 1, "free": 2, "team": 3}
+_KIND_ORDER = {"personal": 0, "team": 1, "free": 2, "permission": 3}
 
 
 #: The most persons that the shared picker answers for one query.
@@ -169,19 +169,11 @@ def _in_column_order(cards: Iterable[TodoCard], columns: Sequence[TodoColumn]) -
 
 
 def _new_entry(board_id: uuid.UUID, kind: str, target_id: uuid.UUID, role: str) -> TodoBoardEntry:
-    """A new entry row of a gremium (``kind`` gremium) or of a person."""
+    """A new entry row of a team (``kind`` team) or of a person."""
     return TodoBoardEntry(
         id=uuid.uuid4(),
         board_id=board_id,
-        gremium_id=target_id if kind == "gremium" else None,
+        team_id=target_id if kind == "team" else None,
         principal_id=target_id if kind == "person" else None,
         role=role,
     )
-
-
-def _agenda_ids(board: TodoBoard, entries: Iterable[uuid.UUID | None]) -> tuple[uuid.UUID, ...]:
-    """The own gremium and the entry gremien of a gremium or free board, sorted."""
-    if board.kind not in ("gremium", "free"):
-        return ()
-    own = {board.gremium_id} if board.gremium_id is not None else set()
-    return tuple(sorted(own | {g for g in entries if g is not None}, key=str))

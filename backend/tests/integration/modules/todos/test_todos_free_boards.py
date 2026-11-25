@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import GremiumMembership
-from tests.integration.modules.todos.conftest import Api, add_gremium, add_member, add_person
+from tests.integration.modules.todos.conftest import (
+    Api,
+    add_gremium,
+    add_member,
+    add_person,
+    team_of,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -52,6 +58,7 @@ async def test_only_the_permission_creates_a_free_board(
     maker_p, maker_id = await add_person(maker, "Mara")
     other, other_id = await add_person(maker, "Otto")
     gid, _ = await add_gremium(maker, "AStA")
+    tid = await team_of(maker, gid)
     with TestClient(api.app) as client:
         api.login(plain)
         _problem(client.post("/api/todos/boards", json={"name": "X"}), 403, "board_create_required")
@@ -62,7 +69,7 @@ async def test_only_the_permission_creates_a_free_board(
                 json={
                     "name": "Ersti-Woche",
                     "entries": [
-                        {"gremiumId": str(gid), "role": "read"},
+                        {"teamId": str(tid), "role": "read"},
                         {"principalId": str(other_id), "role": "edit"},
                     ],
                 },
@@ -74,7 +81,7 @@ async def test_only_the_permission_creates_a_free_board(
         assert board["agendaGremiumIds"] == [str(gid)]
         entries = _ok(client.get(f"/api/todos/boards/{board['id']}/entries"))
         assert [(e["kind"], e["name"], e["role"]) for e in entries] == [
-            ("gremium", "AStA", "read"),
+            ("team", "AStA", "read"),
             ("person", "Mara", "manage"),
             ("person", "Otto", "edit"),
         ]
@@ -83,12 +90,12 @@ async def test_only_the_permission_creates_a_free_board(
         ]
         twice = client.post(
             "/api/todos/boards",
-            json={"name": "Y", "entries": [{"gremiumId": str(gid)}, {"gremiumId": str(gid)}]},
+            json={"name": "Y", "entries": [{"teamId": str(tid)}, {"teamId": str(tid)}]},
         )
         _problem(twice, 422, "entry_duplicate")
         both = client.post(
             "/api/todos/boards",
-            json={"name": "Y", "entries": [{"gremiumId": str(gid), "principalId": str(maker_id)}]},
+            json={"name": "Y", "entries": [{"teamId": str(tid), "principalId": str(maker_id)}]},
         )
         _problem(both, 422, "entry_target")
         api.login(other)
@@ -105,13 +112,14 @@ async def test_the_roles_of_the_entries_and_the_live_gremium(
     owner, _ = await add_person(maker, "Mara")
     reader, reader_id = await add_person(maker, "Rita")
     gid, _ = await add_gremium(maker, "Fachschaft")
+    tid = await team_of(maker, gid)
     await add_member(maker, gid, reader_id, "vote.cast")
     with TestClient(api.app) as client:
         api.login(_creator(owner))
         bid = _ok(
             client.post(
                 "/api/todos/boards",
-                json={"name": "Projekt", "entries": [{"gremiumId": str(gid), "role": "read"}]},
+                json={"name": "Projekt", "entries": [{"teamId": str(tid), "role": "read"}]},
             ),
             201,
         )["id"]
@@ -227,16 +235,16 @@ async def test_a_global_key_reads_a_free_board(
         _ok(client.post("/api/todos/cards", json={"boardId": bid, "title": "A"}), 201)
 
 
-async def test_a_gremium_board_takes_entries_and_every_member_edits(
+async def test_a_team_board_takes_entries_and_every_member_edits(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    """Edit as a plain member, manage with todo.configure, add a guest (specs 001077, 001078)."""
+    """Edit as a member, manage with team.manage, add a guest (specs 001077, 001078, 003066)."""
     gid, bid = await add_gremium(maker, "StuPa")
     member, member_id = await add_person(maker, "Mia")
     lead, lead_id = await add_person(maker, "Lena")
     guest, guest_id = await add_person(maker, "Gast")
     await add_member(maker, gid, member_id, "vote.cast")
-    await add_member(maker, gid, lead_id, "todo.configure")
+    await add_member(maker, gid, lead_id, "todo.configure", "team.manage")
     with TestClient(api.app) as client:
         api.login(member)
         _ok(client.post("/api/todos/cards", json={"boardId": str(bid), "title": "A"}), 201)
@@ -249,9 +257,11 @@ async def test_a_gremium_board_takes_entries_and_every_member_edits(
         own = _ok(client.get(f"/api/todos/boards/{bid}/entries"))
         assert [(e["name"], e["fixed"], e["id"]) for e in own] == [("StuPa", True, None)]
         _problem(
-            client.post(f"/api/todos/boards/{bid}/entries", json={"gremiumId": str(gid)}),
+            client.post(
+                f"/api/todos/boards/{bid}/entries", json={"teamId": str(await team_of(maker, gid))}
+            ),
             409,
-            "own_gremium_entry",
+            "own_team_entry",
         )
         _ok(
             client.post(
@@ -286,7 +296,10 @@ async def test_a_card_of_a_free_board_goes_on_the_agenda_of_its_gremien(
         bid = _ok(
             client.post(
                 "/api/todos/boards",
-                json={"name": "P", "entries": [{"gremiumId": str(on_board), "role": "read"}]},
+                json={
+                    "name": "P",
+                    "entries": [{"teamId": str(await team_of(maker, on_board)), "role": "read"}],
+                },
             ),
             201,
         )["id"]
@@ -319,10 +332,10 @@ async def test_a_card_moves_between_a_free_board_and_a_gremium_board(
         assert back["boardId"] == bid
 
 
-async def test_the_picker_finds_gremien_and_persons(
+async def test_the_picker_finds_teams_and_persons(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
-    """Find gremien by name and persons from two characters on (spec 001074)."""
+    """Find teams by name and persons from two characters on (specs 001074, 003071)."""
     tag = f"Zq{uuid.uuid4().hex[:8]}"
     me, _ = await add_person(maker, "Mara")
     await add_person(maker, f"{tag} Astrid")
@@ -331,9 +344,9 @@ async def test_the_picker_finds_gremien_and_persons(
     with TestClient(api.app) as client:
         api.login(me)
         every = _ok(client.get("/api/todos/entry-options"))
-        assert {g["name"] for g in every["gremien"]} >= {f"{tag} AStA", "Fachschaft"}
+        assert {g["name"] for g in every["teams"]} >= {f"{tag} AStA", "Fachschaft"}
         assert every["persons"] == []
         hits = _ok(client.get("/api/todos/entry-options", params={"q": tag.lower()}))
-        assert [(g["id"], g["logoUrl"]) for g in hits["gremien"]] == [(str(gid), None)]
+        assert [(g["gremiumId"], g["logoUrl"]) for g in hits["teams"]] == [(str(gid), None)]
         assert [p["name"] for p in hits["persons"]] == [f"{tag} Astrid"]
         assert "email" not in hits["persons"][0]
