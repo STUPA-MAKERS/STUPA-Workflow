@@ -106,6 +106,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/002620](requirements/functional/administration/admin/002620_users-no-group-mapping-link.md) | Benutzer and Gremien have no link to the Gruppen-Zuordnung | approved |
 | [F/administration/admin/002691](requirements/functional/administration/admin/002691_admin-list-search.md) | The search of a Verwaltung list finds the text of a row | approved |
 | [F/administration/admin/002693](requirements/functional/administration/admin/002693_audit-log-search.md) | The Audit-Log searches on the server | approved |
+| [F/administration/admin/003017](requirements/functional/administration/admin/003017_permission-names.md) | Every global permission has a German and an English name | draft |
+| [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | draft |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |

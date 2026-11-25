@@ -6,6 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { I18nMap } from '@core/api/models';
 import { i18nLabel, sameI18n, trimI18n } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   type Action,
   ButtonGroupComponent,
@@ -253,6 +254,16 @@ export class AdminRolesComponent {
 
   /** A permission key in parts that may break after a "." or a "_". */
   protected readonly permParts = keyParts;
+
+  /**
+   * The name of a permission in the UI language (`admin.perm.<key>`, F/administration/admin/003017).
+   * A key without a name gives null, so the checkbox shows the key itself (003018).
+   */
+  protected permName(perm: string): string | null {
+    const key = `admin.perm.${perm}` as TranslationKey;
+    const name = this.i18n.translate(key);
+    return name === key ? null : name;
+  }
 
   protected askDelete(role: Role): void {
     this.confirmRole.set(role);
