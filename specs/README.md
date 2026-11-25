@@ -583,7 +583,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | approved |
 | [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | approved |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |
-| [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | draft |
+| [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | approved |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | approved |
 | [F/finance/orders/002874](requirements/functional/finance/orders/002874_order-actual-amount-from-invoice.md) | The invoice fills an empty real price | approved |
 | [F/finance/orders/002876](requirements/functional/finance/orders/002876_order-create-invoice.md) | Rechnung anlegen opens the invoice form from the Bestellung | approved |
