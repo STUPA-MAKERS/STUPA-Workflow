@@ -136,7 +136,7 @@ export class OrdersPageComponent {
             key: 'new',
             label: this.i18n.translate('orders.dialog.create'),
             icon: 'plus',
-            priority: 'head',
+            priority: 'fab',
             route: { commands: ['/orders', 'new'] },
           },
           {

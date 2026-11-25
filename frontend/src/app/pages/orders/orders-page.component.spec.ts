@@ -236,7 +236,7 @@ describe('OrdersPageComponent', () => {
     const created = jest.fn(() => 'blob:x');
     Object.assign(URL, { createObjectURL: created, revokeObjectURL: jest.fn() });
     expect(cmp.actions().map((a: { key: string; priority: string }) => [a.key, a.priority])).toEqual([
-      ['new', 'head'],
+      ['new', 'fab'],
       ['export', 'menu'],
     ]);
     cmp.onQuery(query({ segment: 'delivered', kind: 'outlay' }));
