@@ -175,13 +175,18 @@ async def _protocol(
         return protocol.id, meeting.id
 
 
-async def _decided(maker: Maker) -> uuid.UUID:
-    """Write a confirmed Antrag and move it to an approved state. Return its id."""
+async def _decided(maker: Maker, *, end: bool = True) -> uuid.UUID:
+    """Write a confirmed Antrag and move it to an approved state. Return its id.
+
+    With ``end`` the state is an end state (§F/integrations/paperless/003110).
+    """
     seed = await seed_guest_flow(maker)
     app_id = await create_guest_application(maker, seed)
     async with maker() as session:
         await session.execute(
-            update(State).where(State.id == seed.locked_state_id).values(is_approved=True)
+            update(State)
+            .where(State.id == seed.locked_state_id)
+            .values(is_approved=True, is_terminal=end)
         )
         session.add(
             StatusEvent(
@@ -655,6 +660,77 @@ async def test_a_decided_antrag_is_filed_with_its_clean_attachments(
     assert list(listed) == [app_id]
     assert {entry.document_id for entry in listed[app_id]} == set(fake.documents)
     assert all((entry.url or "").startswith(f"{BASE_URL}/documents/") for entry in listed[app_id])
+
+
+async def test_an_antrag_is_filed_only_in_an_end_state(
+    maker: Maker,
+    settings: Settings,
+    ctx: dict[str, Any],
+    storage: MemoryStorage,
+    fake: FakePaperless,
+) -> None:
+    await _connect(maker, settings, applications=True)
+    app_id = await _decided(maker, end=False)
+    await _attachment(maker, storage, app_id, "angebot.pdf")
+
+    # An approved state without the flag `Endzustand` files nothing.
+    assert await _run(ctx) == 0
+    assert await _filings(maker) == []
+    assert fake.uploads == []
+
+    async with maker() as session:
+        approved = await session.scalar(
+            select(Application.current_state_id).where(Application.id == app_id)
+        )
+        end = State(
+            flow_version_id=(
+                await session.scalar(select(State.flow_version_id).where(State.id == approved))
+            ),
+            key=f"done-{uuid.uuid4().hex[:6]}",
+            is_terminal=True,
+        )
+        session.add(end)
+        await session.flush()
+        session.add(
+            StatusEvent(
+                application_id=app_id,
+                from_state_id=approved,
+                to_state_id=end.id,
+                actor="lead-sub",
+                at=_EVENT + timedelta(minutes=5),
+            )
+        )
+        await session.execute(
+            update(Application).where(Application.id == app_id).values(current_state_id=end.id)
+        )
+        await session.commit()
+
+    assert await _run(ctx, start=2) == 2
+    rows = await _filings(maker)
+    assert [(row.kind, row.source_at) for row in rows] == [
+        ("application", _EVENT + timedelta(minutes=5)),
+        ("attachment", _EVENT + timedelta(minutes=5)),
+    ]
+    assert len(fake.uploads) == 2
+
+
+async def test_a_failed_task_read_does_not_upload_again(
+    maker: Maker,
+    settings: Settings,
+    ctx: dict[str, Any],
+    storage: MemoryStorage,
+    fake: FakePaperless,
+) -> None:
+    await _connect(maker, settings, applications=True)
+    await _decided(maker)
+    fake.task_status = 403
+
+    assert await _run(ctx, MAX_TRIES + 1) == 0
+    rows = await _filings(maker)
+    assert {(row.kind, row.state, row.last_error) for row in rows} == {
+        ("application", "failed", "unauthorized")
+    }
+    assert len(fake.uploads) == 1
 
 
 async def test_a_plan_in_force_is_filed(

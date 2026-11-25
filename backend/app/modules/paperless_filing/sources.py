@@ -1,12 +1,14 @@
 """Find the files that the platform must file in Paperless.
 
 Three events file a document: a protocol becomes final (§F/integrations/paperless/002516),
-an Antrag enters an approved or a denied state (§F/integrations/paperless/002517,
+an Antrag enters an end state of the flow (§F/integrations/paperless/003110,
 §F/integrations/paperless/002535), and a version of a Haushaltsplan comes into force
-(§F/integrations/paperless/002518). `new_filings` finds the events since the switch of
-their part went on. `backfill_filings` finds the elements from before that have no
-document (§F/integrations/paperless/002530). Both give only files without a job, and
-the unique key of the record stops a second job when two runs race.
+(§F/integrations/paperless/002518). An end state is a state with `is_terminal`, also the
+state of a replaced Antrag, so an approved state on the way does not file a copy.
+`new_filings` finds the events since the switch of their part went on. `backfill_filings`
+finds the elements from before that have no document (§F/integrations/paperless/002530).
+Both give only files without a job, and the unique key of the record stops a second job
+when two runs race.
 
 A part whose switch is off gives no file (§F/integrations/paperless/002512).
 """
@@ -17,7 +19,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, exists, func, or_, select
+from sqlalchemy import ColumnElement, and_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
@@ -115,12 +117,13 @@ async def _protocols(
     ]
 
 
-def _decided() -> ColumnElement[bool]:
-    return or_(State.is_approved.is_(True), State.is_denied.is_(True))
+def _end_state() -> ColumnElement[bool]:
+    """The state is an end state of the flow config (§F/integrations/paperless/003110)."""
+    return State.is_terminal.is_(True)
 
 
 async def _attachments(session: AsyncSession, events: Sequence[NewFiling]) -> list[NewFiling]:
-    """The clean attachments of the decided Anträge that have no job.
+    """The clean attachments of the Anträge in an end state that have no job.
 
     An attachment without a clean virus scan is left out
     (§F/integrations/paperless/002535).
@@ -158,13 +161,13 @@ async def _attachments(session: AsyncSession, events: Sequence[NewFiling]) -> li
 
 
 async def _new_decisions(session: AsyncSession, since: datetime) -> list[NewFiling]:
-    """The decisions since the switch went on that have no job, one job per decision."""
+    """The changes into an end state since the switch went on that have no job, one job each."""
     rows = await session.execute(
         select(StatusEvent.id, StatusEvent.at, StatusEvent.actor, Application.id, Application.data)
         .join(State, State.id == StatusEvent.to_state_id)
         .join(Application, Application.id == StatusEvent.application_id)
         .where(
-            _decided(),
+            _end_state(),
             StatusEvent.at >= since,
             ~_has_job("application", StatusEvent.id),
         )
@@ -186,7 +189,7 @@ async def _new_decisions(session: AsyncSession, since: datetime) -> list[NewFili
 
 
 async def _old_decisions(session: AsyncSession, actor: str | None) -> list[NewFiling]:
-    """The Anträge in a decided state without a job, with their newest decision."""
+    """The Anträge in an end state without a job, with their newest change into it."""
     newest = (
         select(func.max(StatusEvent.at))
         .where(
@@ -207,7 +210,7 @@ async def _old_decisions(session: AsyncSession, actor: str | None) -> list[NewFi
             ),
         )
         .join(State, State.id == Application.current_state_id)
-        .where(_decided(), ~_has_element_job("application", Application.id))
+        .where(_end_state(), ~_has_element_job("application", Application.id))
         .order_by(StatusEvent.at, StatusEvent.id)
         .limit(SCAN_LIMIT)
     )
