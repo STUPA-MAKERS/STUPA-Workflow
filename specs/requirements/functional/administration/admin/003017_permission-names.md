@@ -2,7 +2,7 @@
 id: "003017"
 title: Every global permission has a German and an English name
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:
