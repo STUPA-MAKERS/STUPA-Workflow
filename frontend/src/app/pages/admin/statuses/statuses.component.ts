@@ -26,6 +26,8 @@ import {
   NoteComponent,
   SelectFieldComponent,
   type SelectOption,
+  StepListComponent,
+  StepRowComponent,
 } from '@stupa-makers/ui-kit';
 import {
   ScreenGroupDirective,
@@ -97,9 +99,10 @@ const TITLE: Readonly<Record<StatusListKind, TranslationKey>> = {
     MoveButtonsComponent,
     NoteComponent,
     SelectFieldComponent,
+    StepListComponent,
+    StepRowComponent,
   ],
   templateUrl: './statuses.component.html',
-  styleUrl: './statuses.component.scss',
 })
 export class AdminStatusesComponent {
   private readonly api = inject(AdminApiService);
@@ -118,9 +121,10 @@ export class AdminStatusesComponent {
   protected readonly form: SettingsForm<Stored, Draft> = settingsForm<Stored, Draft, Body>({
     allowed: () => this.auth.can('admin.statuses'),
     load: () =>
-      forkJoin({ order: this.api.getStatusList('order'), event: this.api.getStatusList('event') }).pipe(
-        map(({ order, event }) => ({ order: order.statuses, event: event.statuses })),
-      ),
+      forkJoin({
+        order: this.api.getStatusList('order'),
+        event: this.api.getStatusList('event'),
+      }).pipe(map(({ order, event }) => ({ order: order.statuses, event: event.statuses }))),
     put: (body) => this.put(body),
     draftOf: (stored) => ({ order: draftOf(stored.order), event: draftOf(stored.event) }),
     initial: { order: { rows: [], replacements: {} }, event: { rows: [], replacements: {} } },
@@ -167,16 +171,25 @@ export class AdminStatusesComponent {
   });
 
   protected readonly phaseOptions = computed<SelectOption[]>(() =>
-    STATUS_PHASES.map((phase) => ({ value: phase, label: this.i18n.translate(`admin.statuses.phase.${phase}`) })),
+    STATUS_PHASES.map((phase) => ({
+      value: phase,
+      label: this.i18n.translate(`admin.statuses.phase.${phase}`),
+    })),
   );
 
   protected readonly toneOptions = computed<SelectOption[]>(() =>
-    STATUS_TONES.map((tone) => ({ value: tone, label: this.i18n.translate(`admin.statuses.tone.${tone}`) })),
+    STATUS_TONES.map((tone) => ({
+      value: tone,
+      label: this.i18n.translate(`admin.statuses.tone.${tone}`),
+    })),
   );
 
   protected readonly dateOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('admin.statuses.date.none') },
-    ...STATUS_DATES.map((date) => ({ value: date, label: this.i18n.translate(`admin.statuses.date.${date}`) })),
+    ...STATUS_DATES.map((date) => ({
+      value: date,
+      label: this.i18n.translate(`admin.statuses.date.${date}`),
+    })),
   ]);
 
   protected rows(kind: StatusListKind): readonly StatusRow[] {
@@ -233,7 +246,10 @@ export class AdminStatusesComponent {
   }
 
   protected setReplacement(kind: StatusListKind, key: string, to: string | null): void {
-    this.patchList(kind, (list) => ({ ...list, replacements: { ...list.replacements, [key]: to ?? '' } }));
+    this.patchList(kind, (list) => ({
+      ...list,
+      replacements: { ...list.replacements, [key]: to ?? '' },
+    }));
   }
 
   protected canAdd(kind: StatusListKind): boolean {
@@ -269,8 +285,15 @@ export class AdminStatusesComponent {
     this.form.save();
   }
 
-  private patchRow(kind: StatusListKind, index: number, change: (row: StatusRow) => StatusRow): void {
-    this.patchList(kind, (list) => ({ ...list, rows: list.rows.map((row, i) => (i === index ? change(row) : row)) }));
+  private patchRow(
+    kind: StatusListKind,
+    index: number,
+    change: (row: StatusRow) => StatusRow,
+  ): void {
+    this.patchList(kind, (list) => ({
+      ...list,
+      rows: list.rows.map((row, i) => (i === index ? change(row) : row)),
+    }));
   }
 
   private patchList(kind: StatusListKind, change: (list: ListDraft) => ListDraft): void {
@@ -282,7 +305,9 @@ export class AdminStatusesComponent {
     const stored = this.form.saved() ?? { order: [], event: [] };
     const calls = KINDS.map((kind) => {
       const list = body[kind];
-      return list ? this.api.putStatusList(kind, list).pipe(map((out) => out.statuses)) : of(stored[kind]);
+      return list
+        ? this.api.putStatusList(kind, list).pipe(map((out) => out.statuses))
+        : of(stored[kind]);
     });
     return forkJoin(calls).pipe(map(([order, event]) => ({ order, event })));
   }
