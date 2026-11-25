@@ -312,8 +312,8 @@ class AgendaService:
         removes the own title again, so the item follows later edits of the application.
         `non_public` hides the item content in the public protocol PDF.
 
-        A rename needs a `planned` or `live` meeting. The body and `non_public`
-        need a `planned` or `live` meeting, or a closed meeting with a draft protocol.
+        The title, the body and `non_public` need a `planned` or `live` meeting, or a
+        closed meeting with a draft protocol (spec 000982).
         A change writes `agenda_item_update` with the changed field names. The body
         counts only after the close.
 

@@ -1093,8 +1093,8 @@ async def set_agenda_body(
     The per-item editor calls this route. Only the meeting lead or an admin may
     edit the agenda (``canWrite``). The body needs a planned or live meeting, or a
     closed meeting whose protocol is still a draft: the minute-taker can write
-    the minutes before the start. A rename needs a planned or live meeting. The
-    service answers 409 otherwise.
+    the minutes before the start. A rename follows the same window (spec 000982).
+    The service answers 409 ``protocol_final`` otherwise.
 
     In a live meeting with a protokollant only the protokollant writes the body (403
     ``not_protokollant``). Two writers in one text overwrite each other, and a reader

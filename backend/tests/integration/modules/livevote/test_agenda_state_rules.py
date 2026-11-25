@@ -1,10 +1,11 @@
 """The agenda follows the meeting state, and every change is audited.
 
-* Add, reorder, rename and remove need a planned or live meeting (409 otherwise).
+* Add, reorder and remove need a planned or live meeting (409 otherwise).
 * Remove answers 409 while the item has an open or closed vote. It deletes the
   draft and cancelled votes of the item first, each with ``vote_delete``. To delete
   them the caller needs ``canManageVotes``: ``protocol.write`` alone gives 403.
-* The body needs a live meeting, or a closed meeting with a draft protocol.
+* The body and the title need a planned or live meeting, or a closed meeting with
+  a draft protocol.
 """
 
 from __future__ import annotations
