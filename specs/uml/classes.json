@@ -6752,6 +6752,91 @@
     {
       "attributes": [
         {
+          "name": "list_kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "order",
+            "event"
+          ]
+        },
+        {
+          "name": "key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "position",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "tone",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "neutral",
+            "accent",
+            "warn",
+            "error",
+            "muted"
+          ]
+        },
+        {
+          "name": "phase",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "open",
+            "done",
+            "void"
+          ]
+        },
+        {
+          "name": "is_start",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "sets_date",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "StatusDef",
+      "module": "statuses",
+      "name": "StatusDef",
+      "path": "backend/app/modules/statuses/models.py",
+      "table": "status_def"
+    },
+    {
+      "attributes": [
+        {
           "name": "application_id",
           "nullable": false,
           "primaryKey": false,

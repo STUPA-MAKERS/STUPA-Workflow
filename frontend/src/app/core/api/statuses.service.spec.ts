@@ -30,6 +30,19 @@ describe('StatusCatalog', () => {
     http.verify();
   });
 
+  it('keeps the keys when the read fails', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: API_BASE_URL, useValue: '/api' }],
+    });
+    const catalog = TestBed.inject(StatusCatalog);
+    const http = TestBed.inject(HttpTestingController);
+    catalog.list('event');
+    await Promise.resolve();
+    http.expectOne('/api/statuses/event').flush(null, { status: 500, statusText: 'Error' });
+    expect(catalog.label('event', 'planned')).toBe('planned');
+    http.verify();
+  });
+
   it('holds the seeded lists without a read', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideTestStatuses()],

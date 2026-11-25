@@ -190,6 +190,46 @@ describe('AdminStatusesComponent', () => {
     expect(catalog.label('event', 'planned')).toBe('Kommt');
   });
 
+  it('names a phase in use, and leaves an unknown problem to the default text', async () => {
+    const api = makeApi();
+    api.putStatusList
+      .mockReturnValueOnce(throwError(() => ({ status: 409, error: { code: 'status_in_use' } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 500, error: {} })));
+    const { c, toast } = await setup({ api, kind: 'event' });
+    c.setName(0, 'Kommt');
+    c.save();
+    expect(toast.error).toHaveBeenLastCalledWith(expect.stringContaining('noch genutzt'));
+    c.save();
+    expect(toast.error).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores a delete or a pick without its row', async () => {
+    const { c } = await setup({ kind: 'event' });
+    expect(c.columns()).toBe(2);
+    expect([c.deleteTitle(), c.deleteSub()]).toEqual(['', '']);
+    c.remove(9);
+    c.replaceWith('planned');
+    expect(c.rows()).toHaveLength(3);
+    c.add();
+    c.remove(3);
+    expect(c.rows()).toHaveLength(3);
+  });
+
+  it('shows the load error with a retry', async () => {
+    const api = makeApi();
+    api.getStatusList.mockReturnValueOnce(throwError(() => ({ status: 500 })));
+    const { c } = await setup({ api });
+    expect(c.screenState()).toEqual(
+      expect.objectContaining({
+        state: 'error',
+        message: 'Die Phasen konnten nicht geladen werden.',
+      }),
+    );
+    c.screenState().retry();
+    expect(api.getStatusList).toHaveBeenCalledTimes(2);
+    expect(c.screenState()).toEqual({ state: 'ready' });
+  });
+
   it('shows no list without the right of its page', async () => {
     const { api } = await setup({ perms: ['admin.event_phases'] });
     expect(api.getStatusList).not.toHaveBeenCalled();
