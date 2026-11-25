@@ -6238,7 +6238,7 @@
         },
         {
           "name": "application_id",
-          "nullable": false,
+          "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
         },
