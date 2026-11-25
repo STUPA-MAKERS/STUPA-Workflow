@@ -160,6 +160,27 @@ describe('CostCentreSettingsComponent', () => {
     expect(view.api.updateNode).toHaveBeenCalledTimes(4);
   });
 
+  it('§F/finance/budget/003011: the switch Intern is off at start and saves', async () => {
+    const view = await setup();
+    const internal = screen.getByRole('switch', { name: 'Intern' });
+    expect(internal).toHaveAttribute('aria-checked', 'false');
+    expect(internal).toBeEnabled();
+    await userEvent.click(internal);
+    expect(internal).toHaveAttribute('aria-checked', 'true');
+    expect(view.api.updateNode).toHaveBeenCalledWith('ks', { internal: true });
+    expect(view.saved).toHaveBeenCalledWith(true);
+  });
+
+  it('§F/finance/budget/003011: below an Intern node the switch shows on and cannot change', async () => {
+    const view = await setup({ internal: false, internalInherited: true });
+    const internal = screen.getByRole('switch', { name: 'Intern' });
+    expect(internal).toHaveAttribute('aria-checked', 'true');
+    expect(internal).toBeDisabled();
+    expect(screen.getByText('Gilt durch die Ebene darüber.')).toBeInTheDocument();
+    view.fixture.componentInstance.saveInternal(false);
+    expect(view.api.updateNode).not.toHaveBeenCalled();
+  });
+
   it('§F/finance/budget/000831: a save tells the page whether the server took it', async () => {
     const taken = await setup();
     await userEvent.click(screen.getByRole('switch', { name: 'Aktiv' }));

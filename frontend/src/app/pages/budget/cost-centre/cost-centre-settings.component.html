@@ -27,6 +27,15 @@
   <app-switch [id]="'cc-active-' + n.id" [checked]="active()" (checkedChange)="saveActive($event)">
     <span>{{ 'budget.tree.active' | t }}</span>
   </app-switch>
+  <app-switch
+    [id]="'cc-internal-' + n.id"
+    [checked]="internalInherited() || internal()"
+    [disabled]="internalInherited()"
+    [hint]="internalInherited() ? ('budget.tree.internalInherited' | t) : ''"
+    (checkedChange)="saveInternal($event)"
+  >
+    <span>{{ 'budget.tree.internal' | t }}</span>
+  </app-switch>
   <div class="ccs__pair ccs__pair--even">
     <app-select
       [name]="'cc-view-' + n.id"
