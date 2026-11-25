@@ -31,7 +31,6 @@ from tests._support.memory_storage import MemoryStorage
 from tests.integration.modules.orders.test_orders import (
     _FINANCE,
     _LEDGER,
-    _MANAGER,
     _PDF,
     _READER,
     _antrag,
@@ -45,6 +44,9 @@ from tests.integration.modules.orders.test_orders import (
 
 pytestmark = pytest.mark.integration
 
+_OWNER = Principal(
+    sub="free-orders-sub", roles=["member"], permissions={"application.read", "order.manage"}
+)
 _BOOK_ONLY = Principal(sub="book-sub", roles=["member"], permissions={"budget.book"})
 
 
@@ -75,7 +77,7 @@ async def test_a_bestellung_without_an_antrag(
 ) -> None:
     """§ 003014 + § 002863: the create, the read rule, the changes, the files, the delete."""
     storage = MemoryStorage()
-    api = _client(migrated, settings, monkeypatch, _MANAGER, storage=storage)
+    api = _client(migrated, settings, monkeypatch, _OWNER, storage=storage)
     app_id = await _antrag(maker, seed)
     refused = api.post("/api/orders", json={"title": "Stuhl", "positionIds": ["p1"]})
     assert (refused.status_code, refused.json()["code"]) == (422, "positions_need_application")
@@ -119,7 +121,7 @@ async def test_a_bestellung_without_an_antrag(
     assert reader.get(f"/api/attachments/{up['id']}/download").status_code == 404
 
     async with maker() as session:
-        session.add(PrincipalRow(sub=_MANAGER.sub, display_name="Mara", email="mara@example.org"))
+        session.add(PrincipalRow(sub=_OWNER.sub, display_name="Ole", email="ole@example.org"))
         await session.commit()
     ends = {
         "a": {"kind": "order", "id": order["id"]},
