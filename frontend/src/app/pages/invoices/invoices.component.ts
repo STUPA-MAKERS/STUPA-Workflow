@@ -353,17 +353,23 @@ export class InvoicesComponent implements InvoiceFormHost {
     return fetched?.id === id ? fetched : null;
   });
 
-  /** The rows by the month of their invoice date. */
   /**
    * The rows that a swipe took out and that wait for the answer, or for the end of the
    * undo of a delete. The list leaves them out, so the gap closes at once.
    */
   readonly swipedAway = signal<ReadonlySet<string>>(new Set());
 
+  /**
+   * The rows by the month of their invoice date. The invoices without one come last from the
+   * server and form the group "Ohne Rechnungsdatum", never the month of their entry (spec 003021).
+   */
   readonly groups = computed(() =>
-    groupByMonth(this.items().filter((i) => !this.swipedAway().has(i.id)), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
-      utc: true,
-    }),
+    groupByMonth(
+      this.items().filter((i) => !this.swipedAway().has(i.id)),
+      (i) => i.issueDate,
+      this.i18n.formatLocale(),
+      { utc: true, undatedLabel: this.i18n.translate('invoices.group.noIssueDate') },
+    ),
   );
 
   /** Debounced search, about 250 ms. It drives the `q` param of the server query. */

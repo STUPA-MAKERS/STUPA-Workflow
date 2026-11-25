@@ -194,7 +194,9 @@ class TransferOps(ExpenseOps):
         description and the note.
 
         The subtree filter matches through the transfer id, because either leg may sit
-        in the subtree.
+        in the subtree. The sort ``paymentDate`` puts the transfers without a payment date
+        last, where the list shows them in their own group (spec 003021). The entry time and
+        the id break ties, so the pages do not overlap.
         """
         node = await self._get_node(budget_id) if budget_id is not None else None
         leg = aliased(BudgetExpense)
@@ -242,9 +244,9 @@ class TransferOps(ExpenseOps):
         direction = sort_col.asc() if order == "asc" else sort_col.desc()
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
         order_by = (
-            (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
+            (rank_expr.desc(), ordering, BudgetExpense.created_at.desc(), BudgetExpense.id.desc())
             if rank_expr is not None
-            else (ordering, BudgetExpense.created_at.desc())
+            else (ordering, BudgetExpense.created_at.desc(), BudgetExpense.id.desc())
         )
 
         total = await self.session.scalar(

@@ -475,7 +475,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         comes first, and the normal ordering is a deterministic tiebreak.
 
         The sort column comes from a whitelist, and the default is newest first. Empty
-        values of the nullable date columns go last in both directions.
+        values of the nullable date columns go last in both directions, where the list
+        shows them in their own group (spec 003021). The entry time and the id break ties,
+        so the pages do not overlap.
         """
         node = await self._get_node(budget_id) if budget_id is not None else None
         search = (
@@ -540,9 +542,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         total = await self.session.scalar(count_stmt.where(*filters))
         order_by = (
-            (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
+            (rank_expr.desc(), ordering, BudgetExpense.created_at.desc(), BudgetExpense.id.desc())
             if rank_expr is not None
-            else (ordering, BudgetExpense.created_at.desc())
+            else (ordering, BudgetExpense.created_at.desc(), BudgetExpense.id.desc())
         )
         rows = (
             await self.session.execute(

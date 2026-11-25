@@ -211,7 +211,9 @@ class InvoiceOps(BudgetTreeServiceBase):
         filter predicates live in one shared `filters` list. That list goes into
         the count query and into the row query, so the total and the hits do not
         drift on infinite scroll. With `q` the trigram rank orders the hits by
-        relevance before the usual "newest issue date first".
+        relevance before the usual "newest issue date first". The invoices without an issue date
+        come last, in their own group of the list. The entry time and the id break ties, so
+        the pages of the infinite scroll do not overlap (spec 003021).
 
         ``visible_gremium_ids`` filters only ``linkedBookings``, not the invoices.
         An invoice is not bound to a cost centre.
@@ -264,8 +266,12 @@ class InvoiceOps(BudgetTreeServiceBase):
         )
 
         total = await self.session.scalar(select(func.count()).select_from(Invoice).where(*filters))
-        ordering = Invoice.issue_date.desc().nulls_last()
-        order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
+        ordering = (
+            Invoice.issue_date.desc().nulls_last(),
+            Invoice.created_at.desc(),
+            Invoice.id.desc(),
+        )
+        order_by = (rank_expr.desc(), *ordering) if rank_expr is not None else ordering
         rows = (
             await self.session.scalars(
                 select(Invoice).where(*filters).order_by(*order_by).limit(limit).offset(offset)

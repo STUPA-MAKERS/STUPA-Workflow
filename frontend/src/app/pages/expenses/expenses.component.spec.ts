@@ -2386,6 +2386,14 @@ async function openTransfers(
 describe('ExpensesComponent — transfers tab', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  it('sorts the transfers by the date their month headings read (spec 003021)', async () => {
+    const ctx = await setup();
+    pickTransfers(ctx);
+    const req = ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET');
+    expect(req.request.params.get('sort')).toBe('paymentDate');
+    req.flush(transferPage());
+  });
+
   it('lists a transfer as one row with both cost centres', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
