@@ -262,8 +262,9 @@ export class EventDetailComponent {
 
   /** "Title: angenommen". */
   protected decisionTitle(d: EventDecision): string {
-    const result = d.result ? this.t(`vote.result.${d.result}` as TranslationKey) : '';
-    return result ? `${d.title}: ${result}` : d.title;
+    const key = `vote.result.${d.result}` as TranslationKey;
+    const result = d.result ? this.t(key) : '';
+    return result && result !== key ? `${d.title}: ${result}` : d.title;
   }
 
   /** "StuPa 3 · 01.11.2026 · 500,00 € · Auflage: …". */

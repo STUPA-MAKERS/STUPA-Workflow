@@ -17,7 +17,7 @@ const FULL = eventDetail({
       title: 'Antrag Erstiparty',
       decidedAt: '2026-11-01T18:00:00Z',
       meetingTitle: 'StuPa 3',
-      result: 'accepted',
+      result: 'passed',
       amount: '400.00',
       conditions: ['Belege bis Dezember'],
     },
@@ -106,7 +106,8 @@ describe('EventDetailComponent', () => {
     expect(cmp.decisionLink(decision)).toEqual(['/applications', 'a-1']);
     expect(cmp.decisionLink(vote)).toEqual(['/voting', 'v-1']);
     expect(cmp.decisionLink(bare)).toBeNull();
-    expect(cmp.decisionTitle(decision)).toMatch(/^Antrag Erstiparty: /);
+    expect(cmp.decisionTitle(decision)).toBe('Antrag Erstiparty: Angenommen');
+    expect(cmp.decisionTitle({ ...decision, result: 'unknown' })).toBe('Antrag Erstiparty');
     expect(cmp.decisionTitle(vote)).toBe('Umfrage');
     expect(cmp.decisionSub(decision)).toMatch(/^StuPa 3 · 01\.11\.2026 · 400,00\s€ · Auflage: Belege bis Dezember$/);
     expect(cmp.decisionSub(vote)).toBe('');
