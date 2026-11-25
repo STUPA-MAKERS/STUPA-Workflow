@@ -14,7 +14,7 @@ scope:
 
 The platform must assign a Mollie payment to an Event when the metadata of the payment names the
 organizer and the pretix event that the Event links (003083). A payment without such metadata
-must not belong to an Event. The platform must not assign a payment by its amount, its date or
+must not belong to an Event and is booked by 003103. The platform must not assign a payment by its amount, its date or
 its text.
 
 Reason: The pretix payment provider for Mollie writes the organizer and the event into each
