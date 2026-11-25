@@ -71,7 +71,7 @@ async function setup(
   } = {},
 ) {
   const api = opts.api ?? makeApi();
-  const perms = opts.perms ?? ['admin.gremium_roles', 'admin.group_mappings'];
+  const perms = opts.perms ?? ['gremien.gremium_roles', 'admin.group_mappings'];
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(GremiumRoleMatrixComponent, {
     providers: [
@@ -158,7 +158,7 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
-  it('is read-only without admin.gremium_roles and hides the groups without admin.group_mappings', async () => {
+  it('is read-only without gremien.gremium_roles and hides the groups without admin.group_mappings', async () => {
     const api = makeApi();
     await setup({ api, perms: [] });
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeDisabled();
@@ -176,7 +176,7 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(screen.getByRole('textbox', { name: /Schlüssel/ })).toBeInTheDocument();
   });
 
-  it('shows no floating button without admin.gremium_roles', async () => {
+  it('shows no floating button without gremien.gremium_roles', async () => {
     await setup({ perms: [], inputs: { heading: false, fab: true } });
     expect(screen.queryByRole('button', { name: 'Gremium-Rolle anlegen' })).toBeNull();
   });

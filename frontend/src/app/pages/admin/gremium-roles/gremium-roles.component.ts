@@ -9,10 +9,10 @@ import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 
 /**
  * The roles of one gremium on their own page (`/admin/committees/:id/roles`, permission
- * `admin.gremium_roles`).
+ * `gremien.gremium_roles`).
  *
  * The gremien page shows the same matrix inside the row of a gremium. This page serves a
- * principal with `admin.gremium_roles` but without `admin.gremien`, and the "Rollen"
+ * principal with `gremien.gremium_roles` but without `admin.gremien`, and the "Rollen"
  * links of the admin home page. The gremium name comes from `GET /committees`, which every
  * signed-in principal may read.
  */

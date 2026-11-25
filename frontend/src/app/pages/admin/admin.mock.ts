@@ -90,7 +90,7 @@ export const MOCK_PERMISSIONS: readonly string[] = [
   'admin.users.merge',
   'admin.users.revoke_groups',
   'admin.group_mappings',
-  'admin.gremium_roles',
+  'gremien.gremium_roles',
   'admin.cd_variants',
   'admin.delegations',
   'admin.deadlines',

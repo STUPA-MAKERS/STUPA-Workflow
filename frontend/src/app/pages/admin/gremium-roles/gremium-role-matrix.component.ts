@@ -52,7 +52,7 @@ let nextId = 0;
  * A box saves at once. In a narrow container the header goes away and the boxes become
  * chips with their names under the role.
  *
- * - Edit and delete need `admin.gremium_roles`; without it the matrix is read-only.
+ * - Edit and delete need `gremien.gremium_roles`; without it the matrix is read-only.
  * - The group lines need `admin.group_mappings`; without it they do not show.
  * - A forced role cannot be deleted (the server answers 409); a role that a membership or
  *   a group mapping uses cannot be deleted either (409, named in the toast).
@@ -99,7 +99,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
 
   protected readonly uid = `rm-${nextId++}`;
   protected readonly permissions = GREMIUM_PERMISSIONS;
-  protected readonly canEdit = computed(() => this.auth.can('admin.gremium_roles'));
+  protected readonly canEdit = computed(() => this.auth.can('gremien.gremium_roles'));
   protected readonly canGroups = computed(() => this.auth.can('admin.group_mappings'));
 
   protected readonly loading = signal(true);
