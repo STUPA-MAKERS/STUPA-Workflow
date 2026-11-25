@@ -16,7 +16,7 @@ scope:
 
 # The Antrag detail shows no cost line
 
-The line of 001630 and 001631 must show only in the step of the form where the applicant
+The hint `below` of 003010 must show only in the step of the form where the applicant
 enters the positions. The Antrag detail and the review step of the form must not show it below
 the Kostenaufstellung. They show the total of the positions and the answers for the funding and
 the number of participants as their own rows.

@@ -1932,10 +1932,10 @@
           "type": "BOOLEAN"
         },
         {
-          "name": "pdf_signatures",
+          "name": "signature_rows",
           "nullable": false,
           "primaryKey": false,
-          "type": "BOOLEAN"
+          "type": "JSONB"
         },
         {
           "name": "attachment_required",
@@ -2164,12 +2164,6 @@
         },
         {
           "name": "field_key",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TEXT"
-        },
-        {
-          "name": "position_id",
           "nullable": true,
           "primaryKey": false,
           "type": "TEXT"
@@ -4030,6 +4024,12 @@
         },
         {
           "name": "protocol_recipients",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "ARRAY"
+        },
+        {
+          "name": "protocol_signatures",
           "nullable": false,
           "primaryKey": false,
           "type": "ARRAY"

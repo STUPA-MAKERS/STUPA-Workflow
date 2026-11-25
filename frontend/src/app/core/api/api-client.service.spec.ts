@@ -741,12 +741,11 @@ describe('ApiClient', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     let out: Attachment | undefined;
     api
-      .uploadAttachment('app-1', file, { fieldKey: 'invoice', positionId: 'p-1' })
+      .uploadAttachment('app-1', file, { fieldKey: 'invoice' })
       .subscribe((a) => (out = a));
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.get('field_key')).toBe('invoice');
-    expect(form.get('position_id')).toBe('p-1');
     req.flush(
       {
         id: 'att-1',
@@ -755,20 +754,18 @@ describe('ApiClient', () => {
         size: 1,
         scanned: false,
         fieldKey: 'invoice',
-        positionId: 'p-1',
       },
       { status: 201, statusText: 'Created' },
     );
-    expect(out).toMatchObject({ fieldKey: 'invoice', positionId: 'p-1' });
+    expect(out).toMatchObject({ fieldKey: 'invoice' });
   });
 
   it('uploads an attachment with no opts (no field_key)', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    api.uploadAttachment('app-1', file, { positionId: 'p-1' }).subscribe();
+    api.uploadAttachment('app-1', file).subscribe();
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.has('field_key')).toBe(false);
-    expect(form.has('position_id')).toBe(false);
     req.flush(
       { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true },
       { status: 201, statusText: 'Created' },

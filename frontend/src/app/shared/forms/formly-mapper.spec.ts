@@ -345,15 +345,18 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['minPositions']).toBe(3);
   });
 
-  it('gives the cost line to the last positions field only (spec 001630)', () => {
+  it('passes the hint texts with the language and the fields of the form (spec 003010)', () => {
+    const hints = { below: { de: 'Summe {costTotal}' } };
     const fields: FormFieldDef[] = [
       { key: 'a', type: 'positions', label: { de: 'A' } },
-      { key: 'b', type: 'positions', label: { de: 'B' } },
+      { key: 'b', type: 'positions', label: { de: 'B' }, validation: { hints } },
     ];
-    const [first, last] = toFormlyFields(fields, 'de');
-    expect(first.props?.['costLine']).toBeUndefined();
-    expect(last.props?.['costLine']).toBe(true);
-    expect(last.props?.['costFields']).toBe(fields);
+    const [plain, hinted] = toFormlyFields(fields, 'de');
+    expect(plain.props?.['hints']).toBeUndefined();
+    expect(plain.props?.['costLine']).toBeUndefined();
+    expect(hinted.props?.['hints']).toBe(hints);
+    expect(hinted.props?.['hintLang']).toBe('de');
+    expect(hinted.props?.['formFields']).toBe(fields);
   });
 
   it('omits positions min props when validation does not set them', () => {
@@ -446,24 +449,39 @@ describe('requested funding', () => {
     expect(valid({ foerderung: 1 })).toBe(false);
   });
 
-  it('shows the cost total in the hint and in the error text', () => {
+  it('shows only the help of the field', () => {
+    const cfg = toFormlyFields([{ ...fields[1], required: true, help: { de: 'X' } }], 'de')[0];
+    expect(cfg.props?.description).toBe('X');
+    expect(cfg.expressions?.['props.description']).toBeUndefined();
+    expect(toFormlyFields([fields[1]], 'de')[0].props?.description).toBe('Hilfe.');
+  });
+
+  it('shows no hint at a required field without help', () => {
+    const cfg = toFormlyFields([{ ...fields[1], required: true, help: undefined }], 'de')[0];
+    expect(cfg.props?.description).toBeUndefined();
+  });
+
+  it('shows no hint at an optional field without help (spec 003006)', () => {
+    expect(toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0].props?.description).toBeUndefined();
+  });
+
+  it('funding cap: no check and no error text with capAtCost off (spec 003004)', () => {
+    const off = toFormlyFields([fields[0], { ...fields[1], validation: { capAtCost: false } }], 'de')[1];
+    expect(off.validators?.['fundingMax']).toBeUndefined();
+    expect(off.expressions?.['props.errorText']).toBeUndefined();
+    expect(off.props?.description).toBe('Hilfe.');
+    const on = toFormlyFields([fields[0], { ...fields[1], validation: { capAtCost: true } }], 'de')[1];
+    expect(on.validators?.['fundingMax']).toBeDefined();
+  });
+
+  it('names the cost total in the error text', () => {
     const { cfg, field, form } = build('en');
     field.model = { kosten: positions(300, 200) };
     form.controls.foerderung.setValue(600);
-    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)(field);
-    expect(desc).toBe('Hilfe. Total costs: €500.00. Leave empty to request the full amount.');
     const err = cfg.expressions?.['props.errorText'] as (f: FormlyFieldConfig) => string | undefined;
     expect(err(field)).toBe('The funding must not exceed the costs (€500.00).');
     form.controls.foerderung.setValue(100);
     expect(err(field)).toBeUndefined();
-  });
-
-  it('leaves out the help text when the field has none', () => {
-    const cfg = toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0];
-    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)({
-      model: {},
-    } as FormlyFieldConfig);
-    expect(desc).toBe('Kosten gesamt: 0,00\u00a0€. Leer lassen, um die volle Summe zu beantragen.');
   });
 
   it('re-checks the cap when another answer changes', () => {

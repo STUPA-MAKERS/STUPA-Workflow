@@ -1108,7 +1108,19 @@ describe('ApplyWizardComponent', () => {
           label: { de: 'Antrag' },
           fields: [
             { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
-            { key: 'kosten', type: 'positions', label: { de: 'Kosten' }, validation: { minOffers: 1 } },
+            {
+              key: 'kosten',
+              type: 'positions',
+              label: { de: 'Kosten' },
+              validation: {
+                minOffers: 1,
+                hints: {
+                  placeholderValue: { de: 'Wie ein Platzhalter.' },
+                  noFileTitle: { de: 'Ohne Anhang einreichen?' },
+                  noFileBody: { de: 'Dein Antrag über {kosten} hat keinen Anhang.' },
+                },
+              },
+            },
           ],
         },
       ],
@@ -1202,7 +1214,7 @@ describe('ApplyWizardComponent', () => {
       s.fixture.detectChanges();
       expect(s.create).not.toHaveBeenCalled();
       expect(s.comp.confirmNoFile()).toBe(true);
-      expect(await screen.findByText(/Dein Antrag hat keinen Anhang/)).toBeInTheDocument();
+      expect(await screen.findByText('Dein Antrag über 1,00 € hat keinen Anhang.')).toBeInTheDocument();
       s.comp.submit(true);
       expect(s.comp.confirmNoFile()).toBe(false);
       expect(s.create).toHaveBeenCalledTimes(1);
@@ -1213,6 +1225,31 @@ describe('ApplyWizardComponent', () => {
       s.comp.submit();
       expect(s.comp.confirmNoFile()).toBe(false);
       expect(s.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('file reminder: submits without the question when the form has no texts for it (spec 003010)', async () => {
+      const kosten = COSTS.sections[0].fields[1];
+      const off: EffectiveForm = {
+        ...COSTS,
+        sections: [
+          {
+            ...COSTS.sections[0],
+            fields: [COSTS.sections[0].fields[0], { ...kosten, validation: { minOffers: 1 } }],
+          },
+        ],
+      };
+      const s = await setup({ form: off, loggedIn: true });
+      await toReviewSignedIn(s, async () => {
+        await userEvent.click(screen.getByRole('button', { name: /Position hinzufügen/ }));
+        s.fixture.detectChanges();
+        await userEvent.type(screen.getByLabelText('Position'), 'Bus');
+        await userEvent.type(screen.getByLabelText('Anbieter'), 'Reisen AG');
+        await userEvent.type(screen.getByLabelText(/^Betrag/), '120');
+        s.fixture.detectChanges();
+      });
+      s.comp.submit();
+      expect(s.comp.confirmNoFile()).toBe(false);
+      expect(s.create).toHaveBeenCalledTimes(1);
     });
   });
 });

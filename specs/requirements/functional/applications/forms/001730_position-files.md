@@ -2,15 +2,9 @@
 id: "001730"
 title: A position takes files in the form
 kind: functional
-status: approved
+status: removed
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - backend/app/modules/files/service.py
-  - backend/app/modules/files/drafts.py
-  - frontend/src/app/features/apply/draft-attachments.service.ts
-  - frontend/src/app/shared/formly/types/formly-positions.type.ts
-  - frontend/src/app/shared/forms/positions-view/positions-view.component.ts
+updated: 2026-11-24
 scope:
   - backend/app/modules/files
   - backend/app/modules/forms

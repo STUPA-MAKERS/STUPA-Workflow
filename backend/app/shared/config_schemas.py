@@ -172,6 +172,34 @@ class FieldOption(FrozenStrictCamelModel, frozen=True):
     color: str | None = None
 
 
+class FieldHints(FrozenStrictCamelModel, frozen=True):
+    """The hint texts of a ``positions`` field (spec 003010).
+
+    Each text is per language and may hold placeholders in braces: ``{key}`` for the
+    answer of a field, ``{costTotal}``, ``{amount}`` and ``{noOffersSwitch}``. The form
+    fills them in; the backend stores the texts only.
+
+    Attributes:
+        below: Below the sum row of the field.
+        placeholder_value: At an offer whose amount looks like a placeholder.
+        placeholder_label: At an offer whose name has fewer than 3 characters.
+        placeholder_duplicate: At an offer whose name another offer has.
+        use_no_offers: Below the offers of a position with a placeholder offer.
+        no_offers: At a position without comparison offers.
+        no_file_title: The title of the question before a submit without a file.
+        no_file_body: The text of that question.
+    """
+
+    below: I18nMap | None = None
+    placeholder_value: I18nMap | None = Field(default=None, alias="placeholderValue")
+    placeholder_label: I18nMap | None = Field(default=None, alias="placeholderLabel")
+    placeholder_duplicate: I18nMap | None = Field(default=None, alias="placeholderDuplicate")
+    use_no_offers: I18nMap | None = Field(default=None, alias="useNoOffers")
+    no_offers: I18nMap | None = Field(default=None, alias="noOffers")
+    no_file_title: I18nMap | None = Field(default=None, alias="noFileTitle")
+    no_file_body: I18nMap | None = Field(default=None, alias="noFileBody")
+
+
 class FieldValidation(FrozenStrictCamelModel, frozen=True):
     """Validation constraints of one form field.
 
@@ -186,6 +214,10 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
         participants: For ``number``, the field holds the number of participants. The
             cost line of the form divides the requested amount by it (spec 001631). A form
             has at most one such field.
+        cap_at_cost: For ``funding``, the value must not be above the cost total (specs
+            000135, 003004). Unset means on.
+        hints: For ``positions``, the hint texts of the field (spec 003010). The code holds
+            no hint text; a hint without a text shows nothing.
         root_path: For ``budget_select``, the path key of the Kostenstelle whose subtree
             the picker offers (spec 001680). The node itself is not offered. A path key
             stays the same across fiscal years, while the id of a Kostenstelle does not.
@@ -205,7 +237,9 @@ class FieldValidation(FrozenStrictCamelModel, frozen=True):
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
     allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
     participants: bool | None = None
+    cap_at_cost: bool | None = Field(default=None, alias="capAtCost")
     root_path: str | None = Field(default=None, alias="rootPath", min_length=1, max_length=200)
+    hints: FieldHints | None = None
 
     @field_validator("pattern")
     @classmethod

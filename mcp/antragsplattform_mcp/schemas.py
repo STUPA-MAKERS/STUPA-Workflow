@@ -272,6 +272,10 @@ class GremiumCreate(WireModel, frozen=True):
             "protocols page (public version only)."
         ),
     )
+    protocolSignatures: list[str] = Field(
+        default_factory=list[str],
+        description="The signature lines that end the protocol PDF, in order",
+    )
 
 
 class GremiumUpdate(WireModel, frozen=True):
@@ -295,6 +299,10 @@ class GremiumUpdate(WireModel, frozen=True):
             "publishes ALL final protocols that are not held back; a job builds the "
             "missing public versions first."
         ),
+    )
+    protocolSignatures: list[str] | None = Field(
+        default=None,
+        description="Replaces the signature lines that end the protocol PDF, in order",
     )
 
 
@@ -390,7 +398,10 @@ class ApplicationTypeCreate(WireModel, frozen=True):
     nameI18n: I18nMap
     gremiumId: str | None = None
     hasBudget: bool = False
-    pdfSignatures: bool = False
+    signatureRows: list[dict[str, str]] = Field(
+        default_factory=list[dict[str, str]],
+        description="The signature rows of the Antrag PDF: [{label, signer}], in order",
+    )
     attachmentRequired: bool = Field(
         default=False, description="The Antrag needs a file before the submit"
     )
@@ -404,7 +415,10 @@ class ApplicationTypeUpdate(WireModel, frozen=True):
     nameI18n: I18nMap | None = None
     gremiumId: str | None = None
     hasBudget: bool | None = None
-    pdfSignatures: bool | None = None
+    signatureRows: list[dict[str, str]] | None = Field(
+        default=None,
+        description="Replaces the signature rows of the Antrag PDF: [{label, signer}]",
+    )
     attachmentRequired: bool | None = Field(
         default=None, description="The Antrag needs a file before the submit"
     )

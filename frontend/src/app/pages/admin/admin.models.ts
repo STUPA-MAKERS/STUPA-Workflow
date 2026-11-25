@@ -259,6 +259,8 @@ export interface Gremium {
   readonly roleCount?: number;
   /** The final protocols of the gremium show on the public protocol page. */
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /** `GET /admin/committees/{id}/public-preview`: what a switch to "public" publishes. */
@@ -290,6 +292,8 @@ export interface GremiumCreateBody {
   /** Without a value the gremium takes the month of the meeting periods. */
   readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /** Body for `PATCH /admin/committees/{id}` (`GremiumUpdate`) — all fields optional. */
@@ -312,6 +316,8 @@ export interface GremiumUpdateBody {
   readonly guestsMayVote?: boolean;
   readonly termStartMonth?: number;
   readonly protocolsPublic?: boolean;
+  /** The signature lines that end the protocol PDF, in order (spec 003007). */
+  readonly protocolSignatures?: readonly string[];
 }
 
 /**
@@ -728,8 +734,8 @@ export interface ApplicationTypeFull {
   readonly name: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget: boolean;
-  /** The Antrag PDF ends with the signature section (spec 000888). */
-  readonly pdfSignatures?: boolean;
+  /** The signature rows of the Antrag PDF, in order (spec 003005). */
+  readonly signatureRows?: readonly SignatureRow[];
   /** "Anhang Pflicht": an Antrag of this type needs a file (spec 001732). */
   readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
@@ -742,6 +748,12 @@ export interface ApplicationTypeFull {
   readonly groupId?: Uuid | null;
   /** The order inside the group (spec 001183). The server sends the list in this order. */
   readonly position?: number;
+}
+
+/** One signature row of the Antrag PDF (spec 003005): the label and the signer. */
+export interface SignatureRow {
+  readonly label: string;
+  readonly signer: string;
 }
 
 /** A group of Antragsarten, `ApplicationTypeGroupOut` (spec 001180). */
@@ -773,7 +785,8 @@ export interface ApplicationTypeUpdateBody {
   readonly name?: I18nMap;
   readonly gremiumId?: Uuid | null;
   readonly hasBudget?: boolean;
-  readonly pdfSignatures?: boolean;
+  /** Replaces the signature rows of the Antrag PDF (spec 003005). */
+  readonly signatureRows?: readonly SignatureRow[];
   readonly attachmentRequired?: boolean;
   readonly comparisonOffers?: ComparisonOffers | null;
   /** `null` takes the type out of its group (spec 001180); absent keeps it. */

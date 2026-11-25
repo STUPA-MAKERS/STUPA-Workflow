@@ -213,35 +213,6 @@ export function brokenRules(
   return rules.flatMap((rule, i) => (ruleMet(rule, ctx) ? [] : [i]));
 }
 
-/** The figures of the line under the Kostenaufstellung (specs 001630, 001631). */
-export interface CostLine {
-  /** The sum of the preferred offers. */
-  readonly total: number;
-  /** The filled-in funding, else the total. */
-  readonly requested: number;
-  /** The requested amount per participant, rounded to the cent, or null. */
-  readonly perPerson: number | null;
-}
-
-/**
- * The cost line of a form: the total cost, the requested amount and, when the form has
- * a field for the number of participants with a value above 0, the amount per person.
- */
-export function costLine(
-  fields: readonly RuleField[],
-  data: Readonly<Record<string, unknown>>,
-): CostLine {
-  const total = costTotal(fields, data) ?? 0;
-  const funding = fields.find((f) => f.type === 'funding');
-  const fundingValue = funding ? finiteNumber(data[funding.key]) : null;
-  const requested = fundingValue ?? total;
-  const counter = fields.find((f) => f.type === 'number' && f.validation?.participants === true);
-  const people = counter ? finiteNumber(data[counter.key]) : null;
-  const perPerson =
-    people !== null && people > 0 ? Math.round((requested / people) * 100) / 100 : null;
-  return { total, requested, perPerson };
-}
-
 /** Why an offer looks like a placeholder (spec 001640). */
 export type PlaceholderReason = 'value' | 'label' | 'duplicate';
 

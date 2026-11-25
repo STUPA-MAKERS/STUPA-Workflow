@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from app.modules.forms.validation import (
     SYSTEM_TITLE_KEY,
@@ -358,6 +359,30 @@ def test_funding_above_cost_total_rejected() -> None:
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers(_funding_form(), {"positions": _costs(300, 200), "foerderung": 500.01})
     assert [e.msg for e in ei.value.errors] == ["greater than the cost total 500"]
+
+
+def test_funding_cap_setting() -> None:
+    """Accept a funding above the cost total only with ``capAtCost`` off (spec 003004)."""
+    data = {"positions": _costs(300, 200), "foerderung": 900}
+    off = _funding_form(validation={"capAtCost": False})
+    assert validate_answers(off, data)["foerderung"] == 900
+    with pytest.raises(AnswerValidationError):
+        validate_answers(_funding_form(validation={"capAtCost": True}), data)
+
+
+def test_field_hints() -> None:
+    """Save the hint texts of a positions field and read them back (spec 003010)."""
+    hints = {
+        "below": {"de": "Summe {costTotal}, beantragt {amount}"},
+        "placeholderValue": {"de": "Wie ein Platzhalter."},
+        "noFileTitle": {"de": "Ohne Anhang?"},
+    }
+    field = _positions_field(validation={"minOffers": 1, "hints": hints})
+    validate_definition([field])
+    dumped = field.model_dump(by_alias=True, exclude_none=True)["validation"]
+    assert dumped["hints"] == hints
+    with pytest.raises(ValidationError):
+        _positions_field(validation={"hints": {"costLine": {"de": "x"}}})
 
 
 def test_funding_without_positions_answer_rejected() -> None:

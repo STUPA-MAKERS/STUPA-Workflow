@@ -129,10 +129,13 @@ describe('GremiumDialogComponent', () => {
     const mail = screen.getByRole('textbox', { name: 'Zusätzliche Protokoll-Empfänger' });
     await userEvent.clear(mail);
     await userEvent.type(mail, 'a@x.de, b@x.de;{enter}c@x.de');
+    const signs = screen.getByRole('textbox', { name: 'Unterschriften im Protokoll' });
+    await userEvent.type(signs, ' Kasse {enter}{enter}Vorsitz');
     await userEvent.click(save());
     expect(api.updateGremium).toHaveBeenCalledWith('g-1', {
       name: 'Studierendenparlament',
       protocolsPublic: false,
+      protocolSignatures: ['Kasse', 'Vorsitz'],
       cdVariantId: 'cd-2',
       defaultLang: 'en',
       allowVoteDelegation: true,
@@ -172,6 +175,7 @@ describe('GremiumDialogComponent', () => {
     expect(api.createGremium).toHaveBeenCalledWith({
       name: 'Finanz Ausschuss',
       protocolsPublic: false,
+      protocolSignatures: [],
       slug: 'finanz-ausschuss',
       cdVariantId: null,
       defaultLang: 'de',

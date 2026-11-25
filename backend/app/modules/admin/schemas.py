@@ -9,10 +9,10 @@ definitions come from the ``config_schemas`` models. The branding model is
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
@@ -135,6 +135,15 @@ class CdVariantLogoReorder(FrozenCamelModel, frozen=True):
     logo_ids: list[UUID] = Field(alias="logoIds")
 
 
+#: The most signature rows of one Antragsart or lines of one Gremium (specs 003005, 003007).
+MAX_SIGNATURE_ROWS = 10
+
+#: One signature line of the protocol PDF (spec 003007), for example "Schriftführung".
+SignatureLine = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+]
+
+
 class GremiumOut(FrozenCamelModel, frozen=True):
     """A gremium with its delegation, quorum and publication settings."""
 
@@ -178,6 +187,10 @@ class GremiumOut(FrozenCamelModel, frozen=True):
     )
     #: The final protocols of the gremium appear on the public protocols page.
     protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
+    #: The signature lines that end the protocol PDF, in order (spec 003007).
+    protocol_signatures: list[str] = Field(
+        default_factory=list[str], serialization_alias="protocolSignatures"
+    )
 
 
 class GremiumAdminOut(GremiumOut, frozen=True):
@@ -220,6 +233,11 @@ class GremiumCreate(FrozenCamelModel, frozen=True):
     #: Without a value the gremium takes ``termStartMonth`` of the meeting settings.
     term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool = Field(default=False, alias="protocolsPublic")
+    protocol_signatures: list[SignatureLine] = Field(
+        default_factory=list[SignatureLine],
+        alias="protocolSignatures",
+        max_length=MAX_SIGNATURE_ROWS,
+    )
 
 
 class GremiumUpdate(FrozenCamelModel, frozen=True):
@@ -247,6 +265,10 @@ class GremiumUpdate(FrozenCamelModel, frozen=True):
     guests_may_vote: bool | None = Field(default=None, alias="guestsMayVote")
     term_start_month: int | None = Field(default=None, alias="termStartMonth", ge=1, le=12)
     protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
+    #: A sent list replaces the lines; an omitted field keeps them.
+    protocol_signatures: list[SignatureLine] | None = Field(
+        default=None, alias="protocolSignatures", max_length=MAX_SIGNATURE_ROWS
+    )
 
 
 class GremiumPublicPreview(FrozenCamelModel, frozen=True):
@@ -359,6 +381,18 @@ class GremiumRoleMappingUpdate(_OidcGroupField, frozen=True):
         return self
 
 
+class SignatureRow(FrozenStrictCamelModel, frozen=True):
+    """One signature row of the Antrag PDF (spec 003005).
+
+    Attributes:
+        label: The label of the row, for example "Sachlich richtig".
+        signer: The caption of the signature line, for example "Finanzreferent:in".
+    """
+
+    label: str = Field(min_length=1, max_length=120)
+    signer: str = Field(min_length=1, max_length=120)
+
+
 class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     """An application type."""
 
@@ -367,7 +401,9 @@ class ApplicationTypeOut(FrozenCamelModel, frozen=True):
     key: str
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
-    pdf_signatures: bool = Field(default=False, serialization_alias="pdfSignatures")
+    signature_rows: list[SignatureRow] = Field(
+        default_factory=list[SignatureRow], serialization_alias="signatureRows"
+    )
     #: The Antrag needs a file before the submit (spec 001732).
     attachment_required: bool = Field(default=False, serialization_alias="attachmentRequired")
     comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
@@ -388,7 +424,9 @@ class ApplicationTypeCreate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap = Field(alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool = Field(default=False, alias="hasBudget")
-    pdf_signatures: bool = Field(default=False, alias="pdfSignatures")
+    signature_rows: list[SignatureRow] = Field(
+        default_factory=list[SignatureRow], alias="signatureRows", max_length=MAX_SIGNATURE_ROWS
+    )
     attachment_required: bool = Field(default=False, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)
@@ -401,7 +439,10 @@ class ApplicationTypeUpdate(FrozenCamelModel, frozen=True):
     name_i18n: I18nMap | None = Field(default=None, alias="nameI18n")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     has_budget: bool | None = Field(default=None, alias="hasBudget")
-    pdf_signatures: bool | None = Field(default=None, alias="pdfSignatures")
+    #: A sent list replaces the rows; an omitted field keeps them.
+    signature_rows: list[SignatureRow] | None = Field(
+        default=None, alias="signatureRows", max_length=MAX_SIGNATURE_ROWS
+    )
     attachment_required: bool | None = Field(default=None, alias="attachmentRequired")
     comparison_offers: ComparisonOffers | None = Field(default=None, alias="comparisonOffers")
     retention_months: int | None = Field(default=None, alias="retentionMonths", ge=1)

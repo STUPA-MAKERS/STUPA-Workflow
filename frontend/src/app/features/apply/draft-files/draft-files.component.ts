@@ -15,9 +15,6 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
  * submit) shows "Nicht mehr vorhanden" in red; its button takes it off the list at once.
  * Below the rows the drop zone with the limits.
  *
- * With `positionId` it lists the files of one cost position of the `positions` field
- * `fieldKey` (spec 001730); the field type shows it below the position.
- *
  * `changed` emits the ids of the field after each upload and delete; the formly field
  * keeps them as its value.
  */
@@ -45,8 +42,6 @@ export class DraftFilesComponent {
 
   /** The field of the files; `null` for the general block. */
   readonly fieldKey = input<string | null>(null);
-  /** The position of the `positions` field `fieldKey`, for the files of one position. */
-  readonly positionId = input<string | null>(null);
   /** The heading above the rows. */
   readonly heading = input.required<string>();
   /** Show the count and the bytes of the whole draft beside the heading. */
@@ -86,12 +81,9 @@ export class DraftFilesComponent {
     }),
   );
 
-  /** The entries of this block: its field, and its position or none. */
-  private mine<T extends { fieldKey: string | null; positionId?: string | null }>(
-    list: readonly T[],
-  ): readonly T[] {
-    const position = this.positionId();
-    return list.filter((f) => f.fieldKey === this.fieldKey() && (f.positionId ?? null) === position);
+  /** The entries of this block: the files of its field. */
+  private mine<T extends { fieldKey: string | null }>(list: readonly T[]): readonly T[] {
+    return list.filter((f) => f.fieldKey === this.fieldKey());
   }
 
   protected size(bytes: number): string {
@@ -103,10 +95,7 @@ export class DraftFilesComponent {
   }
 
   protected async onFiles(files: File[]): Promise<void> {
-    const { failed } = await this.drafts.upload(files, {
-      fieldKey: this.fieldKey(),
-      positionId: this.positionId(),
-    });
+    const { failed } = await this.drafts.upload(files, { fieldKey: this.fieldKey() });
     for (const f of failed) {
       this.toast.show(`${f.filename}: ${this.i18n.translate(f.reason)}`, 'error');
     }

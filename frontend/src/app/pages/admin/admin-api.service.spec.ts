@@ -426,8 +426,8 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, pdfSignatures: false, attachmentRequired: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, pdfSignatures: false, attachmentRequired: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, signatureRows: [], attachmentRequired: false, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null, groupId: null, position: 0 });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, signatureRows: [], attachmentRequired: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null, groupId: null, position: 0 });
   });
 
   it('maps the number of the active form version', () => {
@@ -574,7 +574,8 @@ describe('AdminApiService — real mode (contract)', () => {
       name: {},
       gremiumId: null,
       hasBudget: false,
-      pdfSignatures: false,
+     
+      signatureRows: [],
       attachmentRequired: false,
       retentionMonths: null,
       activeFormVersionId: null,
@@ -649,7 +650,7 @@ describe('AdminApiService — real mode (contract)', () => {
   /** An empty body sets no keys. */
   it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
-    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, pdfSignatures: true, attachmentRequired: true }).subscribe(
+    s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false, attachmentRequired: true }).subscribe(
       () => (done = true),
     );
     const req = http.expectOne('/api/admin/application-types/t1');
@@ -658,7 +659,7 @@ describe('AdminApiService — real mode (contract)', () => {
       nameI18n: { de: 'N' },
       gremiumId: 'g1',
       hasBudget: false,
-      pdfSignatures: true,
+     
       attachmentRequired: true,
     });
     req.flush({});
