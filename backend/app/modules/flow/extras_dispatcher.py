@@ -265,9 +265,9 @@ class FlowExtrasActionDispatcher:
 
         The applicant controls the field value, so the handler accepts only the set that
         the form offered (see `budget.form_options.budget_field_options`). It skips the action
-        (fail closed) when the node is missing or inactive. It also does not overwrite a
-        different cost center that the application already has, because a staff decision
-        wins over an applicant value.
+        (fail closed) when the node is missing, inactive or Intern (003012). It also does not
+        overwrite a different cost center that the application already has, because a staff
+        decision wins over an applicant value.
         """
         field = action.params.get("field")
         if not field:
@@ -290,6 +290,11 @@ class FlowExtrasActionDispatcher:
                 logger.warning(
                     "assignBudgetFromField: budget %s missing or inactive — skipped",
                     budget_id,
+                )
+                return
+            if await _is_internal(session, node, frozenset()):
+                logger.warning(
+                    "assignBudgetFromField: budget %s is internal — skipped (003012)", budget_id
                 )
                 return
             if app.budget_id is not None and app.budget_id != node.id:
@@ -435,6 +440,21 @@ async def _walk_up(session: AsyncSession, node: Budget, seen: frozenset[UUID]) -
         else None
     )
     return node if parent is None else await _walk_up(session, parent, seen | {node.id})
+
+
+async def _is_internal(session: AsyncSession, node: Budget, seen: frozenset[UUID]) -> bool:
+    """Say if `node` or a node above it has the switch "Intern" on (003011).
+
+    `seen` stops a cycle the same way as in `_walk_up`.
+    """
+    if node.internal:
+        return True
+    parent = (
+        await session.get(Budget, node.parent_id)
+        if node.parent_id is not None and node.parent_id not in seen
+        else None
+    )
+    return parent is not None and await _is_internal(session, parent, seen | {node.id})
 
 
 async def _parent_path(session: AsyncSession, parent_ref: object) -> str | None:

@@ -55,6 +55,7 @@ _REQUIRED_NODE_FIELDS = frozenset(
         "fiscal_start_day",
         "planCoverableDefault",
         "plan_coverable_default",
+        "internal",
     }
 )
 
@@ -78,6 +79,8 @@ class BudgetNodeCreate(FrozenStrictCamelModel, frozen=True):
     currency: Literal["EUR"] = "EUR"
     active: bool = True
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
     #: 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
     #: `date(...)` ValueError. The 500 that follows leaves the budget unusable.
@@ -98,6 +101,8 @@ class BudgetNodeUpdate(FrozenStrictCamelModel, frozen=True):
     name: NodeName | None = None
     active: bool | None = None
     color: str | None = None
+    #: The own switch "Intern" (003011). It changes no figure, so a plan in force takes it.
+    internal: bool | None = None
     #: Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: Deciding Gremium. `None` in the payload clears it; the node then inherits the
@@ -134,6 +139,8 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the
@@ -188,6 +195,8 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the
@@ -210,6 +219,8 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     #: The fiscal years whose version in force puts the node on the income side. An
     #: Antrag must not take the node in these years (001030).
     income_in: tuple[UUID, ...] = Field(default=(), alias="incomeIn")
+    #: A node above this one is Intern, so this one is Intern too (003011).
+    internal_inherited: bool = Field(default=False, alias="internalInherited")
     by_fiscal_year: tuple[AllocationView, ...] = Field(default_factory=tuple, alias="byFiscalYear")
     #: Read-only `Sequence`, because a caller builds a node with a list of children.
     children: Sequence[BudgetTreeNodeOut] = Field(default_factory=tuple)

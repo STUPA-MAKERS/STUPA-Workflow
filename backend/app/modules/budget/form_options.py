@@ -6,6 +6,9 @@ because `forms` imports no higher module (§S/backend/python/000651).
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Iterable
+
 from sqlalchemy import ColumnElement, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -25,7 +28,8 @@ async def budget_field_options(session: AsyncSession) -> list[FieldOption]:
     the cost centers as a tree with the colors of the budget page. A cost center that
     is not active has no option, and no cost center below it has one. A cost center
     that is income in the current year of its budget has no option either, because an
-    Antrag takes only a cost center on the expense side (001030).
+    Antrag takes only a cost center on the expense side (001030). An Intern cost center
+    has no option, and no cost center below it has one (003012).
     """
     rows = (
         await session.execute(
@@ -38,7 +42,7 @@ async def budget_field_options(session: AsyncSession) -> list[FieldOption]:
                 Budget.color,
                 Budget.tree_path,
             )
-            .where(Budget.active.is_(True), below_active_only())
+            .where(Budget.active.is_(True), below_active_only(), not_internal())
             .order_by(Budget.tree_path)
         )
     ).all()
@@ -80,4 +84,25 @@ def below_active_only() -> ColumnElement[bool]:
     above = aliased(Budget)
     return ~exists().where(
         above.active.is_(False), Budget.tree_path.like(above.tree_path + _SEP + "%")
+    )
+
+
+def not_internal() -> ColumnElement[bool]:
+    """Return the filter for a cost center that is not Intern (003011).
+
+    A cost center is Intern when its own switch or the switch of a node above it is on.
+    """
+    above = aliased(Budget)
+    return Budget.internal.is_(False) & ~exists().where(
+        above.internal.is_(True), Budget.tree_path.like(above.tree_path + _SEP + "%")
+    )
+
+
+async def internal_ids(session: AsyncSession, ids: Iterable[uuid.UUID]) -> set[uuid.UUID]:
+    """Return the cost centers among `ids` that are Intern (003011)."""
+    wanted = set(ids)
+    if not wanted:
+        return set()
+    return set(
+        await session.scalars(select(Budget.id).where(Budget.id.in_(wanted), ~not_internal()))
     )

@@ -7,9 +7,13 @@ create and the edit of an Antrag run them after `validate_answers`.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.budget.form_options import internal_ids
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.validation import broken_rules, outside_subtree
 from app.shared.config_schemas import FormFieldDef
@@ -19,6 +23,8 @@ from app.shared.errors import ValidationProblem
 FORM_RULE_FAILED = "form_rule_failed"
 #: The code of a 422 for a cost center outside the root of its field (spec 001681).
 COST_CENTRE_OUTSIDE_SUBTREE = "cost_centre_outside_subtree"
+#: The code of a 422 for an Intern cost center in a form field (spec 003012).
+COST_CENTRE_INTERNAL = "cost_centre_internal"
 
 
 def check_form_rules(
@@ -59,5 +65,42 @@ def check_form_rules(
             errors=[
                 {"field": f"rules[{i}]", "msg": rule.message.get("en") or rule.message["de"]}
                 for i, rule in blocking
+            ],
+        )
+
+
+async def check_internal_cost_centres(
+    session: AsyncSession,
+    effective: EffectiveFormOut,
+    data: Mapping[str, Any],
+    *,
+    changed: frozenset[str] | None = None,
+) -> None:
+    """Refuse an answer of a ``budget_select`` field that names an Intern cost center (003012).
+
+    ``changed`` works as in `check_form_rules`: an edit checks only the fields it changed,
+    because an older answer can name a cost center that became Intern later.
+
+    Raises:
+        ValidationProblem: 422 ``cost_centre_internal`` with the fields.
+    """
+    picked: dict[uuid.UUID, list[str]] = {}
+    for section in effective.sections:
+        for f in section.fields:
+            if f.type != "budget_select" or (changed is not None and f.key not in changed):
+                continue
+            try:
+                picked.setdefault(uuid.UUID(str(data.get(f.key))), []).append(f.key)
+            except ValueError:
+                continue
+    internal = await internal_ids(session, picked)
+    if internal:
+        raise ValidationProblem(
+            "The cost centre is internal.",
+            code=COST_CENTRE_INTERNAL,
+            errors=[
+                {"field": key, "msg": "the cost centre is internal"}
+                for bid in sorted(internal, key=str)
+                for key in picked[bid]
             ],
         )
