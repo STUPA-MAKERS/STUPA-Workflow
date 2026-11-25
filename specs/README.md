@@ -679,11 +679,10 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/pretix/003084](requirements/functional/integrations/pretix/003084_sales-in-detail.md) | The detail of an Event shows the pretix sales | draft |
 | [F/integrations/pretix/003085](requirements/functional/integrations/pretix/003085_refresh-in-worker.md) | The worker reads the pretix sales | draft |
 | [F/integrations/pretix/003086](requirements/functional/integrations/pretix/003086_income-suggestion.md) | The paid sales become a suggested income booking | draft |
-| [F/integrations/pretix/003087](requirements/functional/integrations/pretix/003087_create-shop.md) | A person creates the shop of an Event in pretix | draft |
 | [F/integrations/pretix/003088](requirements/functional/integrations/pretix/003088_only-sums.md) | The platform keeps only sums of pretix orders | draft |
-| [F/integrations/pretix/003089](requirements/functional/integrations/pretix/003089_no-change-in-pretix.md) | The platform changes nothing in pretix except a new shop | draft |
+| [F/integrations/pretix/003089](requirements/functional/integrations/pretix/003089_no-change-in-pretix.md) | The platform changes nothing in pretix | draft |
 | [F/integrations/pretix/003090](requirements/functional/integrations/pretix/003090_audit.md) | The pretix actions write audit entries | draft |
-| [F/integrations/pretix/003091](requirements/functional/integrations/pretix/003091_permission-use.md) | One permission gives the write actions of pretix | draft |
+| [F/integrations/pretix/003091](requirements/functional/integrations/pretix/003091_permission-use.md) | One permission gives the link to pretix | draft |
 | [F/integrations/ticket-mail/002720](requirements/functional/integrations/ticket-mail/002720_postfach-per-bereich.md) | A Bereich has at most one Postfach | approved |
 | [F/integrations/ticket-mail/002721](requirements/functional/integrations/ticket-mail/002721_postfach-page.md) | An admin sets the Postfach on the admin page | approved |
 | [F/integrations/ticket-mail/002722](requirements/functional/integrations/ticket-mail/002722_postfach-switch.md) | Each Postfach has a switch | approved |
