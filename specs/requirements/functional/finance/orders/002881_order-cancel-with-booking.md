@@ -2,9 +2,9 @@
 id: "002881"
 title: The cancel of a booked Bestellung asks first
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-24
+updated: 2026-11-25
 implementation:
   - frontend/src/app/pages/orders/order-detail.component.ts
 scope:
@@ -14,7 +14,8 @@ scope:
 
 # The cancel of a booked Bestellung asks first
 
-When a person sets a Bestellung with a booking to "Storniert", the frontend must ask with the
+When a person sets a Bestellung with a booking to a status of the phase
+`void` (003036), the frontend must ask with the
 booked amount in the text. The cancel must keep the bookings. The platform must not create a
 booking for the refund.
 
