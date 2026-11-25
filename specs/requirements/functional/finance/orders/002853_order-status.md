@@ -2,7 +2,7 @@
 id: "002853"
 title: A Bestellung has a status of its status list
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

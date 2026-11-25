@@ -2,7 +2,7 @@
 id: "002884"
 title: The segments of the page Bestellungen follow the phases
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:
