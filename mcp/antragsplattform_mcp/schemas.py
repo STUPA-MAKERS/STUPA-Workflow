@@ -455,15 +455,31 @@ class AppointmentIn(WireModel, frozen=True):
     description: str | None = Field(default=None, description="Up to 5000 characters")
     forAll: bool = Field(default=False, description="Invite every account")
     public: bool = Field(default=False, description="Show the Termin on the public calendar")
-    gremiumIds: list[str] = Field(default_factory=list, description="Invited Gremien")
+    teamIds: list[str] = Field(
+        default_factory=list, description="Invited teams (the team of a Gremium: its members)"
+    )
     principalIds: list[str] = Field(default_factory=list, description="Invited persons")
 
 
 class ExternalCalendarIn(WireModel, frozen=True):
     name: str = Field(description="1 to 120 characters")
     url: str = Field(description="The http(s) address of the ICS feed")
-    gremiumId: str | None = Field(default=None, description="The Gremium that reads it; none: all")
+    teamId: str | None = Field(default=None, description="The team that reads it; none: all")
     intervalMinutes: Literal[15, 60, 360, 1440] = 60
+
+
+class TeamCreate(WireModel, frozen=True):
+    name: str = Field(description="1 to 120 characters")
+    parentId: str | None = Field(
+        default=None, description="The parent team; none: a team at the top (team.create)"
+    )
+
+
+class TeamPatch(WireModel, frozen=True):
+    name: str | None = Field(default=None, description="A new name (not for a Gremium team)")
+    parentId: str | None = Field(
+        default=None, description="A new parent; send null to move the team to the top"
+    )
 
 
 class PollOptionIn(WireModel, frozen=True):
@@ -1034,8 +1050,8 @@ class TodoEventIn(WireModel, frozen=True):
 
 
 class TodoBoardEntryIn(WireModel, frozen=True):
-    gremiumId: str | None = Field(default=None, description="A gremium; or set principalId")
-    principalId: str | None = Field(default=None, description="A person; or set gremiumId")
+    teamId: str | None = Field(default=None, description="A team; or set principalId")
+    principalId: str | None = Field(default=None, description="A person; or set teamId")
     role: TodoEntryRole = Field(
         default="edit",
         description="read reads, edit works on the cards, manage also changes the board",

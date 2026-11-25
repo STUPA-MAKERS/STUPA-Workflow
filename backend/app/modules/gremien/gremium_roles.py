@@ -42,6 +42,8 @@ from app.shared.errors import ConflictError, NotFoundError
 #:   todo.configure  — edit the name, the columns and the labels of that board
 #:   info.write      — edit the Markdown text and the links of the Info tab
 #:   members.notify  — send a message by mail to all members of the gremium
+#:   team.manage     — manage the inherent team of the gremium: its sub-teams, the
+#:                     settings of its board and its entries (F/collaboration/teams/003066)
 #: An OAuth token caps these permissions through its scope. See
 #: ``app.modules.auth.policy``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
@@ -55,6 +57,7 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "info.write",
     "members.notify",
     "ticket.work",
+    "team.manage",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 

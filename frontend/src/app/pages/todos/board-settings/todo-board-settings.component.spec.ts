@@ -10,7 +10,7 @@ import { TodoBoardSettingsComponent } from './todo-board-settings.component';
 import { toastMock } from '../../../../testing/toast';
 
 const ENTRIES: TodoBoardEntry[] = [
-  { id: null, kind: 'gremium', targetId: 'g-1', name: 'Studierendenparlament', role: 'edit', fixed: true, logoUrl: null },
+  { id: null, kind: 'team', targetId: 'g-1', name: 'Studierendenparlament', role: 'edit', fixed: true, logoUrl: null },
   { id: 'e-1', kind: 'person', targetId: 'p-5', name: 'Lea Schmid', role: 'read', fixed: false, logoUrl: null },
 ];
 
@@ -29,7 +29,7 @@ async function setup(b: TodoBoard = board()) {
     patchLabel: jest.fn(() => of({ id: 'l-1', name: 'Zzz', color: 'gray' as const })),
     deleteLabel: jest.fn(() => of(undefined)),
     entries: jest.fn(() => of(ENTRIES)),
-    entryOptions: jest.fn(() => of({ gremien: [{ id: 'g-7', name: 'AStA', logoUrl: null }], persons: [] })),
+    entryOptions: jest.fn(() => of({ teams: [{ id: 'g-7', name: 'AStA', gremiumId: null, parentName: null, logoUrl: null }], persons: [] })),
     addEntry: jest.fn(() => of(ENTRIES)),
     patchEntry: jest.fn(() => of(ENTRIES)),
     removeEntry: jest.fn(() => of(ENTRIES.slice(0, 1))),
@@ -77,8 +77,8 @@ describe('TodoBoardSettingsComponent', () => {
     expect(screen.getByText('Keine Labels')).toBeInTheDocument();
   });
 
-  /** § 001077: the own Gremium is fixed, the other entries change and go. */
-  it('lists the members of a Gremium board and changes the other entries', async () => {
+  /** § 001077, 003068: the own team is fixed, the other entries change and go. */
+  it('lists the members of a team board and changes the other entries', async () => {
     const { api, cmp, changed, detect } = await setup();
     const members = screen.getByRole('list', { name: 'Mitglieder' });
     expect(within(members).getByText('Studierendenparlament')).toBeInTheDocument();
@@ -92,8 +92,8 @@ describe('TodoBoardSettingsComponent', () => {
     detect();
     expect(api.removeEntry).toHaveBeenCalledWith('b-1', 'e-1');
     expect(cmp.entries()).toHaveLength(1);
-    cmp.addEntry({ hit: { kind: 'gremium', id: 'g-7', name: 'AStA', logoUrl: null }, role: 'edit' });
-    expect(api.addEntry).toHaveBeenCalledWith('b-1', { gremiumId: 'g-7', role: 'edit' });
+    cmp.addEntry({ hit: { kind: 'team', id: 'g-7', name: 'AStA', logoUrl: null }, role: 'edit' });
+    expect(api.addEntry).toHaveBeenCalledWith('b-1', { teamId: 'g-7', role: 'edit' });
     expect(screen.queryByRole('button', { name: 'Board archivieren' })).toBeNull();
   });
 

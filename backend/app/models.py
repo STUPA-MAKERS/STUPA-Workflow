@@ -88,6 +88,7 @@ from app.modules.paperless.models import (
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.statuses.models import StatusDef
+from app.modules.teams.models import Team, TeamMember
 from app.modules.tickets.models import (
     Ticket,
     TicketArea,
@@ -199,6 +200,8 @@ __all__ = [
     "TicketNote",
     "TicketSenderBlock",
     "TodoAssignee",
+    "Team",
+    "TeamMember",
     "TodoBoard",
     "TodoCard",
     "TodoCardLabel",

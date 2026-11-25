@@ -350,7 +350,11 @@ describe('calendar.util', () => {
         endTime: null,
         place: 'Tübingen',
       };
-      expect(entryOf(a, [{ id: 'g-1', name: 'StuPa' }], 'accept')).toEqual(
+      const teams = [
+        { id: 't-1', name: 'StuPa', gremiumId: 'g-1' },
+        { id: 't-2', name: 'Erstiwoche', gremiumId: null },
+      ];
+      expect(entryOf(a, teams, 'accept')).toEqual(
         entry('a-1', {
           title: 'Klausur',
           startsOn: '2026-11-17',
@@ -397,7 +401,7 @@ describe('calendar.util', () => {
         description: null,
         forAll: false,
         public: false,
-        gremiumIds: ['g-1'],
+        teamIds: ['g-1'],
         principalIds: ['p-1'],
       });
       expect(

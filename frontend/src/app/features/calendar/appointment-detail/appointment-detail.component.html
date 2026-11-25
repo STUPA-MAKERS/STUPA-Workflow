@@ -55,7 +55,7 @@
           <div class="apv__block">
             <span class="apv__cap">{{ 'calendar.field.invited' | t }}</span>
             <div class="apv__chips">
-              @for (g of a.gremien; track g.id) {
+              @for (g of a.teams; track g.id) {
                 <app-chip
                   ><app-icon name="landmark" [size]="14" /><span>{{ g.name }}</span></app-chip
                 >

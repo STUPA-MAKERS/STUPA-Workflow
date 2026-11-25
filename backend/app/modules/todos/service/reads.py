@@ -168,6 +168,7 @@ class ReadOps(TodoServiceBase):
                 _in_column_order(per_board.get(b.id, ()), columns.get(b.id, ())),
                 facts,
                 can_write=await self.access.can_write(b, principal),
+                gremium_id=await self.access.gremium_of(b),
             )
             for b in sorted(boards.values(), key=_board_order)
         ]

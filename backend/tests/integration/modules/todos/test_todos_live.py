@@ -66,7 +66,7 @@ async def test_pings_reach_the_readable_boards_only(
     gid, gboard = await add_gremium(maker, "StuPa")
     _hidden_gid, hidden = await add_gremium(maker, "AStA")
     me, me_id = await add_person(maker, "Mia")
-    await add_member(maker, gid, me_id, "todo.write", "todo.configure")
+    await add_member(maker, gid, me_id, "todo.write", "todo.configure", "team.manage")
     _live(api, Principal(sub=me.sub))
     board = str(gboard)
     with TestClient(api.app) as client, client.websocket_connect("/api/ws/todos") as ws:

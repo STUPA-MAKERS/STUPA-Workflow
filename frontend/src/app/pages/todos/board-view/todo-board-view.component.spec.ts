@@ -173,10 +173,10 @@ describe('TodoBoardViewComponent', () => {
     };
     const personal = await lists(board({ kind: 'personal', gremiumId: null }));
     expect(personal.every((l) => l.element.nativeElement.dataset['boardKind'] === 'personal')).toBe(true);
-    expect(personal[0].enterPredicate(from('gremium'), personal[0])).toBe(false);
     expect(personal[0].enterPredicate(from('team'), personal[0])).toBe(false);
+    expect(personal[0].enterPredicate(from('permission'), personal[0])).toBe(false);
     expect(personal[0].enterPredicate(from('personal'), personal[0])).toBe(true);
-    const gremium = DROP_ENTER.gremium;
+    const gremium = DROP_ENTER.team;
     expect(gremium(from('personal'))).toBe(true);
   });
 
@@ -402,7 +402,7 @@ describe('TodoBoardViewComponent', () => {
       try {
         press('Raum buchen');
         expect(on.menu).toHaveBeenCalledWith(
-          expect.objectContaining({ boardId: 'b-1', boardKind: 'gremium', card: expect.objectContaining({ id: 'k-1' }) }),
+          expect.objectContaining({ boardId: 'b-1', boardKind: 'team', card: expect.objectContaining({ id: 'k-1' }) }),
         );
         expect(on.menu.mock.calls[0][0].columns.map((c: { id: string }) => c.id)).toEqual(['c-1', 'c-2', 'c-3', 'c-4']);
         expect(on.openCard).not.toHaveBeenCalled();

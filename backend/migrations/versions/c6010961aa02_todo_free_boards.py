@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c6010961aa02"
@@ -44,12 +45,16 @@ _OWNER_NEW = (
     "AND permission IS NULL)"
 )
 
-_UPGRADE: tuple[str, ...] = (
+#: The steps on the old shape of ``todo_board`` and ``todo_board_entry`` (``gremium_id``).
+_GREMIUM_STEPS: tuple[str, ...] = (
     "ALTER TABLE todo_board DROP CONSTRAINT IF EXISTS ck_todo_board_kind",
     "ALTER TABLE todo_board ADD CONSTRAINT ck_todo_board_kind "
     "CHECK (kind IN ('gremium', 'personal', 'team', 'free'))",
     "ALTER TABLE todo_board DROP CONSTRAINT IF EXISTS ck_todo_board_owner",
     f"ALTER TABLE todo_board ADD CONSTRAINT ck_todo_board_owner CHECK ({_OWNER_NEW})",
+)
+
+_UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS todo_board_entry (
         id uuid CONSTRAINT pk_todo_board_entry PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,14 +72,9 @@ _UPGRADE: tuple[str, ...] = (
     )
     """,
     (
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_entry_gremium "
-        "ON todo_board_entry (board_id, gremium_id) WHERE gremium_id IS NOT NULL"
-    ),
-    (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_entry_principal "
         "ON todo_board_entry (board_id, principal_id) WHERE principal_id IS NOT NULL"
     ),
-    "CREATE INDEX IF NOT EXISTS ix_todo_board_entry_gremium_id ON todo_board_entry (gremium_id)",
     (
         "CREATE INDEX IF NOT EXISTS ix_todo_board_entry_principal_id "
         "ON todo_board_entry (principal_id)"
@@ -98,10 +98,33 @@ _DOWNGRADE: tuple[str, ...] = (
 )
 
 
+#: The gremium indexes of ``todo_board_entry`` in its old shape.
+_ENTRY_INDEXES: tuple[str, ...] = (
+    (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_entry_gremium "
+        "ON todo_board_entry (board_id, gremium_id) WHERE gremium_id IS NOT NULL"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_todo_board_entry_gremium_id ON todo_board_entry (gremium_id)",
+)
+
+
+def _has_gremium(table: str) -> bool:
+    """Tell if ``table`` has the old column ``gremium_id``.
+
+    A fresh database gets both tables from the ``create_all`` baseline (0001) in the shape
+    of the models, with ``team_id`` (9f288998cf57), so the gremium steps do not apply.
+    """
+    return "gremium_id" in {c["name"] for c in sa.inspect(op.get_bind()).get_columns(table)}
+
+
 def upgrade() -> None:
     """Upgrade the schema to this revision."""
-    for stmt in _UPGRADE:
+    old_board = _has_gremium("todo_board")
+    for stmt in (*(_GREMIUM_STEPS if old_board else ()), *_UPGRADE):
         op.execute(stmt)
+    if _has_gremium("todo_board_entry"):
+        for stmt in _ENTRY_INDEXES:
+            op.execute(stmt)
 
 
 def downgrade() -> None:

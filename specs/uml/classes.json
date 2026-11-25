@@ -442,11 +442,11 @@
       "to": "Principal"
     },
     {
-      "column": "gremium_id",
+      "column": "team_id",
       "from": "ExternalCalendar",
       "multiplicity": "*",
       "onDelete": "CASCADE",
-      "to": "Gremium"
+      "to": "Team"
     },
     {
       "column": "calendar_id",
@@ -554,18 +554,18 @@
       "to": "Appointment"
     },
     {
-      "column": "gremium_id",
-      "from": "Invitation",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Gremium"
-    },
-    {
       "column": "principal_id",
       "from": "Invitation",
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Principal"
+    },
+    {
+      "column": "team_id",
+      "from": "Invitation",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Team"
     },
     {
       "column": "created_by",
@@ -960,6 +960,34 @@
       "to": "StatusEvent"
     },
     {
+      "column": "gremium_id",
+      "from": "Team",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Gremium"
+    },
+    {
+      "column": "parent_id",
+      "from": "Team",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "Team"
+    },
+    {
+      "column": "principal_id",
+      "from": "TeamMember",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "team_id",
+      "from": "TeamMember",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Team"
+    },
+    {
       "column": "assignee_id",
       "from": "Ticket",
       "multiplicity": "*",
@@ -1107,13 +1135,6 @@
       "to": "TodoCard"
     },
     {
-      "column": "gremium_id",
-      "from": "TodoBoard",
-      "multiplicity": "*",
-      "onDelete": "CASCADE",
-      "to": "Gremium"
-    },
-    {
       "column": "owner_id",
       "from": "TodoBoard",
       "multiplicity": "*",
@@ -1121,11 +1142,11 @@
       "to": "Principal"
     },
     {
-      "column": "gremium_id",
-      "from": "TodoBoardEntry",
+      "column": "team_id",
+      "from": "TodoBoard",
       "multiplicity": "*",
       "onDelete": "CASCADE",
-      "to": "Gremium"
+      "to": "Team"
     },
     {
       "column": "principal_id",
@@ -1133,6 +1154,13 @@
       "multiplicity": "*",
       "onDelete": "CASCADE",
       "to": "Principal"
+    },
+    {
+      "column": "team_id",
+      "from": "TodoBoardEntry",
+      "multiplicity": "*",
+      "onDelete": "CASCADE",
+      "to": "Team"
     },
     {
       "column": "board_id",
@@ -3549,7 +3577,7 @@
           "type": "TEXT"
         },
         {
-          "name": "gremium_id",
+          "name": "team_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
@@ -4305,7 +4333,7 @@
           "type": "CHAR(32)"
         },
         {
-          "name": "gremium_id",
+          "name": "team_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
@@ -7014,6 +7042,76 @@
     {
       "attributes": [
         {
+          "name": "name",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "parent_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "gremium_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Team",
+      "module": "teams",
+      "name": "Team",
+      "path": "backend/app/modules/teams/models.py",
+      "table": "team"
+    },
+    {
+      "attributes": [
+        {
+          "name": "team_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "principal_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "role",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "member",
+            "manager"
+          ]
+        }
+      ],
+      "id": "TeamMember",
+      "module": "teams",
+      "name": "TeamMember",
+      "path": "backend/app/modules/teams/models.py",
+      "table": "team_member"
+    },
+    {
+      "attributes": [
+        {
           "name": "number",
           "nullable": false,
           "primaryKey": false,
@@ -7748,14 +7846,14 @@
           "primaryKey": false,
           "type": "TEXT",
           "values": [
-            "gremium",
-            "personal",
             "team",
+            "personal",
+            "permission",
             "free"
           ]
         },
         {
-          "name": "gremium_id",
+          "name": "team_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"
@@ -7818,7 +7916,7 @@
           "type": "CHAR(32)"
         },
         {
-          "name": "gremium_id",
+          "name": "team_id",
           "nullable": true,
           "primaryKey": false,
           "type": "CHAR(32)"

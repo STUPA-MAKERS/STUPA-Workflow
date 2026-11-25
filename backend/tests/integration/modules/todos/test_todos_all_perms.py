@@ -71,7 +71,9 @@ async def _world(api: Api, maker: async_sessionmaker[AsyncSession]) -> _World:
     w.gboard = str(gboard)
     w.team = str(await add_team_board(maker, "ticket.manage"))
     writer, w.writer_id = await add_person(maker, "Wanda")
-    await add_member(maker, w.gremium_id, w.writer_id, "todo.write", "todo.configure")
+    await add_member(
+        maker, w.gremium_id, w.writer_id, "todo.write", "todo.configure", "team.manage"
+    )
     reader, w.reader_id = await add_person(maker, "Rita")
     w.reader = Principal(sub=reader.sub, permissions={"todo.read_all"})
     api.login(Principal(sub=writer.sub, permissions={"ticket.manage"}))

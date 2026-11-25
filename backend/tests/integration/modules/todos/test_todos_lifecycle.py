@@ -226,9 +226,7 @@ async def test_the_due_reminder_skips_a_former_member(
     )
     async with maker() as session:
         await session.execute(
-            text(
-                "DELETE FROM gremium_membership WHERE principal_id = :p"
-            ),
+            text("DELETE FROM gremium_membership WHERE principal_id = :p"),
             {"p": former_id},
         )
         await session.commit()
@@ -369,13 +367,17 @@ def test_the_migration_backfills_and_downgrades(alembic_cfg: Config, engine: Eng
         command.upgrade(alembic_cfg, "head")
         with engine.connect() as conn:
             boards = conn.execute(
-                text("SELECT kind, name, gremium_id, permission FROM todo_board ORDER BY kind")
+                text(
+                    "SELECT b.kind, b.name, t.gremium_id, b.permission FROM todo_board b "
+                    "LEFT JOIN team t ON t.id = b.team_id ORDER BY b.kind"
+                )
             ).all()
             columns = conn.execute(
                 text(
                     "SELECT c.name, c.is_done FROM todo_column c "
                     "JOIN todo_board b ON b.id = c.board_id "
-                    "WHERE b.gremium_id = :g ORDER BY c.position"
+                    "JOIN team t ON t.id = b.team_id "
+                    "WHERE t.gremium_id = :g ORDER BY c.position"
                 ),
                 {"g": gid},
             ).all()
@@ -385,8 +387,8 @@ def test_the_migration_backfills_and_downgrades(alembic_cfg: Config, engine: Eng
                     {"g": gid},
                 ).all()
             )
-        assert ("gremium", "Todo-G", gid, None) in boards
-        assert any(b[0] == "team" and b[3] is not None for b in boards)
+        assert ("team", "Todo-G", gid, None) in boards
+        assert any(b[0] == "permission" and b[1] == "Plattform" for b in boards)
         assert [tuple(c) for c in columns] == [
             ("Offen", False),
             ("In Arbeit", False),
@@ -394,7 +396,8 @@ def test_the_migration_backfills_and_downgrades(alembic_cfg: Config, engine: Eng
             ("Erledigt", True),
         ]
         assert "todo.write" in perms["member"] and "todo.configure" not in perms["member"]
-        assert {"todo.write", "todo.configure"} <= set(perms["vorstand"])
+        assert {"todo.write", "todo.configure", "team.manage"} <= set(perms["vorstand"])
+        assert "team.manage" not in perms["member"]
     finally:
         with engine.begin() as conn:
             conn.execute(text("DELETE FROM gremium WHERE slug = 'todo-mig'"))

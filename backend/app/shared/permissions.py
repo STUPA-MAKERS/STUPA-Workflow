@@ -87,6 +87,8 @@ Keys that need a note:
   no member. A personal board stays private.
 - `todo.create_board`: create a free to-do board (spec 001061). The creator becomes a
   member with the role `manage`; the right reaches no existing board.
+- `team.create`: create a team without a parent (F/collaboration/teams/003065). The
+  creator becomes its first manager; the right reaches no existing team.
 - `order.manage`: create, change and delete the Bestellungen that the person reads
   (F/finance/orders/002862). It is separate from `budget.book`, so a role can order
   without the right to book.
@@ -188,6 +190,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "todo.read_all",
     "todo.all",
     "todo.create_board",
+    "team.create",
     "calendar.manage",
     "calendar.publish",
     "admin.calendars",

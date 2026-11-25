@@ -33,7 +33,7 @@ export function appointment(over: Partial<Appointment> = {}): Appointment {
     forAll: false,
     public: false,
     creator: { id: 'p-1', name: 'Dana Meier' },
-    gremien: [{ id: 'g-1', name: 'Haushaltsausschuss' }],
+    teams: [{ id: 'g-1', name: 'Haushaltsausschuss', gremiumId: 'g-1' }],
     persons: [{ id: 'p-2', name: 'Jonas Weber' }],
     answers: [{ principalId: 'p-2', name: 'Jonas Weber', answer: 'accept' }],
     unanswered: [{ id: 'p-3', name: 'Mira Kaya' }],

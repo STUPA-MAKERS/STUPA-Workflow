@@ -79,7 +79,7 @@ async function start(url: string, opts: Opts = {}) {
     ),
     transferCard: jest.fn(opts.transfer ?? (() => of(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat' })))),
     members: jest.fn(() => of(MEMBERS)),
-    mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
+    mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'team', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
     createCard: jest.fn(() => of(detail({ id: 'k-9', columnId: 'c-1', title: 'Neu' }))),
     card: jest.fn(opts.cardRead ?? (() => of(detail()))),
@@ -89,7 +89,7 @@ async function start(url: string, opts: Opts = {}) {
     archive: jest.fn(() => of({ items: [], total: 0, limit: 50, offset: 0 })),
     archivedBoards: jest.fn(() => of([])),
     entries: jest.fn(() => of([])),
-    entryOptions: jest.fn(() => of({ gremien: [], persons: [] })),
+    entryOptions: jest.fn(() => of({ teams: [], persons: [] })),
   };
   const toast = toastMock();
   TestBed.configureTestingModule({
@@ -360,7 +360,7 @@ describe('TodosComponent', () => {
   it('reads "me" again after a change of a card and keeps a done card of mine', async () => {
     const { cmp, api } = await start('/todos/b-1');
     const mineOf = (...ids: string[]): Observable<TodoMine> =>
-      of({ items: ids.map((id) => ({ ...tile({ id }), boardName: '', boardKind: 'gremium' as const, columnName: '', labels: [] })), dueSoonCount: 0 });
+      of({ items: ids.map((id) => ({ ...tile({ id }), boardName: '', boardKind: 'team' as const, columnName: '', labels: [] })), dueSoonCount: 0 });
     cmp.onCardChanged(detail({ id: 'k-2', title: 'Haushalt Kapitel 3' }));
     expect(api.mine).not.toHaveBeenCalled();
     cmp.setAssignee('me');
@@ -1614,7 +1614,7 @@ describe('TodosComponent', () => {
         await settle();
         expect(api.moveCard).toHaveBeenCalledWith('p-1', { columnId: 'c-2', beforeId: 'p-2' });
         expect(cmp.tileMenuOpen()).toBe(false);
-        cmp.onTileMenu({ card: other().cards[0], boardId: 'b-1', boardKind: 'gremium', columns: cols });
+        cmp.onTileMenu({ card: other().cards[0], boardId: 'b-1', boardKind: 'team', columns: cols });
         cmp.onTileMove({ columnId: 'c-3', position: 'bottom' });
         expect(api.moveCard).toHaveBeenLastCalledWith('k-5', { columnId: 'c-3' });
         expect(harness.routeNativeElement).toBeTruthy();
@@ -1725,7 +1725,7 @@ describe('TodosComponent', () => {
           rows: [other()],
           transfer: () => throwError(() => refused),
         });
-        cmp.onTileMenu({ card: other().cards[0], boardId: 'b-1', boardKind: 'gremium', columns: personal().columns });
+        cmp.onTileMenu({ card: other().cards[0], boardId: 'b-1', boardKind: 'team', columns: personal().columns });
         cmp.tileTransferOpen.set(true);
         const reads = api.pollBoard.mock.calls.length;
         const rowReads = api.pollMineBoards.mock.calls.length;
@@ -1743,7 +1743,7 @@ describe('TodosComponent', () => {
         const rows = [other()];
         const moved = detail({ id: 'k-5', boardId: 'b-2', columnId: 'c-1', title: 'Plakat drucken' });
         const { cmp, api, toast, settle } = await start(`/todos/${ALL_BOARDS}`, { all: rows, transfer: () => of(moved) });
-        cmp.onTileMenu({ card: rows[0].cards[0], boardId: 'b-1', boardKind: 'gremium', columns: rows[0].columns });
+        cmp.onTileMenu({ card: rows[0].cards[0], boardId: 'b-1', boardKind: 'team', columns: rows[0].columns });
         const lists = api.boards.mock.calls.length;
         cmp.transferTile({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
         await settle();
@@ -1751,7 +1751,7 @@ describe('TodosComponent', () => {
         expect(toast.success).toHaveBeenCalled();
         expect(cmp.tileMenu()).toBeNull();
         api.transferCard.mockImplementationOnce(() => throwError(() => new Error('x')));
-        cmp.onTileMenu({ card: rows[0].cards[0], boardId: 'b-1', boardKind: 'gremium', columns: rows[0].columns });
+        cmp.onTileMenu({ card: rows[0].cards[0], boardId: 'b-1', boardKind: 'team', columns: rows[0].columns });
         cmp.transferTile({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
         await settle();
         expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');

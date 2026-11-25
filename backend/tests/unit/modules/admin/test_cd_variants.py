@@ -656,7 +656,9 @@ async def test_update_gremium_binds_an_existing_cd_variant() -> None:
 
 async def test_create_gremium_binds_an_existing_cd_variant() -> None:
     variant = variant_row()
-    session = FakeSession([res(), *audit_results()], gets=[variant])
+    session = FakeSession(
+        [res(), res(), *audit_results()], scalars=[None, uuid.uuid4(), None], gets=[variant]
+    )
     service = ConfigService(session)  # type: ignore[arg-type]
     out = await service.create_gremium(
         GremiumCreate(name="StuPa", slug="stupa", cdVariantId=variant.id), "admin"

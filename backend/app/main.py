@@ -102,6 +102,7 @@ from app.modules.protocol.router import router as protocol_router
 from app.modules.push_actions.router import router as push_actions_router
 from app.modules.search.router import router as search_router
 from app.modules.statuses.router import router as statuses_router
+from app.modules.team_pages.router import router as teams_router
 from app.modules.tickets.router import router as tickets_router
 from app.modules.todos.links_router import router as links_router
 from app.modules.todos.router import router as todos_router
@@ -181,6 +182,7 @@ api_router.include_router(links_router)
 api_router.include_router(todos_ws_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(gremien_tab_router)
+api_router.include_router(teams_router)
 api_router.include_router(site_config_public_router)
 api_router.include_router(translations_router)
 api_router.include_router(i18n_public_router)

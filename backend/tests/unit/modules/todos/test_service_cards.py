@@ -591,12 +591,12 @@ async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
 async def test_a_shared_card_never_moves_into_a_personal_board() -> None:
     """Refuse a transfer from a gremium or team board into a personal board."""
     session, b, _col, c, service = _setup()
-    personal, _first, _done = _target(session, kind="personal", gremium_id=None, owner_id=ME)
+    personal, _first, _done = _target(session, kind="personal", team_id=None, owner_id=ME)
     with pytest.raises(ForbiddenError) as exc:
         await service.transfer(c.id, _transfer(personal), USER)
     assert exc.value.code == "transfer_to_personal"
     assert c.board_id == b.id and session.committed == 0
-    b.kind, b.gremium_id, b.permission = "team", None, "ticket.manage"
+    b.kind, b.team_id, b.permission = "permission", None, "ticket.manage"
     with pytest.raises(ForbiddenError):
         await service.transfer(c.id, _transfer(personal), USER)
 
@@ -607,7 +607,7 @@ async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
     Nobody is added when the actor is not a member of the target or an assignee exists.
     """
     session, b, _col, c, service = _setup()
-    b.kind, b.gremium_id, b.owner_id = "personal", None, ME
+    b.kind, b.team_id, b.owner_id = "personal", None, ME
     t, first, _done = _target(session)
     session.scalars_q[:] = [[first], [], [], [], []]
     await service.transfer(c.id, _transfer(t), USER)
@@ -616,7 +616,7 @@ async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
     assert [e.kind for e in _events(session)] == ["moved", "assigned"]
     assert service.outbox == []
     for members, assignees in (({OTHER}, []), ({ME, OTHER}, [OTHER])):
-        back = board(kind="personal", gremium_id=None, owner_id=ME)
+        back = board(kind="personal", team_id=None, owner_id=ME)
         session.put(back)
         c.board_id = back.id
         service.access.member_set = members  # type: ignore[attr-defined]

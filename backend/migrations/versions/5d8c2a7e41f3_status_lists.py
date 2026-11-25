@@ -12,7 +12,7 @@ revisions are append-only, so the downgrade keeps them. The upgrade grants
 role. The step is idempotent.
 
 Revision ID: 5d8c2a7e41f3
-Revises: e5a1c7d93b20
+Revises: 9f288998cf57
 Create Date: 2026-11-25 19:30:00.000000
 """
 
@@ -24,7 +24,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "5d8c2a7e41f3"
-down_revision: str | None = "e5a1c7d93b20"
+down_revision: str | None = "9f288998cf57"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

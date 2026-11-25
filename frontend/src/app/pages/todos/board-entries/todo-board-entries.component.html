@@ -1,7 +1,7 @@
 <ul class="be rowgroup" [attr.aria-label]="'todos.entries.title' | t">
   @for (entry of entries(); track key(entry)) {
     <li class="be__row">
-      @if (entry.kind === 'gremium') {
+      @if (entry.kind === 'team') {
         <app-gremium-logo size="sm" [name]="entry.name" [logoUrl]="entry.logoUrl ?? null" />
       } @else {
         <app-avatar size="sm" [name]="entry.name" [principalId]="entry.targetId" [decorative]="true" />
@@ -34,7 +34,7 @@
 <app-gremium-person-picker
   class="be__picker"
   [placeholder]="'todos.entries.add' | t"
-  [gremien]="gremien()"
+  [teams]="teams()"
   [persons]="findPeople"
   [taken]="taken()"
   (picked)="add($event)"

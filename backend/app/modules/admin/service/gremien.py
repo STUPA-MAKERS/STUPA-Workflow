@@ -29,7 +29,9 @@ from app.modules.gremien.models import (
 )
 from app.modules.meetings.models import Meeting, MeetingSettings
 from app.modules.site_config.models import CdVariant
-from app.modules.todos.boards import ensure_gremium_board
+from app.modules.teams.members import ensure_gremium_team
+from app.modules.teams.models import Team
+from app.modules.todos.boards import ensure_team_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -184,7 +186,8 @@ class GremiumOps(ConfigServiceBase):
         self.session.add(row)
         await self.session.flush()
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
-        await ensure_gremium_board(self.session, row.id, row.name)
+        team_id = await ensure_gremium_team(self.session, row.id)
+        await ensure_team_board(self.session, team_id, row.name)
         await self._audit(
             actor,
             AuditAction.CONFIG_CHANGE,
@@ -359,7 +362,8 @@ class GremiumOps(ConfigServiceBase):
                 application types still exists, the gremium decides the running vote of an
                 application (`gremium_decides_vote`), a budget belongs to the
                 gremium (`gremium_has_budget`), or a vote of the gremium is open
-                (`open_vote`) (409).
+                (`open_vote`), or the team of the gremium has sub-teams
+                (`team_has_sub_teams`, F/collaboration/teams/003062) (409).
         """
         await self._lock_budget_trees(gremium_id)
         row = await self.session.scalar(
@@ -407,6 +411,16 @@ class GremiumOps(ConfigServiceBase):
                 "A budget belongs to the Gremium. Delete the budget first.",
                 code="gremium_has_budget",
             )
+        sub_team = await self.session.scalar(
+            select(Team.id)
+            .where(Team.parent_id.in_(select(Team.id).where(Team.gremium_id == gremium_id)))
+            .limit(1)
+        )
+        if sub_team is not None:
+            raise ConflictError(
+                "The team of the Gremium has sub-teams. Move or delete them first.",
+                code="team_has_sub_teams",
+            )
         comment_ids = await self._lock_gremium_todos(gremium_id)
         files = FilesService(self.session, storage=self.storage)
         await files.lock_for_messages("todo_comment", comment_ids)
@@ -448,7 +462,7 @@ class GremiumOps(ConfigServiceBase):
             await lock_tree(self.session, budget_id)
 
     async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
-        """Lock the to-do board of a gremium and its cards, and return its comment ids.
+        """Lock the board of the team of a gremium and its cards; return its comment ids.
 
         The board goes first and then the cards, the order of every to-do write. The
         card lock is ``FOR UPDATE``, which waits for the key-share lock of a comment
@@ -456,7 +470,9 @@ class GremiumOps(ConfigServiceBase):
         or its insert waits and then fails on the deleted card. Otherwise its files
         would lose their row through the cascade and keep their object.
         """
-        boards = select(TodoBoard.id).where(TodoBoard.gremium_id == gremium_id)
+        boards = select(TodoBoard.id).where(
+            TodoBoard.team_id.in_(select(Team.id).where(Team.gremium_id == gremium_id))
+        )
         await self.session.execute(boards.order_by(TodoBoard.id).with_for_update())
         await self.session.execute(
             select(TodoCard.id)

@@ -353,8 +353,8 @@ export function defaultBoard(
 ): TodoBoardSummary | null {
   return (
     boards.find((b) => b.kind === 'personal') ??
-    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
-    boards.find((b) => b.kind === 'gremium') ??
+    boards.find((b) => b.kind === 'team' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
+    boards.find((b) => b.kind === 'team') ??
     boards[0] ??
     null
   );

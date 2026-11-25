@@ -4,9 +4,9 @@ A Termin has a title, a start day and an end day. It is all-day when ``start_tim
 NULL and timed otherwise. The times are local ``Europe/Berlin`` values without a zone,
 like the times of a meeting, so the Kalender and the feed convert both the same way.
 
-``calendar_invitation`` invites exactly one Gremium or one person per row
-(``ck_calendar_invitation_target``). An invited Gremium stands for the persons who read
-its meetings at the time of the read, so the row holds the Gremium and not its members.
+``calendar_invitation`` invites exactly one team or one person per row
+(``ck_calendar_invitation_target``). An invited team stands for its members at the time of
+the read (spec 003069), so the row holds the team and not its members.
 
 ``calendar_answer`` holds one answer per person and Termin. A change of the start or
 the end deletes the answers of the Termin.
@@ -15,7 +15,7 @@ the end deletes the answers of the Termin.
 invited persons.
 
 ``calendar_external`` is an ICS feed that an admin subscribed, for all persons
-(``gremium_id`` NULL) or for one Gremium. ``due_at`` is the time of its next fetch: the
+(``team_id`` NULL) or for one team (spec 003070). ``due_at`` is the time of its next fetch: the
 worker fetches a calendar whose ``due_at`` is over, and a save of the URL sets it to
 now. ``last_error`` is a short code of the newest failure and NULL after a success.
 ``calendar_external_entry`` holds the entries of the newest good fetch as plain text,
@@ -92,28 +92,28 @@ class Appointment(UUIDPkMixin, TimestampMixin, Base):
 
 
 class Invitation(UUIDPkMixin, Base):
-    """One invited Gremium or one invited person of a Termin."""
+    """One invited team or one invited person of a Termin."""
 
     __tablename__ = "calendar_invitation"
 
     appointment_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("calendar_appointment.id", ondelete="CASCADE")
     )
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team.id", ondelete="CASCADE"), nullable=True
     )
     principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
     )
 
     __table_args__ = (
-        CheckConstraint("(gremium_id IS NULL) <> (principal_id IS NULL)", name="target"),
+        CheckConstraint("(team_id IS NULL) <> (principal_id IS NULL)", name="target"),
         Index(
-            "uq_calendar_invitation_gremium",
+            "uq_calendar_invitation_team",
             "appointment_id",
-            "gremium_id",
+            "team_id",
             unique=True,
-            postgresql_where=text("gremium_id IS NOT NULL"),
+            postgresql_where=text("team_id IS NOT NULL"),
         ),
         Index(
             "uq_calendar_invitation_principal",
@@ -122,7 +122,7 @@ class Invitation(UUIDPkMixin, Base):
             unique=True,
             postgresql_where=text("principal_id IS NOT NULL"),
         ),
-        Index("ix_calendar_invitation_gremium_id", "gremium_id"),
+        Index("ix_calendar_invitation_team_id", "team_id"),
         Index("ix_calendar_invitation_principal_id", "principal_id"),
     )
 
@@ -155,10 +155,9 @@ class ExternalCalendar(UUIDPkMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(Text)
     url: Mapped[str] = mapped_column(Text)
-    #: NULL: each signed-in person reads the entries. Else the readers of the meetings
-    #: of this Gremium read them.
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    #: NULL: each signed-in person reads the entries. Else the members of this team.
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team.id", ondelete="CASCADE"), nullable=True
     )
     interval_minutes: Mapped[int] = mapped_column(Integer, server_default=text("60"))
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -168,7 +167,7 @@ class ExternalCalendar(UUIDPkMixin, TimestampMixin, Base):
 
     __table_args__ = (
         CheckConstraint("interval_minutes IN (15, 60, 360, 1440)", name="interval"),
-        Index("ix_calendar_external_gremium_id", "gremium_id"),
+        Index("ix_calendar_external_team_id", "team_id"),
         Index("ix_calendar_external_due_at", "due_at"),
     )
 

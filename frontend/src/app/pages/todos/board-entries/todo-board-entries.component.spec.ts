@@ -4,7 +4,7 @@ import { TodosApiService, type TodoBoardEntry } from '@core/api/todos.service';
 import { TodoBoardEntriesComponent, entryOf } from './todo-board-entries.component';
 
 const ENTRIES: readonly TodoBoardEntry[] = [
-  { id: null, kind: 'gremium', targetId: 'g-1', name: 'AStA', role: 'manage', fixed: true },
+  { id: null, kind: 'team', targetId: 'g-1', name: 'AStA', role: 'manage', fixed: true },
   { id: 'e-1', kind: 'person', targetId: 'p-1', name: 'Astrid Berg', role: 'edit', fixed: false },
 ];
 
@@ -13,7 +13,7 @@ async function setup(failGremien = false) {
     entryOptions: jest.fn((q?: string) =>
       failGremien && q === undefined
         ? throwError(() => new Error('down'))
-        : of({ gremien: [{ id: 'g-2', name: 'Fachschaft', logoUrl: null }], persons: [{ id: 'p-2', name: 'Bert' }] }),
+        : of({ teams: [{ id: 'g-2', name: 'Fachschaft', logoUrl: null }], persons: [{ id: 'p-2', name: 'Bert' }] }),
     ),
   };
   const added = jest.fn();
@@ -46,9 +46,9 @@ describe('TodoBoardEntriesComponent', () => {
     view.cmp.setRole(ENTRIES[1], 'nope');
     expect(view.roleChanged).toHaveBeenCalledTimes(1);
 
-    expect(view.cmp.gremien()).toEqual([{ id: 'g-2', name: 'Fachschaft', logoUrl: null }]);
+    expect(view.cmp.teams()).toEqual([{ id: 'g-2', name: 'Fachschaft', logoUrl: null }]);
     expect(view.cmp.taken()).toEqual(['g-1', 'p-1']);
-    expect(view.cmp.key(ENTRIES[0])).toBe('gremium:g-1');
+    expect(view.cmp.key(ENTRIES[0])).toBe('team:g-1');
     expect(view.cmp.key(ENTRIES[1])).toBe('e-1');
     expect(view.cmp.roleName('nope' as never)).toBe('Bearbeiten');
     const people: unknown[] = [];
@@ -60,12 +60,12 @@ describe('TodoBoardEntriesComponent', () => {
 
   it('offers no Gremien when they cannot load', async () => {
     const view = await setup(true);
-    expect(view.cmp.gremien()).toEqual([]);
+    expect(view.cmp.teams()).toEqual([]);
   });
 
   it('turns a hit into a new entry', () => {
-    expect(entryOf({ kind: 'gremium', id: 'g-2', name: 'Fachschaft', logoUrl: '/l' }, 'read')).toEqual(
-      expect.objectContaining({ id: null, kind: 'gremium', targetId: 'g-2', role: 'read', fixed: false, logoUrl: '/l' }),
+    expect(entryOf({ kind: 'team', id: 'g-2', name: 'Fachschaft', logoUrl: '/l' }, 'read')).toEqual(
+      expect.objectContaining({ id: null, kind: 'team', targetId: 'g-2', role: 'read', fixed: false, logoUrl: '/l' }),
     );
     expect(entryOf({ kind: 'person', id: 'p-2', name: 'Bert' }, 'edit')).toEqual(
       expect.objectContaining({ kind: 'person', targetId: 'p-2', role: 'edit' }),

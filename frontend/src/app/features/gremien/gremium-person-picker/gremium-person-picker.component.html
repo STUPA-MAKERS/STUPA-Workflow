@@ -38,13 +38,13 @@
               [id]="optionId(i)"
               (click)="pick(hit)"
             >
-              @if (hit.kind === 'gremium') {
+              @if (hit.kind === 'team') {
                 <app-gremium-logo size="sm" [name]="hit.name" [logoUrl]="hit.logoUrl" />
               } @else {
                 <app-avatar size="sm" [name]="hit.name" [principalId]="hit.id" [decorative]="true" />
               }
-              <span class="gpp__name">{{ hit.name }}</span>
-              <span class="sr-only">{{ (hit.kind === 'gremium' ? 'picker.kind.gremium' : 'picker.kind.person') | t }}</span>
+              <span class="gpp__name">{{ hit.kind === 'team' && hit.parentName ? hit.parentName + ' / ' + hit.name : hit.name }}</span>
+              <span class="sr-only">{{ (hit.kind === 'team' ? 'picker.kind.team' : 'picker.kind.person') | t }}</span>
             </button>
           </li>
         }

@@ -18,7 +18,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   activity, committees, graph, links, notifications, search, tickets, todos
+      collaboration/   activity, committees, graph, links, notifications, search, teams, tickets, todos
       finance/         budget, invoices, orders
       integrations/    external, mcp, mollie, paperless, pretix, ticket-mail, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -362,6 +362,21 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/search/000328](requirements/functional/collaboration/search/000328_reuse-gates.md) | Search reuses the gate of each module | approved |
 | [F/collaboration/search/000329](requirements/functional/collaboration/search/000329_query-length.md) | Search needs two characters | approved |
 | [F/collaboration/search/000330](requirements/functional/collaboration/search/000330_per-kind-cap.md) | Search shows 5 hits per kind | approved |
+| [F/collaboration/teams/003060](requirements/functional/collaboration/teams/003060_team-entity.md) | A team is a named group of persons | approved |
+| [F/collaboration/teams/003061](requirements/functional/collaboration/teams/003061_gremium-inherent-team.md) | Every Gremium has exactly one inherent team | approved |
+| [F/collaboration/teams/003062](requirements/functional/collaboration/teams/003062_sub-teams.md) | A team can have sub-teams | approved |
+| [F/collaboration/teams/003063](requirements/functional/collaboration/teams/003063_free-team-members.md) | The managers of a team add its members by hand | approved |
+| [F/collaboration/teams/003064](requirements/functional/collaboration/teams/003064_sub-team-members-separate.md) | A sub-team does not add its members to the parent team | approved |
+| [F/collaboration/teams/003065](requirements/functional/collaboration/teams/003065_create-team.md) | team.create creates a team and a team manager creates a sub-team | approved |
+| [F/collaboration/teams/003066](requirements/functional/collaboration/teams/003066_gremium-team-managers.md) | team.manage in a Gremium role manages the inherent team | approved |
+| [F/collaboration/teams/003067](requirements/functional/collaboration/teams/003067_team-board.md) | Every team has its own board | approved |
+| [F/collaboration/teams/003068](requirements/functional/collaboration/teams/003068_board-entry-team.md) | A board entry names a team or a person | approved |
+| [F/collaboration/teams/003069](requirements/functional/collaboration/teams/003069_termin-invite-team.md) | A Termin invites teams and persons | approved |
+| [F/collaboration/teams/003070](requirements/functional/collaboration/teams/003070_external-calendar-team.md) | An external calendar belongs to a team | approved |
+| [F/collaboration/teams/003071](requirements/functional/collaboration/teams/003071_team-person-picker.md) | The picker offers teams and persons | approved |
+| [F/collaboration/teams/003072](requirements/functional/collaboration/teams/003072_teams-tab.md) | The tab Gremien is the tab Teams | approved |
+| [F/collaboration/teams/003073](requirements/functional/collaboration/teams/003073_permission-board-kind.md) | The board kind of a permission is called permission | approved |
+| [F/collaboration/teams/003074](requirements/functional/collaboration/teams/003074_team-api-mcp.md) | Teams have an API and MCP tools | approved |
 | [F/collaboration/tickets/000150](requirements/functional/collaboration/tickets/000150_public-report.md) | Anyone can report a help ticket | approved |
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
 | [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | replaced |

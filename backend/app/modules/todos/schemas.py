@@ -17,11 +17,11 @@ from app.modules.auth.people import PersonRef
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-TodoBoardKind = Literal["gremium", "personal", "team", "free"]
+TodoBoardKind = Literal["team", "personal", "permission", "free"]
 #: The role of a member entry (spec 001062).
 TodoEntryRole = Literal["read", "edit", "manage"]
 #: The target of a member entry.
-TodoEntryKind = Literal["gremium", "person"]
+TodoEntryKind = Literal["team", "person"]
 TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
 TodoLinkKind = Literal[
     "application",
@@ -65,6 +65,9 @@ class TodoBoardSummary(FrozenCamelModel, frozen=True):
     id: UUID
     name: str
     kind: TodoBoardKind
+    #: The own team of a team board (spec 003067), else null.
+    team_id: UUID | None = Field(default=None, serialization_alias="teamId")
+    #: The Gremium of the own team when that team is inherent, else null.
     gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
     can_configure: bool = Field(default=False, serialization_alias="canConfigure")
@@ -285,6 +288,9 @@ class TodoBoardOut(FrozenCamelModel, frozen=True):
     id: UUID
     name: str
     kind: TodoBoardKind
+    #: The own team of a team board (spec 003067), else null.
+    team_id: UUID | None = Field(default=None, serialization_alias="teamId")
+    #: The Gremium of the own team when that team is inherent, else null.
     gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
     archive_after_days: int | None = Field(default=None, serialization_alias="archiveAfterDays")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
@@ -400,6 +406,9 @@ class TodoAssignedBoard(FrozenCamelModel, frozen=True):
     id: UUID
     name: str
     kind: TodoBoardKind
+    #: The own team of a team board (spec 003067), else null.
+    team_id: UUID | None = Field(default=None, serialization_alias="teamId")
+    #: The Gremium of the own team when that team is inherent, else null.
     gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
     can_write: bool = Field(default=True, serialization_alias="canWrite")
     columns: tuple[TodoColumnOut, ...] = Field(default_factory=tuple)
@@ -467,9 +476,9 @@ class BoardPatch(FrozenStrictCamelModel, frozen=True):
 
 
 class EntryIn(FrozenStrictCamelModel, frozen=True):
-    """A new member entry: exactly one of ``gremiumId`` and ``principalId``."""
+    """A new member entry: exactly one of ``teamId`` and ``principalId`` (spec 003068)."""
 
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    team_id: UUID | None = Field(default=None, alias="teamId")
     principal_id: UUID | None = Field(default=None, alias="principalId")
     role: TodoEntryRole = "edit"
 
@@ -493,8 +502,9 @@ class BoardCreate(FrozenStrictCamelModel, frozen=True):
 class TodoBoardEntryOut(FrozenCamelModel, frozen=True):
     """A member entry of a board.
 
-    ``fixed`` marks the own gremium of a gremium board: it has no row (``id`` null) and
-    cannot be changed or removed (spec 001077). ``name`` is the gremium or the person.
+    ``fixed`` marks the own team of a team board: it has no row (``id`` null) and cannot
+    be changed or removed (spec 001077). ``name`` is the team or the person.
+    ``gremiumId`` is the Gremium of an inherent team, else null.
     """
 
     id: UUID | None = None
@@ -503,15 +513,22 @@ class TodoBoardEntryOut(FrozenCamelModel, frozen=True):
     name: str
     role: TodoEntryRole
     fixed: bool = False
-    #: The square logo of a gremium entry (``/api/committees/{id}/logo``), else null.
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
+    #: The square logo of an inherent team (``/api/committees/{id}/logo``), else null.
     logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
 
 
-class EntryGremiumOption(FrozenCamelModel, frozen=True):
-    """A gremium that the shared picker offers, with its logo path or null."""
+class EntryTeamOption(FrozenCamelModel, frozen=True):
+    """A team that the shared picker offers (spec 003071).
+
+    ``gremiumId`` and ``logoUrl`` belong to an inherent team, ``parentName`` to a
+    sub-team.
+    """
 
     id: UUID
     name: str
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
+    parent_name: str | None = Field(default=None, serialization_alias="parentName")
     logo_url: str | None = Field(default=None, serialization_alias="logoUrl")
 
 
@@ -523,14 +540,14 @@ class EntryPersonOption(FrozenCamelModel, frozen=True):
 
 
 class EntryOptionsOut(FrozenCamelModel, frozen=True):
-    """The hits of the shared picker of gremien and persons (spec 001074).
+    """The hits of the shared picker of teams and persons (spec 003071).
 
-    ``gremien`` holds every gremium whose name holds the query (all of them for an
-    empty query); ``persons`` the active persons whose name holds it, from two
-    characters on and at most ten.
+    ``teams`` holds every team whose name holds the query (all of them for an empty
+    query); ``persons`` the active persons whose name holds it, from two characters on
+    and at most ten.
     """
 
-    gremien: list[EntryGremiumOption]
+    teams: list[EntryTeamOption]
     persons: list[EntryPersonOption]
 
 

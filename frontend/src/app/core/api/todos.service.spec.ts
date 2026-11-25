@@ -35,7 +35,7 @@ describe('TodosApiService', () => {
   /** § 001061, 001064, 001068, 001074: free boards, their entries and the picker. */
   it('creates, archives, restores and deletes a free board and edits its entries', () => {
     const calls: [() => unknown, string, string][] = [
-      [() => api.createBoard('Ersti', [{ gremiumId: 'g-1', role: 'edit' }]), 'POST', '/api/todos/boards'],
+      [() => api.createBoard('Ersti', [{ teamId: 'g-1', role: 'edit' }]), 'POST', '/api/todos/boards'],
       [() => api.deleteBoard('b-1'), 'DELETE', '/api/todos/boards/b-1'],
       [() => api.archiveBoard('b-1'), 'POST', '/api/todos/boards/b-1/archive'],
       [() => api.restoreBoard('b-1'), 'POST', '/api/todos/boards/b-1/restore'],

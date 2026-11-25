@@ -88,9 +88,9 @@ async def test_the_rows_hold_only_my_live_cards_on_boards_i_read(
 
         rows = _ok(client.get(ROWS))
         assert [(b["name"], b["kind"]) for b in rows] == [
-            ("AStA", "gremium"),
-            ("StuPa", "gremium"),
-            ("Plattform", "team"),
+            ("AStA", "team"),
+            ("StuPa", "team"),
+            ("Plattform", "permission"),
         ]
         st = rows[1]
         assert st["id"] == str(stupa_board) and st["canWrite"] is True

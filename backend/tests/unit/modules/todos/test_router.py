@@ -67,15 +67,15 @@ def _detail() -> TodoCardDetail:
     return TodoCardDetail(
         **_tile().model_dump(by_alias=False),
         board_name="B",
-        board_kind="gremium",
+        board_kind="team",
         created_by=PersonRef(),
     )
 
 
 _COMMENT = TodoCommentOut(id=XID, author=PersonRef(), body="b", at=NOW)
-_BOARD = TodoBoardOut(id=BID, name="B", kind="gremium")
+_BOARD = TodoBoardOut(id=BID, name="B", kind="team")
 _ANSWERS: dict[str, Callable[[], Any]] = {
-    "list_boards": lambda: [TodoBoardSummary(id=BID, name="B", kind="gremium")],
+    "list_boards": lambda: [TodoBoardSummary(id=BID, name="B", kind="team")],
     "board": lambda: _BOARD,
     "patch_board": lambda: _BOARD,
     "members": lambda: [TodoMember(principal_id=XID, display_name="Ada")],
@@ -88,7 +88,7 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "patch_label": lambda: TodoLabelOut(id=XID, name="L", color="red"),
     "delete_label": lambda: None,
     "mine": lambda: TodoMine(),
-    "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="gremium", cards=[_tile()])],
+    "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="team", cards=[_tile()])],
     "all_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="personal", cards=[_tile()])],
     "create": _detail,
     "card": _detail,
@@ -221,8 +221,8 @@ def test_the_board_read_has_an_etag_and_answers_304(env: _Env) -> None:
 
 def test_etag_matching() -> None:
     tag = board_etag(_BOARD)
-    assert tag == board_etag(TodoBoardOut(id=BID, name="B", kind="gremium"))
-    assert tag != board_etag(TodoBoardOut(id=BID, name="C", kind="gremium"))
+    assert tag == board_etag(TodoBoardOut(id=BID, name="B", kind="team"))
+    assert tag != board_etag(TodoBoardOut(id=BID, name="C", kind="team"))
     assert not _matches(None, tag)
     assert not _matches("", tag)
     assert _matches("*", tag)
@@ -254,11 +254,11 @@ def test_the_all_boards_read_has_an_etag_and_answers_304(env: _Env) -> None:
 
 
 def test_mine_boards_etag_changes_with_the_body() -> None:
-    one = [TodoAssignedBoard(id=BID, name="B", kind="gremium")]
+    one = [TodoAssignedBoard(id=BID, name="B", kind="team")]
     assert mine_boards_etag(one) == mine_boards_etag(list(one))
     assert mine_boards_etag(one) != mine_boards_etag([])
     assert mine_boards_etag(one) != mine_boards_etag(
-        [TodoAssignedBoard(id=BID, name="B", kind="gremium", can_write=False)]
+        [TodoAssignedBoard(id=BID, name="B", kind="team", can_write=False)]
     )
 
 

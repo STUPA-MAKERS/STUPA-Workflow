@@ -121,7 +121,7 @@ export function board(over: Partial<TodoBoard> = {}): TodoBoard {
   return {
     id: 'b-1',
     name: 'Studierendenparlament',
-    kind: 'gremium',
+    kind: 'team',
     gremiumId: 'g-1',
     archiveAfterDays: 30,
     canWrite: true,
@@ -141,7 +141,7 @@ export function summary(over: Partial<TodoBoardSummary> = {}): TodoBoardSummary 
   return {
     id: 'b-1',
     name: 'Studierendenparlament',
-    kind: 'gremium',
+    kind: 'team',
     gremiumId: 'g-1',
     canWrite: true,
     canConfigure: true,
@@ -154,7 +154,7 @@ export const BOARDS: TodoBoardSummary[] = [
   summary({ id: 'b-0', name: 'Meine To-Dos', kind: 'personal', gremiumId: null, canConfigure: true, openCount: 1 }),
   summary(),
   summary({ id: 'b-2', name: 'Fachschaft Informatik', gremiumId: 'g-2', canConfigure: false, openCount: 4 }),
-  summary({ id: 'b-3', name: 'Tickets', kind: 'team', gremiumId: null, canConfigure: false, openCount: 6 }),
+  summary({ id: 'b-3', name: 'Tickets', kind: 'permission', gremiumId: null, canConfigure: false, openCount: 6 }),
 ];
 
 export const MEMBERS: TodoMember[] = [
@@ -168,7 +168,7 @@ export function detail(over: Partial<TodoCardDetail> = {}): TodoCardDetail {
     ...tile({ id: 'k-1', title: 'Raum buchen', dueDate: '2026-10-23' }),
     descriptionMd: 'Raum **A 101**',
     boardName: 'Studierendenparlament',
-    boardKind: 'gremium',
+    boardKind: 'team',
     canWrite: true,
     columns: [
       { id: 'c-1', name: 'Offen', isDone: false },

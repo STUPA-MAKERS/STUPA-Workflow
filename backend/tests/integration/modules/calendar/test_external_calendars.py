@@ -26,7 +26,7 @@ from app.modules.calendar.external_fetch import Fetched
 from app.modules.calendar.ics import build_calendar
 from app.modules.calendar.models import ExternalCalendar, ExternalEntry
 from tests.integration.modules.calendar.conftest import CalendarApi
-from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
+from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person, team_of
 from worker.calendars import fetch_external_calendars
 
 pytestmark = pytest.mark.integration
@@ -110,17 +110,18 @@ async def test_admin_subscribes_changes_and_deletes(
 ) -> None:
     """§F/meetings/calendar/000729: the list, the dialog rules and the delete with entries."""
     gremium_id, _ = await add_gremium(maker, "Senat")
+    team_id = await team_of(maker, gremium_id)
     api.login(ADMIN)
     with TestClient(api.app) as client:
         made = _subscribe(client, "uni")
-        assert (made["intervalMinutes"], made["gremiumId"], made["entryCount"]) == (60, None, 0)
+        assert (made["intervalMinutes"], made["teamId"], made["entryCount"]) == (60, None, 0)
         assert made["lastAttemptAt"] is None and made["lastError"] is None
         for bad in (
             {"url": "http://feeds.example.org/a.ics"},
             {"url": "https://feeds.example.org/a b.ics"},
             {"name": "   "},
             {"intervalMinutes": 30},
-            {"gremiumId": str(uuid.uuid4())},
+            {"teamId": str(uuid.uuid4())},
         ):
             _ok(client.post("/api/admin/calendars", json={**made, **bad}), 422)
         fetcher = FakeFetcher({made["url"]: Fetched(data=FEED)})
@@ -128,11 +129,11 @@ async def test_admin_subscribes_changes_and_deletes(
         body = {
             "name": " Senat ",
             "url": made["url"],
-            "gremiumId": str(gremium_id),
+            "teamId": str(team_id),
             "intervalMinutes": 15,
         }
         changed = _ok(client.put(f"/api/admin/calendars/{made['id']}", json=body))
-        assert (changed["name"], changed["gremiumName"], changed["intervalMinutes"]) == (
+        assert (changed["name"], changed["teamName"], changed["intervalMinutes"]) == (
             "Senat",
             "Senat",
             15,
@@ -241,13 +242,14 @@ async def test_scope_of_a_gremium_calendar(
 ) -> None:
     """§F/meetings/calendar/000721 and 000711: a non-member does not find the entry."""
     gremium_id, _ = await add_gremium(maker, "Senat")
+    team_id = await team_of(maker, gremium_id)
     member, member_id = await add_person(maker, "Mia")
     outsider, outsider_id = await add_person(maker, "Otto")
     await add_member(maker, gremium_id, member_id)
     api.login(ADMIN)
     with TestClient(api.app) as client:
         for_all = _subscribe(client, "uni")
-        scoped = _subscribe(client, "senat", gremiumId=str(gremium_id))
+        scoped = _subscribe(client, "senat", teamId=str(team_id))
         feed = FEED.replace(b"Senat", b"Intern").replace(b"Vorlesungsfrei", b"Klausur")
         fetcher = FakeFetcher(
             {for_all["url"]: Fetched(data=FEED), scoped["url"]: Fetched(data=feed)}

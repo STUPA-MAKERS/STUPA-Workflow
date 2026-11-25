@@ -325,7 +325,7 @@ describe('TodoNewDialogComponent from a ticket', () => {
       { id: `${id}-c1`, name: 'Offen', position: 1, isDone: false, cardCount: 0 },
     ],
   ): TodoBoard {
-    return board({ id, name: id, kind: 'team', gremiumId: null, columns, cards: [] });
+    return board({ id, name: id, kind: 'permission', gremiumId: null, columns, cards: [] });
   }
 
   const TICKET_MEMBERS: TodoMember[] = [
@@ -334,10 +334,10 @@ describe('TodoNewDialogComponent from a ticket', () => {
   ];
 
   const TICKET_BOARDS: TodoBoardSummary[] = [
-    { ...BOARDS[1], id: 'gb', name: 'StuPa', kind: 'gremium', gremiumId: 'g1', canWrite: true },
+    { ...BOARDS[1], id: 'gb', name: 'StuPa', kind: 'team', gremiumId: 'g1', canWrite: true },
     { ...BOARDS[1], id: 'pb', name: 'Persönlich', kind: 'personal', gremiumId: null, canWrite: true },
-    { ...BOARDS[1], id: 'tb', name: 'Plattform', kind: 'team', gremiumId: null, canWrite: true },
-    { ...BOARDS[1], id: 'ro', name: 'Nur lesen', kind: 'team', gremiumId: null, canWrite: false },
+    { ...BOARDS[1], id: 'tb', name: 'Plattform', kind: 'permission', gremiumId: null, canWrite: true },
+    { ...BOARDS[1], id: 'ro', name: 'Nur lesen', kind: 'permission', gremiumId: null, canWrite: false },
   ];
 
   interface TicketOpts {
@@ -362,7 +362,7 @@ describe('TodoNewDialogComponent from a ticket', () => {
       inputs: {
         heading: 'tickets.todo.title',
         withDescription: false,
-        boardKinds: ['team', 'personal'],
+        boardKinds: ['permission', 'personal'],
         initialTitle: TICKET.title,
         initialLinks: [TICKET_LINK],
         open: true,

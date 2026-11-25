@@ -64,6 +64,8 @@ _TERMIN_READ = "calendar.rules.can_read (AppointmentService._readable_row)"
 _TERMIN_EDIT = "calendar.rules.can_edit"
 _STATUS_LIST = "admin.statuses_router._list_admin (STATUS_LIST_PERMISSIONS of the list)"
 
+_TEAM_MANAGE = "TeamService (managed_team_ids: team.manage or a manager row, spec 003066)"
+
 OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/admin/config-revisions/{revision_id}/restore"): (
         "config_revision.router._require_restore_perm (permission of the entity type)"
@@ -256,6 +258,13 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/tickets/mine/{ticket_id}/notes"): _REPORTER,
     ("PATCH", "/api/tickets/mine/{ticket_id}/notes/{note_id}"): _REPORTER_NOTE,
     ("DELETE", "/api/tickets/mine/{ticket_id}/notes/{note_id}"): _REPORTER_NOTE,
+    ("GET", "/api/teams"): "TeamService.listing (every team by name; isMember, canManage)",
+    ("POST", "/api/teams"): "TeamService.create (team.create, or a manager of the parent)",
+    ("GET", "/api/teams/{team_id}"): "TeamService.detail (members for a member or manager)",
+    ("PATCH", "/api/teams/{team_id}"): _TEAM_MANAGE,
+    ("DELETE", "/api/teams/{team_id}"): _TEAM_MANAGE,
+    ("PUT", "/api/teams/{team_id}/members/{principal_id}"): _TEAM_MANAGE,
+    ("DELETE", "/api/teams/{team_id}/members/{principal_id}"): _TEAM_MANAGE,
     ("GET", "/api/todos/all/boards"): _TODO_SCOPE,
     ("GET", "/api/todos/boards"): _TODO_SCOPE,
     ("GET", "/api/todos/boards/{board_id}"): _TODO_READ,

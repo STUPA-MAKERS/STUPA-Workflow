@@ -1,10 +1,11 @@
 """Create boards with their default columns.
 
-The migration backfills a board for every gremium and the team board "Plattform".
-At runtime ``ensure_gremium_board`` runs in the transaction of the gremium create,
-and ``ensure_personal_board`` creates the board "Meine To-Dos" of an account on its
-first ``GET /todos/boards``. The insert of a personal board skips a conflict on
-``uq_todo_board_owner``, so two parallel first reads create one board.
+The migrations backfill a board for every team and the permission board "Plattform".
+At runtime ``ensure_team_board`` runs in the transaction of the team create (also the
+inherent team of a new Gremium), and ``ensure_personal_board`` creates the board
+"Meine To-Dos" of an account on its first ``GET /todos/boards``. The insert of a
+personal board skips a conflict on ``uq_todo_board_owner``, so two parallel first reads
+create one board.
 """
 
 from __future__ import annotations
@@ -33,16 +34,16 @@ def add_default_columns(session: AsyncSession, board_id: uuid.UUID) -> None:
         )
 
 
-async def ensure_gremium_board(session: AsyncSession, gremium_id: uuid.UUID, name: str) -> bool:
-    """Create the board of a gremium when it has none. The caller commits.
+async def ensure_team_board(session: AsyncSession, team_id: uuid.UUID, name: str) -> bool:
+    """Create the board of a team when it has none (spec 003067). The caller commits.
 
     Returns:
         True when the call created the board.
     """
-    existing = await session.scalar(select(TodoBoard.id).where(TodoBoard.gremium_id == gremium_id))
+    existing = await session.scalar(select(TodoBoard.id).where(TodoBoard.team_id == team_id))
     if existing is not None:
         return False
-    board = TodoBoard(id=uuid.uuid4(), name=name, kind="gremium", gremium_id=gremium_id)
+    board = TodoBoard(id=uuid.uuid4(), name=name, kind="team", team_id=team_id)
     session.add(board)
     await session.flush()
     add_default_columns(session, board.id)
