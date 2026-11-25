@@ -110,7 +110,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | approved |
 | [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | approved |
 | [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the phase open, done or void | approved |
-| [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | draft |
+| [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | approved |
 | [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | approved |
 | [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | approved |
 | [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The page Status & Phasen uses the editor of the plan steps | approved |
