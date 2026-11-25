@@ -8,7 +8,8 @@ updated: 2026-11-25
 implementation: null
 scope:
   - backend/app/
-  - frontend/src/app/---
+  - frontend/src/app/
+---
 
 # A Mollie payment without an Event is booked without a link
 
