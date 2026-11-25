@@ -72,7 +72,7 @@ describe('NavService', () => {
 
   it('puts the Bestellungen after the invoices, with the routes of the list, the form and the detail', () => {
     const item = NAV_ITEMS.find((i) => i.key === 'orders');
-    expect(item).toMatchObject({ path: '/orders', labelKey: 'nav.orders', feature: 'budget', place: 'main' });
+    expect(item).toMatchObject({ path: '/orders', labelKey: 'nav.orders', feature: 'orders', place: 'main' });
     expect(NAV_ITEMS.findIndex((i) => i.key === 'orders')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
     const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'orders');
     expect(route?.data).toMatchObject({ title: 'nav.orders', permission: ['order.manage', 'budget.view'] });
@@ -185,8 +185,9 @@ describe('NavService', () => {
       ['calendar', ['calendar', 'publicCalendar']],
       ['meetings', ['meetings', 'protocols', 'decisions']],
       ['voting', ['voting']],
-      ['budget', ['budget', 'expenses', 'orders']],
+      ['budget', ['budget', 'expenses']],
       ['invoices', ['invoices']],
+      ['orders', ['orders']],
       ['tickets', ['tickets']],
       ['graph', ['graph']],
       ['public', ['protocols', 'decisions', 'publicCalendar']],

@@ -393,7 +393,7 @@ export const routes: Routes = [
       },
       {
         path: 'orders',
-        canMatch: [featureMatch('budget')],
+        canMatch: [featureMatch('orders')],
         data: { title: 'nav.orders', permission: ORDER_PERMISSIONS, wide: true },
         canActivate: [authGuard, orderAddress],
         loadComponent: () =>

@@ -91,6 +91,7 @@ HIT_URL: Mapping[SearchKind, str] = {
 SOURCE_FEATURE: Mapping[str, frozenset[Feature]] = {
     "meeting": frozenset({Feature.MEETINGS}),
     "invoice": frozenset({Feature.INVOICES}),
+    "order": frozenset({Feature.ORDERS}),
     "expense": frozenset({Feature.BUDGET}),
     "budget": frozenset({Feature.BUDGET}),
     "ticket": frozenset({Feature.TICKETS}),

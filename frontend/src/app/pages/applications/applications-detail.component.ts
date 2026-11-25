@@ -1463,12 +1463,14 @@ export class ApplicationsDetailComponent {
       },
     });
     this.orderList.set(null);
-    this.ordersApi.list(this.id).subscribe({
-      next: (list) => {
-        if (seq === this.loadSeq) this.orderList.set(list);
-      },
-      error: () => {},
-    });
+    if (this.features.isOn('orders')) {
+      this.ordersApi.list(this.id).subscribe({
+        next: (list) => {
+          if (seq === this.loadSeq) this.orderList.set(list);
+        },
+        error: () => {},
+      });
+    }
     this.api.timeline(this.id, { quiet: true, detail }).subscribe({
       next: (events) => {
         if (seq === this.loadSeq) this.timeline.set(events);

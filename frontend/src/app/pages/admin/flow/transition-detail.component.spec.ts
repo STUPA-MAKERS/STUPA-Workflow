@@ -167,8 +167,8 @@ describe('TransitionDetailComponent', () => {
     ]);
   });
 
-  it('hides the setting of the Bestellungen while the budget is off', async () => {
-    localStorage.setItem('ap.features.off', JSON.stringify(['budget']));
+  it('hides the setting of the Bestellungen while their feature is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['orders']));
     const { c } = await setup({ from: 'a', to: 'b', actions: [] });
     localStorage.removeItem('ap.features.off');
     expect(c.ordersOn()).toBe(false);

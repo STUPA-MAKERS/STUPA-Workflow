@@ -952,6 +952,7 @@ export const MOCK_FEATURES: FeatureSwitches = {
   voting: true,
   budget: true,
   invoices: true,
+  orders: true,
   tickets: true,
   graph: true,
   public: true,

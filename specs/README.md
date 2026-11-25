@@ -579,7 +579,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002865](requirements/functional/finance/orders/002865_order-audit.md) | Each write of a Bestellung has an audit entry | approved |
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | approved |
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | approved |
-| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | draft |
+| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | approved |
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | approved |
 | [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | approved |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |
@@ -608,6 +608,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | approved |
 | [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | approved |
 | [F/finance/orders/002937](requirements/functional/finance/orders/002937_order-form-in-pane.md) | The form of a Bestellung opens in the pane of the page | approved |
+| [F/finance/orders/003011](requirements/functional/finance/orders/003011_orders-feature-switch.md) | Bestellungen have a feature switch | draft |
 | [F/integrations/external/000176](requirements/functional/integrations/external/000176_optional.md) | Integrations are optional | approved |
 | [F/integrations/external/000177](requirements/functional/integrations/external/000177_preview-access.md) | A link preview uses the access of the viewer | approved |
 | [F/integrations/mcp/000174](requirements/functional/integrations/mcp/000174_acts-as-user.md) | The MCP server acts as the logged-in user | approved |

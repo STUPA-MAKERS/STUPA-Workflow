@@ -62,6 +62,12 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
         ("GET", "/api/expenses"),
     ),
     Feature.INVOICES: (("GET", "/api/invoices"), ("POST", "/api/invoices/parse")),
+    #: §F/finance/orders/003011. The Bestellungen of an invoice close with `Rechnungen` too.
+    Feature.ORDERS: (
+        ("GET", "/api/orders"),
+        ("GET", "/api/orders/pending-applications"),
+        ("GET", f"/api/applications/{uuid.uuid4()}/orders"),
+    ),
     Feature.TICKETS: (("GET", "/api/tickets"), ("POST", "/api/tickets")),
     Feature.GRAPH: (("GET", "/api/graph"),),
     Feature.PUSH: (("GET", "/api/push/key"), ("GET", "/api/push/devices")),
@@ -83,7 +89,7 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
 #: The routes of other features that close with a feature: the routes of the features
 #: that need it and the public routes of its records.
 CLOSED_WITH: dict[Feature, int] = {
-    Feature.BUDGET: len(ROUTES[Feature.INVOICES]),
+    Feature.BUDGET: len(ROUTES[Feature.INVOICES]) + len(ROUTES[Feature.ORDERS]),
     Feature.MEETINGS: 3,
     Feature.CALENDAR: 1,
 }
@@ -179,6 +185,26 @@ async def test_invoices_go_off_with_budget_and_return_to_their_state(
         _save(client, invoices=False)
         assert _disabled(client, "GET", "/api/invoices")
         assert not _disabled(client, "GET", "/api/budgets")
+
+
+async def test_orders_go_off_with_budget_and_with_their_own_switch(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """§F/finance/orders/003011."""
+    await _admin(api, maker)
+    by_invoice = f"/api/invoices/{uuid.uuid4()}/orders"
+    with TestClient(api.app) as client:
+        _save(client, budget=False)
+        assert _disabled(client, "GET", "/api/orders")
+        assert client.get("/api/admin/features").json()["orders"] is True
+        _save(client, orders=False)
+        assert _disabled(client, "GET", "/api/orders")
+        assert _disabled(client, "GET", by_invoice)
+        assert not _disabled(client, "GET", "/api/invoices")
+        _save(client, invoices=False)
+        assert _disabled(client, "GET", by_invoice)
+        _save(client)
+        assert not _disabled(client, "GET", "/api/orders")
 
 
 async def test_a_switch_keeps_the_records_and_the_search_follows_it(

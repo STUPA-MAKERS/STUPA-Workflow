@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import type { Uuid } from '@core/api/models';
+import { FeatureService } from '@core/features/feature.service';
 import { type InvoiceOrders, OrdersApiService } from '@core/api/orders.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -61,6 +62,7 @@ interface Row {
 export class InvoiceOrdersComponent {
   private readonly api = inject(OrdersApiService);
   private readonly i18n = inject(I18nService);
+  private readonly features = inject(FeatureService);
 
   readonly invoiceId = input.required<Uuid>();
   /** The gross amount of the invoice, as a decimal string. */
@@ -104,6 +106,7 @@ export class InvoiceOrdersComponent {
     effect(() => {
       const id = this.invoiceId();
       this.list.set(null);
+      if (!this.features.isOn('orders')) return;
       this.api.ofInvoice(id).subscribe({
         next: (list) => {
           if (id === this.invoiceId()) this.list.set(list);

@@ -2,7 +2,7 @@
 id: "002868"
 title: A sum above the approved amount warns and does not block
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

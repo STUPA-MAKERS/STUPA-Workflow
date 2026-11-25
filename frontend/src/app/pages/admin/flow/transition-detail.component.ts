@@ -87,9 +87,9 @@ export class TransitionDetailComponent {
     this.pendingAction.set('');
   }
 
-  /** The offer after a Bestellung shows only while the budget, the feature of the Bestellungen, is on. */
+  /** The offer after a Bestellung shows only while the feature `Bestellungen` is on. */
   protected ordersOn(): boolean {
-    return this.features.isOn('budget');
+    return this.features.isOn('orders');
   }
 
   /** The two statuses of a Bestellung that can offer a transition of the Antrag. */

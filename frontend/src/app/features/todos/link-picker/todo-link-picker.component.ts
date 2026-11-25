@@ -86,7 +86,7 @@ const LINK_FEATURE: Partial<Record<TodoLinkKind, FeatureKey>> = {
   appointment: 'calendar',
   invoice: 'invoices',
   expense: 'budget',
-  order: 'budget',
+  order: 'orders',
   budget: 'budget',
   ticket: 'tickets',
   paperless: 'paperless',

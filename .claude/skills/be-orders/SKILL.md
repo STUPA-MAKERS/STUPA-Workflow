@@ -63,7 +63,7 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   `order_pending_applications`, `order_bookings`, `export_orders_xlsx`).
 
 **Frontend** (`frontend/src/app/pages/orders/`, API in `core/api/orders.service.ts`): the
-page "Bestellungen" at `/orders` (nav entry after Rechnungen, feature `budget`,
+page "Bestellungen" at `/orders` (nav entry after Rechnungen, feature `orders`,
 `ORDER_PERMISSIONS` = `order.manage` or `budget.view`). A Bestellung is an element with a
 page of its own; the Antrag detail has no section and no dialog for it.
 - `orders-page` — kit `app-list-detail-screen`. The first chip is the segment ("Ohne
@@ -93,7 +93,7 @@ page of its own; the Antrag detail has no section and no dialog for it.
 - Antrag detail: the Bestellungen are rows of "Verknüpft" (`linkedRows`, link `/orders/<id>`,
   no link in the applicant view) and "Bestellung anlegen" is the button `extra` in its head.
 - Flow editor: the setting "Nach einer Bestellung anbieten" of a transition
-  (`offerOnOrderStatus`), hidden while the feature `budget` is off.
+  (`offerOnOrderStatus`), hidden while the feature `orders` is off.
 - `order-files` — list, upload, download and delete of the files.
 - `orders.util.ts` — the pure helpers; `orderPositions` finds the positions by their shape,
   because the key of a positions field differs from form to form.
@@ -155,3 +155,9 @@ page of its own; the Antrag detail has no section and no dialog for it.
 
 **Related:** `be-applications`, `be-files`, `be-budget`, `be-audit`, `be-privacy`, `mcp`,
 `frontend`.
+
+**Feature switch** (§F/finance/orders/003011): `Feature.ORDERS` (`orders`, needs `budget`) in
+`site_config/features.py`; `feature_routes.py` closes `/orders`, the Bestellungen of an Antrag and
+of an invoice with 404 `feature_disabled`; the link kind and the search source follow it
+(`LINK_FEATURE`, `SOURCE_FEATURE`). Frontend: `featureMatch('orders')`, the nav entry, the
+Antrag detail and `invoice-orders` read nothing while it is off.

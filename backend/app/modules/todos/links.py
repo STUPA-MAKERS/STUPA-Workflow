@@ -127,6 +127,7 @@ LINK_FEATURE: dict[str, Feature] = {
     "vote": Feature.VOTING,
     "appointment": Feature.CALENDAR,
     "invoice": Feature.INVOICES,
+    "order": Feature.ORDERS,
     "expense": Feature.BUDGET,
     "budget": Feature.BUDGET,
     "ticket": Feature.TICKETS,
