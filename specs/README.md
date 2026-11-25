@@ -643,6 +643,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mollie/003098](requirements/functional/integrations/mollie/003098_only-money.md) | The platform keeps only the money data of Mollie | approved |
 | [F/integrations/mollie/003099](requirements/functional/integrations/mollie/003099_no-change-in-mollie.md) | The platform changes nothing in Mollie | approved |
 | [F/integrations/mollie/003103](requirements/functional/integrations/mollie/003103_book-unassigned.md) | A Mollie payment without an Event is booked without a link | approved |
+| [F/integrations/mollie/003104](requirements/functional/integrations/mollie/003104_manual-refresh.md) | The pages Buchungen and Veranstaltungen fetch the pretix and Mollie data on demand | approved |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
 | [F/integrations/paperless/002512](requirements/functional/integrations/paperless/002512_switch.md) | Each part of the Paperless integration has its own switch | approved |
 | [F/integrations/paperless/002513](requirements/functional/integrations/paperless/002513_service-account.md) | Each call to Paperless uses the token of the connection | approved |
