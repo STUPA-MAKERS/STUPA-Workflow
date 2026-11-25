@@ -3,7 +3,8 @@
 The orders service calls these functions in the transaction of the create and of the
 status change (F/integrations/webhooks/002410). The Gremium filter and the Antragsart
 filter of a webhook read the Gremium and the type of the Antrag, because a Bestellung has
-none of its own.
+none of its own. A Bestellung without an Antrag has neither, so only a webhook without
+these filters gets its events.
 """
 
 from __future__ import annotations
@@ -51,7 +52,11 @@ async def emit_order_event(
     Returns:
         The number of new deliveries.
     """
-    application = await session.get(Application, row.application_id)
+    application = (
+        await session.get(Application, row.application_id)
+        if row.application_id is not None
+        else None
+    )
 
     async def fields() -> Mapping[str, Any]:
         base = order_fields(row, _title_of(application.data) if application else None)

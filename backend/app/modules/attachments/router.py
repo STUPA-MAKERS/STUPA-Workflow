@@ -49,6 +49,7 @@ from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import AttachmentOwner, application_id_of
+from app.modules.orders.access import reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.tickets.access import works_on_ticket
 from app.modules.tickets.models import TicketNote
@@ -324,13 +325,17 @@ async def _assert_order_reader(
 
     Raises:
         NotFoundError: ``missing``, when the caller does not read the Antrag of the
-            Bestellung as a member.
+            Bestellung as a member, or a Bestellung without an Antrag
+            (F/finance/orders/002863).
     """
-    application_id = await db.scalar(
-        select(PurchaseOrder.application_id).where(PurchaseOrder.id == owner.id)
-    )
-    if application_id is None:
+    order = await db.get(PurchaseOrder, owner.id)
+    if order is None:
         raise missing
+    application_id = order.application_id
+    if application_id is None:
+        if not reads_free(principal):
+            raise missing
+        return
     try:
         access = await resolve_app_read(db, application_id, principal, applicant, observers=True)
     except ForbiddenError as exc:

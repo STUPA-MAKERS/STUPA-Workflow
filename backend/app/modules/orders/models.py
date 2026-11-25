@@ -47,11 +47,11 @@ def _in(values: tuple[str, ...]) -> str:
 
 
 class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
-    """One Bestellung of an Antrag.
+    """One Bestellung, of an Antrag or without one (F/finance/orders/003014).
 
     Attributes:
         number: The eight random characters of the number, unique on the platform.
-        application_id: The Antrag; it never changes.
+        application_id: The Antrag, else NULL; it never changes.
         kind: ``order`` or ``outlay``.
         status: ``planned``, ``ordered``, ``delivered`` or ``cancelled``.
         title: The Bezeichnung.
@@ -70,8 +70,8 @@ class PurchaseOrder(UUIDPkMixin, TimestampMixin, Base):
     __tablename__ = "purchase_order"
 
     number: Mapped[str] = mapped_column(Text, default=draw_number, unique=True)
-    application_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("application.id", ondelete="CASCADE")
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     kind: Mapped[str] = mapped_column(Text, server_default="order")
     status: Mapped[str] = mapped_column(Text, server_default="planned")

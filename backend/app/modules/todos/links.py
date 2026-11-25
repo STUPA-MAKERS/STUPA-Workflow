@@ -72,6 +72,7 @@ from app.modules.calendar.models import Appointment
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.orders.access import reads_free
 from app.modules.orders.listing import OrderFilter, OrderListing
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number as format_order_number
@@ -768,14 +769,22 @@ class LinkResolver:
         principal: Principal,
         open_ids: frozenset[uuid.UUID] = NONE,
     ) -> dict[uuid.UUID, Resolved]:
-        """Resolve the Bestellungen whose Antrag the principal reads as a member."""
+        """Resolve the Bestellungen whose Antrag the principal reads as a member.
+
+        A Bestellung without an Antrag is readable for the persons of ``reads_free``.
+        """
         orders = (
             await self.session.scalars(select(PurchaseOrder).where(PurchaseOrder.id.in_(ids)))
         ).all()
         readable = [
             order
             for order in orders
-            if order.id in open_ids or await self._reads_as_member(order.application_id, principal)
+            if order.id in open_ids
+            or (
+                reads_free(principal)
+                if order.application_id is None
+                else await self._reads_as_member(order.application_id, principal)
+            )
         ]
         return {order.id: _order_target(order) for order in readable}
 

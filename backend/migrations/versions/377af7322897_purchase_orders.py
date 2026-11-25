@@ -34,7 +34,7 @@ _UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS purchase_order (
         number TEXT NOT NULL,
-        application_id UUID NOT NULL,
+        application_id UUID,
         kind TEXT DEFAULT 'order' NOT NULL,
         status TEXT DEFAULT 'planned' NOT NULL,
         title TEXT NOT NULL,

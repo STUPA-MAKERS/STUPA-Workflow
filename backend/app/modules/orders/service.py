@@ -230,9 +230,14 @@ class OrderService:
         )
         return list(rows)
 
-    async def application_titles(self, application_ids: Sequence[UUID]) -> dict[UUID, str]:
-        """Return the title of each of the Anträge that has one."""
-        ids = set(application_ids)
+    async def application_titles(
+        self, application_ids: Sequence[UUID | None]
+    ) -> dict[UUID | None, str]:
+        """Return the title of each of the Anträge that has one.
+
+        A Bestellung without an Antrag gives None, which is no key of the answer.
+        """
+        ids = {application_id for application_id in application_ids if application_id is not None}
         found = (
             (
                 await self.session.execute(
@@ -341,18 +346,26 @@ class OrderService:
             raise _refused("order_buyer_unknown", "buyerId", "No account has this id.")
 
     async def _check_positions(
-        self, application_id: UUID, wanted: Sequence[str], *, own: UUID | None
+        self, application_id: UUID | None, wanted: Sequence[str], *, own: UUID | None
     ) -> None:
         """Check the positions of a Bestellung (F/finance/orders/002860).
 
         Raises:
-            ValidationProblem: The current version of the Antrag holds no position with
-                an id (``order_position_unknown``).
+            ValidationProblem: The Bestellung has no Antrag, so it has no
+                Kostenaufstellung (``positions_need_application``,
+                F/finance/orders/003014), or the current version of the Antrag holds
+                no position with an id (``order_position_unknown``).
             ConflictError: A different Bestellung that is not cancelled names a
                 position (``order_position_taken``).
         """
         if not wanted:
             return
+        if application_id is None:
+            raise _refused(
+                "positions_need_application",
+                "positionIds",
+                "A Bestellung without an Antrag has no positions.",
+            )
         data = await self.session.scalar(
             select(Application.data).where(Application.id == application_id)
         )
@@ -391,17 +404,19 @@ class OrderService:
     async def _event(self, row: PurchaseOrder, actor: str, kind: str, **extra: str) -> None:
         """Write one timeline event of the Antrag and emit the webhook event of it.
 
-        The create and a status change are webhook events (F/finance/orders/002891).
+        The create and a status change are webhook events (F/finance/orders/002891). A
+        Bestellung without an Antrag has no timeline to write to.
         """
-        self.session.add(
-            ApplicationOrderEvent(
-                application_id=row.application_id,
-                order_id=row.id,
-                actor=actor,
-                kind=kind,
-                payload={"number": format_number(row.number), "title": row.title, **extra},
+        if row.application_id is not None:
+            self.session.add(
+                ApplicationOrderEvent(
+                    application_id=row.application_id,
+                    order_id=row.id,
+                    actor=actor,
+                    kind=kind,
+                    payload={"number": format_number(row.number), "title": row.title, **extra},
+                )
             )
-        )
         match kind:
             case "created":
                 await emit_order_event(self.session, row)
@@ -411,9 +426,11 @@ class OrderService:
                 pass
 
     async def create(
-        self, application_id: UUID, payload: OrderCreate, *, actor: str
+        self, application_id: UUID | None, payload: OrderCreate, *, actor: str
     ) -> PurchaseOrder:
-        """Create a Bestellung for an Antrag.
+        """Create a Bestellung for an Antrag, or without one (F/finance/orders/003014).
+
+        Only a Bestellung of an Antrag needs the approved Antrag of a type with money.
 
         Raises:
             ValidationProblem: The type of the Antrag has no money
@@ -422,7 +439,9 @@ class OrderService:
             ConflictError: The Antrag is in no approved state
                 (``application_not_approved``), or a position is taken.
         """
-        has_budget, approved = await self._gate(application_id)
+        has_budget, approved = (
+            await self._gate(application_id) if application_id is not None else (True, True)
+        )
         if not has_budget:
             raise ValidationProblem(
                 "The type of the Antrag has no money.", code="application_type_without_budget"
@@ -465,7 +484,7 @@ class OrderService:
             target_type="order",
             target_id=str(row.id),
             data={
-                "applicationId": str(application_id),
+                "applicationId": _wire(application_id),
                 "number": format_number(row.number),
                 "after": {
                     "status": row.status,
@@ -516,7 +535,7 @@ class OrderService:
             target_type="order",
             target_id=str(row.id),
             data={
-                "applicationId": str(row.application_id),
+                "applicationId": _wire(row.application_id),
                 "number": format_number(row.number),
                 "before": {
                     **{key: before[key] for key in values if key in changed},
@@ -625,7 +644,7 @@ class OrderService:
             target_type="order",
             target_id=str(row.id),
             data={
-                "applicationId": str(row.application_id),
+                "applicationId": _wire(row.application_id),
                 "number": format_number(row.number),
                 "before": {
                     "status": row.status,

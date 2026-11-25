@@ -117,7 +117,8 @@ TYPICAL FLOWS:
   `link_add(a, b)`, `link_list(kind, target_id)`, `link_remove(link_id)`, `link_view`
   (the other end of a card link). A link has no direction; the caller reads both ends
   and changes at least one (403 `link_forbidden`).
-- Bestellungen of an Antrag: `order_list(application_id)`, `order_get`, `order_create`,
+- Bestellungen of an Antrag: `order_list(application_id)`, `order_get`, `order_create`
+  (`application_id` null: a Bestellung without an Antrag),
   `order_update` (needs `version`), `order_set_status`, `order_delete`,
   `order_set_invoice` (the invoice of a Bestellung), `invoice_orders`, and the files of
   a Bestellung `order_attachments`, `order_attachment_upload`, `order_attachment_delete`.

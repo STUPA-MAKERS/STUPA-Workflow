@@ -642,6 +642,11 @@ class ExpenseUpdate(WireModel, frozen=True):
     paymentMethod: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None
     category: str | None = None
     invoiceId: str | None = Field(default=None, description="Linked invoice; null clears")
+    orderId: str | None = Field(
+        default=None,
+        description="The Bestellung that the booking names; null clears. The booking and "
+        "the Bestellung name the same Antrag, or both name none",
+    )
 
 
 class TransferCreate(WireModel, frozen=True):

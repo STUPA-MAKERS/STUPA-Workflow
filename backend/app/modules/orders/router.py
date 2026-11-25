@@ -5,6 +5,9 @@
   (F/finance/orders/002864).
 - ``POST /applications/{id}/orders``, ``PATCH /orders/{id}``, ``POST /orders/{id}/status``
   and ``DELETE /orders/{id}`` need ``order.manage`` and the read of the Antrag.
+- ``POST /orders`` creates a Bestellung without an Antrag and needs ``order.manage``
+  (F/finance/orders/003014). The persons with ``order.manage`` or ``budget.view`` read
+  such a Bestellung, because no Antrag gives a read rule.
 - ``GET /orders/{id}/attachments`` lists the files of a Bestellung for a member who reads
   its Antrag. ``POST /orders/{id}/attachments`` and
   ``DELETE /orders/{id}/attachments/{attachment_id}`` need ``order.manage``
@@ -40,6 +43,7 @@ from app.modules.files.body import read_capped
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut
 from app.modules.files.service import FilesService, attachment_out
+from app.modules.orders.access import reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import orders_sum, over_by
@@ -156,8 +160,13 @@ async def _view(service: OrderService, row: PurchaseOrder) -> OrderOut:
     )
 
 
-async def _reads(db: DbSession, application_id: UUID, principal: Principal) -> bool:
-    """Tell whether the caller reads the Antrag as a member."""
+async def _reads(db: DbSession, application_id: UUID | None, principal: Principal) -> bool:
+    """Tell whether the caller reads the Bestellungen of the Antrag as a member.
+
+    Without an Antrag the permissions of the page "Bestellungen" decide.
+    """
+    if application_id is None:
+        return reads_free(principal)
     try:
         access = await resolve_app_read(db, application_id, principal, None)
     except (ForbiddenError, NotFoundError):
@@ -173,21 +182,28 @@ async def _readable(
     applicant: Applicant | None,
     *,
     observers: bool,
-) -> tuple[PurchaseOrder, Access]:
-    """Return the Bestellung and the access of the caller to its Antrag.
+) -> tuple[PurchaseOrder, bool]:
+    """Return the Bestellung and whether the caller gets the short view of an applicant.
+
+    A Bestellung without an Antrag has no applicant, so its readers always get the
+    member view.
 
     Raises:
-        NotFoundError: No Bestellung has this id, or the caller does not read its Antrag.
+        NotFoundError: No Bestellung has this id, or the caller does not read it.
         UnauthorizedError: The request carries no identity.
     """
     row = await service.get(order_id)
+    if row.application_id is None:
+        if not reads_free(principal):
+            raise NotFoundError("Bestellung not found.")
+        return row, False
     try:
         access = await resolve_app_read(
             db, row.application_id, principal, applicant, observers=observers
         )
     except ForbiddenError as exc:
         raise NotFoundError("Bestellung not found.") from exc
-    return row, access
+    return row, access.is_applicant_view
 
 
 @router.get(
@@ -247,6 +263,26 @@ async def create_order(
     return out
 
 
+@router.post(
+    "/orders",
+    response_model=OrderOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_ERRORS,
+)
+async def create_free_order(
+    payload: OrderCreate, db: DbSession, service: ServiceDep, principal: ManagerDep
+) -> OrderOut:
+    """Create a Bestellung without an Antrag (F/finance/orders/003014).
+
+    422 ``positions_need_application`` refuses positions, because the positions are
+    those of the Kostenaufstellung of an Antrag.
+    """
+    row = await service.create(None, payload, actor=principal.sub)
+    out = await _view(service, row)
+    await db.commit()
+    return out
+
+
 @router.get(
     "/orders/{order_id}",
     response_model=OrderOut | OrderApplicantOut,
@@ -260,8 +296,8 @@ async def get_order(
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> OrderOut | OrderApplicantOut:
     """Return one Bestellung; an applicant and an observer get the short view."""
-    row, access = await _readable(db, service, order_id, principal, applicant, observers=True)
-    return _applicant_out(row) if access.is_applicant_view else await _view(service, row)
+    row, short = await _readable(db, service, order_id, principal, applicant, observers=True)
+    return _applicant_out(row) if short else await _view(service, row)
 
 
 @router.patch("/orders/{order_id}", response_model=OrderOut, responses=_ERRORS)
@@ -375,8 +411,8 @@ async def list_order_bookings(
     The caller needs a budget read permission, like the list of the bookings, and the
     member read of the Antrag.
     """
-    _, access = await _readable(db, service, order_id, principal, None, observers=False)
-    if access.is_applicant_view:
+    _, short = await _readable(db, service, order_id, principal, None, observers=False)
+    if short:
         raise NotFoundError("Bestellung not found.")
     return [
         OrderBookingOut(id=row.id, description=row.description, amount=row.amount)
@@ -411,8 +447,8 @@ async def list_order_attachments(
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[AttachmentOut]:
     """List the files of a Bestellung, the oldest first, for a member who reads its Antrag."""
-    _, access = await _readable(db, service, order_id, principal, None, observers=True)
-    if access.is_applicant_view:
+    _, short = await _readable(db, service, order_id, principal, None, observers=True)
+    if short:
         raise NotFoundError("Bestellung not found.")
     return await files.list_for_order(order_id)
 

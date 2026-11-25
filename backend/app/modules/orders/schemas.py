@@ -103,7 +103,7 @@ class OrderOut(FrozenCamelModel, frozen=True):
 
     id: UUID
     number: str
-    application_id: UUID = Field(alias="applicationId")
+    application_id: UUID | None = Field(default=None, alias="applicationId")
     application_title: str | None = Field(default=None, alias="applicationTitle")
     title: str
     kind: OrderKind

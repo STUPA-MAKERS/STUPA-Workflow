@@ -426,7 +426,9 @@ class ExpenseUpdate(FrozenCamelModel, frozen=True):
     editable. The fiscal year and the application binding stay fixed to keep
     the booking stable. The server writes the set fields only. An explicit
     `null` clears an optional field. `budgetId` is the exception, because the
-    FK is required.
+    FK is required. `orderId` sets or removes the Bestellung that the booking names
+    (F/finance/orders/002878), so a booking from the time before the Bestellungen can
+    name one.
     """
 
     amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -440,6 +442,7 @@ class ExpenseUpdate(FrozenCamelModel, frozen=True):
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    order_id: UUID | None = Field(default=None, alias="orderId")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> ExpenseUpdate:

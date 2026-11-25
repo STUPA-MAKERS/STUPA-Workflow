@@ -43,6 +43,14 @@ def test_order_tools_read_create_change_and_delete(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_order_create_without_an_antrag_posts_to_the_orders(fake_api: _FakeApi) -> None:
+    """§F/finance/orders/003014: no Antrag sends the create to ``POST /orders``."""
+    asyncio.run(orders.order_create(None, S.OrderCreate(title="Beamer")))
+    assert fake_api.calls == [
+        ("POST", "/orders", {"title": "Beamer", "kind": "order", "status": "planned"}),
+    ]
+
+
 def test_order_invoice_tools_set_remove_and_list(fake_api: _FakeApi) -> None:
     """§F/finance/orders/002873 and 002877: the invoice of a Bestellung and its list."""
     asyncio.run(orders.order_set_invoice("o1", "i1", 2))

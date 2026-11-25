@@ -51,8 +51,12 @@ async def order_get(order_id: str) -> dict:
 
 
 @group.tool
-async def order_create(application_id: str, order: S.OrderCreate) -> dict:
+async def order_create(application_id: str | None, order: S.OrderCreate) -> dict:
     """Create a Bestellung for an Antrag. Requires `order.manage`.
+
+    `application_id` null creates a Bestellung without an Antrag, for a purchase from
+    the time before the platform. It takes no positions (422
+    `positions_need_application`), and the checks of the Antrag do not apply.
 
     409 `application_not_approved` when the Antrag is not approved, 422
     `application_type_without_budget` for a type without money, 422 `order_url_invalid`,
@@ -60,7 +64,8 @@ async def order_create(application_id: str, order: S.OrderCreate) -> dict:
     `buyerName`), 422 `order_buyer_unknown`, 422 `order_position_unknown` and 409
     `order_position_taken` (the position belongs to another Bestellung). Audited.
     """
-    return await api().post(f"/applications/{application_id}/orders", json=dump_create(order))
+    path = "/orders" if application_id is None else f"/applications/{application_id}/orders"
+    return await api().post(path, json=dump_create(order))
 
 
 @group.tool

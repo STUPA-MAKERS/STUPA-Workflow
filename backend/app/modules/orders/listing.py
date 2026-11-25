@@ -3,6 +3,9 @@
 Both lists hold only the Anträge that the caller reads as a member
 (F/finance/orders/002883). The filters read the Kostenstelle, the Haushaltsjahr and the
 Gremium of the Antrag, because a Bestellung has none of its own (F/finance/orders/002885).
+A Bestellung without an Antrag is in the first list for the persons of
+`access.reads_free`. The filters read the Kostenstelle and the Haushaltsjahr of its
+bookings, and the Gremium filter leaves it out, because no Gremium owns it.
 The functions read only the flags of a state and of a type and never a key of the flow,
 because the flow is the configuration of each installation.
 """
@@ -14,7 +17,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.application_types.models import ApplicationType
@@ -22,9 +25,10 @@ from app.modules.applications.models import Application
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service.service_base import _title_of
 from app.modules.auth.principal import Principal
-from app.modules.budget.tree_models import BudgetExpense
+from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
+from app.modules.orders.access import reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.rules import OrderKind, Segment
 from app.modules.orders.schemas import PendingApplicationOut
@@ -112,6 +116,48 @@ class OrderListing:
             *(clause for clause in optional if clause is not None),
         ]
 
+    async def _free_filters(self, wanted: OrderFilter) -> list[ColumnElement[bool]]:
+        """Build the clauses of the Bestellungen without an Antrag.
+
+        The Haushaltsjahr and the Kostenstelle are those of a booking that names the
+        Bestellung. The subtree of the Kostenstelle counts, as with an Antrag.
+        """
+        node_path = (
+            await self.session.scalar(select(Budget.tree_path).where(Budget.id == wanted.budget_id))
+            if wanted.budget_id is not None
+            else None
+        )
+        subtree = select(Budget.id).where(
+            or_(Budget.tree_path == node_path, Budget.tree_path.like(f"{node_path}-%"))
+        )
+        booked = select(BudgetExpense.id).where(BudgetExpense.order_id == PurchaseOrder.id)
+        optional = (
+            false() if wanted.gremium_id is not None else None,
+            (
+                booked.where(BudgetExpense.fiscal_year_id == wanted.fiscal_year_id).exists()
+                if wanted.fiscal_year_id is not None
+                else None
+            ),
+            (
+                booked.where(BudgetExpense.budget_id.in_(subtree)).exists()
+                if wanted.budget_id is not None
+                else None
+            ),
+        )
+        return [
+            PurchaseOrder.application_id.is_(None),
+            *(clause for clause in optional if clause is not None),
+        ]
+
+    async def _scope(self, principal: Principal, wanted: OrderFilter) -> ColumnElement[bool]:
+        """Build the read scope with the filters on the Antrag or on the bookings."""
+        with_application = and_(*(await self._application_filters(principal, wanted)))
+        return (
+            or_(with_application, and_(*(await self._free_filters(wanted))))
+            if reads_free(principal)
+            else with_application
+        )
+
     def _search(self, q: str | None) -> tuple[ColumnElement[bool], ColumnElement[Any]] | None:
         """Build the search clause and its rank, or None without a query.
 
@@ -147,10 +193,10 @@ class OrderListing:
             search[0] if search is not None else None,
         )
         filters = [
-            *(await self._application_filters(principal, wanted)),
+            await self._scope(principal, wanted),
             *(clause for clause in optional if clause is not None),
         ]
-        joined = select(PurchaseOrder).join(
+        joined = select(PurchaseOrder).outerjoin(
             Application, Application.id == PurchaseOrder.application_id
         )
         total = await self.session.scalar(

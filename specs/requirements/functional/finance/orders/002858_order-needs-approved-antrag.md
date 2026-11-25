@@ -1,10 +1,10 @@
 ---
 id: "002858"
-title: A Bestellung needs an approved Antrag of a type with money
+title: A Bestellung of an Antrag needs an approved Antrag of a type with money
 kind: functional
-status: approved
+status: draft
 owner: frederikbeimgraben
-updated: 2026-11-24
+updated: 2026-11-25
 implementation:
   - backend/app/modules/orders/service.py
 scope:
@@ -12,13 +12,14 @@ scope:
   - backend/app/modules/applications
 ---
 
-# A Bestellung needs an approved Antrag of a type with money
+# A Bestellung of an Antrag needs an approved Antrag of a type with money
 
-The server must create a Bestellung only for an Antrag of a type with money (`hasBudget`) that
-is in a state with the flag approved (F/applications/flow/000571). It must answer 422
-`application_type_without_budget` for a different type and 409 `application_not_approved` for a
-different state. It must read only the flag and must not compare the key of a state. A
-Bestellung that exists must stay editable when the Antrag leaves the approved state.
+The server must create a Bestellung for an Antrag only when the Antrag is of a type with money
+(`hasBudget`) and is in a state with the flag approved (F/applications/flow/000571). It must
+answer 422 `application_type_without_budget` for a different type and 409
+`application_not_approved` for a different state. It must read only the flag and must not
+compare the key of a state. A Bestellung that exists must stay editable when the Antrag leaves
+the approved state. A Bestellung without an Antrag (003014) needs none of this.
 
 Reason: Before the approval there is no money to spend, and an Antrag of a type without money
 has no amount and no Kostenstelle (F/finance/budget/001033).
