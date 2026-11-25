@@ -2,7 +2,7 @@
 id: "003041"
 title: Many bookings of an Event fold into one row
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:
