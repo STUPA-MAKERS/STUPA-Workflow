@@ -2,14 +2,10 @@
 id: "002517"
 title: The PDF of an Antrag is filed at each decision
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-23
-tests:
-  - "backend/tests/integration/modules/paperless/test_paperless.py:test_a_decided_antrag_is_filed_with_its_clean_attachments"
-implementation:
-  - backend/app/modules/paperless_filing/sources.py
-  - backend/app/modules/paperless_filing/files.py
+updated: 2026-11-25
+replaced_by: F/integrations/paperless/003110
 scope:
   - backend/app/
   - frontend/src/app/
