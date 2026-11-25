@@ -81,7 +81,7 @@ def _svc(session: ScriptedSession, links: FakeLinks | None = None, **kw: Any) ->
     return service
 
 
-def _setup(kind: str = "gremium", **kw: Any) -> tuple[EventSession, Any, Any, Any, TodoService]:
+def _setup(kind: str = "team", **kw: Any) -> tuple[EventSession, Any, Any, Any, TodoService]:
     b = board(kind=kind)
     col = column(b.id)
     c = card(b, col, **kw)
@@ -135,21 +135,21 @@ async def test_a_new_link_of_an_event_refuses_an_element_of_another_event() -> N
     ("kind", "payload", "code"),
     [
         ("personal", EventIn(), "event_personal_board"),
-        ("gremium", EventIn(endsOn=date(2026, 5, 1)), "event_dates_invalid"),
+        ("team", EventIn(endsOn=date(2026, 5, 1)), "event_dates_invalid"),
         (
-            "gremium",
+            "team",
             EventIn(startsOn=date(2026, 5, 2), endsOn=date(2026, 5, 1)),
             "event_dates_invalid",
         ),
-        ("gremium", EventIn(seriesId=SERIES), "series_not_found"),
-        ("gremium", EventIn(startTime=time(19)), "event_time_without_date"),
+        ("team", EventIn(seriesId=SERIES), "series_not_found"),
+        ("team", EventIn(startTime=time(19)), "event_time_without_date"),
         (
-            "gremium",
+            "team",
             EventIn(startsOn=date(2026, 5, 2), endTime=time(19)),
             "event_time_without_date",
         ),
         (
-            "gremium",
+            "team",
             EventIn(
                 startsOn=date(2026, 5, 2),
                 endsOn=date(2026, 5, 2),

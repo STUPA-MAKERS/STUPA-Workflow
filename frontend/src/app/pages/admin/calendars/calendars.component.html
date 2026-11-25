@@ -113,14 +113,14 @@
           [value]="d.scope"
           (valueChange)="patch('scope', $any($event))"
         />
-        @if (d.scope === 'gremium') {
+        @if (d.scope === 'team') {
           <app-select
-            [label]="'admin.calendars.gremium' | t"
+            [label]="'admin.calendars.team' | t"
             [clearable]="false"
-            [options]="gremien()"
-            [ngModel]="d.gremiumId"
-            (ngModelChange)="patch('gremiumId', $event)"
-            name="gremium"
+            [options]="teams()"
+            [ngModel]="d.teamId"
+            (ngModelChange)="patch('teamId', $event)"
+            name="team"
           />
         }
         <app-select

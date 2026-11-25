@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e3a63975be4d"
@@ -44,7 +45,6 @@ _UPGRADE: tuple[str, ...] = (
             FOREIGN KEY (gremium_id) REFERENCES gremium (id) ON DELETE CASCADE
     )
     """,
-    "CREATE INDEX IF NOT EXISTS ix_calendar_external_gremium_id ON calendar_external (gremium_id)",
     "CREATE INDEX IF NOT EXISTS ix_calendar_external_due_at ON calendar_external (due_at)",
     """
     CREATE TABLE IF NOT EXISTS calendar_external_entry (
@@ -84,10 +84,29 @@ _DOWNGRADE: tuple[str, ...] = (
 )
 
 
+#: The gremium indexes of ``calendar_external`` in its old shape.
+_GREMIUM_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS ix_calendar_external_gremium_id ON calendar_external (gremium_id)",
+)
+
+
+def _has_gremium() -> bool:
+    """Tell if ``calendar_external`` has the old column ``gremium_id``.
+
+    A fresh database gets the table from the ``create_all`` baseline (0001) in the shape
+    of the models, with ``team_id`` (9f288998cf57), so the gremium indexes do not apply.
+    """
+    columns = sa.inspect(op.get_bind()).get_columns("calendar_external")
+    return "gremium_id" in {c["name"] for c in columns}
+
+
 def upgrade() -> None:
     """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
+    if _has_gremium():
+        for stmt in _GREMIUM_INDEXES:
+            op.execute(stmt)
 
 
 def downgrade() -> None:

@@ -5,6 +5,12 @@
  * exact REST calls go out. Branding/site-config uses the local `/api/admin/site-config`
  * path, which is not part of the API spec.
  */
+import {
+  DEFAULT_STATUS_LISTS,
+  type StatusDef,
+  type StatusList,
+  type StatusListKind,
+} from '@core/api/statuses.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { searchWords, textsMatch } from './list-search';
 import { skipLoading } from '@stupa-makers/ui-kit';
@@ -90,6 +96,7 @@ import {
   type OAuthGrantQuery,
   type Role,
   type SiteConfig,
+  type StatusListBody,
   type WebhookCatalogEvent,
   type WebhookConfig,
   type WebhookDeliveryStatus,
@@ -1518,6 +1525,35 @@ export class AdminApiService {
   putGremiumDefaults(body: GremiumDefaults): Observable<GremiumDefaults> {
     if (this.mock) return of(structuredCopy(body));
     return this.http.put<GremiumDefaults>(`${this.base}/admin/gremium-defaults`, body);
+  }
+
+  private readonly mockStatuses = signal<Readonly<Record<StatusListKind, readonly StatusDef[]>>>({
+    order: DEFAULT_STATUS_LISTS.order.map((status, i) => ({ ...status, used: i === 0 ? 3 : 1 })),
+    event: DEFAULT_STATUS_LISTS.event.map((status) => ({ ...status, used: 0 })),
+  });
+
+  /** GET /admin/statuses/{kind} — a status list with the number of elements per status. */
+  getStatusList(kind: StatusListKind): Observable<StatusList> {
+    if (this.mock) return of({ kind, statuses: this.mockStatuses()[kind] });
+    return this.http.get<StatusList>(`${this.base}/admin/statuses/${kind}`, { context: skipLoading() });
+  }
+
+  /**
+   * PUT /admin/statuses/{kind} — replaces a list; each removed status in use names its
+   * replacement (409 `status_in_use` without, 409 `status_in_flow` for a status the flow names).
+   */
+  putStatusList(kind: StatusListKind, body: StatusListBody): Observable<StatusList> {
+    if (this.mock) {
+      const used = new Map(this.mockStatuses()[kind].map((s) => [s.key, s.used ?? 0]));
+      const moved = Object.entries(body.replacements);
+      const statuses = body.statuses.map((s) => ({
+        ...s,
+        used: (used.get(s.key) ?? 0) + moved.filter(([, to]) => to === s.key).reduce((n, [from]) => n + (used.get(from) ?? 0), 0),
+      }));
+      this.mockStatuses.update((all) => ({ ...all, [kind]: statuses }));
+      return of({ kind, statuses });
+    }
+    return this.http.put<StatusList>(`${this.base}/admin/statuses/${kind}`, body);
   }
 
   /**

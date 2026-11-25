@@ -87,6 +87,8 @@ Keys that need a note:
   no member. A personal board stays private.
 - `todo.create_board`: create a free to-do board (spec 001061). The creator becomes a
   member with the role `manage`; the right reaches no existing board.
+- `team.create`: create a team without a parent (F/collaboration/teams/003065). The
+  creator becomes its first manager; the right reaches no existing team.
 - `order.manage`: create, change and delete the Bestellungen that the person reads
   (F/finance/orders/002862). It is separate from `budget.book`, so a role can order
   without the right to book.
@@ -118,6 +120,12 @@ Keys that need a note:
   the page /admin/paperless. The holder gives the server an address to call and a token,
   so the key is separate from `admin.site`. No OAuth scope carries it, so an agent token
   never changes the connection.
+- `admin.order_phases`: edit the status list of the Bestellungen on the page
+  "Bestellphasen" (/admin/order-phases, F/administration/admin/003035). A change moves
+  Bestellungen to another status, so the key is separate from `admin.site`. The OAuth
+  scope `admin:write` carries it.
+- `admin.event_phases`: the same for the status list of the Events on the page
+  "Veranstaltungsphasen" (/admin/event-phases).
 - `admin.ticket_mail`: set the Postfach of a Bereich (/admin/help-tickets): its address,
   the IMAP and the SMTP account, and its switch. The holder gives the server two hosts to
   call and the password of a mail account, so the key is separate from `admin.site`
@@ -182,6 +190,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "todo.read_all",
     "todo.all",
     "todo.create_board",
+    "team.create",
     "calendar.manage",
     "calendar.publish",
     "admin.calendars",
@@ -189,5 +198,14 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "graph.view",
     "admin.paperless",
     "admin.ticket_mail",
+    "admin.order_phases",
+    "admin.event_phases",
     "paperless.use",
 )
+
+
+#: The permission that edits each status list, one page each (F/administration/admin/003035).
+STATUS_LIST_PERMISSIONS: dict[str, str] = {
+    "order": "admin.order_phases",
+    "event": "admin.event_phases",
+}

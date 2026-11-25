@@ -63,6 +63,7 @@ from app.modules.orders.schemas import (
     OrderUpdate,
 )
 from app.modules.orders.service import MANAGE_PERMISSION, Marks, OrderService
+from app.modules.statuses.service import StatusReader
 from app.shared.antiabuse import enforce_attachment_body_cap, rate_limit_attachments
 from app.shared.errors import ForbiddenError, NotFoundError
 
@@ -120,7 +121,7 @@ def order_out(
         bookedAmount=marks.booked,
         title=row.title,
         kind=row.kind,  # pyright: ignore[reportArgumentType]
-        status=row.status,  # pyright: ignore[reportArgumentType]
+        status=row.status,
         supplier=row.supplier,
         url=row.url,
         orderNumber=row.order_number,
@@ -146,7 +147,7 @@ def _applicant_out(row: PurchaseOrder) -> OrderApplicantOut:
         number=format_number(row.number),
         title=row.title,
         kind=row.kind,  # pyright: ignore[reportArgumentType]
-        status=row.status,  # pyright: ignore[reportArgumentType]
+        status=row.status,
         orderedOn=row.ordered_on,
         deliveredOn=row.delivered_on,
     )
@@ -231,7 +232,10 @@ async def list_orders(
     buyers = await service.buyer_names(rows)
     marks = await service.marks(rows)
     title = (await service.application_titles([access.application_id])).get(access.application_id)
-    total = orders_sum((row.status, row.actual_amount, row.planned_amount) for row in rows)
+    phases = await StatusReader(service.session).phases("order")
+    total = orders_sum(
+        (phases.get(row.status, "open"), row.actual_amount, row.planned_amount) for row in rows
+    )
     approved = await service.approved_amount(access.application_id)
     manages = access.principal is not None and access.principal.has(MANAGE_PERMISSION)
     return OrdersOut(

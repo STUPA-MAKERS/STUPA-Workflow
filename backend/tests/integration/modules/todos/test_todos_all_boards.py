@@ -64,7 +64,7 @@ async def test_all_boards_lists_every_readable_board_with_all_live_cards(
     with TestClient(api.app) as client:
         api.login(other)
         foreign = _ok(client.get(ALL))
-        assert [b["kind"] for b in foreign] == ["personal", "gremium"]
+        assert [b["kind"] for b in foreign] == ["personal", "team"]
         _card(client, foreign[0]["id"], "Fremd privat")
         theirs = _card(client, str(stupa_board), "Von Olaf", assigneeIds=[str(other_id)])
 
@@ -72,9 +72,9 @@ async def test_all_boards_lists_every_readable_board_with_all_live_cards(
         rows = _ok(client.get(ALL))
         assert [(b["name"], b["kind"]) for b in rows] == [
             ("Meine To-Dos", "personal"),
-            ("AStA", "gremium"),
-            ("StuPa", "gremium"),
-            ("Plattform", "team"),
+            ("AStA", "team"),
+            ("StuPa", "team"),
+            ("Plattform", "permission"),
         ]
         assert all(b["canWrite"] for b in rows)
         assert str(fsi_board) not in {b["id"] for b in rows}

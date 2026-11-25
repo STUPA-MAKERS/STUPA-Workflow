@@ -86,7 +86,7 @@ export class AppointmentDetailComponent {
   );
   readonly hasInvited = computed(() => {
     const a = this.appointment();
-    return !!a && a.gremien.length + a.persons.length > 0;
+    return !!a && a.teams.length + a.persons.length > 0;
   });
 
   readonly answerKey = answerKey;

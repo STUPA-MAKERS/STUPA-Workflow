@@ -141,7 +141,7 @@ export class GremiumDetailComponent {
       switchMap((id) =>
         id && this.features.isOn('todos')
           ? this.todos.boards(id).pipe(
-              map((boards) => boards.find((b) => b.kind === 'gremium')?.id ?? null),
+              map((boards) => boards.find((b) => b.kind === 'team' && b.gremiumId === id)?.id ?? null),
               catchError(() => of(null)),
             )
           : of(null),

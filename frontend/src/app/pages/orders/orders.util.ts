@@ -1,4 +1,4 @@
-import type { Order, OrderInput, OrderKind, OrderStatus } from '@core/api/orders.service';
+import type { Order, OrderInput, OrderKind } from '@core/api/orders.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { dayMonthYear } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
@@ -8,21 +8,6 @@ import {
   positionValue,
   preferredOffer,
 } from '@shared/forms/positions';
-import type { StatusKind } from '@stupa-makers/ui-kit';
-
-export const ORDER_STATUS_LABEL: Readonly<Record<OrderStatus, TranslationKey>> = {
-  planned: 'orders.status.planned',
-  ordered: 'orders.status.ordered',
-  delivered: 'orders.status.delivered',
-  cancelled: 'orders.status.cancelled',
-};
-
-export const ORDER_STATUS_KIND: Readonly<Record<OrderStatus, StatusKind>> = {
-  planned: 'neutral',
-  ordered: 'warn',
-  delivered: 'accent',
-  cancelled: 'muted',
-};
 
 export const ORDER_KIND_LABEL: Readonly<Record<OrderKind, TranslationKey>> = {
   order: 'orders.kind.order',
@@ -89,11 +74,18 @@ export function positionPrefill(picked: readonly OrderPosition[]): {
   };
 }
 
-/** The ids of the positions that another Bestellung holds that is not cancelled. */
-export function takenPositions(orders: readonly Order[], selfId: string | null): ReadonlySet<string> {
+/**
+ * The ids of the positions that another Bestellung holds whose status is not in the phase
+ * `void` (spec 003036): `isVoid` reads the phase of a status key.
+ */
+export function takenPositions(
+  orders: readonly Order[],
+  selfId: string | null,
+  isVoid: (status: string) => boolean,
+): ReadonlySet<string> {
   return new Set(
     orders
-      .filter((o) => o.id !== selfId && o.status !== 'cancelled')
+      .filter((o) => o.id !== selfId && !isVoid(o.status))
       .flatMap((o) => o.positionIds ?? []),
   );
 }
@@ -143,15 +135,10 @@ export function orderFormValue(order: Order | null): Record<string, unknown> {
   };
 }
 
-export type OrderAction =
-  | 'ordered'
-  | 'delivered'
-  | 'invoiceLink'
-  | 'invoiceNew'
-  | 'booking'
-  | 'edit'
-  | 'cancelled'
-  | 'delete';
+/** The key of a menu item that sets a status: the prefix and the key of the status. */
+export const STATUS_ACTION = 'status:' as const;
+
+export type OrderAction = 'invoiceLink' | 'invoiceNew' | 'booking' | 'edit' | 'delete';
 
 /**
  * The marks of a Bestellung: "Rechnung offen" or "Rechnung bezahlt" from its invoice, and
@@ -226,6 +213,7 @@ export function orderFacts(
   locale: string,
   currency: string | null,
   t: (key: TranslationKey) => string,
+  statusName: (key: string) => string,
 ): readonly OrderFact[] {
   const money = (value: string | null | undefined): string =>
     formatMoney(value, locale, { currency });
@@ -236,7 +224,7 @@ export function orderFacts(
   const facts: readonly OrderFact[] = [
     { label: t('orders.field.number'), value: order.number, mono: true },
     { label: t('orders.field.kind'), value: t(ORDER_KIND_LABEL[order.kind]) },
-    { label: t('orders.field.status'), value: t(ORDER_STATUS_LABEL[order.status]) },
+    { label: t('orders.field.status'), value: statusName(order.status) },
     { label: t('orders.field.supplier'), value: order.supplier ?? '' },
     { label: t('orders.field.positions'), value: picked, wide: true },
     { label: t('orders.field.url'), value: order.url ?? '', href: order.url ?? undefined, wide: true },

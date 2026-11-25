@@ -113,7 +113,7 @@ def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
 #: ``email_login_link``, ``audit_verification`` and ``ticket_sender_block`` have no FK
 #: that a CASCADE follows.
 #: ``ticket`` and ``todo_board`` clear their child rows by CASCADE; a test creates the
-#: boards it needs (``ensure_gremium_board``, ``GET /todos/boards``).
+#: boards it needs (``ensure_team_board``, ``GET /todos/boards``).
 _DATA_TABLES = (
     "applicant",
     "application",

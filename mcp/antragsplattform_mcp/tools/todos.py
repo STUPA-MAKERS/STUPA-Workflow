@@ -1,12 +1,13 @@
 """To-do board tools: boards, columns, labels, member entries, cards, checklists and comments.
 
-A person has a role on a board: `read`, `edit` or `manage`. A gremium board: each active
-member of the gremium edits, a member whose gremium role holds `todo.configure` manages,
-and its extra entries (gremien or persons) add their roles. A free board (kind `free`)
-follows its entries only. The personal board is for its owner only, a team board for the
-holders of its permission; an admin manages every gremium and free board. The global
-`todo.all` reads and writes, `todo.read_all` only reads every gremium, free and team
-board (never a personal one). An unreadable board or card is 404; a card write on a
+A person has a role on a board: `read`, `edit` or `manage`. A team board (kind `team`,
+the board of a team; the board of a Gremium is the board of its team): each member of
+the team edits, a manager of the team manages, and its extra entries (teams or persons)
+add their roles. A free board (kind `free`) follows its entries only. The personal board
+is for its owner only, a permission board (kind `permission`) for the holders of its
+permission; an admin manages every team and free board. The global `todo.all` reads and
+writes, `todo.read_all` only reads every team, free and permission board (never a
+personal one). An unreadable board or card is 404; a card write on a
 board that is only readable is 403 `todo_write_required`; a change of the settings or
 the entries without `manage` is 403 `todo_configure_required`. The token reads with the
 scope `read` (`todo.read_all`) or `todos:write` and writes with `todos:write`.
@@ -29,12 +30,13 @@ async def todo_boards(gremium_id: str | None = None, archived: bool | None = Non
     """List the to-do boards the caller can read.
 
     The order is the personal board ("Meine To-Dos", created on the first call), the
-    gremium boards by name, the free boards by name, then the team boards. Each entry
-    carries `canWrite`, `canConfigure`, `openCount` (cards not archived and not in the
-    done column) and `agendaGremiumIds` (the gremien whose meetings take its cards).
+    team boards by name, the free boards by name, then the permission boards. Each entry
+    carries `teamId`, `gremiumId` (the Gremium of an inherent team), `canWrite`,
+    `canConfigure`, `openCount` (cards not archived and not in the done column) and
+    `agendaGremiumIds` (the gremien whose meetings take its cards).
 
     Args:
-        gremium_id: Only the board of this gremium.
+        gremium_id: Only the board of the team of this gremium.
         archived: True lists the archived free boards that the caller manages instead.
     """
     return await api().get(
@@ -53,7 +55,7 @@ async def todo_board_create(name: str, entries: list[S.TodoBoardEntryIn] | None 
 
     Args:
         name: 1 to 120 characters.
-        entries: The first gremien and persons, each with a role (default `edit`).
+        entries: The first teams and persons, each with a role (default `edit`).
     """
     body = {"name": name, "entries": [e.model_dump(exclude_none=True) for e in entries or []]}
     return await api().post("/todos/boards", json=body)
@@ -61,22 +63,22 @@ async def todo_board_create(name: str, entries: list[S.TodoBoardEntryIn] | None 
 
 @group.tool
 async def todo_board_entries(board_id: str) -> list:
-    """List the member entries of a board: gremien first, then persons, each by name.
+    """List the member entries of a board: teams first, then persons, each by name.
 
-    The own gremium of a gremium board comes first with `fixed: true` and no `id`; it
-    cannot be changed. Each entry has `id`, `kind` (`gremium` | `person`), `targetId`,
-    `name` and `role`.
+    The own team of a team board comes first with `fixed: true` and no `id`; it cannot be
+    changed. Each entry has `id`, `kind` (`team` | `person`), `targetId`, `name`, `role`
+    and, for the team of a Gremium, `gremiumId`.
     """
     return await api().get(f"/todos/boards/{board_id}/entries")
 
 
 @group.tool
 async def todo_board_entry_add(board_id: str, entry: S.TodoBoardEntryIn) -> list:
-    """Add a gremium or a person to a gremium board or a free board (needs `manage`).
+    """Add a team or a person to a team board or a free board (needs `manage`).
 
-    A gremium entry stands for the members of the gremium at the time of each read. 409
-    `entry_exists` for a target on the board, 409 `own_gremium_entry` for the own gremium
-    of a gremium board, 422 `entries_not_supported` on a personal or team board. Returns
+    A team entry stands for the members of the team at the time of each read. 409
+    `entry_exists` for a target on the board, 409 `own_team_entry` for the own team of a
+    team board, 422 `entries_not_supported` on a personal or permission board. Returns
     all entries.
     """
     return await api().post(
@@ -142,7 +144,7 @@ async def todo_my_cards() -> list:
     """List my cards on the other boards, grouped by board.
 
     Each entry is a board that the caller can read and on which live cards (done
-    ones too) name the caller as an assignee: `id`, `name`, `kind`, `gremiumId`,
+    ones too) name the caller as an assignee: `id`, `name`, `kind`, `teamId`, `gremiumId`,
     `canWrite`, all `columns` in their order (`cardCount` counts my cards there), the
     board `labels` and only my `cards`. The personal board is left out; read it with
     `todo_board`. A board that the caller can no longer read is left out, also when
@@ -157,8 +159,8 @@ async def todo_all_boards() -> list:
     """List every board that the caller can read, with all its live cards.
 
     The meta-board "Alle": the personal board first (the call creates it), then the
-    gremium boards by name, then the team boards. Each entry has `id`, `name`, `kind`,
-    `gremiumId`, `canWrite` (false on a board that the caller only reads), all
+    team boards by name, then the permission boards. Each entry has `id`, `name`, `kind`,
+    `teamId`, `gremiumId`, `canWrite` (false on a board that the caller only reads), all
     `columns` in their order (`cardCount` counts the live cards there), the board
     `labels` and every live `card`, done ones too; archived cards are left out. Move a
     card with `todo_card_move` on its own board, and with `todo_card_transfer` to
@@ -244,7 +246,7 @@ async def todo_card_transfer(
     done column of the target marks the card done; another column reopens it.
     A card of the caller's own personal board without assignees gets the caller as
     assignee when the caller is a member of the target board. A card of a shared
-    board (gremium or team) never moves into a personal board.
+    board (team, free or permission) never moves into a personal board.
     Errors: 404 for a card or target board that the caller cannot read, 403
     `todo_write_required` (a board that the caller reads but cannot write) or
     `transfer_to_personal` (a shared board into a personal board), 422
@@ -494,7 +496,7 @@ async def todo_board_archived_cards(
 
 @group.tool
 async def todo_entry_options(q: str = "") -> dict:
-    """Find gremien and persons for a member entry of a free board."""
+    """Find teams and persons for a member entry of a free board."""
     return await api().get("/todos/entry-options", params={"q": q})
 
 

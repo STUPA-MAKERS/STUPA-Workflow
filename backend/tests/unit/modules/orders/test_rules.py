@@ -63,12 +63,13 @@ def test_an_auslage_needs_its_buyer() -> None:
 
 
 def test_status_sets_only_an_empty_date() -> None:
-    assert status_dates("ordered", None, None, _TODAY) == (_TODAY, None)
-    assert status_dates("ordered", _TYPED, None, _TODAY) == (_TYPED, None)
-    assert status_dates("delivered", None, None, _TODAY) == (None, _TODAY)
-    assert status_dates("delivered", _TYPED, _TYPED, _TODAY) == (_TYPED, _TYPED)
-    assert status_dates("planned", None, None, _TODAY) == (None, None)
-    assert status_dates("cancelled", _TYPED, None, _TODAY) == (_TYPED, None)
+    """§ F/administration/admin/003037: a status sets the date that it names, when empty."""
+    assert status_dates("orderedOn", None, None, _TODAY) == (_TODAY, None)
+    assert status_dates("orderedOn", _TYPED, None, _TODAY) == (_TYPED, None)
+    assert status_dates("deliveredOn", None, None, _TODAY) == (None, _TODAY)
+    assert status_dates("deliveredOn", _TYPED, _TYPED, _TODAY) == (_TYPED, _TYPED)
+    assert status_dates(None, None, None, _TODAY) == (None, None)
+    assert status_dates(None, _TYPED, None, _TODAY) == (_TYPED, None)
 
 
 def test_position_ids_come_from_every_list_with_offers() -> None:
@@ -87,12 +88,13 @@ def test_position_ids_come_from_every_list_with_offers() -> None:
     assert position_ids({}) == frozenset()
 
 
-def test_sum_leaves_out_a_cancelled_bestellung() -> None:
+def test_sum_leaves_out_a_bestellung_in_the_phase_void() -> None:
+    """§ F/administration/admin/003036: the phase ``void`` does not count to the sum."""
     rows = [
-        ("ordered", Decimal("112.50"), Decimal("100.00")),
-        ("planned", None, Decimal("20.00")),
-        ("delivered", None, None),
-        ("cancelled", Decimal("999.00"), None),
+        ("open", Decimal("112.50"), Decimal("100.00")),
+        ("open", None, Decimal("20.00")),
+        ("done", None, None),
+        ("void", Decimal("999.00"), None),
     ]
     assert orders_sum(rows) == Decimal("132.50")
     assert orders_sum([]) == Decimal(0)
@@ -112,7 +114,7 @@ def test_schema_accepts_the_required_fields_only() -> None:
     assert (order.title, order.kind, order.status, order.position_ids) == (
         "Regal",
         "order",
-        "planned",
+        None,
         (),
     )
 
@@ -124,7 +126,7 @@ def test_schema_accepts_the_required_fields_only() -> None:
         {"title": ""},
         {"title": "Regal", "plannedAmount": "1.234"},
         {"title": "Regal", "actualAmount": "-1"},
-        {"title": "Regal", "status": "paid"},
+        {"title": "Regal", "status": "x" * 41},
         {"title": "Regal", "kind": "gift"},
         {"title": "Regal", "unknown": 1},
     ],
@@ -134,10 +136,11 @@ def test_schema_refuses(body: dict[str, object]) -> None:
         OrderCreate.model_validate(body)
 
 
-def test_status_body_refuses_a_fifth_value() -> None:
-    assert OrderStatusIn.model_validate({"status": "delivered", "version": 1}).status == "delivered"
+def test_status_body_takes_any_key_of_the_list() -> None:
+    """§ F/administration/admin/003035: the service checks the key against the list."""
+    assert OrderStatusIn.model_validate({"status": "returned", "version": 1}).status == "returned"
     with pytest.raises(ValidationError):
-        OrderStatusIn.model_validate({"status": "returned", "version": 1})
+        OrderStatusIn.model_validate({"status": "x" * 41, "version": 1})
 
 
 def test_the_invoice_fills_only_an_empty_price_of_its_only_bestellung() -> None:
@@ -149,22 +152,22 @@ def test_the_invoice_fills_only_an_empty_price_of_its_only_bestellung() -> None:
 
 
 @pytest.mark.parametrize(
-    ("status", "cost", "booked", "segment"),
+    ("phase", "cost", "booked", "segment"),
     [
-        ("planned", "60.00", "0", "open"),
-        ("ordered", None, "0", "open"),
-        ("delivered", "60.00", "0", "delivered"),
-        ("delivered", "60.00", "20.00", "delivered"),
-        ("delivered", None, "0", "delivered"),
-        ("delivered", "60.00", "60.00", "done"),
-        ("delivered", "60.00", "75.00", "done"),
-        ("delivered", None, "20.00", "done"),
-        ("cancelled", "60.00", "0", "done"),
+        ("open", "60.00", "0", "open"),
+        ("open", None, "0", "open"),
+        ("done", "60.00", "0", "delivered"),
+        ("done", "60.00", "20.00", "delivered"),
+        ("done", None, "0", "delivered"),
+        ("done", "60.00", "60.00", "done"),
+        ("done", "60.00", "75.00", "done"),
+        ("done", None, "20.00", "done"),
+        ("void", "60.00", "0", "done"),
     ],
 )
 def test_the_segment_of_a_bestellung(
-    status: str, cost: str | None, booked: str, segment: str
+    phase: str, cost: str | None, booked: str, segment: str
 ) -> None:
-    """§ 002884: a delivered Bestellung waits until its price is booked in full."""
+    """§ 002884: a Bestellung in the phase done waits until its price is booked in full."""
     price_of = Decimal(cost) if cost is not None else None
-    assert segment_of(status, price_of, Decimal(booked)) == segment
+    assert segment_of(phase, price_of, Decimal(booked)) == segment

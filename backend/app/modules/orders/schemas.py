@@ -26,7 +26,8 @@ class OrderCreate(FrozenStrictCamelModel, frozen=True):
 
     title: Title
     kind: OrderKind = "order"
-    status: OrderStatus = "planned"
+    #: Empty for the start status of the list (F/administration/admin/003035).
+    status: OrderStatus | None = Field(default=None, max_length=40)
     supplier: Short | None = None
     url: str | None = None
     order_number: Annotated[str, StringConstraints(max_length=100)] | None = Field(
@@ -72,7 +73,7 @@ class OrderUpdate(FrozenStrictCamelModel, frozen=True):
 class OrderStatusIn(FrozenStrictCamelModel, frozen=True):
     """The body of a status change."""
 
-    status: OrderStatus
+    status: OrderStatus = Field(max_length=40)
     version: int
 
 

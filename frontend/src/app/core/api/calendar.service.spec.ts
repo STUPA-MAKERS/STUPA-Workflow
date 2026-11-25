@@ -19,7 +19,7 @@ const BODY: AppointmentInput = {
   description: null,
   forAll: false,
   public: false,
-  gremiumIds: ['g-1'],
+  teamIds: ['g-1'],
   principalIds: [],
 };
 
@@ -92,7 +92,7 @@ describe('CalendarApiService', () => {
     const body: ExternalCalendarInput = {
       name: 'Hochschule',
       url: 'https://example.org/a.ics',
-      gremiumId: null,
+      teamId: null,
       intervalMinutes: 60,
     };
     admin.list().subscribe();

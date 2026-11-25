@@ -35,7 +35,7 @@ def test_order_tools_read_create_change_and_delete(fake_api: _FakeApi) -> None:
         (
             "POST",
             "/applications/a1/orders",
-            {"title": "Beamer", "kind": "order", "status": "planned", "positionIds": ["p1"]},
+            {"title": "Beamer", "kind": "order", "positionIds": ["p1"]},
         ),
         ("PATCH", "/orders/o1", {"version": 2, "url": None, "note": "x"}),
         ("POST", "/orders/o1/status", {"status": "ordered", "version": 3}),
@@ -50,7 +50,7 @@ def test_order_create_without_an_antrag_posts_to_the_orders(fake_api: _FakeApi) 
         (
             "POST",
             "/orders",
-            {"title": "Beamer", "kind": "order", "status": "planned", "positionIds": []},
+            {"title": "Beamer", "kind": "order", "positionIds": []},
         ),
     ]
 

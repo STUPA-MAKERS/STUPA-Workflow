@@ -19,6 +19,7 @@ import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { LOCATION } from '@core/browser/location.token';
+import { StatusCatalog } from '@core/api/statuses.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -176,6 +177,7 @@ export class StatusTimelineComponent {
   private readonly apiBase = inject(API_BASE_URL);
   private readonly location = inject(LOCATION);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly injector = inject(Injector);
@@ -420,7 +422,7 @@ export class StatusTimelineComponent {
             {
               at: e.at,
               icon: 'package' as const,
-              ...orderEventText(e.order, t),
+              ...orderEventText(e.order, t, (key) => this.statuses.label('order', key)),
               actor: actor(e.actorInfo, e.actor),
             },
           ]

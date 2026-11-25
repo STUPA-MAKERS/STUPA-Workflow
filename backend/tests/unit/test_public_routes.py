@@ -46,6 +46,8 @@ Groups of ``PUBLIC_ROUTES`` and why each one is public:
 - Site config: the SPA reads branding and the PWA manifest before login. The web server
   includes the branded page head into every page, and a link preview fetches its images.
 - UI texts: the SPA reads the text overrides and the extra languages before login.
+- Status lists: the names, tones and phases of the statuses of the Bestellungen and the
+  Events are plain config, and the applicant view (magic link) shows them too.
 - Apply: the public wizard lists the application types and their groups, uploads and
   removes draft files with its draft token (ALTCHA when signed out) and submits the
   application.
@@ -153,6 +155,7 @@ PUBLIC_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
         ("GET", "/api/altcha/challenge"),
         ("GET", "/api/site-config"),
         ("GET", "/api/i18n"),
+        ("GET", "/api/statuses/{kind}"),
         ("GET", "/api/manifest.webmanifest"),
         ("GET", "/api/page-head"),
         ("GET", "/api/branding/preview.png"),

@@ -34,7 +34,8 @@ async def reapply_snapshot(
 
     The responsible config service writes a new version. It also writes the linked
     ``config_revision`` and the audit entry with the given ``action`` and
-    ``extra_data``. ``entity_type`` is one of ``form``, ``flow`` or ``site_config``.
+    ``extra_data``. ``entity_type`` is one of ``form``, ``flow``, ``site_config`` or
+    ``status_list``.
     ``entity_id`` holds the application type id for a form, or ``global`` for the flow
     and the site config. ``actor`` is the OIDC ``sub`` to record. ``features_only`` is
     the revert of a save of the feature switches: the site config takes only the
@@ -76,6 +77,14 @@ async def reapply_snapshot(
             branding = Branding.model_validate(snapshot)
             await SiteConfigService(session).restore_branding(
                 branding, actor, action=action, extra_data=extra_data, with_features=features_only
+            )
+        case entities.ENTITY_STATUS_LIST:
+            from app.modules.admin.service.statuses import StatusListAdmin
+            from app.modules.statuses.schemas import StatusIn
+
+            statuses = [StatusIn.model_validate(s) for s in snapshot.get("statuses", []) or []]
+            await StatusListAdmin(session).restore(
+                entity_id, statuses, actor, action=action, extra_data=extra_data
             )
         case _:  # pragma: no cover - defensive; entity_type comes from a closed list
             raise ValidationProblem(

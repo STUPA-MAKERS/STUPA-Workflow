@@ -34,6 +34,7 @@ from app.modules.orders.access import reads_all, reads_free
 from app.modules.orders.models import PurchaseOrder
 from app.modules.orders.rules import OrderKind, Segment
 from app.modules.orders.schemas import PendingApplicationOut
+from app.modules.statuses.service import in_phase
 from app.shared.paging import Page
 from app.shared.search import dialect_of, trigram_rank
 
@@ -84,13 +85,13 @@ def segment_clause(segment: Segment) -> ColumnElement[bool]:
     waits = or_(and_(cost.is_not(None), booked < cost), and_(cost.is_(None), booked == 0))
     match segment:
         case "open":
-            return PurchaseOrder.status.in_(("planned", "ordered"))
+            return in_phase(PurchaseOrder.status, "order", "open")
         case "delivered":
-            return and_(PurchaseOrder.status == "delivered", waits)
+            return and_(in_phase(PurchaseOrder.status, "order", "done"), waits)
         case "done":
             return or_(
-                PurchaseOrder.status == "cancelled",
-                and_(PurchaseOrder.status == "delivered", ~waits),
+                in_phase(PurchaseOrder.status, "order", "void"),
+                and_(in_phase(PurchaseOrder.status, "order", "done"), ~waits),
             )
 
 
@@ -239,7 +240,7 @@ class OrderListing:
         """Return the approved Anträge without a Bestellung (F/finance/orders/002934).
 
         An Antrag counts when its state has the flag approved, its type has money and no
-        Bestellung of it has a status other than "Storniert". An archived Antrag is out
+        Bestellung of it has a status outside the phase ``void``. An archived Antrag is out
         of the work, so the list leaves it out. The newest Antrag stands first.
 
         ``with_orders`` keeps the Anträge that have a Bestellung too, because the form of
@@ -249,7 +250,7 @@ class OrderListing:
             select(PurchaseOrder.id)
             .where(
                 PurchaseOrder.application_id == Application.id,
-                PurchaseOrder.status != "cancelled",
+                ~in_phase(PurchaseOrder.status, "order", "void"),
             )
             .exists()
         )

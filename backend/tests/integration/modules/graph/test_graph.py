@@ -26,7 +26,13 @@ from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.site_config.features import Feature
 from app.modules.tickets.models import Ticket
 from app.modules.todos.models import Link, TodoCard, TodoColumn
-from tests.integration.modules.todos.conftest import Api, add_gremium, add_member, add_person
+from tests.integration.modules.todos.conftest import (
+    Api,
+    add_gremium,
+    add_member,
+    add_person,
+    team_of,
+)
 from tests.integration.modules.todos.test_todos_events import _money
 
 pytestmark = pytest.mark.integration
@@ -243,8 +249,8 @@ async def test_a_termin_a_ticket_and_a_card_take_their_dates(
         await session.flush()
         session.add_all(
             [
-                Invitation(appointment_id=termin.id, gremium_id=gremium_id),
-                Invitation(appointment_id=termin.id, gremium_id=other_id),
+                Invitation(appointment_id=termin.id, team_id=await team_of(maker, gremium_id)),
+                Invitation(appointment_id=termin.id, team_id=await team_of(maker, other_id)),
                 Invitation(appointment_id=termin.id, principal_id=admin_id),
             ]
         )

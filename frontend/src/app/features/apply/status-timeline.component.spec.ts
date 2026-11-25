@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { NEVER, of, throwError, type Observable } from 'rxjs';
@@ -195,6 +196,7 @@ async function setup(
   const toast = toastMock();
   const view = await render(StatusTimelineComponent, {
     providers: [
+      provideTestStatuses(),
       provideRouter([]),
       provideFormly(),
       { provide: ApiClient, useValue: api },

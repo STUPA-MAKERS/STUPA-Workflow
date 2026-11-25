@@ -4,16 +4,16 @@
 decisions. No method commits; the router commits and then sends the mails that a write
 returns (`Written.mails`).
 
-An invited Gremium stands for its members and its substitute pool at the time of the
-read (`gremium_person_ids`), the persons who read its meetings without a global
-permission. A holder of ``meeting.view_all`` reads the meetings of every Gremium and is
-not invited by that, because the permission is a view and no membership.
+An invited team stands for its members at the time of the read (`team_person_ids`,
+F/collaboration/teams/003069). The team of a Gremium holds the members and the substitute
+pool of the Gremium. A holder of ``meeting.view_all`` is not invited by that, because the
+permission is a view and no membership.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Literal, cast
@@ -34,12 +34,11 @@ from app.modules.calendar.schemas import (
     AnswerOut,
     AppointmentIn,
     AppointmentOut,
-    GremiumRefOut,
     PersonOut,
+    TeamRefOut,
 )
-from app.modules.gremien.gremium_roles import gremium_reader_ids
-from app.modules.gremien.models import DelegationSubstitute, Gremium, GremiumMembership
-from app.modules.meetings.rules import MeetingRules
+from app.modules.teams.members import gremien_of_teams, member_ids, member_team_ids, team_infos
+from app.modules.teams.models import Team
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.search import escape_like
 
@@ -152,27 +151,15 @@ def mine(viewer: Viewer) -> ColumnElement[bool]:
             Invitation.appointment_id == Appointment.id,
             or_(
                 Invitation.principal_id == viewer.id,
-                Invitation.gremium_id.in_(viewer.gremium_ids),
+                Invitation.team_id.in_(viewer.team_ids),
             ),
         ),
     )
 
 
-async def gremium_person_ids(
-    session: AsyncSession, gremium_ids: Collection[UUID]
-) -> frozenset[UUID]:
-    """The persons that an invitation of the Gremien reaches: members and pool substitutes."""
-    if not gremium_ids:
-        return frozenset()
-    members = await session.scalars(
-        select(GremiumMembership.principal_id).where(GremiumMembership.gremium_id.in_(gremium_ids))
-    )
-    pool = await session.scalars(
-        select(DelegationSubstitute.substitute_principal_id).where(
-            DelegationSubstitute.gremium_id.in_(gremium_ids)
-        )
-    )
-    return frozenset(members.all()) | frozenset(pool.all())
+async def team_person_ids(session: AsyncSession, team_ids: Collection[UUID]) -> frozenset[UUID]:
+    """The persons that an invitation of the teams reaches: their active members."""
+    return frozenset(await member_ids(session, team_ids))
 
 
 class AppointmentService:
@@ -190,14 +177,14 @@ class AppointmentService:
             id=await self.session.scalar(
                 select(PrincipalRow.id).where(PrincipalRow.sub == principal.sub)
             ),
-            gremium_ids=frozenset(await gremium_reader_ids(self.session, principal.sub)),
+            team_ids=await member_team_ids(self.session, principal),
             manages=principal.has(CALENDAR_MANAGE),
             publishes=principal.has(CALENDAR_PUBLISH),
         )
 
     async def people(self, targets: Targets) -> frozenset[UUID]:
         """Every person that the invitations reach at this moment."""
-        return targets.principal_ids | await gremium_person_ids(self.session, targets.gremium_ids)
+        return targets.principal_ids | await team_person_ids(self.session, targets.team_ids)
 
     async def load(self, rows: Sequence[Appointment]) -> tuple[Loaded, ...]:
         """Read the invitations and the answers of the rows with two statements.
@@ -222,10 +209,10 @@ class AppointmentService:
             Loaded(
                 row=row,
                 targets=Targets(
-                    gremium_ids=frozenset(
-                        i.gremium_id
+                    team_ids=frozenset(
+                        i.team_id
                         for i in invitations
-                        if i.appointment_id == row.id and i.gremium_id is not None
+                        if i.appointment_id == row.id and i.team_id is not None
                     ),
                     principal_ids=frozenset(
                         i.principal_id
@@ -310,19 +297,19 @@ class AppointmentService:
         ).all()
         return {pid: name or (email or "").partition("@")[0] for pid, name, email in rows}
 
-    async def _gremium_names(self, ids: Collection[UUID]) -> dict[UUID, str]:
-        if not ids:
-            return {}
-        rows = (
-            await self.session.execute(select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids)))
-        ).all()
-        return {row[0]: row[1] for row in rows}
+    async def _teams(self, ids: Collection[UUID]) -> dict[UUID, TeamRefOut]:
+        return {
+            t.id: TeamRefOut(id=t.id, name=t.name, gremium_id=t.gremium_id)
+            for t in await team_infos(self.session, ids=ids)
+        }
 
-    async def gremium_names(self, loaded: Sequence[Loaded]) -> dict[UUID, str]:
-        """The names of every Gremium that the Termine invite."""
-        return await self._gremium_names(
-            {gid for item in loaded for gid in item.targets.gremium_ids}
-        )
+    async def invited_teams(self, loaded: Sequence[Loaded]) -> dict[UUID, TeamRefOut]:
+        """Every team that the Termine invite, with its name and its Gremium."""
+        return await self._teams({tid for item in loaded for tid in item.targets.team_ids})
+
+    async def gremium_of(self, team_ids: Collection[UUID]) -> Mapping[UUID, UUID]:
+        """The Gremium of each inherent team among ``team_ids``."""
+        return await gremien_of_teams(self.session, team_ids)
 
     async def out(self, viewer: Viewer, item: Loaded) -> AppointmentOut:
         """Build the body of one Termin for the viewer."""
@@ -335,7 +322,7 @@ class AppointmentService:
             {*item.targets.principal_ids, *answered, *unanswered}
             | ({row.creator_id} if row.creator_id is not None else set())
         )
-        gremien = await self._gremium_names(item.targets.gremium_ids)
+        teams = await self._teams(item.targets.team_ids)
         return AppointmentOut(
             id=row.id,
             title=row.title,
@@ -352,12 +339,7 @@ class AppointmentService:
                 if row.creator_id is not None
                 else None
             ),
-            gremien=tuple(
-                sorted(
-                    (GremiumRefOut(id=gid, name=name) for gid, name in gremien.items()),
-                    key=lambda g: g.name.casefold(),
-                )
-            ),
+            teams=tuple(sorted(teams.values(), key=lambda t: t.name.casefold())),
             persons=tuple(
                 sorted(
                     (
@@ -417,8 +399,16 @@ class AppointmentService:
     async def _check_targets(
         self, principal: Principal, viewer: Viewer, data: AppointmentIn, before: Targets
     ) -> None:
-        """Refuse an unknown target and a Gremium that the caller must not invite."""
-        known_gremien = await self._gremium_names(data.gremium_ids)
+        """Refuse an unknown target and a team that the caller must not invite."""
+        known_teams = (
+            set(
+                (
+                    await self.session.scalars(select(Team.id).where(Team.id.in_(data.team_ids)))
+                ).all()
+            )
+            if data.team_ids
+            else set()
+        )
         known_persons = (
             set(
                 (
@@ -432,31 +422,25 @@ class AppointmentService:
             if data.principal_ids
             else set()
         )
-        if set(data.gremium_ids) - set(known_gremien):
+        if set(data.team_ids) - known_teams:
             raise ValidationProblem(
-                "Unknown Gremium.", errors=[{"field": "gremiumIds", "msg": "unknown"}]
+                "Unknown team.", errors=[{"field": "teamIds", "msg": "unknown"}]
             )
         if set(data.principal_ids) - known_persons - before.principal_ids:
             raise ValidationProblem(
                 "Unknown person.", errors=[{"field": "principalIds", "msg": "unknown"}]
             )
-        scope = (
-            None
-            if viewer.manages
-            else (await MeetingRules(self.session).meeting_read_scope(principal))[0]
-        )
-        if rules.forbidden_gremien(data.gremium_ids, scope, before.gremium_ids):
-            raise ForbiddenError(
-                "You cannot invite this Gremium.", code="calendar_gremium_forbidden"
-            )
+        own = None if viewer.manages else viewer.team_ids
+        if rules.forbidden_teams(data.team_ids, own, before.team_ids):
+            raise ForbiddenError("You cannot invite this team.", code="calendar_team_forbidden")
 
     async def create(self, principal: Principal, data: AppointmentIn) -> Written:
         """Create a Termin of the caller with its invitations.
 
         Raises:
             ForbiddenError: A scoped token, the switches "Für alle" and "Öffentlich" without
-                ``calendar.publish``, or a Gremium that the caller must not invite.
-            ValidationProblem: An unknown Gremium or person.
+                ``calendar.publish``, or a team that the caller must not invite.
+            ValidationProblem: An unknown team or person.
         """
         viewer = await self.viewer(principal)
         if viewer.id is None:
@@ -479,10 +463,10 @@ class AppointmentService:
         )
         self.session.add(row)
         await self.session.flush()
-        targets = Targets(frozenset(data.gremium_ids), frozenset(data.principal_ids))
+        targets = Targets(frozenset(data.team_ids), frozenset(data.principal_ids))
         self.session.add_all(
             [
-                *(Invitation(appointment_id=row.id, gremium_id=gid) for gid in targets.gremium_ids),
+                *(Invitation(appointment_id=row.id, team_id=tid) for tid in targets.team_ids),
                 *(
                     Invitation(appointment_id=row.id, principal_id=pid)
                     for pid in targets.principal_ids
@@ -507,9 +491,9 @@ class AppointmentService:
         Raises:
             NotFoundError: The Termin is unknown or not readable by the caller.
             ForbiddenError: The caller is neither the creator nor a manager, changes the
-                switch "Für alle" without ``calendar.publish`` or invites a Gremium that
+                switch "Für alle" without ``calendar.publish`` or invites a team that
                 the caller must not invite.
-            ValidationProblem: An unknown Gremium or person.
+            ValidationProblem: An unknown team or person.
         """
         viewer = await self.viewer(principal)
         item = await self._readable_row(viewer, appointment_id, lock=True)
@@ -521,7 +505,7 @@ class AppointmentService:
         await self._check_targets(principal, viewer, data, item.targets)
         before = span_of(row)
         after = span_of(data)
-        targets = Targets(frozenset(data.gremium_ids), frozenset(data.principal_ids))
+        targets = Targets(frozenset(data.team_ids), frozenset(data.principal_ids))
         people_before = await self.people(item.targets)
         await self.session.execute(
             update(Appointment)
@@ -544,7 +528,7 @@ class AppointmentService:
             delete(Invitation).where(
                 Invitation.appointment_id == row.id,
                 or_(
-                    Invitation.gremium_id.in_(item.targets.gremium_ids - targets.gremium_ids),
+                    Invitation.team_id.in_(item.targets.team_ids - targets.team_ids),
                     Invitation.principal_id.in_(item.targets.principal_ids - targets.principal_ids),
                 ),
             )
@@ -552,8 +536,8 @@ class AppointmentService:
         self.session.add_all(
             [
                 *(
-                    Invitation(appointment_id=row.id, gremium_id=gid)
-                    for gid in targets.gremium_ids - item.targets.gremium_ids
+                    Invitation(appointment_id=row.id, team_id=tid)
+                    for tid in targets.team_ids - item.targets.team_ids
                 ),
                 *(
                     Invitation(appointment_id=row.id, principal_id=pid)

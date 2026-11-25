@@ -6,6 +6,7 @@
  * developable and testable. Branding/site-config uses the local `/api/admin/site-config`
  * path, which is not part of the API spec.
  */
+import type { StatusDef } from '@core/api/statuses.service';
 import type { FeatureKey } from '@core/features/feature.service';
 import type {
   DataDiff,
@@ -80,7 +81,7 @@ export interface TransitionDef {
    * The platform offers the transition to the person who sets a Bestellung of the Antrag
    * to this status. It never fires the transition by itself.
    */
-  readonly offerOnOrderStatus?: 'ordered' | 'delivered' | null;
+  readonly offerOnOrderStatus?: string | null;
 }
 
 /** Visual node group. Only the editor renders it and the engine ignores it. On the
@@ -945,6 +946,7 @@ export const GREMIUM_PERMISSIONS = [
   'info.write',
   'members.notify',
   'ticket.work',
+  'team.manage',
 ] as const;
 
 /**
@@ -1568,3 +1570,10 @@ export type { FormFieldDef };
  * a key that does not match with 422. A key never changes after the create.
  */
 export const ROLE_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+/** The body of `PUT /admin/statuses/{kind}` (spec 003035, 003038). */
+export interface StatusListBody {
+  readonly statuses: readonly Omit<StatusDef, 'used'>[];
+  /** Removed key → kept key: the elements of the removed status move there. */
+  readonly replacements: Readonly<Record<string, string>>;
+}

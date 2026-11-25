@@ -86,7 +86,7 @@
       "to": "applications"
     },
     {
-      "count": 20,
+      "count": 21,
       "from": "admin",
       "to": "audit"
     },
@@ -111,7 +111,7 @@
       "to": "calendar"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "admin",
       "to": "config_revision"
     },
@@ -126,7 +126,7 @@
       "to": "files"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "admin",
       "to": "flow"
     },
@@ -176,7 +176,7 @@
       "to": "protocol"
     },
     {
-      "count": 41,
+      "count": 43,
       "from": "admin",
       "to": "shared"
     },
@@ -184,6 +184,16 @@
       "count": 28,
       "from": "admin",
       "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "admin",
+      "to": "statuses"
+    },
+    {
+      "count": 3,
+      "from": "admin",
+      "to": "teams"
     },
     {
       "count": 1,
@@ -521,12 +531,12 @@
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 4,
       "from": "calendar",
       "to": "gremien"
     },
     {
-      "count": 8,
+      "count": 7,
       "from": "calendar",
       "to": "meetings"
     },
@@ -551,12 +561,17 @@
       "to": "site_config"
     },
     {
+      "count": 4,
+      "from": "calendar",
+      "to": "teams"
+    },
+    {
       "count": 5,
       "from": "calendar",
       "to": "todos"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "config_revision",
       "to": "admin"
     },
@@ -601,7 +616,7 @@
       "to": "orders"
     },
     {
-      "count": 7,
+      "count": 9,
       "from": "config_revision",
       "to": "shared"
     },
@@ -609,6 +624,11 @@
       "count": 1,
       "from": "config_revision",
       "to": "site_config"
+    },
+    {
+      "count": 1,
+      "from": "config_revision",
+      "to": "statuses"
     },
     {
       "count": 4,
@@ -844,6 +864,11 @@
       "count": 3,
       "from": "graph",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "teams"
     },
     {
       "count": 1,
@@ -1134,6 +1159,11 @@
       "count": 9,
       "from": "orders",
       "to": "shared"
+    },
+    {
+      "count": 5,
+      "from": "orders",
+      "to": "statuses"
     },
     {
       "count": 1,
@@ -1481,6 +1511,51 @@
       "to": "shared"
     },
     {
+      "count": 5,
+      "from": "statuses",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "team_pages",
+      "to": "audit"
+    },
+    {
+      "count": 4,
+      "from": "team_pages",
+      "to": "auth"
+    },
+    {
+      "count": 3,
+      "from": "team_pages",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "team_pages",
+      "to": "teams"
+    },
+    {
+      "count": 2,
+      "from": "team_pages",
+      "to": "todos"
+    },
+    {
+      "count": 2,
+      "from": "teams",
+      "to": "auth"
+    },
+    {
+      "count": 3,
+      "from": "teams",
+      "to": "gremien"
+    },
+    {
+      "count": 1,
+      "from": "teams",
+      "to": "shared"
+    },
+    {
       "count": 4,
       "from": "tickets",
       "to": "applications"
@@ -1586,7 +1661,7 @@
       "to": "forms"
     },
     {
-      "count": 4,
+      "count": 3,
       "from": "todos",
       "to": "gremien"
     },
@@ -1624,6 +1699,11 @@
       "count": 2,
       "from": "todos",
       "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "todos",
+      "to": "teams"
     },
     {
       "count": 6,
@@ -1928,6 +2008,24 @@
       "layer": 6,
       "name": "site_config",
       "path": "backend/app/modules/site_config"
+    },
+    {
+      "id": "statuses",
+      "layer": 5,
+      "name": "statuses",
+      "path": "backend/app/modules/statuses"
+    },
+    {
+      "id": "team_pages",
+      "layer": 1,
+      "name": "team_pages",
+      "path": "backend/app/modules/team_pages"
+    },
+    {
+      "id": "teams",
+      "layer": 5,
+      "name": "teams",
+      "path": "backend/app/modules/teams"
     },
     {
       "id": "tickets",

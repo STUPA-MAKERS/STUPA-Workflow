@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "59ccfd0a0856"
@@ -66,10 +67,6 @@ _TABLES: tuple[str, ...] = (
             CHECK (archive_after_days IS NULL OR archive_after_days BETWEEN 1 AND 365)
     )
     """,
-    (
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_gremium ON todo_board (gremium_id) "
-        "WHERE gremium_id IS NOT NULL"
-    ),
     (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_owner ON todo_board (owner_id) "
         "WHERE owner_id IS NOT NULL"
@@ -273,23 +270,42 @@ _COLUMNS_SQL = (
     "('Wartet', 2, false), ('Erledigt', 3, true)) AS c(name, position, is_done)"
 )
 
-_BOARDS: tuple[str, ...] = (
-    (
-        "WITH boards AS ("
-        "INSERT INTO todo_board (name, kind, gremium_id) "
-        "SELECT g.name, 'gremium', g.id FROM gremium g "
-        "WHERE NOT EXISTS (SELECT 1 FROM todo_board t WHERE t.gremium_id = g.id) "
-        "RETURNING id) " + _COLUMNS_SQL.format(boards="boards")
-    ),
-    (
+#: The parts of the old shape of ``todo_board`` (``gremium_id``), see ``_legacy``.
+_GREMIUM_INDEX = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_todo_board_gremium ON todo_board (gremium_id) "
+    "WHERE gremium_id IS NOT NULL"
+)
+_GREMIUM_BOARDS = (
+    "WITH boards AS ("
+    "INSERT INTO todo_board (name, kind, gremium_id) "
+    "SELECT g.name, 'gremium', g.id FROM gremium g "
+    "WHERE NOT EXISTS (SELECT 1 FROM todo_board t WHERE t.gremium_id = g.id) "
+    "RETURNING id) " + _COLUMNS_SQL.format(boards="boards")
+)
+
+
+def _plattform(kind: str) -> str:
+    """The insert of the board "Plattform" of ``ticket.manage`` with the board kind ``kind``."""
+    return (
         "WITH boards AS ("
         "INSERT INTO todo_board (name, kind, permission) "
-        "SELECT 'Plattform', 'team', 'ticket.manage' "
+        f"SELECT 'Plattform', '{kind}', 'ticket.manage' "
         "WHERE NOT EXISTS (SELECT 1 FROM todo_board t "
-        "WHERE t.kind = 'team' AND t.permission = 'ticket.manage') "
+        f"WHERE t.kind = '{kind}' AND t.permission = 'ticket.manage') "
         "RETURNING id) " + _COLUMNS_SQL.format(boards="boards")
-    ),
-)
+    )
+
+
+def _legacy() -> bool:
+    """Tell if ``todo_board`` has the old shape with ``gremium_id``.
+
+    A fresh database gets ``todo_board`` from the ``create_all`` baseline (0001) in the
+    shape of the models, with ``team_id`` and the kind ``permission`` (9f288998cf57).
+    The gremium index and the gremium boards then do not apply, and the board
+    "Plattform" takes the kind ``permission``.
+    """
+    return "gremium_id" in {c["name"] for c in sa.inspect(op.get_bind()).get_columns("todo_board")}
+
 
 _DOWNGRADE: tuple[str, ...] = (
     "UPDATE gremium_role SET permissions = permissions - 'todo.configure' "
@@ -313,7 +329,11 @@ _DOWNGRADE: tuple[str, ...] = (
 
 def upgrade() -> None:
     """Upgrade the schema to this revision."""
-    for stmt in (*_TABLES, *_LINK_INDEXES, *_AGENDA, *_GRANTS, *_BOARDS):
+    for stmt in _TABLES:
+        op.execute(stmt)
+    legacy = _legacy()
+    boards = (_GREMIUM_INDEX, _GREMIUM_BOARDS, _plattform("team")) if legacy else ()
+    for stmt in (*_LINK_INDEXES, *_AGENDA, *_GRANTS, *(boards or (_plattform("permission"),))):
         op.execute(stmt)
 
 

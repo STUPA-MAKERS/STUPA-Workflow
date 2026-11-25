@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoLinkTarget } from '@core/api/todos.service';
@@ -23,6 +24,7 @@ async function setup(opts: { fail?: boolean; linked?: string[]; budgetWrite?: bo
     inputs: { open: false, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set(opts.linked ?? []) },
     on: { picked },
     providers: [
+      provideTestStatuses(),
       { provide: TodosApiService, useValue: { linkSearch } },
       { provide: PaperlessService, useValue: { linksOn: () => of(opts.paperless ?? false) } },
       ...(opts.budgetWrite === undefined
@@ -69,7 +71,7 @@ describe('TodoLinkPickerComponent', () => {
     const linkSearch = jest.fn(() => of(found(HITS)));
     await render(TodoLinkPickerComponent, {
       inputs: { open: true, exclude: { kind: 'todo', id: 'k-1' }, linked: new Set<string>() },
-      providers: [{ provide: TodosApiService, useValue: { linkSearch } }],
+      providers: [provideTestStatuses(), { provide: TodosApiService, useValue: { linkSearch } }],
     });
     expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
     expect(document.querySelectorAll('.lp-layer')).toHaveLength(1);

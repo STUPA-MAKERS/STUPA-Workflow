@@ -203,11 +203,15 @@ def test_list_transitions_ok(app: FastAPI, client: TestClient, fake_service: _Fa
 def test_list_transitions_keeps_the_offered_ones(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """§ F/finance/orders/002931: ``orderStatus`` keeps the transitions with the setting."""
+    """§ F/finance/orders/002931: ``orderStatus`` keeps the transitions with the setting.
+
+    Any key of the configured list passes (003035); a key that no list can hold is 422.
+    """
     _as_principal(app, "application.transition")
     url = f"/api/applications/{uuid4()}/transitions"
     assert client.get(url, params={"orderStatus": "delivered"}).json() == []
-    assert client.get(url, params={"orderStatus": "paid"}).status_code == 422
+    assert client.get(url, params={"orderStatus": "paid"}).json() == []
+    assert client.get(url, params={"orderStatus": "Paid!"}).status_code == 422
 
 
 def test_the_offer_of_a_status_change_of_a_bestellung() -> None:

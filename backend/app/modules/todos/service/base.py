@@ -359,7 +359,8 @@ class TodoServiceBase:
             id=board.id,
             name=board.name,
             kind=board.kind,  # pyright: ignore[reportArgumentType]
-            gremium_id=board.gremium_id,
+            team_id=board.team_id,
+            gremium_id=await self.access.gremium_of(board),
             archive_after_days=board.archive_after_days,
             can_write=await self.access.can_write(board, principal),
             can_configure=await self.access.can_configure(board, principal),
@@ -448,7 +449,7 @@ class TodoServiceBase:
             raise _invalid("The series was not found.", "series_not_found", "seriesId")
 
     async def _shared_boards(self, principal: Principal) -> list[TodoBoard]:
-        """The live gremium and team boards that the principal reads."""
+        """The live team, free and permission boards that the principal reads."""
         if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)

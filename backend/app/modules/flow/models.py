@@ -107,7 +107,7 @@ class Transition(UUIDPkMixin, Base):
         branch: Result branch of a vote-state exit, `pass` or `fail`. NULL otherwise.
         requires_action: The firable transition counts as an open task. False marks an
             optional action.
-        offer_on_order_status: ``ordered`` or ``delivered``: the page offers the
+        offer_on_order_status: The key of a status of a Bestellung: the page offers the
             transition to the person who sets a Bestellung of the Antrag to this status
             (F/finance/orders/002931). NULL offers nothing. No code fires the transition.
     """

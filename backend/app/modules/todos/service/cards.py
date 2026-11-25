@@ -247,7 +247,7 @@ class CardOps(DetailOps):
         assignee when the actor is a member of the target (no mail), so it stays in
         "Meine To-Dos".
 
-        A card of a shared board (gremium or team) never moves into a personal board
+        A card of a shared board (team, free or permission) never moves into a personal board
         (403 ``transfer_to_personal``), because its comments, files and links would
         then leave the reach of everyone else on the board.
 

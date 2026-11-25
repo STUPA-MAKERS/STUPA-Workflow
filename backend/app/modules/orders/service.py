@@ -36,6 +36,7 @@ from app.modules.orders.numbers import format_number
 from app.modules.orders.rules import buyer_missing, price_from_invoice, status_dates, url_valid
 from app.modules.orders.schemas import OrderCreate, OrderUpdate
 from app.modules.orders.webhook_fields import emit_order_event
+from app.modules.statuses.service import StatusReader, in_phase
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 #: The permission that every write of a Bestellung needs (F/finance/orders/002862).
@@ -379,7 +380,7 @@ class OrderService:
             .join(PurchaseOrder, PurchaseOrder.id == PurchaseOrderPosition.order_id)
             .where(
                 PurchaseOrder.application_id == application_id,
-                PurchaseOrder.status != "cancelled",
+                ~in_phase(PurchaseOrder.status, "order", "void"),
                 PurchaseOrder.id != own,
                 PurchaseOrderPosition.position_id.in_(wanted),
             )
@@ -452,13 +453,17 @@ class OrderService:
             raise _refused("order_url_invalid", "url", "The link must be an http or https address.")
         await self._check_buyer(payload.kind, payload.buyer_id, payload.buyer_name)
         await self._check_positions(application_id, payload.position_ids, own=None)
+        statuses = StatusReader(self.session)
+        status = await statuses.require(
+            "order", payload.status or await statuses.start_key("order")
+        )
         ordered_on, delivered_on = status_dates(
-            payload.status, payload.ordered_on, payload.delivered_on, self.today
+            status.sets_date, payload.ordered_on, payload.delivered_on, self.today
         )
         row = PurchaseOrder(
             application_id=application_id,
             kind=payload.kind,
-            status=payload.status,
+            status=status.key,
             title=payload.title,
             supplier=payload.supplier or None,
             url=payload.url or None,
@@ -587,21 +592,26 @@ class OrderService:
     ) -> PurchaseOrder:
         """Set the status and the dates that follow from it (F/finance/orders/002853).
 
-        A person sets each status from each other status. A Bestellung that leaves
-        "Storniert" takes its positions again, so the check of the positions runs.
+        A person sets each status from each other status of the list. A Bestellung that
+        leaves the phase ``void`` takes its positions again, so the check of the
+        positions runs (F/administration/admin/003036).
 
         Raises:
             NotFoundError: No Bestellung has this id.
+            ValidationProblem: The status is not in the list (``status_unknown``).
             ConflictError: A different version is current, or a position is taken.
         """
         row = await self.get(order_id)
         self._check_version(row, version)
         previous = row.status
-        if previous == "cancelled" and status != "cancelled":
+        statuses = StatusReader(self.session)
+        target = await statuses.require("order", status)
+        was = await statuses.get("order", previous)
+        if (was is None or was.phase == "void") and target.phase != "void":
             own = (await self.positions_of([row.id]))[row.id]
             await self._check_positions(row.application_id, own, own=row.id)
         ordered_on, delivered_on = status_dates(
-            status, row.ordered_on, row.delivered_on, self.today
+            target.sets_date, row.ordered_on, row.delivered_on, self.today
         )
         values = {"status": status, "orderedOn": ordered_on, "deliveredOn": delivered_on}
         result = await self._write(row, values, None, actor=actor, action=AuditAction.ORDER_STATUS)

@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:
-  - backend/alembic/versions
+  - backend/migrations/versions/5d8c2a7e41f3_status_lists.py
 scope:
   - backend/app/modules/statuses
   - backend/app/modules/orders

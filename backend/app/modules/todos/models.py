@@ -2,17 +2,19 @@
 
 A board has one of four kinds, and the kind decides its owner column:
 
-* ``gremium`` — ``gremium_id``; one board per gremium (``uq_todo_board_gremium``).
+* ``team`` — ``team_id``; one board per team (``uq_todo_board_team``, spec 003067). The
+  board of an inherent team is the board of its Gremium; the board names the team and
+  never the Gremium.
 * ``personal`` — ``owner_id``; one board per account (``uq_todo_board_owner``).
-* ``team`` — ``permission``; the holders of that global permission.
+* ``permission`` — ``permission``; the holders of that global permission (spec 003073).
 * ``free`` — no owner column; its members are its entries only (spec 001060).
 
 ``ck_todo_board_owner`` keeps exactly the owner column of the kind set.
 
 ``todo_board_entry`` holds the member entries of a free board and the extra entries of a
-gremium board (specs 001060, 001077): exactly one of ``gremium_id`` and
-``principal_id``, with the role ``read``, ``edit`` or ``manage``. The own gremium of a
-gremium board is no row, it is a fixed member (spec 001078).
+team board (specs 001060, 001077, 003068): exactly one of ``team_id`` and
+``principal_id``, with the role ``read``, ``edit`` or ``manage``. The own team of a
+team board is no row, it is a fixed member (spec 003067).
 
 A board has exactly one done column (partial unique index ``uq_todo_column_done``).
 A card in the done column carries ``completed_at``; a move out clears it. A card
@@ -66,7 +68,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
 #: The kinds of a board.
-BOARD_KINDS: tuple[str, ...] = ("gremium", "personal", "team", "free")
+BOARD_KINDS: tuple[str, ...] = ("team", "personal", "permission", "free")
 #: The roles of a member entry, from the lowest to the highest (spec 001062).
 ENTRY_ROLES: tuple[str, ...] = ("read", "edit", "manage")
 #: The colors of a label (a fixed palette of the frontend).
@@ -120,9 +122,9 @@ LINK_TABLES: dict[str, str] = {
 DEFAULT_COLUMNS: tuple[str, ...] = ("Offen", "In Arbeit", "Wartet", "Erledigt")
 #: The name of a new personal board.
 PERSONAL_BOARD_NAME = "Meine To-Dos"
-#: The team board that the migration creates for the ticket team.
-TEAM_BOARD_NAME = "Plattform"
-TEAM_BOARD_PERMISSION = "ticket.manage"
+#: The permission board that the migration creates for the ticket team.
+PERMISSION_BOARD_NAME = "Plattform"
+PERMISSION_BOARD_PERMISSION = "ticket.manage"
 
 
 def _in(values: tuple[str, ...]) -> str:
@@ -130,14 +132,14 @@ def _in(values: tuple[str, ...]) -> str:
 
 
 class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
-    """A board of a gremium, of one account or of a permission (team)."""
+    """A board of a team, of one account, of a permission or a free board."""
 
     __tablename__ = "todo_board"
 
     name: Mapped[str] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(Text)
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team.id", ondelete="CASCADE"), nullable=True
     )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     permission: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -149,13 +151,13 @@ class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(BOARD_KINDS)})", name="kind"),
         CheckConstraint(
-            "(kind = 'gremium' AND gremium_id IS NOT NULL AND owner_id IS NULL "
+            "(kind = 'team' AND team_id IS NOT NULL AND owner_id IS NULL "
             "AND permission IS NULL) OR "
-            "(kind = 'personal' AND owner_id IS NOT NULL AND gremium_id IS NULL "
+            "(kind = 'personal' AND owner_id IS NOT NULL AND team_id IS NULL "
             "AND permission IS NULL) OR "
-            "(kind = 'team' AND permission IS NOT NULL AND gremium_id IS NULL "
+            "(kind = 'permission' AND permission IS NOT NULL AND team_id IS NULL "
             "AND owner_id IS NULL) OR "
-            "(kind = 'free' AND gremium_id IS NULL AND owner_id IS NULL "
+            "(kind = 'free' AND team_id IS NULL AND owner_id IS NULL "
             "AND permission IS NULL)",
             name="owner",
         ),
@@ -164,10 +166,10 @@ class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
             name="archive_after_days",
         ),
         Index(
-            "uq_todo_board_gremium",
-            "gremium_id",
+            "uq_todo_board_team",
+            "team_id",
             unique=True,
-            postgresql_where=text("gremium_id IS NOT NULL"),
+            postgresql_where=text("team_id IS NOT NULL"),
         ),
         Index(
             "uq_todo_board_owner",
@@ -179,17 +181,17 @@ class TodoBoard(UUIDPkMixin, TimestampMixin, Base):
 
 
 class TodoBoardEntry(UUIDPkMixin, Base):
-    """A member entry of a board: one gremium or one person, with a role.
+    """A member entry of a board: one team or one person, with a role.
 
-    A gremium entry stands for the members of the gremium at the time of the read
-    (spec 001063), so the row names the gremium and never its members.
+    A team entry stands for the members of the team at the time of the read (spec
+    003068), so the row names the team and never its members.
     """
 
     __tablename__ = "todo_board_entry"
 
     board_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("todo_board.id", ondelete="CASCADE"))
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team.id", ondelete="CASCADE"), nullable=True
     )
     principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
@@ -199,13 +201,13 @@ class TodoBoardEntry(UUIDPkMixin, Base):
 
     __table_args__ = (
         CheckConstraint(f"role IN ({_in(ENTRY_ROLES)})", name="role"),
-        CheckConstraint("(gremium_id IS NULL) <> (principal_id IS NULL)", name="target"),
+        CheckConstraint("(team_id IS NULL) <> (principal_id IS NULL)", name="target"),
         Index(
-            "uq_todo_board_entry_gremium",
+            "uq_todo_board_entry_team",
             "board_id",
-            "gremium_id",
+            "team_id",
             unique=True,
-            postgresql_where=text("gremium_id IS NOT NULL"),
+            postgresql_where=text("team_id IS NOT NULL"),
         ),
         Index(
             "uq_todo_board_entry_principal",
@@ -214,7 +216,7 @@ class TodoBoardEntry(UUIDPkMixin, Base):
             unique=True,
             postgresql_where=text("principal_id IS NOT NULL"),
         ),
-        Index("ix_todo_board_entry_gremium_id", "gremium_id"),
+        Index("ix_todo_board_entry_team_id", "team_id"),
         Index("ix_todo_board_entry_principal_id", "principal_id"),
     )
 

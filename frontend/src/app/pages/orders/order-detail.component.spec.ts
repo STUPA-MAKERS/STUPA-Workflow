@@ -1,3 +1,4 @@
+import { DEFAULT_STATUS_LISTS, nextStatus, provideTestStatuses } from '@core/api/statuses.service';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject, type Observable, Subject, of, throwError } from 'rxjs';
@@ -9,7 +10,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { NO_ORDER_LIST, order } from '../../../testing/order-fixtures';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 import { BudgetTreeApi } from '../budget/budget-tree.api';
-import { OrderDetailComponent, nextStatus } from './order-detail.component';
+import { OrderDetailComponent } from './order-detail.component';
 import { OrdersRefresh } from './orders-refresh';
 
 const APPLICATION = {
@@ -70,6 +71,7 @@ async function setup(options: Options = {}) {
   const paramMap = new BehaviorSubject(convertToParamMap({ id: first.id }));
   const view = await render(OrderDetailComponent, {
     providers: [
+      provideTestStatuses(),
       provideRouter([]),
       NO_LINKED_TODOS,
       { provide: OrdersApiService, useValue: api },
@@ -105,8 +107,16 @@ describe('OrderDetailComponent', () => {
     jest.useRealTimers();
   });
 
-  it('names the status that follows in the work of a purchase', () => {
-    expect((['planned', 'ordered', 'delivered', 'cancelled'] as const).map(nextStatus)).toEqual(['ordered', 'delivered', null, null]);
+  /** §F/administration/admin/003035: the next status of the list that is not void. */
+  it('names the status that follows in the list of the Bestellungen', () => {
+    const list = DEFAULT_STATUS_LISTS.order;
+    expect(['planned', 'ordered', 'delivered', 'cancelled', 'gone'].map((key) => nextStatus(list, key)?.key ?? null)).toEqual([
+      'ordered',
+      'delivered',
+      null,
+      null,
+      null,
+    ]);
   });
 
   /** §F/finance/orders/002936: head, fields, positions, sum and the built-in rows of "Verknüpft". */
@@ -200,7 +210,7 @@ describe('OrderDetailComponent', () => {
     expect(cmp.sumLine()).toMatch(/^212,50\s€$/);
     expect(cmp.linked()[0].title).toBe('Ohne Titel');
     expect(api.bookings).not.toHaveBeenCalled();
-    expect(screen.getByTestId('od-step')).toHaveTextContent('Als bestellt markieren');
+    expect(screen.getByTestId('od-step')).toHaveTextContent('Als „Bestellt“ markieren');
   });
 
   it('leaves the parts of the Antrag out when their reads fail, and hides the sum of the applicant view', async () => {
@@ -256,8 +266,8 @@ describe('OrderDetailComponent', () => {
   /** §F/finance/orders/002870: the next status is the main button, the rest is in the menu. */
   it('offers the next status as the main button and every other action in the menu', async () => {
     const { cmp, keys } = await setup();
-    expect(cmp.step()).toEqual({ status: 'ordered', label: 'Als bestellt markieren' });
-    expect(keys()).toEqual(['delivered', 'invoiceLink', 'invoiceNew', 'booking', 'edit', 'cancelled', 'delete']);
+    expect(cmp.step()).toEqual({ status: 'ordered', label: 'Als „Bestellt“ markieren' });
+    expect(keys()).toEqual(['status:delivered', 'invoiceLink', 'invoiceNew', 'booking', 'edit', 'status:cancelled', 'delete']);
     const byKey = Object.fromEntries(cmp.actions().map((a: { key: string }) => [a.key, a]));
     expect(byKey['edit']).toMatchObject({ priority: 'head', route: { commands: ['/orders', 'o-1', 'edit'] } });
     expect(byKey['invoiceNew'].route).toEqual({ commands: ['/invoices'], query: { new: 'invoice', order: 'o-1' } });
@@ -271,13 +281,13 @@ describe('OrderDetailComponent', () => {
   it('fits the menu to the status, the invoice and the rights', async () => {
     const delivered = await setup({ first: order({ status: 'delivered', invoiceId: 'i-1' }), permissions: ['order.manage'] });
     expect(delivered.cmp.step()).toBeNull();
-    expect(delivered.keys()).toEqual(['ordered', 'invoiceUnlink', 'edit', 'cancelled', 'delete']);
+    expect(delivered.keys()).toEqual(['status:planned', 'status:ordered', 'invoiceUnlink', 'edit', 'status:cancelled', 'delete']);
   });
 
   it('offers no cancel for a cancelled Bestellung', async () => {
     const { keys, cmp } = await setup({ first: order({ status: 'cancelled' }), permissions: ['order.manage', 'budget.view'] });
     expect(cmp.step()).toBeNull();
-    expect(keys()).toEqual(['ordered', 'delivered', 'invoiceLink', 'edit', 'delete']);
+    expect(keys()).toEqual(['status:planned', 'status:ordered', 'status:delivered', 'invoiceLink', 'edit', 'delete']);
   });
 
   /** §F/finance/orders/002931: after "Bestellt" the detail offers the marked transitions; nothing fires by itself. */
@@ -303,7 +313,7 @@ describe('OrderDetailComponent', () => {
   it('fires the offered transition on a press and says how it went', async () => {
     const { cmp, client, toast, navigate } = await setup({ first: order({ status: 'ordered', version: undefined }) });
     client.transitions.mockReturnValue(of([transition(), transition({ id: 't-2', label: 'Zur Sitzung', addsToAgenda: true }), transition({ id: 't-3', label: 'Entscheiden', allowsDecision: true })]));
-    cmp.onAction('delivered');
+    cmp.onAction('status:delivered');
     expect(client.transitions).toHaveBeenCalledWith('a-1', { orderStatus: 'delivered' });
     expect(cmp.offerActions().map((a: { kind?: string }) => a.kind)).toEqual([undefined, 'main', undefined, undefined]);
     cmp.onOffer('t-1');
@@ -322,12 +332,13 @@ describe('OrderDetailComponent', () => {
     expect(client.fireTransition).toHaveBeenCalledTimes(2);
   });
 
-  it('offers nothing after a cancel, without an Antrag or when the flow does not answer', async () => {
+  it('asks the flow after each status, and offers nothing without an Antrag or when the flow does not answer', async () => {
     const { cmp, api, client } = await setup();
-    cmp.onAction('cancelled');
+    cmp.onAction('status:cancelled');
     expect(api.setStatus).toHaveBeenCalledWith('o-1', 'cancelled', 1);
-    expect(client.transitions).not.toHaveBeenCalled();
+    expect(client.transitions).toHaveBeenCalledWith('a-1', { orderStatus: 'cancelled' });
     client.transitions.mockReturnValue(throwError(() => ({ status: 500 })));
+    cmp.offered.set([]);
     cmp.setStatus('ordered');
     expect(cmp.offered()).toEqual([]);
     api.setStatus.mockReturnValueOnce(of(order({ applicationId: undefined, status: 'delivered' })));
@@ -339,12 +350,14 @@ describe('OrderDetailComponent', () => {
   /** §F/finance/orders/002881: a cancel of a Bestellung with bookings asks first. */
   it('asks before the cancel of a Bestellung with bookings', async () => {
     const { cmp, api } = await setup({ first: order({ bookedAmount: '40.00' }) });
-    cmp.onAction('cancelled');
-    expect(cmp.cancelling()).toBe(true);
+    cmp.onAction('status:cancelled');
+    expect(cmp.cancelling()?.key).toBe('cancelled');
+    expect(cmp.cancelTitle()).toBe('Status „Storniert“ setzen?');
+    expect(cmp.cancelLabel()).toBe('Als „Storniert“ markieren');
     expect(cmp.cancelBody()).toMatch(/^Für „Beamer“ sind 40,00\s€ verbucht\. Die Buchungen bleiben bestehen\.$/);
     expect(api.setStatus).not.toHaveBeenCalled();
     cmp.confirmCancel();
-    expect(cmp.cancelling()).toBe(false);
+    expect(cmp.cancelling()).toBeNull();
     expect(api.setStatus).toHaveBeenCalledWith('o-1', 'cancelled', 1);
   });
 

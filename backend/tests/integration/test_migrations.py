@@ -2594,3 +2594,44 @@ def test_finance_export_permission_rename(alembic_cfg: Config, engine: Engine) -
         assert _perms(conn, roles["kasse-export"]) == ["budget.export"]
         conn.execute(text("DELETE FROM role WHERE key LIKE 'kasse-%'"))
     command.upgrade(alembic_cfg, "head")
+
+
+def test_paperless_open_antrag_jobs_dropped(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration e5a1c7d93b20 deletes the open Paperless jobs of Anträge.
+
+    Each job of kind `application` or `attachment` that is not filed goes, so the worker
+    opens one job per end state anew (§ 003110, § 003111). A filed job and a job of
+    another kind stay.
+    """
+    command.downgrade(alembic_cfg, "c3ee58a9d4df")
+    rows = (
+        ("application", "pending"),
+        ("application", "uploaded"),
+        ("application", "failed"),
+        ("application", "filed"),
+        ("attachment", "failed"),
+        ("attachment", "filed"),
+        ("protocol", "failed"),
+    )
+    with engine.begin() as conn:
+        for kind, state in rows:
+            conn.execute(
+                text(
+                    "INSERT INTO paperless_filing (kind, element_id, source_id, source_at, state) "
+                    "VALUES (:k, gen_random_uuid(), gen_random_uuid(), now(), :s)"
+                ),
+                {"k": kind, "s": state},
+            )
+
+    command.upgrade(alembic_cfg, "e5a1c7d93b20")
+    with engine.begin() as conn:
+        kept = conn.execute(
+            text("SELECT kind, state FROM paperless_filing ORDER BY kind, state")
+        ).all()
+        assert [tuple(row) for row in kept] == [
+            ("application", "filed"),
+            ("attachment", "filed"),
+            ("protocol", "failed"),
+        ]
+        conn.execute(text("DELETE FROM paperless_filing"))
+    command.upgrade(alembic_cfg, "head")

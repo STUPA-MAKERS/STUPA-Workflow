@@ -36,8 +36,9 @@ from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.gremien.models import Gremium
 from app.modules.privacy.service import PrincipalService
+from app.modules.teams.members import ensure_gremium_team
 from app.modules.tickets.models import Ticket, TicketNote
-from app.modules.todos.boards import ensure_gremium_board, ensure_personal_board
+from app.modules.todos.boards import ensure_personal_board, ensure_team_board
 from app.modules.todos.models import TodoBoard, TodoCard, TodoColumn, TodoComment
 from tests._support.guest_apps import create_guest_application, seed_guest_flow
 from tests._support.memory_storage import MemoryStorage
@@ -193,8 +194,9 @@ async def test_a_gremium_delete_and_an_infected_verdict_both_finish(
         gremium = Gremium(name="G", slug=f"{_SLUG}{uuid.uuid4().hex[:8]}")
         session.add(gremium)
         await session.flush()
-        await ensure_gremium_board(session, gremium.id, "G")
-        board = await session.scalar(select(TodoBoard.id).where(TodoBoard.gremium_id == gremium.id))
+        team_id = await ensure_gremium_team(session, gremium.id)
+        await ensure_team_board(session, team_id, "G")
+        board = await session.scalar(select(TodoBoard.id).where(TodoBoard.team_id == team_id))
         assert board is not None
         author = await _person(session)
         files = _files(todo_comment_id=await _comment_on(session, board, author.id))

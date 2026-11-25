@@ -352,8 +352,8 @@ export class TicketDetailComponent {
     error: () => this.duplicateHits.set([]),
   });
   readonly todoOpen = signal(false);
-  /** A to-do of the ticket starts on the team board of `ticket.manage`, else the personal one. */
-  readonly todoBoardKinds: readonly TodoBoardKind[] = ['team', 'personal'];
+  /** A to-do of the ticket starts on the permission board of `ticket.manage`, else the personal one. */
+  readonly todoBoardKinds: readonly TodoBoardKind[] = ['permission', 'personal'];
   /** The link of a new to-do to this ticket: "Ticket · T-7K3QX9MD Titel". */
   readonly todoLinks = computed<NewTodoLink[]>(() => {
     const t = this.ticket();

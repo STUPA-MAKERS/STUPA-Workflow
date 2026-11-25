@@ -93,7 +93,7 @@ async def test_mine_boards_needs_the_scope_and_an_account() -> None:
 
 
 async def test_mine_boards_groups_the_cards_by_board_with_all_columns() -> None:
-    team = board(name="Plattform", kind="team", gremium_id=None, permission="ticket.manage")
+    team = board(name="Plattform", kind="permission", team_id=None, permission="ticket.manage")
     stupa = board(name="stupa")
     asta = board(name="AStA")
     s_open, s_done = column(stupa.id, "Offen", 0), column(stupa.id, "Erledigt", 1, is_done=True)
@@ -119,14 +119,14 @@ async def test_mine_boards_groups_the_cards_by_board_with_all_columns() -> None:
     out = await _svc(session).mine_boards(USER)
     assert [b.name for b in out] == ["AStA", "stupa", "Plattform"]
     st = out[1]
-    assert st.can_write is True and st.kind == "gremium" and st.gremium_id == stupa.gremium_id
+    assert st.can_write is True and st.kind == "team" and st.gremium_id == stupa.team_id
     assert [c.name for c in st.columns] == ["Offen", "Erledigt", "In Arbeit"]
     assert [c.card_count for c in st.columns] == [2, 1, 0]
     assert [c.title for c in st.cards] == ["Offen 1", "Offen 2", "Erledigt"]
     assert st.cards[0].label_ids == [lab.id]
     assert [x.name for x in st.labels] == ["Wichtig"]
     assert out[0].labels == [] and [c.id for c in out[0].cards] == [other.id]
-    assert out[2].kind == "team" and out[2].gremium_id is None
+    assert out[2].kind == "permission" and out[2].gremium_id is None
     assert "todo_column.board_id IN" in _sql(session.statements[1])
     assert "todo_label.board_id IN" in _sql(session.statements[2])
 
@@ -155,7 +155,7 @@ async def test_all_boards_lists_every_board_with_all_live_cards(
         return True
 
     monkeypatch.setattr("app.modules.todos.service.reads.ensure_personal_board", _ensure)
-    personal = board(kind="personal", gremium_id=None, owner_id=ME, name="Meine To-Dos")
+    personal = board(kind="personal", team_id=None, owner_id=ME, name="Meine To-Dos")
     stupa = board(name="StuPa")
     empty = board(name="AStA")
     p_open = column(personal.id, "Offen", 0)
@@ -220,10 +220,10 @@ async def test_card_for_agenda_rules() -> None:
     The board lock comes first, then the card lock, which is the order of every card write.
     """
     gid = uuid.uuid4()
-    b = board(gremium_id=gid)
+    b = board(team_id=gid)
     col = column(b.id)
     live, archived = card(b, col), card(b, col, archived_at=b.created_at)
-    personal = board(kind="personal", gremium_id=None, owner_id=ME)
+    personal = board(kind="personal", team_id=None, owner_id=ME)
     mine = card(personal, column(personal.id))
     session = ScriptedSession(scalar=[live, archived, live, mine, live])
     session.put(b, live, archived, personal, mine)

@@ -55,7 +55,7 @@ describe('TodoTransferDialogComponent', () => {
   });
 
   it('leaves the personal board out for a card of a shared board', async () => {
-    const { cmp, open } = await setup({ inputs: { boardKind: 'gremium' } });
+    const { cmp, open } = await setup({ inputs: { boardKind: 'team' } });
     open();
     expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-2', 'b-3']);
     expect(cmp.selectedBoard()).toBe('b-2');

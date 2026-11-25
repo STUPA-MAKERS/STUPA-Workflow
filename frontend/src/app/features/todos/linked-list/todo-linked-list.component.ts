@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { booleanAttribute, ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, of, switchMap } from 'rxjs';
@@ -18,7 +19,7 @@ import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
 import { LinkToDirective } from '../../../shared/link-to.directive';
-import { LINK_ICON, LINK_KIND_LABEL, eventDays, linkSub, linkTitle } from '../todos.util';
+import { LINK_ICON, LINK_KIND_LABEL, type StatusName, eventDays, linkSub, linkTitle } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
@@ -122,6 +123,8 @@ export class TodoLinkedListComponent {
   private readonly refresh = inject(TodoLinkedRefresh);
   private readonly features = inject(FeatureService);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
+  private readonly statusName: StatusName = (kind, key) => this.statuses.label(kind, key);
   private readonly toast = inject(ToastService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
@@ -288,7 +291,7 @@ export class TodoLinkedListComponent {
   }
 
   linkSub(row: LinkRow): string {
-    return linkSub(row, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
+    return linkSub(row, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t, this.statusName);
   }
 
 

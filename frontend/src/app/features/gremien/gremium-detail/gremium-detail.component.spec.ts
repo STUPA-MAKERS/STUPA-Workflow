@@ -295,7 +295,7 @@ describe('GremiumDetailComponent', () => {
   /** Spec 000758: the detail leaves out the parts of a feature that is off. */
   it('opens on the members without Sitzungen, Abstimmungen, Boards and Kalender', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'voting', 'todos', 'calendar']));
-    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, boards: [{ id: 'b-1', kind: 'gremium' }] });
+    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, boards: [{ id: 'b-1', kind: 'team' }] });
     restore = s.restore;
     const d = s.detail();
     expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder']);
@@ -348,7 +348,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   describe('tab To-Dos (spec 000551)', () => {
-    const boards = [{ id: 'b-7', name: 'Studierendenparlament', kind: 'gremium' as const, gremiumId: 'g-1', canWrite: false }];
+    const boards = [{ id: 'b-7', name: 'Studierendenparlament', kind: 'team' as const, gremiumId: 'g-1', canWrite: false }];
     const gremiumBoard = board({
       id: 'b-7',
       cards: [

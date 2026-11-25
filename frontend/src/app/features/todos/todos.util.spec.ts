@@ -86,9 +86,10 @@ describe('todos.util', () => {
      * only the kind shows.
      */
     it('lists the facts of each kind below the title', () => {
-      const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
+      const sub = (l: Parameters<typeof linkSub>[0]) =>
+        linkSub(l, 'de-DE', 'de', t, (kind, key) => (kind === 'order' && key === 'ordered' ? 'Bestellt' : key));
       expect(sub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }))).toBe('Antrag · In Prüfung');
-      expect(linkSub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }), 'en-GB', 'en', t)).toBe(
+      expect(linkSub(link({ detail: { stateLabel: { de: 'In Prüfung', en: 'In review' } } }), 'en-GB', 'en', t, (_, key) => key)).toBe(
         'Antrag · In review',
       );
       expect(sub(link({ detail: {} }))).toBe('Antrag');
@@ -120,7 +121,8 @@ describe('todos.util', () => {
 
     /** A title that is the supplier names neither twice; without an amount the date shows. */
     it('lists the facts of a vote, a gremium, an invoice and a booking', () => {
-      const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
+      const sub = (l: Parameters<typeof linkSub>[0]) =>
+        linkSub(l, 'de-DE', 'de', t, (kind, key) => (kind === 'order' && key === 'ordered' ? 'Bestellt' : key));
       const eur = (v: string) => formatMoney(v, 'de-DE');
       expect(
         sub(link({ kind: 'vote', detail: { meetingTitle: '33. Sitzung', voteStatus: 'closed', voteResult: 'passed' } })),
@@ -382,21 +384,21 @@ describe('todos.util', () => {
 
     /** A list without a kind lets the card in, because the server decides. */
     it('never moves a card of a shared board into a personal board', () => {
-      expect(canTransfer('personal', 'gremium')).toBe(true);
+      expect(canTransfer('personal', 'team')).toBe(true);
       expect(canTransfer('personal', 'personal')).toBe(true);
-      expect(canTransfer('gremium', 'team')).toBe(true);
-      expect(canTransfer('team', 'gremium')).toBe(true);
-      expect(canTransfer('gremium', 'personal')).toBe(false);
+      expect(canTransfer('team', 'permission')).toBe(true);
+      expect(canTransfer('permission', 'team')).toBe(true);
       expect(canTransfer('team', 'personal')).toBe(false);
+      expect(canTransfer('permission', 'personal')).toBe(false);
       const from = (kind?: string) => {
         const el = document.createElement('div');
         if (kind) el.dataset['boardKind'] = kind;
         return { dropContainer: { element: { nativeElement: el } } };
       };
-      expect(DROP_ENTER.personal(from('gremium'))).toBe(false);
+      expect(DROP_ENTER.personal(from('team'))).toBe(false);
       expect(DROP_ENTER.personal(from('personal'))).toBe(true);
-      expect(DROP_ENTER.gremium(from('personal'))).toBe(true);
-      expect(DROP_ENTER.team(from('gremium'))).toBe(true);
+      expect(DROP_ENTER.team(from('personal'))).toBe(true);
+      expect(DROP_ENTER.permission(from('team'))).toBe(true);
       expect(dropEnter('personal')(from())).toBe(true);
     });
 
@@ -429,8 +431,8 @@ describe('todos.util', () => {
 
     it('opens the personal board, else the first own gremium board, else any', () => {
       const personal = summary({ id: 'p', kind: 'personal' });
-      const team = summary({ id: 't', kind: 'team' });
-      const gremium = summary({ id: 'g', kind: 'gremium', gremiumId: 'gr-1' });
+      const team = summary({ id: 't', kind: 'permission' });
+      const gremium = summary({ id: 'g', kind: 'team', gremiumId: 'gr-1' });
       expect(defaultBoard([personal, team, gremium], ['gr-1'])?.id).toBe('p');
       expect(defaultBoard([team, gremium], ['gr-1'])?.id).toBe('g');
       expect(defaultBoard([team, personal])?.id).toBe('p');
@@ -441,9 +443,9 @@ describe('todos.util', () => {
 
     it('skips the gremium boards an admin sees but does not belong to', () => {
       const personal = summary({ id: 'p', kind: 'personal' });
-      const asta = summary({ id: 'a', kind: 'gremium', gremiumId: 'gr-asta' });
-      const fs = summary({ id: 'f', kind: 'gremium', gremiumId: 'gr-fs' });
-      const stupa = summary({ id: 's', kind: 'gremium', gremiumId: 'gr-stupa' });
+      const asta = summary({ id: 'a', kind: 'team', gremiumId: 'gr-asta' });
+      const fs = summary({ id: 'f', kind: 'team', gremiumId: 'gr-fs' });
+      const stupa = summary({ id: 's', kind: 'team', gremiumId: 'gr-stupa' });
       expect(defaultBoard([asta, fs, stupa], ['gr-stupa'])?.id).toBe('s');
       expect(defaultBoard([personal, asta, fs, stupa], ['gr-stupa'])?.id).toBe('p');
     });

@@ -22,7 +22,7 @@ from app.modules.notifications.mail import MailMessage
 from app.modules.notifications.models import NotificationPreference
 from app.settings import Settings
 from tests.integration.modules.calendar.conftest import CalendarApi
-from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
+from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person, team_of
 
 pytestmark = pytest.mark.integration
 
@@ -105,17 +105,19 @@ async def test_invited_gremium_follows_its_members(
     anna, anna_id = await add_person(maker, "Anna")
     cleo, cleo_id = await add_person(maker, "Cleo")
     stupa, _ = await add_gremium(maker, "StuPa")
+    stupa_t = await team_of(maker, stupa)
     asta, _ = await add_gremium(maker, "AStA")
+    asta_t = await team_of(maker, asta)
     await add_member(maker, stupa, anna_id)
     with TestClient(api.app) as client:
         api.login(anna)
         _ok(
-            client.post("/api/calendar/appointments", json={**TERMIN, "gremiumIds": [str(asta)]}),
+            client.post("/api/calendar/appointments", json={**TERMIN, "teamIds": [str(asta_t)]}),
             403,
         )
         _ok(
             client.post(
-                "/api/calendar/appointments", json={**TERMIN, "gremiumIds": [str(uuid.uuid4())]}
+                "/api/calendar/appointments", json={**TERMIN, "teamIds": [str(uuid.uuid4())]}
             ),
             422,
         )
@@ -125,8 +127,8 @@ async def test_invited_gremium_follows_its_members(
             ),
             422,
         )
-        made = _create(client, gremiumIds=[str(stupa)])
-        assert [g["name"] for g in made["gremien"]] == ["StuPa"]
+        made = _create(client, teamIds=[str(stupa_t)])
+        assert [g["name"] for g in made["teams"]] == ["StuPa"]
         url = f"/api/calendar/appointments/{made['id']}"
         api.login(cleo)
         _ok(client.get(url), 404)
@@ -134,11 +136,11 @@ async def test_invited_gremium_follows_its_members(
         seen = _ok(client.get(url))
         assert seen["invited"] is True and seen["canEdit"] is False
         api.login(_with(anna, "calendar.manage"))
-        kept = _ok(client.put(url, json={**TERMIN, "gremiumIds": [str(stupa), str(asta)]}))
-        assert [g["name"] for g in kept["gremien"]] == ["AStA", "StuPa"]
+        kept = _ok(client.put(url, json={**TERMIN, "teamIds": [str(stupa_t), str(asta_t)]}))
+        assert [g["name"] for g in kept["teams"]] == ["AStA", "StuPa"]
         api.login(anna)
-        again = _ok(client.put(url, json={**TERMIN, "gremiumIds": [str(asta)]}))
-        assert [g["name"] for g in again["gremien"]] == ["AStA"]
+        again = _ok(client.put(url, json={**TERMIN, "teamIds": [str(asta_t)]}))
+        assert [g["name"] for g in again["teams"]] == ["AStA"]
 
 
 async def test_visibility_and_for_all(
@@ -229,15 +231,16 @@ async def test_mails_of_a_write(api: CalendarApi, maker: async_sessionmaker[Asyn
     _, bert_id = await add_person(maker, "Bert")
     _, cleo_id = await add_person(maker, "Cleo")
     stupa, _ = await add_gremium(maker, "StuPa")
+    stupa_t = await team_of(maker, stupa)
     for person in (anna_id, bert_id):
         await add_member(maker, stupa, person)
     api.login(anna)
     with TestClient(api.app) as client:
-        made = _create(client, **TIMED, gremiumIds=[str(stupa)])
+        made = _create(client, **TIMED, teamIds=[str(stupa_t)])
         url = f"/api/calendar/appointments/{made['id']}"
         assert [(m.kind, m.recipients) for m in api.mails] == [("invited", (bert_id,))]
         api.mails.clear()
-        _ok(client.put(url, json={**TIMED, "title": "Neu", "gremiumIds": [str(stupa)]}))
+        _ok(client.put(url, json={**TIMED, "title": "Neu", "teamIds": [str(stupa_t)]}))
         assert api.mails == []
         _ok(
             client.put(
@@ -245,7 +248,7 @@ async def test_mails_of_a_write(api: CalendarApi, maker: async_sessionmaker[Asyn
                 json={
                     **TIMED,
                     "place": "Aula",
-                    "gremiumIds": [str(stupa)],
+                    "teamIds": [str(stupa_t)],
                     "principalIds": [str(cleo_id)],
                 },
             )
@@ -278,11 +281,12 @@ async def test_mail_per_person_with_ics_and_opt_out(
     _, bert_id = await add_person(maker, "Bert")
     _, cleo_id = await add_person(maker, "Cleo")
     stupa, _ = await add_gremium(maker, "StuPa")
+    stupa_t = await team_of(maker, stupa)
     for person in (anna_id, bert_id, cleo_id):
         await add_member(maker, stupa, person)
     api.login(anna)
     with TestClient(api.app) as client:
-        made = _create(client, **TIMED, gremiumIds=[str(stupa)])
+        made = _create(client, **TIMED, teamIds=[str(stupa_t)])
         _ok(client.delete(f"/api/calendar/appointments/{made['id']}"), 204)
     queue = _Queue()
     async with maker() as session:
@@ -312,6 +316,7 @@ async def test_entries_follow_the_module_rules(
     bert, bert_id = await add_person(maker, "Bert")
     dora, _ = await add_person(maker, "Dora")
     stupa, board = await add_gremium(maker, "StuPa")
+    stupa_t = await team_of(maker, stupa)
     for person in (anna_id, bert_id):
         await add_member(maker, stupa, person, "todo.write")
     async with maker() as session:
@@ -356,7 +361,7 @@ async def test_entries_follow_the_module_rules(
                 },
             )
         )
-        _create(client, **TIMED, gremiumIds=[str(stupa)])
+        _create(client, **TIMED, teamIds=[str(stupa_t)])
         seen = _entries(client)
         assert [(e["kind"], e["title"], e["mine"]) for e in seen] == [
             ("appointment", "Klausurtagung", True),

@@ -490,6 +490,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     id=order_id,
                     application_id=app_id,
                     title=f"Bestellung {tag}",
+                    status="planned",
                     created_by=old.sub,
                     buyer_id=old.id,
                 ),

@@ -219,7 +219,7 @@ describe('TodoLinkedListComponent actions (specs 000547, 001404, 001408)', () =>
       link: jest.fn(() => of(linksOf([], [linkRow()], true))),
       unlink: jest.fn(() => of(undefined)),
       linkTargets: jest.fn(() => of([])),
-      boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'gremium', gremiumId: 'g-1', canWrite: writes }])),
+      boards: jest.fn(() => of([{ id: 'b-1', name: 'StuPa', kind: 'team', gremiumId: 'g-1', canWrite: writes }])),
       ...more,
     };
     const view = await render(TodoLinkedListComponent, {

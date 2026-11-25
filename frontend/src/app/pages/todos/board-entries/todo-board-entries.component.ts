@@ -13,9 +13,9 @@ import {
 import { GremiumLogoComponent } from '../../../features/gremien/gremium-logo/gremium-logo.component';
 import {
   GremiumPersonPickerComponent,
-  type PickerGremium,
   type PickerHit,
   type PickerPerson,
+  type PickerTeam,
 } from '../../../features/gremien/gremium-person-picker/gremium-person-picker.component';
 
 /** The roles in their order, with their names (spec 001062). */
@@ -34,7 +34,7 @@ export function entryOf(hit: PickerHit, role: TodoEntryRole): TodoBoardEntry {
     name: hit.name,
     role,
     fixed: false,
-    logoUrl: hit.kind === 'gremium' ? hit.logoUrl : null,
+    logoUrl: hit.kind === 'team' ? hit.logoUrl : null,
   };
 }
 
@@ -42,10 +42,10 @@ export function entryOf(hit: PickerHit, role: TodoEntryRole): TodoBoardEntry {
 export const NEW_ENTRY_ROLE: TodoEntryRole = 'edit';
 
 /**
- * The member entries of a board (section "Mitglieder", spec 001064, 001077): each Gremium
- * with its logo and each person with the avatar, its role, and a × that removes it. The
- * fixed own Gremium of a Gremium board shows its role only. The picker of spec 001074
- * adds a Gremium or a person with the role "Bearbeiten". The host saves each change, or
+ * The member entries of a board (section "Mitglieder", spec 001064, 001077, 003068): each
+ * team with its logo and each person with the avatar, its role, and a × that removes it.
+ * The fixed own team of a team board shows its role only. The picker of spec 001074 adds
+ * a team or a person with the role "Bearbeiten". The host saves each change, or
  * keeps the list itself (the dialog "Neues Board").
  */
 @Component({
@@ -75,7 +75,7 @@ export class TodoBoardEntriesComponent {
   readonly roleChanged = output<{ readonly entry: TodoBoardEntry; readonly role: TodoEntryRole }>();
   readonly removed = output<TodoBoardEntry>();
 
-  readonly gremien = signal<readonly PickerGremium[]>([]);
+  readonly teams = signal<readonly PickerTeam[]>([]);
   readonly taken = computed(() => this.entries().map((e) => e.targetId));
   readonly roleOptions = computed<FilterSelectOption[]>(() =>
     ENTRY_ROLES.map((r) => ({ value: r.role, label: this.i18n.translate(r.label) })),
@@ -85,8 +85,8 @@ export class TodoBoardEntriesComponent {
 
   constructor() {
     this.api.entryOptions().subscribe({
-      next: (o) => this.gremien.set(o.gremien),
-      error: () => this.gremien.set([]),
+      next: (o) => this.teams.set(o.teams),
+      error: () => this.teams.set([]),
     });
   }
 
@@ -94,7 +94,7 @@ export class TodoBoardEntriesComponent {
     return this.i18n.translate(ENTRY_ROLES.find((r) => r.role === role)?.label ?? 'todos.entries.role.edit');
   }
 
-  /** The key of a row: the id, or the target for the fixed Gremium and a new entry. */
+  /** The key of a row: the id, or the target for the fixed team and a new entry. */
   key(entry: TodoBoardEntry): string {
     return entry.id ?? `${entry.kind}:${entry.targetId}`;
   }

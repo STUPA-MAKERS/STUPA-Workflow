@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "5b112a444f34"
@@ -72,14 +73,10 @@ _UPGRADE: tuple[str, ...] = (
             FOREIGN KEY (principal_id) REFERENCES principal (id) ON DELETE CASCADE
     )
     """,
-    "CREATE INDEX IF NOT EXISTS ix_calendar_invitation_gremium_id "
-    "ON calendar_invitation (gremium_id)",
     "CREATE INDEX IF NOT EXISTS ix_calendar_invitation_principal_id "
     "ON calendar_invitation (principal_id)",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_calendar_invitation_principal "
     "ON calendar_invitation (appointment_id, principal_id) WHERE principal_id IS NOT NULL",
-    "CREATE UNIQUE INDEX IF NOT EXISTS uq_calendar_invitation_gremium "
-    "ON calendar_invitation (appointment_id, gremium_id) WHERE gremium_id IS NOT NULL",
     """
     CREATE TABLE IF NOT EXISTS calendar_answer (
         appointment_id uuid NOT NULL,
@@ -113,10 +110,32 @@ _DOWNGRADE: tuple[str, ...] = (
 )
 
 
+#: The gremium indexes of ``calendar_invitation`` in its old shape.
+_GREMIUM_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS ix_calendar_invitation_gremium_id "
+    "ON calendar_invitation (gremium_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_calendar_invitation_gremium "
+    "ON calendar_invitation (appointment_id, gremium_id) WHERE gremium_id IS NOT NULL",
+)
+
+
+def _has_gremium() -> bool:
+    """Tell if ``calendar_invitation`` has the old column ``gremium_id``.
+
+    A fresh database gets the table from the ``create_all`` baseline (0001) in the shape
+    of the models, with ``team_id`` (9f288998cf57), so the gremium indexes do not apply.
+    """
+    columns = sa.inspect(op.get_bind()).get_columns("calendar_invitation")
+    return "gremium_id" in {c["name"] for c in columns}
+
+
 def upgrade() -> None:
     """Upgrade the schema to this revision."""
     for stmt in _UPGRADE:
         op.execute(stmt)
+    if _has_gremium():
+        for stmt in _GREMIUM_INDEXES:
+            op.execute(stmt)
 
 
 def downgrade() -> None:

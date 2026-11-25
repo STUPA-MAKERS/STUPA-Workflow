@@ -481,7 +481,7 @@ describe('CalendarComponent (desktop)', () => {
     const req = view.http.expectOne('/api/calendar/appointments');
     expect(req.request.body).toMatchObject({ title: 'Neu', startsOn: '2026-11-14', endsOn: '2026-11-14' });
     req.flush(
-      appointment({ id: 'a-9', title: 'Neu', startsOn: '2026-11-14', endsOn: '2026-11-14', startTime: null, endTime: null, gremien: [] }),
+      appointment({ id: 'a-9', title: 'Neu', startsOn: '2026-11-14', endsOn: '2026-11-14', startTime: null, endTime: null, teams: [] }),
     );
     view.fixture.detectChanges();
     expect(view.cmp.formOpen()).toBe(false);

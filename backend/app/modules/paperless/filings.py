@@ -216,12 +216,17 @@ async def mark_failure(
     """Count a failed try. Return whether the job failed for the last time.
 
     ``final`` ends the job at once, for a failure that a new try cannot repair. A job
-    with a document number keeps it and tries only the rest again. Each other job
-    starts again with a new upload, because its consume task is over.
+    that Paperless accepted keeps its consume task and its document number, and a new
+    try reads the task or sets the link again, never uploads again
+    (§F/integrations/paperless/003111): a failed read does not show that Paperless has
+    no document. Only a job that ends without a document number drops its task, so
+    `Erneut versuchen` uploads anew.
     """
     attempts = filing.attempts + 1
     last = final or attempts >= MAX_TRIES
-    again = "uploaded" if filing.document_id is not None else "pending"
+    uploaded = filing.document_id is not None or filing.task_id is not None
+    again = "uploaded" if uploaded else "pending"
+    drop_task = filing.document_id is None and (last or filing.task_id is None)
     await session.execute(
         update(PaperlessFiling)
         .where(PaperlessFiling.id == filing.id)
@@ -231,7 +236,7 @@ async def mark_failure(
             last_error=error,
             failed_at=now if last else None,
             due_at=now + backoff(attempts),
-            **({} if filing.document_id is not None else {"task_id": None, "uploaded_at": None}),
+            **({"task_id": None, "uploaded_at": None} if drop_task else {}),
         )
     )
     return last
