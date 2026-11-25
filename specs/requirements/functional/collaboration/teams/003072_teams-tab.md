@@ -15,8 +15,10 @@ scope:
 
 The navigation tab Gremien must be named Teams and open `/teams`. The old route `/committees`
 must lead to `/teams`. The list must show the teams of the person, each sub-team under its
-parent. The page of an inherent team must show the tabs of its Gremium as today. The page of
-another team must show the tabs Board, Mitglieder, Sub-Teams and Info.
+parent. The page of an inherent team must show the tabs of its Gremium as today, plus the tab
+Sub-Teams. The tabs Sitzungen, Beschlüsse and Anwesenheit must exist only on the page of an
+inherent team. The page of another team must show only the tabs Board, Mitglieder, Sub-Teams and
+Info.
 
 Reason: Every Gremium is a team, so one tab shows both.
 
