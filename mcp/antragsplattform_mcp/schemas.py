@@ -1229,7 +1229,7 @@ StatusListKind = Literal["order", "event"]
 
 
 class StatusIn(WireModel, frozen=True):
-    """One status of a status list (Verwaltung > Status & Phasen)."""
+    """One status of a status list (Verwaltung > Bestellphasen or Veranstaltungsphasen)."""
 
     key: str = Field(description="Stable key: lower case, digits and `_`, up to 40 characters")
     name: I18nMap = Field(description="The shown name per language, for example {de, en}")

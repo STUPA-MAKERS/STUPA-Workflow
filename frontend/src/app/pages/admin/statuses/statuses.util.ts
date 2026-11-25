@@ -1,5 +1,11 @@
 import type { I18nMap } from '@core/api/models';
-import type { StatusDate, StatusDef, StatusListKind, StatusPhase, StatusTone } from '@core/api/statuses.service';
+import type {
+  StatusDate,
+  StatusDef,
+  StatusListKind,
+  StatusPhase,
+  StatusTone,
+} from '@core/api/statuses.service';
 import { STATUS_PHASES } from '@core/api/statuses.service';
 import type { StatusListBody } from '../admin.models';
 
@@ -51,7 +57,15 @@ export function draftOf(statuses: readonly StatusDef[]): ListDraft {
 
 /** A new row at the end of the list: in the phase `open`, without a name. */
 export function newRow(): StatusRow {
-  return { key: '', name: {}, tone: 'neutral', phase: 'open', setsDate: null, used: 0, fresh: true };
+  return {
+    key: '',
+    name: {},
+    tone: 'neutral',
+    phase: 'open',
+    setsDate: null,
+    used: 0,
+    fresh: true,
+  };
 }
 
 /**
@@ -88,7 +102,9 @@ export function rowKeys(
   const reserved = [...stored.map((s) => s.key), ...rows.filter((r) => !r.fresh).map((r) => r.key)];
   return rows.reduce<readonly string[]>(
     (keys, row) =>
-      row.fresh ? [...keys, keyOf(nameText(row.name, lang), new Set([...reserved, ...keys]))] : [...keys, row.key],
+      row.fresh
+        ? [...keys, keyOf(nameText(row.name, lang), new Set([...reserved, ...keys]))]
+        : [...keys, row.key],
     [],
   );
 }
@@ -99,7 +115,10 @@ export function nameText(name: I18nMap, lang: string): string {
 }
 
 /** The stored statuses that the draft no longer holds and that elements have. */
-export function removedInUse(stored: readonly StatusDef[], rows: readonly StatusRow[]): readonly Removed[] {
+export function removedInUse(
+  stored: readonly StatusDef[],
+  rows: readonly StatusRow[],
+): readonly Removed[] {
   const kept = new Set(rows.filter((r) => !r.fresh).map((r) => r.key));
   return stored
     .filter((s) => !kept.has(s.key) && (s.used ?? 0) > 0)
@@ -144,7 +163,9 @@ export function bodyOf(
       start: i === 0,
       ...(kind === 'order' && row.setsDate ? { setsDate: row.setsDate } : {}),
     })),
-    replacements: Object.fromEntries(Object.entries(draft.replacements).filter(([key]) => removed.has(key))),
+    replacements: Object.fromEntries(
+      Object.entries(draft.replacements).filter(([key]) => removed.has(key)),
+    ),
   };
 }
 
@@ -159,8 +180,38 @@ export function unchanged(body: StatusListBody, stored: readonly StatusDef[]): b
   );
 }
 
+/**
+ * Remove a row. A stored row that elements have names the row that takes them (`to`), which
+ * the save sends as its replacement (003038); a new row or one without elements needs none.
+ */
+export function removeRow(list: ListDraft, index: number, to: string | null): ListDraft {
+  const row = list.rows[index];
+  if (!row) return list;
+  const moved = to && !row.fresh ? { ...list.replacements, [row.key]: to } : list.replacements;
+  return {
+    rows: list.rows.filter((_, i) => i !== index),
+    // The elements that an earlier delete sent to this row go on to its replacement.
+    replacements: Object.fromEntries(
+      Object.entries(moved).map(([from, target]) => [from, target === row.key && to ? to : target]),
+    ),
+  };
+}
+
+/** The elements that the row takes at the save: its own and those of the rows it replaces. */
+export function elementsOf(row: StatusRow, list: ListDraft, stored: readonly StatusDef[]): number {
+  if (row.fresh) return 0;
+  const used = new Map(stored.map((s) => [s.key, s.used ?? 0]));
+  return Object.entries(list.replacements)
+    .filter(([, target]) => target === row.key)
+    .reduce((sum, [from]) => sum + (used.get(from) ?? 0), row.used);
+}
+
 /** Move a row one place up (-1) or down (1). */
-export function moveRow(rows: readonly StatusRow[], index: number, by: -1 | 1): readonly StatusRow[] {
+export function moveRow(
+  rows: readonly StatusRow[],
+  index: number,
+  by: -1 | 1,
+): readonly StatusRow[] {
   const to = index + by;
   if (to < 0 || to >= rows.length) return rows;
   return rows.map((row, i) => (i === index ? rows[to] : i === to ? rows[index] : row));

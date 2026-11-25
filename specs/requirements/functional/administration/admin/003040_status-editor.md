@@ -2,7 +2,7 @@
 id: "003040"
 title: The pages Bestellphasen and Veranstaltungsphasen use the editor of the plan steps
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:

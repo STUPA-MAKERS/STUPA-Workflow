@@ -102,7 +102,8 @@ SCOPES: dict[str, frozenset[str]] = {
             "admin.deadlines",
             "admin.translations",
             "admin.calendars",
-            "admin.statuses",
+            "admin.order_phases",
+            "admin.event_phases",
             "webhook.manage",
         }
     ),

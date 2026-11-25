@@ -35,6 +35,7 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+from app.shared.permissions import STATUS_LIST_PERMISSIONS
 
 if TYPE_CHECKING:
     from app.modules.meetings.publisher import MeetingPublisher
@@ -46,7 +47,6 @@ _CONFIG_REVERT_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
     ENTITY_SITE_CONFIG: "admin.site",
-    ENTITY_STATUS_LIST: "admin.statuses",
 }
 
 #: Budget mutations need the same permission as the original mutation. Structure work
@@ -169,7 +169,11 @@ class RevertService:
 
         features_only = _is_features_save(recorded.entity_type, entry.data or {})
         perm = (
-            FEATURES_REVERT_PERM if features_only else _CONFIG_REVERT_PERM.get(recorded.entity_type)
+            FEATURES_REVERT_PERM
+            if features_only
+            else STATUS_LIST_PERMISSIONS.get(recorded.entity_id)
+            if recorded.entity_type == ENTITY_STATUS_LIST
+            else _CONFIG_REVERT_PERM.get(recorded.entity_type)
         )
         if perm is None:
             raise ForbiddenError(f"Cannot revert unknown config entity {recorded.entity_type}.")

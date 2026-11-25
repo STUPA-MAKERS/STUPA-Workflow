@@ -799,14 +799,14 @@ async def status_list(kind: S.StatusListKind) -> dict:
 async def admin_status_list(kind: S.StatusListKind) -> dict:
     """Read a status list with `used`, the number of elements per status.
 
-    Requires admin.statuses.
+    Requires admin.order_phases for `order`, admin.event_phases for `event`.
     """
     return await api().get(f"/admin/statuses/{kind}")
 
 
 @group.tool
 async def admin_set_status_list(kind: S.StatusListKind, payload: S.StatusListSet) -> dict:
-    """Replace a status list as a whole (Verwaltung > Status & Phasen). Requires admin.statuses.
+    """Replace a status list as a whole (Verwaltung > Bestellphasen or Veranstaltungsphasen).
 
     Keep the keys of the statuses that stay. 422 `status_list_invalid` for a wrong list.
     A removed status that elements have needs a replacement in `replacements`, else 409

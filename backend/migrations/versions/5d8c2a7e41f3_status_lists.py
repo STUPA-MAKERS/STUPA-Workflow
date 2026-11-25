@@ -8,7 +8,8 @@ because the start status is the one that the list names. A stored Bestellung kee
 status, because each old status is a key of the new list. Each list gets its first
 config revision, so the audit log can revert the first save of the admin. The
 revisions are append-only, so the downgrade keeps them. The upgrade grants
-``admin.statuses`` to the ``admin`` role. The step is idempotent.
+``admin.order_phases`` and ``admin.event_phases`` to the ``admin``
+role. The step is idempotent.
 
 Revision ID: 5d8c2a7e41f3
 Revises: c3ee58a9d4df
@@ -96,14 +97,16 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE purchase_order ALTER COLUMN status DROP DEFAULT",
     (
         "INSERT INTO role_permission (role_id, permission) "
-        "SELECT r.id, 'admin.statuses' FROM role r "
+        "SELECT r.id, p.permission FROM role r "
+        "CROSS JOIN (VALUES ('admin.order_phases'), ('admin.event_phases')) AS p(permission) "
         "WHERE r.key = 'admin' "
         "ON CONFLICT DO NOTHING"
     ),
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    "DELETE FROM role_permission WHERE permission = 'admin.statuses'",
+    "DELETE FROM role_permission "
+    "WHERE permission IN ('admin.order_phases', 'admin.event_phases')",
     "UPDATE purchase_order SET status = 'planned' "
     "WHERE status NOT IN ('planned', 'ordered', 'delivered', 'cancelled')",
     "ALTER TABLE purchase_order ALTER COLUMN status SET DEFAULT 'planned'",

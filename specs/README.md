@@ -108,12 +108,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/002693](requirements/functional/administration/admin/002693_audit-log-search.md) | The Audit-Log searches on the server | approved |
 | [F/administration/admin/003017](requirements/functional/administration/admin/003017_permission-names.md) | Every global permission has a German and an English name | approved |
 | [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | approved |
-| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | draft |
+| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | approved |
 | [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the phase open, done or void | approved |
 | [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | approved |
 | [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | approved |
 | [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | approved |
-| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellphasen and Veranstaltungsphasen use the editor of the plan steps | draft |
+| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellphasen and Veranstaltungsphasen use the editor of the plan steps | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |

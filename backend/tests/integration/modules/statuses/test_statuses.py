@@ -31,7 +31,10 @@ from tests.integration.modules.orders.test_orders import (
 
 pytestmark = pytest.mark.integration
 
-_ADMIN = Principal(sub="status-admin", roles=[], permissions={"admin.statuses"})
+_ADMIN = Principal(
+    sub="status-admin", roles=[], permissions={"admin.order_phases", "admin.event_phases"}
+)
+_ORDER_ADMIN = Principal(sub="order-admin", roles=[], permissions={"admin.order_phases"})
 _BUYER = Principal(sub="status-buyer", roles=["member"], permissions={"order.manage"})
 _MEMBER = Principal(sub="status-member", roles=["member"], permissions=set())
 
@@ -86,6 +89,9 @@ async def test_the_migration_creates_both_lists(
     ]
     assert member.get("/api/statuses/other").status_code == 422
     assert member.get("/api/admin/statuses/order").status_code == 403
+    order_admin = _client(migrated, settings, monkeypatch, _ORDER_ADMIN)
+    assert order_admin.get("/api/admin/statuses/order").status_code == 200
+    assert order_admin.get("/api/admin/statuses/event").status_code == 403
     anonymous = _client(migrated, settings, monkeypatch, None)
     assert _shape(anonymous.get("/api/statuses/order").json()) == _ORDER_LIST
 

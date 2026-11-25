@@ -778,8 +778,28 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'statuses',
-            data: { title: 'admin.statuses.title', permission: 'admin.statuses', parent: ['admin'] },
+            path: 'order-phases',
+            canMatch: [featureMatch('orders')],
+            data: {
+              title: 'admin.statuses.title.order',
+              permission: 'admin.order_phases',
+              parent: ['admin'],
+              statusList: 'order',
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/statuses/statuses.component').then(
+                (m) => m.AdminStatusesComponent,
+              ),
+          },
+          {
+            path: 'event-phases',
+            data: {
+              title: 'admin.statuses.title.event',
+              permission: 'admin.event_phases',
+              parent: ['admin'],
+              statusList: 'event',
+            },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/statuses/statuses.component').then(

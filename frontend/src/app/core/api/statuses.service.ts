@@ -121,7 +121,7 @@ export class StatusCatalog {
     return this.lists[kind].asReadonly();
   }
 
-  /** Read a list again, after a save on the page "Status & Phasen". */
+  /** Read a list again, after a save on the page Bestellphasen or Veranstaltungsphasen. */
   reload(kind: StatusListKind): void {
     this.started[kind].set(true);
     if (this.seed) return;

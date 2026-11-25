@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { type Observable, forkJoin, map, of } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { type Observable, map } from 'rxjs';
 import { problemCode } from '@core/api/problem';
 import {
   STATUS_DATES,
@@ -11,10 +12,8 @@ import {
   StatusCatalog,
 } from '@core/api/statuses.service';
 import { AuthService } from '@core/auth/auth.service';
-import { FeatureService } from '@core/features/feature.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import { setI18n } from '@shared/forms/i18n-text';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import {
@@ -26,6 +25,8 @@ import {
   NoteComponent,
   SelectFieldComponent,
   type SelectOption,
+  SelectSheetComponent,
+  type SelectSheetOption,
   StepListComponent,
   StepRowComponent,
 } from '@stupa-makers/ui-kit';
@@ -39,49 +40,53 @@ import { AdminApiService } from '../admin-api.service';
 import type { StatusListBody } from '../admin.models';
 import {
   type ListDraft,
-  type Removed,
   type StatusRow,
   bodyOf,
   draftOf,
+  elementsOf,
   listValid,
   missingPhases,
   moveRow,
   nameText,
   newRow,
-  removedInUse,
+  removeRow,
   unchanged,
 } from './statuses.util';
-
-type Stored = Readonly<Record<StatusListKind, readonly StatusDef[]>>;
-type Draft = Readonly<Record<StatusListKind, ListDraft>>;
-/** The lists that the save sends: only a changed list. */
-type Body = Readonly<Partial<Record<StatusListKind, StatusListBody>>>;
-
-const KINDS: readonly StatusListKind[] = ['order', 'event'];
 
 /** The most statuses of one list, as the server takes them. */
 export const MAX_STATUSES = 30;
 
-const TITLE: Readonly<Record<StatusListKind, TranslationKey>> = {
-  order: 'admin.statuses.order',
-  event: 'admin.statuses.event',
+/** The permission of the page of each list (spec 003035). */
+export const STATUS_LIST_PERMISSION: Readonly<Record<StatusListKind, string>> = {
+  order: 'admin.order_phases',
+  event: 'admin.event_phases',
 };
 
+/** The route data that names the list of the page. */
+export const STATUS_LIST_DATA = 'statusList';
+
+/** A delete that waits for the pick of a replacement. */
+interface Deleting {
+  readonly index: number;
+  readonly row: StatusRow;
+  /** The elements that move: the row's own and those it took from deleted rows. */
+  readonly count: number;
+}
+
 /**
- * "Status & Phasen" (`/admin/statuses`, permission `admin.statuses`, spec 003035-003040).
+ * "Bestellphasen" (`/admin/order-phases`) and "Veranstaltungsphasen" (`/admin/event-phases`):
+ * one page per status list (spec 003035-003040). The route data `statusList` names the list,
+ * and each page needs its own permission.
  *
- * One section per kind of element with a status list: the Bestellungen (while the feature
- * is on) and the Veranstaltungen. Each section edits its statuses like the steps of a
- * Haushaltsplan under Budgets: a numbered list, per row the name, the buttons up and down
- * and the delete, under it the selects of the phase, the color and, for a Bestellung, the
- * date that the status sets; "+ Status" under the list. The order of the list is the
- * position, and the first status is the start status of a new element, so it needs the
- * phase `open`.
+ * The page edits the list like the steps of a Haushaltsplan under Budgets: the kit step list
+ * with per row the name, the buttons up and down and the delete, under it the selects of the
+ * kind (`open`, `done`, `void`), the color and, for a Bestellung, the date that the status
+ * sets; the add button under the list. The order of the list is the position, and the first
+ * row is the start of a new element, so it needs the kind `open`.
  *
- * A removed status that elements have needs a replacement of the same list (003038): the
- * section lists it with a select under the statuses, and the save moves its elements.
- * "Speichern" sends each changed list; the server writes an audit entry and a config
- * revision for each.
+ * The delete of a stored row that elements have opens a select sheet: the admin picks the
+ * row that takes the elements, and only the pick removes the row (003038). "Speichern" sends
+ * the list; the server writes an audit entry and a config revision.
  */
 @Component({
   selector: 'app-admin-statuses',
@@ -99,6 +104,7 @@ const TITLE: Readonly<Record<StatusListKind, TranslationKey>> = {
     MoveButtonsComponent,
     NoteComponent,
     SelectFieldComponent,
+    SelectSheetComponent,
     StepListComponent,
     StepRowComponent,
   ],
@@ -108,49 +114,46 @@ export class AdminStatusesComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  private readonly features = inject(FeatureService);
   private readonly catalog = inject(StatusCatalog);
 
-  /** The lists of the page: the Bestellungen only while their feature is on. */
-  protected readonly kinds = computed<readonly StatusListKind[]>(() =>
-    KINDS.filter((kind) => kind !== 'order' || this.features.isOn('orders')),
-  );
+  /** The list of the page, from the route data. */
+  protected readonly kind: StatusListKind =
+    inject(ActivatedRoute).snapshot.data[STATUS_LIST_DATA] === 'event' ? 'event' : 'order';
 
   private readonly lang = computed(() => this.i18n.uiLocale());
 
-  protected readonly form: SettingsForm<Stored, Draft> = settingsForm<Stored, Draft, Body>({
-    allowed: () => this.auth.can('admin.statuses'),
-    load: () =>
-      forkJoin({
-        order: this.api.getStatusList('order'),
-        event: this.api.getStatusList('event'),
-      }).pipe(map(({ order, event }) => ({ order: order.statuses, event: event.statuses }))),
+  protected readonly form: SettingsForm<readonly StatusDef[], ListDraft> = settingsForm<
+    readonly StatusDef[],
+    ListDraft,
+    StatusListBody
+  >({
+    allowed: () => this.auth.can(STATUS_LIST_PERMISSION[this.kind]),
+    load: () => this.api.getStatusList(this.kind).pipe(map((list) => list.statuses)),
     put: (body) => this.put(body),
-    draftOf: (stored) => ({ order: draftOf(stored.order), event: draftOf(stored.event) }),
-    initial: { order: { rows: [], replacements: {} }, event: { rows: [], replacements: {} } },
+    draftOf,
+    initial: { rows: [], replacements: {} },
     body: () => this.body(),
-    unchanged: (body) => Object.keys(body).length === 0,
-    onApply: (stored) => KINDS.forEach((kind) => this.catalog.set(kind, stored[kind])),
+    unchanged,
+    onApply: (stored) => this.catalog.set(this.kind, stored),
     errorText: (err) => this.errorText(err),
   });
   protected readonly draft = this.form.draft;
 
-  /** The body of the save, or `null` while a list breaks a rule. */
-  protected readonly body = computed<Body | null>(() => {
+  /** The body of the save, or `null` while the list breaks a rule. */
+  protected readonly body = computed<StatusListBody | null>(() => {
     const stored = this.form.saved();
     if (!stored) return null;
-    const draft = this.draft();
     const lang = this.lang();
-    if (!KINDS.every((kind) => listValid(draft[kind], stored[kind], lang))) return null;
-    return Object.fromEntries(
-      KINDS.map((kind) => [kind, bodyOf(kind, draft[kind], stored[kind], lang)] as const).filter(
-        ([kind, body]) => !unchanged(body, stored[kind]),
-      ),
-    );
+    return listValid(this.draft(), stored, lang)
+      ? bodyOf(this.kind, this.draft(), stored, lang)
+      : null;
   });
 
-  protected readonly groups = computed<SettingsGroup[]>(() =>
-    this.kinds().map((kind) => ({ key: kind, label: this.i18n.translate(TITLE[kind]), rows: [] })),
+  /** One group without a head: the page holds one list. */
+  protected readonly groups: SettingsGroup[] = [{ key: 'list', rows: [] }];
+
+  protected readonly title = computed(() =>
+    this.i18n.translate(`admin.statuses.title.${this.kind}`),
   );
 
   protected readonly screenState = computed<SettingsState>(() => {
@@ -158,7 +161,10 @@ export class AdminStatusesComponent {
       case 'loading':
         return { state: 'loading', skeleton: { variant: 'rows', count: 4 } };
       case 'forbidden':
-        return { state: 'forbidden', message: this.i18n.translate('admin.statuses.forbidden') };
+        return {
+          state: 'forbidden',
+          message: this.i18n.translate(`admin.statuses.forbidden.${this.kind}`),
+        };
       case 'error':
         return {
           state: 'error',
@@ -192,9 +198,47 @@ export class AdminStatusesComponent {
     })),
   ]);
 
-  protected rows(kind: StatusListKind): readonly StatusRow[] {
-    return this.draft()[kind].rows;
-  }
+  protected readonly rows = computed(() => this.draft().rows);
+
+  /** The columns of the selects under a name: phase and color, and the date of a Bestellung. */
+  protected readonly columns = computed(() => (this.kind === 'order' ? 3 : 2));
+
+  /** The phases that the list misses, as one line under the list; empty when none. */
+  protected readonly missing = computed(() => {
+    const phases = missingPhases(this.rows());
+    return phases.length
+      ? this.i18n.translate('admin.statuses.missingPhase', {
+          phases: phases.map((p) => this.i18n.translate(`admin.statuses.phase.${p}`)).join(', '),
+        })
+      : '';
+  });
+
+  protected readonly canAdd = computed(() => this.rows().length < MAX_STATUSES);
+
+  /** The delete that waits for its replacement; `null` while the sheet is closed. */
+  protected readonly deleting = signal<Deleting | null>(null);
+
+  protected readonly deleteTitle = computed(() => {
+    const d = this.deleting();
+    return d
+      ? this.i18n.translate('admin.statuses.delete.title', { name: this.name(d.row) || d.row.key })
+      : '';
+  });
+
+  protected readonly deleteSub = computed(() => {
+    const d = this.deleting();
+    return d
+      ? this.i18n.translate(`admin.statuses.delete.sub.${this.kind}`, { count: d.count })
+      : '';
+  });
+
+  /** The stored rows that stay in the list: the targets of a replacement. */
+  protected readonly targets = computed<SelectSheetOption[]>(() => {
+    const d = this.deleting();
+    return this.rows()
+      .filter((row, i) => !row.fresh && i !== d?.index)
+      .map((row) => ({ value: row.key, label: this.name(row) || row.key }));
+  });
 
   protected name(row: StatusRow): string {
     return nameText(row.name, this.lang());
@@ -205,78 +249,53 @@ export class AdminStatusesComponent {
   }
 
   /** The first status is the start status, so its phase is `open` (spec 003035). */
-  protected phaseError(kind: StatusListKind, index: number): string {
-    return index === 0 && this.rows(kind)[0]?.phase !== 'open'
+  protected phaseError(index: number): string {
+    return index === 0 && this.rows()[0]?.phase !== 'open'
       ? this.i18n.translate('admin.statuses.startOpen')
       : '';
   }
 
-  /** The phases that the list misses, as one line under the list; empty when none. */
-  protected missing(kind: StatusListKind): string {
-    const phases = missingPhases(this.rows(kind));
-    return phases.length
-      ? this.i18n.translate('admin.statuses.missingPhase', {
-          phases: phases.map((p) => this.i18n.translate(`admin.statuses.phase.${p}`)).join(', '),
-        })
-      : '';
+  protected add(): void {
+    this.draft.update((list) => ({ ...list, rows: [...list.rows, newRow()] }));
   }
 
-  /** The removed statuses that elements have; each needs a replacement. */
-  protected removed(kind: StatusListKind): readonly Removed[] {
-    const stored = this.form.saved()?.[kind] ?? [];
-    return removedInUse(stored, this.rows(kind));
+  /** Delete a row; a stored row that elements have asks for its replacement first (003038). */
+  protected remove(index: number): void {
+    const row = this.rows()[index];
+    if (!row) return;
+    const count = elementsOf(row, this.draft(), this.form.saved() ?? []);
+    if (count > 0) {
+      this.deleting.set({ index, row, count });
+      return;
+    }
+    this.draft.update((list) => removeRow(list, index, null));
   }
 
-  protected removedLabel(kind: StatusListKind, removed: Removed): string {
-    return this.i18n.translate(`admin.statuses.replace.${kind}`, {
-      name: nameText(removed.name, this.lang()) || removed.key,
-      count: removed.used,
-    });
+  /** The pick of the sheet: the row goes, and its elements move to `to` at the save. */
+  protected replaceWith(to: string | readonly string[]): void {
+    const d = this.deleting();
+    if (!d || typeof to !== 'string') return;
+    this.draft.update((list) => removeRow(list, d.index, to));
+    this.deleting.set(null);
   }
 
-  /** The stored statuses that stay in the list: the targets of a replacement. */
-  protected replacementOptions(kind: StatusListKind): SelectOption[] {
-    return this.rows(kind)
-      .filter((row) => !row.fresh)
-      .map((row) => ({ value: row.key, label: this.name(row) || row.key }));
+  protected cancelDelete(): void {
+    this.deleting.set(null);
   }
 
-  protected replacement(kind: StatusListKind, key: string): string {
-    return this.draft()[kind].replacements[key] ?? '';
+  protected move(index: number, by: -1 | 1): void {
+    this.draft.update((list) => ({ ...list, rows: moveRow(list.rows, index, by) }));
   }
 
-  protected setReplacement(kind: StatusListKind, key: string, to: string | null): void {
-    this.patchList(kind, (list) => ({
-      ...list,
-      replacements: { ...list.replacements, [key]: to ?? '' },
-    }));
+  protected setName(index: number, text: string): void {
+    this.patchRow(index, (row) => ({ ...row, name: setI18n(row.name, this.lang(), text) }));
   }
 
-  protected canAdd(kind: StatusListKind): boolean {
-    return this.rows(kind).length < MAX_STATUSES;
+  protected patch(index: number, change: Partial<StatusRow>): void {
+    this.patchRow(index, (row) => ({ ...row, ...change }));
   }
 
-  protected add(kind: StatusListKind): void {
-    this.patchList(kind, (list) => ({ ...list, rows: [...list.rows, newRow()] }));
-  }
-
-  protected remove(kind: StatusListKind, index: number): void {
-    this.patchList(kind, (list) => ({ ...list, rows: list.rows.filter((_, i) => i !== index) }));
-  }
-
-  protected move(kind: StatusListKind, index: number, by: -1 | 1): void {
-    this.patchList(kind, (list) => ({ ...list, rows: moveRow(list.rows, index, by) }));
-  }
-
-  protected setName(kind: StatusListKind, index: number, text: string): void {
-    this.patchRow(kind, index, (row) => ({ ...row, name: setI18n(row.name, this.lang(), text) }));
-  }
-
-  protected patch(kind: StatusListKind, index: number, change: Partial<StatusRow>): void {
-    this.patchRow(kind, index, (row) => ({ ...row, ...change }));
-  }
-
-  /** "Verwerfen": back to the stored lists. */
+  /** "Verwerfen": back to the stored list. */
   protected discard(): void {
     this.form.reset();
   }
@@ -285,31 +304,15 @@ export class AdminStatusesComponent {
     this.form.save();
   }
 
-  private patchRow(
-    kind: StatusListKind,
-    index: number,
-    change: (row: StatusRow) => StatusRow,
-  ): void {
-    this.patchList(kind, (list) => ({
+  private patchRow(index: number, change: (row: StatusRow) => StatusRow): void {
+    this.draft.update((list) => ({
       ...list,
       rows: list.rows.map((row, i) => (i === index ? change(row) : row)),
     }));
   }
 
-  private patchList(kind: StatusListKind, change: (list: ListDraft) => ListDraft): void {
-    this.draft.update((draft) => ({ ...draft, [kind]: change(draft[kind]) }));
-  }
-
-  /** Save each changed list; the answer is both stored lists. */
-  private put(body: Body): Observable<Stored> {
-    const stored = this.form.saved() ?? { order: [], event: [] };
-    const calls = KINDS.map((kind) => {
-      const list = body[kind];
-      return list
-        ? this.api.putStatusList(kind, list).pipe(map((out) => out.statuses))
-        : of(stored[kind]);
-    });
-    return forkJoin(calls).pipe(map(([order, event]) => ({ order, event })));
+  private put(body: StatusListBody): Observable<readonly StatusDef[]> {
+    return this.api.putStatusList(this.kind, body).pipe(map((out) => out.statuses));
   }
 
   private errorText(err: unknown): string | null {
