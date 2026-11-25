@@ -16,7 +16,12 @@ scope:
 
 A data migration must make an Event of each card with event data. The Event must get the title,
 the description, the dates, the times, the place, the participants and the series of the card,
-the creator and the date of creation of the card, and the team of the board of the card (003067). The status must be `settled` (003039) for a card in the done column
+the creator and the date of creation of the card, and the team of the board of the card (003067). A card on a board without a team (a free
+board) must take the one team entry of the board with the role edit or manage. A board with no
+such entry or with more than one must get a new team with the name of the board: each person
+entry of the board becomes a member, an entry with manage becomes a manager, and without a
+manager the person entries with manage, else the creator of the card, become managers. The new
+team must get its own board (003067). The status must be `settled` (003039) for a card in the done column
 of its board or in the archive, else `planned`. Each link of the card must also become a link of
 the Event. The card must stay on its board with its checklist, comments, assignees, labels and
 links, lose its event data, and get a link to the new Event. A link of another element to the
