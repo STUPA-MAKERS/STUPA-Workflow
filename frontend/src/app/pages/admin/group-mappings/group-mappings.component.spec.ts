@@ -311,7 +311,7 @@ describe('GroupMappingsComponent', () => {
     expect(screen.getByRole('link', { name: 'Rollen verwalten' })).toHaveAttribute('href', '/admin/committees/g3/roles');
   });
 
-  it('hides the roles link without admin.gremium_roles', async () => {
+  it('hides the roles link without gremien.gremium_roles', async () => {
     const { c, fixture } = await setup(makeApi(), makeToast(), false);
     c.openAdd('role');
     c.onDialogGremium('g3');

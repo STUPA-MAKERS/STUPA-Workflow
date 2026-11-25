@@ -20,7 +20,7 @@ export const ORDER_PERMISSIONS = ['order.manage', ...BUDGET_PERMISSIONS];
 /**
  * Every permission of an admin page. Each one opens the admin overview and shows the
  * "Verwaltung" entry. The list holds the permission of every entry of the admin
- * navigation (`ADMIN_PAGES`, a spec keeps the two in step) plus `admin.gremium_roles`,
+ * navigation (`ADMIN_PAGES`, a spec keeps the two in step) plus `gremien.gremium_roles`,
  * whose pages the overview links per gremium.
  */
 export const ADMIN_AREA_PERMISSIONS = [
@@ -30,7 +30,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.roles',
   'admin.users',
   'admin.group_mappings',
-  'admin.gremium_roles',
+  'gremien.gremium_roles',
   'admin.cd_variants',
   'admin.delegations',
   'admin.deadlines',

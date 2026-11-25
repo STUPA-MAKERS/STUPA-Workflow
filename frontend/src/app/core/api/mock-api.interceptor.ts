@@ -146,7 +146,7 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.users',
     'admin.users.merge',
     'admin.users.revoke_groups',
-    'admin.gremium_roles',
+    'gremien.gremium_roles',
     'admin.cd_variants',
     'admin.delegations',
     'admin.deadlines',

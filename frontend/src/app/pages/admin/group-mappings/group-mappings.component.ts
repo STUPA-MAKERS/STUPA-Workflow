@@ -129,7 +129,7 @@ export class GroupMappingsComponent {
   private readonly auth = inject(AuthService);
 
   /** The link to the gremium roles page needs its own permission. */
-  protected readonly canManageGremiumRoles = computed(() => this.auth.can('admin.gremium_roles'));
+  protected readonly canManageGremiumRoles = computed(() => this.auth.can('gremien.gremium_roles'));
 
   private readonly globalMappings = signal<GroupMapping[]>([]);
   private readonly membershipMappings = signal<GremiumMembershipMapping[]>([]);

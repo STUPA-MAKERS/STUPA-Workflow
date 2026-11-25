@@ -100,7 +100,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
 /** NgModel writes its value after a microtask. */
 async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] } = {}) {
   const api = opts.api ?? makeApi();
-  const perms = opts.perms ?? ['admin.gremien', 'admin.gremium_roles', 'admin.group_mappings'];
+  const perms = opts.perms ?? ['admin.gremien', 'gremien.gremium_roles', 'admin.group_mappings'];
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(AdminGremienComponent, {
     providers: [

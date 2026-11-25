@@ -731,7 +731,7 @@ export const routes: Routes = [
           },
           {
             path: 'committees/:id/roles',
-            data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/committees'] },
+            data: { title: 'admin.gremiumRoles.title', permission: 'gremien.gremium_roles', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/gremium-roles/gremium-roles.component').then(
