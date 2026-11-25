@@ -468,7 +468,7 @@ async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPat
         id=app_id, budget_id=None, fiscal_year_id=None,
         current_state_id=None, data={"ziel": str(node_id)}
     )
-    node = SimpleNamespace(id=node_id, parent_id=None, active=True)
+    node = SimpleNamespace(id=node_id, parent_id=None, active=True, internal=False)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
@@ -518,6 +518,30 @@ async def test_assign_from_field_inactive_node_skipped(monkeypatch: pytest.Monke
     assert calls == []
 
 
+async def test_assign_budget_from_field_skips_an_internal_cost_centre(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Skip a cost center whose own switch or whose parent's switch is Intern (003012)."""
+    calls = _stub_audit(monkeypatch)
+    app_id, top_id, node_id = uuid4(), uuid4(), uuid4()
+    top = SimpleNamespace(id=top_id, parent_id=None, active=True, internal=True)
+    node = SimpleNamespace(id=node_id, parent_id=top_id, active=True, internal=False)
+    for answer in (node_id, top_id):
+        app = SimpleNamespace(
+            id=app_id, budget_id=None, fiscal_year_id=None,
+            current_state_id=None, data={"ziel": str(answer)}
+        )
+        session = _Session(
+            store={app_id: app, top_id: top, node_id: node}, active_fy=(uuid4(),)
+        )
+        await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+            [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+        )
+        assert app.budget_id is None
+        assert session.committed == 0
+    assert calls == []
+
+
 async def test_assign_from_field_keeps_existing_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep a cost center that staff already set."""
     calls = _stub_audit(monkeypatch)
@@ -525,7 +549,7 @@ async def test_assign_from_field_keeps_existing_budget(monkeypatch: pytest.Monke
     app = SimpleNamespace(
         id=app_id, budget_id=staff_id, fiscal_year_id=fy_id, data={"ziel": str(node_id)}
     )
-    node = SimpleNamespace(id=node_id, parent_id=None, active=True)
+    node = SimpleNamespace(id=node_id, parent_id=None, active=True, internal=False)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(),))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudgetFromField", field="ziel", application_id=app_id)]

@@ -95,6 +95,10 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     plan_coverable_default: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
+    #: The own switch "Intern" (003011). A node is Intern when its own switch or the
+    #: switch of a node above it is on (``tree_rules.internal_paths``). The form field
+    #: ``budget_select`` offers no Intern node (003012).
+    internal: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     def __init__(self, **fields: object) -> None:
         """Make a node. Without a tree path it takes its path key."""

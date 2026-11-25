@@ -15,7 +15,7 @@ idempotent. A fresh database already gets the tables from the ``create_all`` bas
 (0001), because the models sit in ``app.models``.
 
 Revision ID: 377af7322897
-Revises: f2b8d6a1c374
+Revises: b7e3a91d4c58
 Create Date: 2026-11-24 18:40:00.000000
 """
 
@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "377af7322897"
-down_revision: str | None = "f2b8d6a1c374"
+down_revision: str | None = "b7e3a91d4c58"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

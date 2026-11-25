@@ -396,6 +396,10 @@ export interface BudgetTreeNode {
   /** The fiscal years whose plan version in force puts the node on the income side. An
    *  Antrag must not take the node in these years (spec 001030). */
   readonly incomeIn?: readonly Uuid[];
+  /** The own switch "Intern" (spec 003011). */
+  readonly internal?: boolean;
+  /** A node above is Intern, so this one is Intern too (spec 003011). */
+  readonly internalInherited?: boolean;
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }
@@ -463,6 +467,8 @@ export interface BudgetNodeUpdate {
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
   readonly planCoverableDefault?: boolean;
+  /** The own switch "Intern" (spec 003011). */
+  readonly internal?: boolean;
 }
 
 /** A top-level budget with one fiscal year that a new booking can take (spec 000879). */

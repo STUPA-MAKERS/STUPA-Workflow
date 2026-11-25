@@ -513,3 +513,24 @@ def build_forest(
 
     roots = children_of.get(None, [])
     return [to_dict(r) for r in roots if gremium_id is None or r[2] == gremium_id]
+
+
+def with_internal(
+    forest: Sequence[dict[str, Any]], own_of: Mapping[object, bool], *, above: bool = False
+) -> list[dict[str, Any]]:
+    """Add the own switch ``internal`` and ``internal_inherited`` to each node (003011).
+
+    ``internal_inherited`` says that a node above is Intern. The pass runs on the whole
+    forest before a scope cuts it, so a scoped root still knows a node above it.
+    """
+    return [
+        {
+            **node,
+            "internal": own_of.get(node["id"], False),
+            "internal_inherited": above,
+            "children": with_internal(
+                node["children"], own_of, above=above or own_of.get(node["id"], False)
+            ),
+        }
+        for node in forest
+    ]
