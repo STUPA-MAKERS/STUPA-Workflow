@@ -17,7 +17,7 @@ TODAY = date(2026, 11, 25)
 
 def test_a_new_event_gets_a_number_with_v() -> None:
     """003022: the number is V- and eight random characters, like a Bestellung."""
-    number = Event.__table__.c.number.default.arg(None)  # type: ignore[union-attr]
+    number = Event.__table__.c.number.default.arg(None)
     assert len(number) == 8
     assert format_event_number(number) == f"V-{number}"
 

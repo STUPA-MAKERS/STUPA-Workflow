@@ -115,7 +115,7 @@ def _row_values(row: Event) -> dict[str, Any]:
     }
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class EventService:
     """The Events as one request sees them.
 
@@ -228,8 +228,9 @@ class EventService:
                 "A different person changed the Event.", code="event_version_conflict"
             )
 
-    async def _save(self, row: Event) -> Event:
-        row.version = row.version + 1
+    async def _save(self, row: Event, values: Mapping[str, object]) -> Event:
+        for col, value in {**values, "version": row.version + 1}.items():
+            setattr(row, col, value)
         await self.session.flush()
         await self.session.refresh(row)
         return row
@@ -267,9 +268,7 @@ class EventService:
         self._check_shop(values.get("shop_url"))
         if "series_id" in values:
             await self._check_series(values["series_id"])
-        for col, value in values.items():
-            setattr(row, col, value)
-        saved = await self._save(row)
+        saved = await self._save(row, values)
         await emit_event_event(self.session, saved, "event.updated")
         return saved
 
@@ -287,8 +286,7 @@ class EventService:
         self._check_version(row, version)
         target = await StatusReader(self.session).require(LIST, status)
         previous = row.status
-        row.status = target.key
-        saved = await self._save(row)
+        saved = await self._save(row, {"status": target.key})
         if previous != target.key:
             await emit_event_event(self.session, saved, "event.status_changed", previous=previous)
         return saved

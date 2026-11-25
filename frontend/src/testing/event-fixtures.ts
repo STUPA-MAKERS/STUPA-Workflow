@@ -33,6 +33,28 @@ export function eventDetail(over: Partial<EventDetail> = {}): EventDetail {
 
 /** One row of the list of the Events. */
 export function eventItem(over: Partial<EventItem> = {}): EventItem {
-  const { decisions: _d, editions: _e, hiddenEditions: _h, ...item } = eventDetail(over);
-  return item;
+  const e = eventDetail(over);
+  return {
+    id: e.id,
+    number: e.number,
+    teamId: e.teamId,
+    teamName: e.teamName,
+    status: e.status,
+    phase: e.phase,
+    title: e.title,
+    descriptionMd: e.descriptionMd,
+    startsOn: e.startsOn,
+    startTime: e.startTime,
+    endsOn: e.endsOn,
+    endTime: e.endTime,
+    place: e.place,
+    participants: e.participants,
+    seriesId: e.seriesId,
+    seriesName: e.seriesName,
+    shopUrl: e.shopUrl,
+    totals: e.totals,
+    version: e.version,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  };
 }
