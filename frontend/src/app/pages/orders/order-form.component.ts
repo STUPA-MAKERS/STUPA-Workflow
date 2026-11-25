@@ -14,7 +14,6 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { formatMoney } from '@shared/format-money';
 import {
   ChipComponent,
   ErrorTextComponent,
@@ -140,19 +139,6 @@ export class OrderFormComponent {
   private readonly positions = computed(() => orderPositions(this.application()?.data));
 
   /** The sum of the Bestellungen of the Antrag against its approved amount, or a warning. */
-  private readonly sumText = computed(() => {
-    const list = this.list();
-    if (!list || list.total === null) return '';
-    const money = (amount: unknown): string =>
-      formatMoney(amount, this.i18n.formatLocale(), { currency: this.application()?.currency });
-    const approved = money(list.approvedAmount);
-    const sum = approved
-      ? this.i18n.translate('orders.section.sumOfApproved', { total: money(list.total), approved })
-      : money(list.total);
-    const over = money(list.overBy);
-    return over ? `${sum}. ${this.i18n.translate('orders.section.over', { amount: over })}` : sum;
-  });
-
   protected readonly form = computed<FormDef>(() => {
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const known = new Set(this.positions().map((p) => p.id));
@@ -219,13 +205,6 @@ export class OrderFormComponent {
             { key: 'url', kind: 'url', label: t('orders.field.url'), maxLength: 2000 },
             { key: 'plannedAmount', kind: 'money', label: t('orders.field.planned'), min: 0, width: 'half' },
             { key: 'actualAmount', kind: 'money', label: t('orders.field.actual'), min: 0, width: 'half' },
-            {
-              key: 'sum',
-              kind: 'display',
-              label: t('orders.detail.sumTitle'),
-              text: this.sumText(),
-              visible: this.sumText() !== '',
-            },
             { key: 'orderNumber', kind: 'text', label: t('orders.field.orderNumber'), maxLength: 100 },
             { key: 'orderedOn', kind: 'date', label: t('orders.field.orderedOn'), width: 'half' },
             { key: 'deliveredOn', kind: 'date', label: t('orders.field.deliveredOn'), width: 'half' },

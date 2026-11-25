@@ -579,7 +579,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002865](requirements/functional/finance/orders/002865_order-audit.md) | Each write of a Bestellung has an audit entry | approved |
 | [F/finance/orders/002866](requirements/functional/finance/orders/002866_order-timeline.md) | The timeline of the Antrag shows the Bestellungen | approved |
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | approved |
-| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | approved |
+| [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | draft |
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | approved |
 | [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | approved |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |

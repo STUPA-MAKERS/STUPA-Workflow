@@ -113,7 +113,6 @@ describe('OrderFormComponent', () => {
       ],
     });
     expect(field('positionIds').visible).toBe(false);
-    expect(field('sum').visible).toBe(false);
     expect(field('buyerName').visible).toBe(true);
     cmp.save({ title: 'Beamer' });
     expect(api.create).not.toHaveBeenCalled();
@@ -129,7 +128,6 @@ describe('OrderFormComponent', () => {
         { value: 'p-2', label: 'Kabel' },
       ],
     });
-    expect(field('sum').text).toMatch(/^Alle Bestellungen des Antrags 100,00\s€, genehmigt 200,00\s€$/);
     cmp.save(cmp.value());
     expect(api.create).toHaveBeenCalledWith('a-1', expect.objectContaining({ title: 'Beamer', kind: 'order', buyerId: null }));
     expect(screen.getByRole('heading', { name: 'Bestellung anlegen' })).toBeInTheDocument();
@@ -177,15 +175,10 @@ describe('OrderFormComponent', () => {
     expect(cmp.value()).toMatchObject({ plannedAmount: 100 });
   });
 
-  it('warns in the form when the sum is above the approved amount, and shows a sum without one', async () => {
-    const over = await setup({ application: 'a-1', list: { ...LIST, total: '212.50', overBy: '12.50' } });
-    expect(over.field('sum').text).toMatch(/^Alle Bestellungen des Antrags 212,50\s€, genehmigt 200,00\s€\. Alle Bestellungen des Antrags liegen zusammen 12,50\s€ über dem genehmigten Betrag\.$/);
-    expect(over.field('sum').visible).toBe(true);
-  });
-
-  it('shows the sum alone without an approved amount', async () => {
-    const { field } = await setup({ id: 'o-1', list: { ...LIST, approvedAmount: null } });
-    expect(field('sum').text).toMatch(/^100,00\s€$/);
+  /** §F/finance/orders/002868: the sum and its warning stand in the detail, not in the form. */
+  it('shows no sum of the Antrag in the form', async () => {
+    const { field } = await setup({ application: 'a-1', list: { ...LIST, total: '212.50', overBy: '12.50' } });
+    expect(field('sum')).toBeUndefined();
   });
 
   it('opens an existing Bestellung with its values, its removed position and its buyer', async () => {
