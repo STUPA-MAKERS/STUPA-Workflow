@@ -2,7 +2,7 @@
 id: "003021"
 title: A row without the date of its list goes to its own group, not to its entry month
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:
