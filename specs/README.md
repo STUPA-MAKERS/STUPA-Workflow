@@ -588,13 +588,13 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002874](requirements/functional/finance/orders/002874_order-actual-amount-from-invoice.md) | The invoice fills an empty real price | approved |
 | [F/finance/orders/002876](requirements/functional/finance/orders/002876_order-create-invoice.md) | Rechnung anlegen opens the invoice form from the Bestellung | approved |
 | [F/finance/orders/002877](requirements/functional/finance/orders/002877_order-invoice-shows-orders.md) | The invoice detail lists its Bestellungen | approved |
-| [F/finance/orders/002878](requirements/functional/finance/orders/002878_order-booking-reference.md) | A booking can name a Bestellung | draft |
+| [F/finance/orders/002878](requirements/functional/finance/orders/002878_order-booking-reference.md) | A booking can name a Bestellung | approved |
 | [F/finance/orders/002879](requirements/functional/finance/orders/002879_order-create-booking.md) | Buchung anlegen fills the booking form from the Bestellung | approved |
 | [F/finance/orders/002880](requirements/functional/finance/orders/002880_order-marks.md) | A Bestellung shows marks for its invoice and its bookings | approved |
 | [F/finance/orders/002881](requirements/functional/finance/orders/002881_order-cancel-with-booking.md) | The cancel of a booked Bestellung asks first | approved |
 | [F/finance/orders/002883](requirements/functional/finance/orders/002883_orders-list-page.md) | Bestellungen is a page of its own with a list and a detail | approved |
 | [F/finance/orders/002884](requirements/functional/finance/orders/002884_orders-list-segments.md) | The page Bestellungen has three segments | approved |
-| [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | draft |
+| [F/finance/orders/002885](requirements/functional/finance/orders/002885_orders-list-filters.md) | The page Bestellungen filters like the bookings list | approved |
 | [F/finance/orders/002886](requirements/functional/finance/orders/002886_orders-export.md) | The list of Bestellungen exports as XLSX | approved |
 | [F/finance/orders/002887](requirements/functional/finance/orders/002887_order-link-kind.md) | A Bestellung is a link kind | approved |
 | [F/finance/orders/002889](requirements/functional/finance/orders/002889_order-builtin-relations.md) | The relations of a Bestellung show without a link | approved |
