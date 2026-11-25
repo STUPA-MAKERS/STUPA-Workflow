@@ -65,7 +65,7 @@ async def members_for_substitute(
     return {m for m in members if m is not None}, gremium_wide
 
 
-def _substitute_gremien_stmt(principal: UUID | ScalarSelect[UUID]) -> Select[UUID]:
+def substitute_gremien_stmt(principal: UUID | ScalarSelect[UUID]) -> Select[UUID]:
     """Select the gremien in which `principal` is a pool substitute."""
     return (
         select(DelegationSubstitute.gremium_id)
@@ -80,7 +80,7 @@ async def substitute_gremien_for_sub(session: AsyncSession, sub: str) -> set[UUI
     The call runs one statement: the principal id is a subquery on `sub`.
     """
     pid = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
-    stmt = _substitute_gremien_stmt(pid)
+    stmt = substitute_gremien_stmt(pid)
     return set((await session.execute(stmt)).scalars().all())
 
 
@@ -112,3 +112,13 @@ def pool_principals_stmt(ids: list[UUID]) -> list[Select[Any]]:
             DelegationSubstitute.member_principal_id.in_(ids)
         ),
     ]
+
+
+def pool_principals_of_gremien_stmt(gremium_ids: Select[Any]) -> Select[Any]:
+    """Select the pool substitutes of the gremien that ``gremium_ids`` selects.
+
+    The team of a gremium counts its pool as members (``app.modules.teams.members``).
+    """
+    return select(DelegationSubstitute.substitute_principal_id).where(
+        DelegationSubstitute.gremium_id.in_(gremium_ids)
+    )

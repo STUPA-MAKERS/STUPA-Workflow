@@ -186,6 +186,11 @@
       "to": "site_config"
     },
     {
+      "count": 3,
+      "from": "admin",
+      "to": "teams"
+    },
+    {
       "count": 1,
       "from": "admin",
       "to": "tickets"
@@ -521,12 +526,12 @@
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 4,
       "from": "calendar",
       "to": "gremien"
     },
     {
-      "count": 8,
+      "count": 7,
       "from": "calendar",
       "to": "meetings"
     },
@@ -549,6 +554,11 @@
       "count": 5,
       "from": "calendar",
       "to": "site_config"
+    },
+    {
+      "count": 4,
+      "from": "calendar",
+      "to": "teams"
     },
     {
       "count": 5,
@@ -844,6 +854,11 @@
       "count": 3,
       "from": "graph",
       "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "teams"
     },
     {
       "count": 1,
@@ -1481,6 +1496,46 @@
       "to": "shared"
     },
     {
+      "count": 2,
+      "from": "team_pages",
+      "to": "audit"
+    },
+    {
+      "count": 4,
+      "from": "team_pages",
+      "to": "auth"
+    },
+    {
+      "count": 3,
+      "from": "team_pages",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "team_pages",
+      "to": "teams"
+    },
+    {
+      "count": 2,
+      "from": "team_pages",
+      "to": "todos"
+    },
+    {
+      "count": 2,
+      "from": "teams",
+      "to": "auth"
+    },
+    {
+      "count": 3,
+      "from": "teams",
+      "to": "gremien"
+    },
+    {
+      "count": 1,
+      "from": "teams",
+      "to": "shared"
+    },
+    {
       "count": 4,
       "from": "tickets",
       "to": "applications"
@@ -1586,7 +1641,7 @@
       "to": "forms"
     },
     {
-      "count": 4,
+      "count": 3,
       "from": "todos",
       "to": "gremien"
     },
@@ -1624,6 +1679,11 @@
       "count": 2,
       "from": "todos",
       "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "todos",
+      "to": "teams"
     },
     {
       "count": 6,
@@ -1928,6 +1988,18 @@
       "layer": 6,
       "name": "site_config",
       "path": "backend/app/modules/site_config"
+    },
+    {
+      "id": "team_pages",
+      "layer": 1,
+      "name": "team_pages",
+      "path": "backend/app/modules/team_pages"
+    },
+    {
+      "id": "teams",
+      "layer": 5,
+      "name": "teams",
+      "path": "backend/app/modules/teams"
     },
     {
       "id": "tickets",

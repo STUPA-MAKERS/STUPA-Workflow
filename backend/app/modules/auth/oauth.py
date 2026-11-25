@@ -30,10 +30,11 @@ the view over every gremium. ``read`` also holds ``graph.view``, the page "Graph
 ``todos:write`` holds ``todo.all``, the global write key of
 the to-do cards. The to-dos read with any of ``todo.write``, ``todo.all`` and
 ``todo.read_all`` in the scope and write with ``todo.write`` or ``todo.all``. Through
-``todo.all`` or ``todo.read_all`` a team board also needs its own permission in the scope,
+``todo.all`` or ``todo.read_all`` a permission board also needs its own permission in the scope,
 so a ``read`` token never opens the board "Plattform" (``ticket.manage``).
-``committees:write`` lets the gremium permissions ``info.write`` and ``members.notify``
-through: the edit of the Info tab of a Gremium and the message to its members.
+``committees:write`` lets the gremium permissions ``info.write``, ``members.notify`` and
+``team.manage`` and the global ``team.create`` through: the edit of the Info tab of a
+Gremium, the message to its members and the work on the teams.
 ``tickets:write`` lets the gremium permission ``ticket.work`` through: the work on the
 tickets of the Bereiche of a Gremium.
 ``paperless:use`` holds exactly ``paperless.use``: the links with a Paperless end, their
@@ -84,7 +85,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "tickets:write": frozenset({"ticket.manage", "ticket.work"}),
     "todos:write": frozenset({"todo.write", "todo.configure", "todo.all", "todo.create_board"}),
-    "committees:write": frozenset({"info.write", "members.notify"}),
+    "committees:write": frozenset({"info.write", "members.notify", "team.create", "team.manage"}),
     "paperless:use": frozenset({"paperless.use"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),

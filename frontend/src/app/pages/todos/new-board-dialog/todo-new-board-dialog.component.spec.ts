@@ -11,7 +11,7 @@ import { toastMock } from '../../../../testing/toast';
 async function setup() {
   const created = board({ id: 'b-9', name: 'Ersti-Woche', kind: 'free', gremiumId: null });
   const api = {
-    entryOptions: jest.fn(() => of({ gremien: [{ id: 'g-1', name: 'AStA', logoUrl: null }], persons: [] })),
+    entryOptions: jest.fn(() => of({ teams: [{ id: 'g-1', name: 'AStA', gremiumId: null, parentName: null, logoUrl: null }], persons: [] })),
     createBoard: jest.fn(() => of(created)),
   };
   const toast = toastMock();
@@ -31,13 +31,13 @@ describe('TodoNewBoardDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   /** § 001061, 001074: a name and the members of the one picker, each with a role. */
-  it('creates a free board with a Gremium and a person', async () => {
+  it('creates a free board with a team and a person', async () => {
     const view = await setup();
     const dialog = screen.getByRole('dialog', { name: 'Neues Board' });
     const create = within(dialog).getByRole('button', { name: 'Anlegen' });
     expect(create).toBeDisabled();
     fireEvent.input(within(dialog).getByLabelText(/Name/), { target: { value: 'Ersti-Woche' } });
-    view.cmp.add({ hit: { kind: 'gremium', id: 'g-1', name: 'AStA', logoUrl: null }, role: 'edit' });
+    view.cmp.add({ hit: { kind: 'team', id: 'g-1', name: 'AStA', logoUrl: null }, role: 'edit' });
     view.cmp.add({ hit: { kind: 'person', id: 'p-2', name: 'Lea Schmid' }, role: 'edit' });
     view.cmp.setRole({ entry: view.cmp.entries()[0], role: 'read' });
     view.fixture.detectChanges();
@@ -48,7 +48,7 @@ describe('TodoNewBoardDialogComponent', () => {
     expect(await runAxe(view.container)).toHaveNoViolations();
     fireEvent.click(create);
     expect(view.api.createBoard).toHaveBeenCalledWith('Ersti-Woche', [
-      { gremiumId: 'g-1', role: 'read' },
+      { teamId: 'g-1', role: 'read' },
       { principalId: 'p-3', role: 'edit' },
     ]);
     expect(view.onCreated).toHaveBeenCalledWith(view.created);

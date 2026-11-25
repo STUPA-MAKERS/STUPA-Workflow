@@ -69,19 +69,19 @@ async def test_list_boards_sorts_counts_and_creates_the_personal_board(
         return True
 
     monkeypatch.setattr("app.modules.todos.service.boards.ensure_personal_board", _ensure)
-    personal = board(kind="personal", gremium_id=None, owner_id=ME, name="Meine To-Dos")
+    personal = board(kind="personal", team_id=None, owner_id=ME, name="Meine To-Dos")
     stupa = board(name="StuPa")
     asta = board(name="asta")
-    team = board(kind="team", gremium_id=None, permission="platform.manage", name="Plattform")
+    team = board(kind="permission", team_id=None, permission="platform.manage", name="Plattform")
     session = ScriptedSession(
         scalars=[[team, stupa, personal, asta]], execute=[[(stupa.id, 3), (personal.id, 1)]]
     )
-    out = await _svc(session).list_boards(USER, gremium_id=stupa.gremium_id)
+    out = await _svc(session).list_boards(USER, gremium_id=stupa.team_id)
     assert [b.name for b in out] == ["Meine To-Dos", "asta", "StuPa", "Plattform"]
     assert [b.open_count for b in out] == [1, 0, 3, 0]
     assert all(b.can_write and b.can_configure for b in out)
     assert ensured == [ME]
-    assert "todo_board.gremium_id =" in str(session.statements[0])
+    assert "team.gremium_id =" in str(session.statements[0])
 
 
 async def test_list_boards_without_an_account_or_boards(monkeypatch: pytest.MonkeyPatch) -> None:

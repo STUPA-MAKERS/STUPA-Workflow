@@ -945,6 +945,7 @@ export const GREMIUM_PERMISSIONS = [
   'info.write',
   'members.notify',
   'ticket.work',
+  'team.manage',
 ] as const;
 
 /**

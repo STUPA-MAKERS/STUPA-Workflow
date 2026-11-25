@@ -10,12 +10,17 @@ import { runAxe } from '../../../../testing/a11y';
 import { errorToasts } from '../../../../testing/load-error';
 import { AppointmentDialogComponent } from './appointment-dialog.component';
 
-const GREMIEN = [
-  { id: 'g-1', name: 'Haushaltsausschuss' },
-  { id: 'g-2', name: 'Studierendenparlament' },
+const TEAMS = [
+  { id: 'g-1', name: 'Haushaltsausschuss', gremiumId: 'gr-1', parentName: null, logoUrl: null },
+  { id: 'g-2', name: 'Studierendenparlament', gremiumId: 'gr-2', parentName: null, logoUrl: null },
+  { id: 't-9', name: 'Fremdes Team', gremiumId: null, parentName: null, logoUrl: null },
 ];
+/** The teams of the caller: the third team is not one of them. */
+const OWN = ['g-1', 'g-2'];
 
-async function setup(opts: { appointment?: Appointment | null; publish?: boolean; gremien?: typeof GREMIEN | null } = {}) {
+async function setup(
+  opts: { appointment?: Appointment | null; publish?: boolean; manage?: boolean; teams?: typeof TEAMS | null } = {},
+) {
   const on = { closed: jest.fn(), saved: jest.fn() };
   const view = await render(AppointmentDialogComponent, {
     inputs: { open: true, appointment: opts.appointment ?? null, day: '2026-11-17' },
@@ -23,14 +28,24 @@ async function setup(opts: { appointment?: Appointment | null; publish?: boolean
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      { provide: AuthService, useValue: { can: (p: string) => p === 'calendar.publish' && !!opts.publish } },
+      {
+        provide: AuthService,
+        useValue: {
+          can: (p: string) => (p === 'calendar.publish' && !!opts.publish) || (p === 'calendar.manage' && !!opts.manage),
+        },
+      },
     ],
   });
   const injector = view.fixture.debugElement.injector;
   const http = injector.get(HttpTestingController);
-  const committees = http.expectOne('/api/meetings/committees');
-  if (opts.gremien === null) committees.flush(null, { status: 500, statusText: 'Error' });
-  else committees.flush(opts.gremien ?? GREMIEN);
+  const options = http.expectOne((r) => r.url === '/api/todos/entry-options');
+  if (opts.teams === null) options.flush(null, { status: 500, statusText: 'Error' });
+  else {
+    options.flush({ teams: opts.teams ?? TEAMS, persons: [] });
+    http
+      .expectOne('/api/teams')
+      .flush(TEAMS.map((t) => ({ ...t, parentId: null, boardId: null, isMember: OWN.includes(t.id), canManage: false })));
+  }
   view.fixture.detectChanges();
   const toasts = () => injector.get(ToastService).toasts().map((t) => t.message);
   return { ...view, on, http, toasts, cmp: view.fixture.componentInstance };
@@ -65,7 +80,7 @@ describe('AppointmentDialogComponent', () => {
       description: 'Mit Übernachtung',
       forAll: false,
       public: false,
-      gremiumIds: [],
+      teamIds: [],
       principalIds: [],
     });
     view.cmp.submit();
@@ -93,12 +108,12 @@ describe('AppointmentDialogComponent', () => {
     view.http.expectNone('/api/calendar/appointments');
   });
 
-  /** § 000717, 001074: one field finds the Gremien whose meetings the creator reads. */
-  it('invites Gremien from the meeting Gremien of the person in the one field', async () => {
+  /** § 000717, 001074, 003069: one field finds the teams of the creator. */
+  it('invites the own teams of the person in the one field', async () => {
     const view = await setup();
     const dialog = screen.getByRole('dialog', { name: 'Termin anlegen' });
     expect(within(dialog).queryByRole('button', { name: /^Gremium$/ })).toBeNull();
-    const field = within(dialog).getByLabelText('Gremium oder Person einladen');
+    const field = within(dialog).getByLabelText('Team oder Person einladen');
     fireEvent.pointerDown(field);
     view.fixture.detectChanges();
     const all = screen.getByRole('listbox', { name: 'Treffer' });
@@ -109,27 +124,36 @@ describe('AppointmentDialogComponent', () => {
     ]);
     fireEvent.click(within(all).getByRole('option', { name: /Studierendenparlament/ }));
     view.fixture.detectChanges();
-    expect(view.cmp.gremien()).toEqual([{ id: 'g-2', name: 'Studierendenparlament' }]);
+    expect(view.cmp.teams()).toEqual([{ id: 'g-2', name: 'Studierendenparlament' }]);
     expect(screen.queryByRole('listbox', { name: 'Treffer' })).toBeNull();
     fireEvent.pointerDown(field);
     view.fixture.detectChanges();
     expect(within(screen.getByRole('listbox', { name: 'Treffer' })).getAllByRole('option')).toHaveLength(1);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Studierendenparlament entfernen' }));
-    expect(view.cmp.gremien()).toEqual([]);
+    expect(view.cmp.teams()).toEqual([]);
   });
 
-  it('offers no Gremium when the read of the Gremien fails', async () => {
-    const view = await setup({ gremien: null });
+  it('offers no team when the read of the teams fails', async () => {
+    const view = await setup({ teams: null });
     expect(view.cmp.known()).toEqual([]);
   });
 
-  /** § 000738, 001074: Gremien and persons in one popover, from two characters on for persons. */
-  it('finds a Gremium and a person in one popover and invites both once', async () => {
+  /** § 003069: the own teams, every team with calendar.manage. */
+  it('offers only the own teams', async () => {
+    expect((await setup()).cmp.known().map((t) => t.id)).toEqual(['g-1', 'g-2']);
+  });
+
+  it('offers every team to calendar.manage', async () => {
+    expect((await setup({ manage: true })).cmp.known().map((t) => t.id)).toEqual(['g-1', 'g-2', 't-9']);
+  });
+
+  /** § 000738, 001074: teams and persons in one popover, from two characters on for persons. */
+  it('finds a team and a person in one popover and invites both once', async () => {
     jest.useFakeTimers();
     try {
       const view = await setup({ appointment: appointment() });
       const dialog = screen.getByRole('dialog', { name: 'Termin bearbeiten' });
-      const field = within(dialog).getByLabelText('Gremium oder Person einladen');
+      const field = within(dialog).getByLabelText('Team oder Person einladen');
       fireEvent.input(field, { target: { value: 'j' } });
       jest.advanceTimersByTime(LIVE_SEARCH_DEBOUNCE_MS);
       view.http.expectNone((r) => r.url === '/api/calendar/people');
@@ -156,7 +180,7 @@ describe('AppointmentDialogComponent', () => {
       fireEvent.click(within(screen.getByRole('listbox', { name: 'Treffer' })).getByRole('option', { name: /Studierendenparlament/ }));
       view.fixture.detectChanges();
       expect(view.cmp.persons().map((p) => p.name)).toEqual(['Jonas Weber', 'Stefan Schmid']);
-      expect(view.cmp.gremien().map((g) => g.name)).toEqual(['Haushaltsausschuss', 'Studierendenparlament']);
+      expect(view.cmp.teams().map((g) => g.name)).toEqual(['Haushaltsausschuss', 'Studierendenparlament']);
       expect(within(dialog).getByRole('button', { name: 'Stefan Schmid entfernen' })).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Studierendenparlament entfernen' })).toBeInTheDocument();
       fireEvent.click(within(dialog).getByRole('button', { name: 'Jonas Weber entfernen' }));
@@ -185,14 +209,14 @@ describe('AppointmentDialogComponent', () => {
       place: 'AStA-Büro',
       description: 'Offene Buchungen',
     });
-    expect(view.cmp.gremien()).toEqual([{ id: 'g-1', name: 'Haushaltsausschuss' }]);
+    expect(view.cmp.teams()).toEqual([{ id: 'g-1', name: 'Haushaltsausschuss', gremiumId: 'g-1' }]);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     const req = view.http.expectOne('/api/calendar/appointments/a-1');
     expect(req.request.method).toBe('PUT');
     expect(req.request.body).toMatchObject({
       startTime: '14:00:00',
       endTime: '15:30:00',
-      gremiumIds: ['g-1'],
+      teamIds: ['g-1'],
       principalIds: ['p-2'],
     });
     req.flush(appointment());
@@ -238,7 +262,7 @@ describe('AppointmentDialogComponent', () => {
   });
 
   it.each([
-    ['calendar_gremium_forbidden', 'Du kannst nur Gremien einladen, deren Sitzungen du siehst.'],
+    ['calendar_team_forbidden', 'Du kannst nur Teams einladen, in denen du Mitglied bist.'],
     ['calendar_publish', 'Dir fehlt das Recht, einen Termin für alle sichtbar zu machen.'],
     ['other', 'Der Termin konnte nicht gespeichert werden.'],
   ])('reports the refusal %s of the server', async (code, text) => {
@@ -258,7 +282,7 @@ describe('AppointmentDialogComponent', () => {
       inputs: { open: false },
       providers: [provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { can: () => false } }],
     });
-    view.fixture.debugElement.injector.get(HttpTestingController).expectNone('/api/meetings/committees');
+    view.fixture.debugElement.injector.get(HttpTestingController).expectNone('/api/teams');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

@@ -21,7 +21,8 @@ from app.deps import get_current_principal
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
-from app.modules.todos.boards import ensure_gremium_board
+from app.modules.teams.members import ensure_gremium_team
+from app.modules.todos.boards import ensure_team_board
 from app.modules.todos.models import TodoBoard
 from app.modules.todos.router import get_todo_mail_sender
 from app.modules.todos.service import TodoMail
@@ -34,6 +35,7 @@ def _clear(eng: Engine) -> None:
     clear_privacy_tables(eng)
     with eng.begin() as conn:
         conn.execute(text("DELETE FROM gremium WHERE slug LIKE 'todo-%'"))
+        conn.execute(text("DELETE FROM team WHERE gremium_id IS NULL"))
 
 
 @pytest.fixture
@@ -101,19 +103,30 @@ async def add_person(
 async def add_gremium(
     maker: async_sessionmaker[AsyncSession], name: str = "StuPa"
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    """Write a gremium with its board and return both ids."""
+    """Write a gremium with its inherent team and its board; return the gremium and board ids."""
     async with maker() as session:
         row = Gremium(name=name, slug=f"todo-{uuid.uuid4().hex[:8]}")
         session.add(row)
         await session.flush()
-        await ensure_gremium_board(session, row.id, name)
+        team_id = await ensure_gremium_team(session, row.id)
+        await ensure_team_board(session, team_id, name)
         await session.commit()
         board_id = (
             await session.execute(
-                text("SELECT id FROM todo_board WHERE gremium_id = :g"), {"g": row.id}
+                text("SELECT id FROM todo_board WHERE team_id = :t"), {"t": team_id}
             )
         ).scalar_one()
         return row.id, board_id
+
+
+async def team_of(maker: async_sessionmaker[AsyncSession], gremium_id: uuid.UUID) -> uuid.UUID:
+    """The id of the inherent team of a gremium."""
+    async with maker() as session:
+        return (
+            await session.execute(
+                text("SELECT id FROM team WHERE gremium_id = :g"), {"g": gremium_id}
+            )
+        ).scalar_one()
 
 
 async def add_member(
@@ -143,11 +156,11 @@ async def add_member(
 
 
 async def add_team_board(maker: async_sessionmaker[AsyncSession], permission: str) -> uuid.UUID:
-    """Write a team board with the default columns."""
+    """Write a permission board with the default columns (spec 003073)."""
     from app.modules.todos.boards import add_default_columns
 
     async with maker() as session:
-        row = TodoBoard(name="Plattform", kind="team", permission=permission)
+        row = TodoBoard(name="Plattform", kind="permission", permission=permission)
         session.add(row)
         await session.flush()
         add_default_columns(session, row.id)

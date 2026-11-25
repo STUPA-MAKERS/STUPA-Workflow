@@ -347,12 +347,12 @@ export class TodoCardDetailComponent {
   }
 
   /**
-   * The board whose Gremien can take the card as a TOP (spec 000553, 001069): a Gremium
+   * The board whose Gremien can take the card as a TOP (spec 000553, 001069): a team
    * board or a free board, a card the person writes, not archived and not on an agenda yet.
    */
   private readonly agendaBoard = computed(() => {
     const c = this.card();
-    if (!c || (c.boardKind !== 'gremium' && c.boardKind !== 'free') || !c.canWrite || c.archivedAt) return null;
+    if (!c || (c.boardKind !== 'team' && c.boardKind !== 'free') || !c.canWrite || c.archivedAt) return null;
     return c.links.some((l) => l.kind === 'agenda_item') ? null : c.boardId;
   });
   /**

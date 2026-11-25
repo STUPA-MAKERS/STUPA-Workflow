@@ -49,6 +49,7 @@ from app.modules.admin.service.webhooks import (
     _webhook_out,
 )
 from app.modules.auth.principal import Principal
+from app.modules.todos.models import TodoBoard
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.errors import (
     BadRequestError,
@@ -328,15 +329,21 @@ async def test_list_gremien_admin_counts() -> None:
 
 
 async def test_create_gremium_ok() -> None:
-    """Create a gremium with a free slug.
+    """Create a gremium with a free slug, its inherent team and the board of the team.
 
-    Queue: ``_gremium_by_slug`` finds no row, ``ensure_forced_roles`` finds no role, then
-    the two audit results.
+    Queue: ``_gremium_by_slug`` finds no row, ``ensure_forced_roles`` finds no role, the
+    insert of the team, then the two audit results. The scalars:
+    no ``term_start_month`` setting, the id of the team, and no board of the team yet
+    (spec 003061, 003067).
     """
-    s, sess = svc([res(), res(), *audit_results()])
+    team_id = uuid.uuid4()
+    s, sess = svc([res(), res(), res(), *audit_results()], scalars=[None, team_id, None])
     out = await s.create_gremium(GremiumCreate(name="Neu", slug="neu", quorumPercent=10), "admin")
     assert out.name == "Neu"
     assert sess.committed == 1
+    assert any("INSERT INTO team" in str(stmt) for stmt in sess.statements)
+    boards = [o for o in sess.added if isinstance(o, TodoBoard)]
+    assert [(b.kind, b.team_id, b.name) for b in boards] == [("team", team_id, "Neu")]
 
 
 async def test_create_gremium_slug_conflict() -> None:
@@ -463,8 +470,10 @@ async def test_delete_gremium_ok() -> None:
     assert sess.committed == 1
     lock = str(sess.statements[0])
     assert "FROM gremium" in lock and "FOR UPDATE" in lock
-    board, cards, comments = (str(sess.statements[i]) for i in (4, 5, 6))
+    sub_teams, board, cards, comments = (str(sess.statements[i]) for i in (4, 5, 6, 7))
+    assert "team.parent_id" in sub_teams
     assert "FROM todo_board" in board and "FOR UPDATE" in board
+    assert "team.gremium_id" in board
     assert "FROM todo_card" in cards and "FOR UPDATE" in cards
     assert "ORDER BY todo_card.id" in cards
     assert "FROM todo_comment" in comments and "FOR UPDATE" not in comments
@@ -620,7 +629,7 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
         ),
     ]
     assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
-    lock = str(sess.statements[7])
+    lock = str(sess.statements[8])
     assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
     assert "ORDER BY meeting.id" in lock
     assert row in sess.deleted
@@ -1658,7 +1667,7 @@ async def test_create_public_gremium_audits_the_flag(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         "app.modules.admin.service.gremien.GremiumRoleService.ensure_forced_roles", _roles
     )
-    s, _ = svc([res()])
+    s, _ = svc([res(), res()], scalars=[None, uuid.uuid4(), None])
     out = await s.create_gremium(GremiumCreate(name="FS", slug="fs", protocolsPublic=True), "admin")
     assert out.protocols_public is True
     assert entries[-1]["data"] == {"protocolsPublic": True}

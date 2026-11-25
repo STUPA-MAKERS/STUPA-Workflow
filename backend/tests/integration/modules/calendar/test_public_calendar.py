@@ -23,7 +23,7 @@ from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.meetings.protocol_models import Protocol
 from tests.integration.modules.calendar.conftest import CalendarApi
-from tests.integration.modules.todos.conftest import add_gremium, add_person
+from tests.integration.modules.todos.conftest import add_gremium, add_person, team_of
 
 pytestmark = pytest.mark.integration
 
@@ -106,6 +106,7 @@ async def test_public_termin(api: CalendarApi, maker: async_sessionmaker[AsyncSe
     anna, anna_id = await add_person(maker, "Anna")
     bert, _ = await add_person(maker, "Bert")
     gremium_id, _ = await add_gremium(maker, "AStA")
+    team_id = await team_of(maker, gremium_id)
     with TestClient(api.app) as client:
         api.login(anna)
         _ok(client.post("/api/calendar/appointments", json={**TERMIN, "public": True}), 403)
@@ -119,7 +120,7 @@ async def test_public_termin(api: CalendarApi, maker: async_sessionmaker[AsyncSe
                     "public": True,
                     "place": "Aula",
                     "description": "Offen für alle.",
-                    "gremiumIds": [str(gremium_id)],
+                    "teamIds": [str(team_id)],
                     "principalIds": [str(anna_id)],
                 },
             ),

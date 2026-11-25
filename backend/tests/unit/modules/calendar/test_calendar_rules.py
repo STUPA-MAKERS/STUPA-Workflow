@@ -29,13 +29,13 @@ def _span(**kw: object) -> Span:
 
 
 def test_read_rule() -> None:
-    """§F/meetings/calendar/000718: the creator, the invited, everyone with the switch."""
-    me = Viewer(id=ME, gremium_ids=frozenset({GREMIUM}))
+    """§F/meetings/calendar/000718, 003069: the creator, the invited, all with the switch."""
+    me = Viewer(id=ME, team_ids=frozenset({GREMIUM}))
     assert rules.can_read(me, ME, Targets(), for_all=False)
     assert not rules.can_read(me, OTHER, Targets(), for_all=False)
     assert rules.can_read(me, OTHER, Targets(), for_all=True)
     assert rules.can_read(me, OTHER, Targets(principal_ids=frozenset({ME})), for_all=False)
-    assert rules.can_read(me, OTHER, Targets(gremium_ids=frozenset({GREMIUM})), for_all=False)
+    assert rules.can_read(me, OTHER, Targets(team_ids=frozenset({GREMIUM})), for_all=False)
     assert rules.can_read(Viewer(id=ME, manages=True), OTHER, Targets(), for_all=False)
     assert not rules.can_read(Viewer(id=None, manages=True), None, Targets(), for_all=True)
     assert not rules.is_creator(Viewer(id=None), None)
@@ -74,12 +74,12 @@ def test_has_ended() -> None:
     assert not rules.has_ended(timed, date(2031, 5, 4), time(23, 59))
 
 
-def test_forbidden_gremien() -> None:
-    """§F/meetings/calendar/000717: only a Gremium whose meetings the creator reads."""
+def test_forbidden_teams() -> None:
+    """F/collaboration/teams/003069: only an own team, every team with calendar.manage."""
     other = uuid.uuid4()
-    assert rules.forbidden_gremien([GREMIUM, other], None, []) == frozenset()
-    assert rules.forbidden_gremien([GREMIUM, other], [GREMIUM], []) == {other}
-    assert rules.forbidden_gremien([GREMIUM, other], [GREMIUM], [other]) == frozenset()
+    assert rules.forbidden_teams([GREMIUM, other], None, []) == frozenset()
+    assert rules.forbidden_teams([GREMIUM, other], [GREMIUM], []) == {other}
+    assert rules.forbidden_teams([GREMIUM, other], [GREMIUM], [other]) == frozenset()
 
 
 def test_when_text() -> None:

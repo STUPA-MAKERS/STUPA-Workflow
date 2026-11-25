@@ -46,7 +46,7 @@ class AppointmentIn(FrozenStrictCamelModel, frozen=True):
     description: str | None = Field(default=None, max_length=5000)
     for_all: bool = Field(default=False, alias="forAll")
     public: bool = False
-    gremium_ids: tuple[UUID, ...] = Field(default=(), alias="gremiumIds", max_length=_MAX_TARGETS)
+    team_ids: tuple[UUID, ...] = Field(default=(), alias="teamIds", max_length=_MAX_TARGETS)
     principal_ids: tuple[UUID, ...] = Field(
         default=(), alias="principalIds", max_length=_MAX_TARGETS
     )
@@ -82,11 +82,12 @@ class PersonOut(FrozenCamelModel, frozen=True):
     name: str
 
 
-class GremiumRefOut(FrozenCamelModel, frozen=True):
-    """An invited Gremium by id and name."""
+class TeamRefOut(FrozenCamelModel, frozen=True):
+    """An invited team by id and shown name; ``gremiumId`` for an inherent team."""
 
     id: UUID
     name: str
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
 
 
 class AnswerOut(FrozenCamelModel, frozen=True):
@@ -117,7 +118,7 @@ class AppointmentOut(FrozenCamelModel, frozen=True):
     for_all: bool = Field(default=False, serialization_alias="forAll")
     public: bool = False
     creator: PersonOut | None = None
-    gremien: tuple[GremiumRefOut, ...] = ()
+    teams: tuple[TeamRefOut, ...] = ()
     persons: tuple[PersonOut, ...] = ()
     answers: tuple[AnswerOut, ...] = ()
     unanswered: tuple[PersonOut, ...] = ()
@@ -131,9 +132,10 @@ class EntryOut(FrozenCamelModel, frozen=True):
 
     ``id`` is the id of the meeting, the card, the Termin or the external entry.
     ``source`` is the name that the page shows below the title: the Gremium of a
-    meeting, the board of a card or an Event, the first invited Gremium of a Termin and
-    the name of an external calendar. ``gremiumIds`` feeds the
-    Gremium filter. ``mine`` marks a card assigned to the caller and a Termin that the
+    meeting, the board of a card or an Event, the first invited team of a Termin and
+    the name of an external calendar. ``gremiumIds`` feeds the Gremium filter: the
+    Gremium of a meeting, and the Gremien of the inherent teams of a board, a Termin or
+    an external calendar. ``mine`` marks a card assigned to the caller and a Termin that the
     caller created or is invited to.
     """
 
@@ -158,11 +160,11 @@ class EntriesOut(FrozenCamelModel, frozen=True):
 
 
 class ExternalCalendarIn(FrozenStrictCamelModel, frozen=True):
-    """The data of an external calendar. Without ``gremiumId`` it is for all persons."""
+    """The data of an external calendar. Without ``teamId`` it is for all persons."""
 
     name: str = Field(min_length=1, max_length=120)
     url: str = Field(min_length=9, max_length=2000)
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    team_id: UUID | None = Field(default=None, alias="teamId")
     interval_minutes: FetchInterval = Field(default=60, alias="intervalMinutes")
 
     @model_validator(mode="after")
@@ -183,8 +185,8 @@ class ExternalCalendarOut(FrozenCamelModel, frozen=True):
     id: UUID
     name: str
     url: str
-    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
-    gremium_name: str | None = Field(default=None, serialization_alias="gremiumName")
+    team_id: UUID | None = Field(default=None, serialization_alias="teamId")
+    team_name: str | None = Field(default=None, serialization_alias="teamName")
     interval_minutes: int = Field(serialization_alias="intervalMinutes")
     last_attempt_at: datetime | None = Field(default=None, serialization_alias="lastAttemptAt")
     last_success_at: datetime | None = Field(default=None, serialization_alias="lastSuccessAt")

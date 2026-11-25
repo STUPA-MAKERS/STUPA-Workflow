@@ -252,7 +252,7 @@ async def restore_board(board_id: UUID, service: ServiceDep, principal: Member) 
 async def entry_options(
     service: ServiceDep, principal: Member, q: Annotated[str, Query(max_length=100)] = ""
 ) -> EntryOptionsOut:
-    """The gremien and persons of the shared picker (spec 001074): names, never e-mails."""
+    """The teams and persons of the shared picker (spec 003071): names, never e-mails."""
     return await service.entry_options(principal, q)
 
 

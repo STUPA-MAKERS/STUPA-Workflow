@@ -25,12 +25,14 @@ import {
 } from '@stupa-makers/ui-kit';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 
-/** A Gremium that the picker offers. */
-export interface PickerGremium {
+/** A team that the picker offers (spec 003071). */
+export interface PickerTeam {
   readonly id: Uuid;
   readonly name: string;
-  /** The square logo (`/api/committees/{id}/logo`), else the initials show. */
+  /** The square logo of an inherent team (`/api/committees/{id}/logo`), else the initials show. */
   readonly logoUrl?: string | null;
+  /** The parent of a sub-team, shown after the name. */
+  readonly parentName?: string | null;
 }
 
 /** A person that the search of the picker finds. */
@@ -41,7 +43,13 @@ export interface PickerPerson {
 
 /** One hit of the picker. */
 export type PickerHit =
-  | { readonly kind: 'gremium'; readonly id: Uuid; readonly name: string; readonly logoUrl: string | null }
+  | {
+      readonly kind: 'team';
+      readonly id: Uuid;
+      readonly name: string;
+      readonly logoUrl: string | null;
+      readonly parentName?: string | null;
+    }
   | { readonly kind: 'person'; readonly id: Uuid; readonly name: string };
 
 /** Space between the field and the list, in px. */
@@ -50,13 +58,13 @@ const GAP = 4;
 const MAX_HEIGHT = 320;
 
 /**
- * One search field that picks Gremien and persons (spec 001074).
+ * One search field that picks teams and persons (spec 001074, 003071).
  *
- * The field finds the Gremien of `gremien` by name in place, and the persons through
+ * The field finds the teams of `teams` by name in place, and the persons through
  * `persons` from two characters on. The hits open in a popover in the top layer, at the
- * field, so a dialog does not grow: a Gremium shows its logo, a person the avatar. A click
- * into the empty field or Arrow Down lists every Gremium, so no separate "+ Gremium"
- * button is needed. A pick emits `picked` and empties the field; the host shows the
+ * field, so a dialog does not grow: a team shows its logo, a person the avatar. A click
+ * into the empty field or Arrow Down lists every team, so no separate "+ Team" button is
+ * needed. A pick emits `picked` and empties the field; the host shows the
  * chosen ones as chips and passes their ids in `taken`, so they leave the hits.
  *
  * Keyboard: Arrow Down moves into the list, the arrows move in it, Arrow Up on the first
@@ -76,8 +84,8 @@ export class GremiumPersonPickerComponent {
 
   /** The text of the empty field, also its name. */
   readonly placeholder = input.required<string>();
-  /** The Gremien to offer, searched by name in place. */
-  readonly gremien = input<readonly PickerGremium[]>([]);
+  /** The teams to offer, searched by name in place. */
+  readonly teams = input<readonly PickerTeam[]>([]);
   /** The search of the persons; null offers no persons. */
   readonly persons = input<((q: string) => Observable<readonly PickerPerson[]>) | null>(null);
   /** The ids that are chosen already: they do not show as hits. */
@@ -90,7 +98,7 @@ export class GremiumPersonPickerComponent {
   protected readonly spot = signal<FieldListPlace | null>(null);
   protected readonly query = signal('');
   private readonly found = signal<readonly PickerPerson[]>([]);
-  /** The list shows every Gremium while the field is empty (a click, Arrow Down). */
+  /** The list shows every team while the field is empty (a click, Arrow Down). */
   private readonly browsing = signal(false);
   private readonly dismissed = signal(false);
 
@@ -104,15 +112,23 @@ export class GremiumPersonPickerComponent {
   protected readonly hits = computed<readonly PickerHit[]>(() => {
     const taken = new Set(this.taken());
     const needle = this.query().trim().toLocaleLowerCase();
-    const gremien = this.gremien()
+    const teams = this.teams()
       .filter((g) => !taken.has(g.id) && (needle === '' || g.name.toLocaleLowerCase().includes(needle)))
-      .map((g): PickerHit => ({ kind: 'gremium', id: g.id, name: g.name, logoUrl: g.logoUrl ?? null }));
+      .map(
+        (g): PickerHit => ({
+          kind: 'team',
+          id: g.id,
+          name: g.name,
+          logoUrl: g.logoUrl ?? null,
+          parentName: g.parentName ?? null,
+        }),
+      );
     const persons = needle === ''
       ? []
       : this.found()
           .filter((p) => !taken.has(p.id))
           .map((p): PickerHit => ({ kind: 'person', id: p.id, name: p.name }));
-    return [...gremien, ...persons];
+    return [...teams, ...persons];
   });
 
   /** The query has no hit, and no search runs. */
@@ -153,7 +169,7 @@ export class GremiumPersonPickerComponent {
     this.search.set(text);
   }
 
-  /** A press into the field lists every Gremium; a press in the list does nothing here. */
+  /** A press into the field lists every team; a press in the list does nothing here. */
   protected onPointer(event: Event): void {
     const field = this.field().nativeElement as HTMLElement;
     if (!(event.target instanceof Node) || !field.contains(event.target)) return;

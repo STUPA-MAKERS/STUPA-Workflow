@@ -181,9 +181,14 @@ class FakeAccess:
     async def member_ids(self, _board: TodoBoard) -> set[uuid.UUID]:
         return set(self.member_set)
 
+    async def gremium_of(self, board: TodoBoard) -> uuid.UUID | None:
+        """The fake takes the id of the own team of a team board as its Gremium."""
+        return board.team_id if board.kind == "team" else None
+
     async def agenda_gremien(self, board: TodoBoard) -> set[uuid.UUID]:
-        """The own gremium of a gremium board; the fake has no entries."""
-        return {board.gremium_id} if board.kind == "gremium" and board.gremium_id else set()
+        """The Gremium of the own team of a team board; the fake has no entries."""
+        gremium = await self.gremium_of(board)
+        return {gremium} if gremium else set()
 
 
 class FakeLinks:
@@ -232,8 +237,8 @@ def board(**kw: Any) -> TodoBoard:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
         "name": "Board",
-        "kind": "gremium",
-        "gremium_id": uuid.uuid4(),
+        "kind": "team",
+        "team_id": uuid.uuid4(),
         "owner_id": None,
         "permission": None,
         "archive_after_days": 30,

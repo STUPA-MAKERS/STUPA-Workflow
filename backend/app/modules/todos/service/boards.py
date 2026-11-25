@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 
-from sqlalchemy import func, select, true, update
+from sqlalchemy import func, select, update
 
 from app.modules.auth import policy
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.people import DELETED_PERSON, person_refs
 from app.modules.auth.principal import Principal
-from app.modules.gremien.models import Gremium
 from app.modules.site_config.square_logos import logo_url_of, square_logo_variants
+from app.modules.teams.members import TeamInfo, gremien_of_teams, team_infos
+from app.modules.teams.models import Team
 from app.modules.todos.access import TODO_CONFIGURE, can_create_board, token_reads
 from app.modules.todos.boards import add_default_columns, ensure_personal_board
 from app.modules.todos.grouping import grouped
@@ -27,11 +29,11 @@ from app.modules.todos.models import (
 from app.modules.todos.schemas import (
     BoardCreate,
     BoardPatch,
-    EntryGremiumOption,
     EntryIn,
     EntryOptionsOut,
     EntryPatch,
     EntryPersonOption,
+    EntryTeamOption,
     TodoBoardEntryOut,
     TodoBoardOut,
     TodoBoardSummary,
@@ -42,7 +44,6 @@ from app.modules.todos.service.base import TodoServiceBase
 from app.modules.todos.service.common import (
     _PICKER_PEOPLE,
     TodoMail,
-    _agenda_ids,
     _board_order,
     _invalid,
     _new_entry,
@@ -59,7 +60,9 @@ class BoardOps(TodoServiceBase):
     async def list_boards(
         self, principal: Principal, *, gremium_id: uuid.UUID | None = None
     ) -> list[TodoBoardSummary]:
-        """List the readable boards: personal, the gremium boards by name, then team.
+        """List the readable boards: personal, the team boards by name, then the rest.
+
+        ``gremium_id`` keeps the board of the inherent team of that Gremium.
 
         The first call of an account creates its personal board.
 
@@ -73,7 +76,11 @@ class BoardOps(TodoServiceBase):
         if me is not None:
             await ensure_personal_board(self.session, me)
         scope = await self.access.scope(principal)
-        of_gremium = (TodoBoard.gremium_id == gremium_id,) if gremium_id is not None else ()
+        of_gremium = (
+            (TodoBoard.team_id.in_(select(Team.id).where(Team.gremium_id == gremium_id)),)
+            if gremium_id is not None
+            else ()
+        )
         stmt = select(TodoBoard).where(
             scope.condition(), TodoBoard.archived_at.is_(None), *of_gremium
         )
@@ -96,28 +103,34 @@ class BoardOps(TodoServiceBase):
             ).all()
         }
         boards = sorted(found, key=_board_order)
-        entry_gremien = grouped(
+        entry_teams = grouped(
             (
                 await self.session.execute(
-                    select(TodoBoardEntry.board_id, TodoBoardEntry.gremium_id).where(
+                    select(TodoBoardEntry.board_id, TodoBoardEntry.team_id).where(
                         TodoBoardEntry.board_id.in_([b.id for b in found]),
-                        TodoBoardEntry.gremium_id.is_not(None),
+                        TodoBoardEntry.team_id.is_not(None),
                     )
                 )
             )
             .tuples()
             .all()
         )
+        teams = {
+            *(b.team_id for b in found if b.team_id is not None),
+            *(t for ts in entry_teams.values() for t in ts if t is not None),
+        }
+        gremium_of = await gremien_of_teams(self.session, teams)
         return [
             TodoBoardSummary(
                 id=b.id,
                 name=b.name,
                 kind=b.kind,  # pyright: ignore[reportArgumentType]
-                gremium_id=b.gremium_id,
+                team_id=b.team_id,
+                gremium_id=gremium_of.get(b.team_id) if b.team_id is not None else None,
                 can_write=await self.access.can_write(b, principal),
                 can_configure=await self.access.can_configure(b, principal),
                 open_count=counts.get(b.id, 0),
-                agenda_gremium_ids=_agenda_ids(b, entry_gremien.get(b.id, ())),
+                agenda_gremium_ids=_agenda_ids(b, entry_teams.get(b.id, ()), gremium_of),
             )
             for b in boards
         ]
@@ -185,15 +198,15 @@ class BoardOps(TodoServiceBase):
         return await self._board_out(board, principal)
 
     async def _entry_target(self, entry: EntryIn) -> tuple[str, uuid.UUID]:
-        """Check the target of an entry: exactly one known gremium or active person."""
-        if (entry.gremium_id is None) == (entry.principal_id is None):
+        """Check the target of an entry: exactly one known team or active person."""
+        if (entry.team_id is None) == (entry.principal_id is None):
             raise _invalid(
-                "An entry names exactly one gremium or one person.", "entry_target", "entries"
+                "An entry names exactly one team or one person.", "entry_target", "entries"
             )
-        if entry.gremium_id is not None:
-            if await self.session.get(Gremium, entry.gremium_id) is None:
-                raise _invalid("Unknown gremium.", "entry_target_not_found", "gremiumId")
-            return ("gremium", entry.gremium_id)
+        if entry.team_id is not None:
+            if await self.session.get(Team, entry.team_id) is None:
+                raise _invalid("Unknown team.", "entry_target_not_found", "teamId")
+            return ("team", entry.team_id)
         person = await self.session.get(PrincipalRow, entry.principal_id)
         if person is None or not person.active or person.merged_into is not None:
             raise _invalid("Unknown person.", "entry_target_not_found", "principalId")
@@ -208,7 +221,7 @@ class BoardOps(TodoServiceBase):
             )
 
     async def entries(self, board_id: uuid.UUID, principal: Principal) -> list[TodoBoardEntryOut]:
-        """The member entries of a readable board: the own gremium first, then by name."""
+        """The member entries of a readable board: the own team first, then by name."""
         board = await self._board(board_id, principal)
         return await self._entry_outs(board)
 
@@ -218,84 +231,47 @@ class BoardOps(TodoServiceBase):
                 select(TodoBoardEntry).where(TodoBoardEntry.board_id == board.id)
             )
         ).all()
-        gremium_ids = {r.gremium_id for r in rows if r.gremium_id is not None} | (
-            {board.gremium_id} if board.gremium_id is not None else set()
+        team_ids = {r.team_id for r in rows if r.team_id is not None} | (
+            {board.team_id} if board.team_id is not None else set()
         )
-        gremien = (
-            {
-                gid: (name, variant)
-                for gid, name, variant in (
-                    await self.session.execute(
-                        select(Gremium.id, Gremium.name, Gremium.cd_variant_id).where(
-                            Gremium.id.in_(gremium_ids)
-                        )
-                    )
-                ).tuples()
-            }
-            if gremium_ids
-            else {}
-        )
-        names = {gid: name for gid, (name, _variant) in gremien.items()}
-        logos = await square_logo_variants(self.session, (v for _n, v in gremien.values()))
-        logo = {gid: logo_url_of(gid, v, logos) for gid, (_n, v) in gremien.items()}
+        teams = {t.id: t for t in await team_infos(self.session, ids=team_ids)}
+        logos = await square_logo_variants(self.session, (t.cd_variant_id for t in teams.values()))
         people = await person_refs(self.session, (r.principal_id for r in rows))
         own = (
-            [
-                TodoBoardEntryOut(
-                    kind="gremium",
-                    target_id=board.gremium_id,
-                    name=names.get(board.gremium_id, ""),
-                    role="edit",
-                    fixed=True,
-                    logo_url=logo.get(board.gremium_id),
-                )
-            ]
-            if board.kind == "gremium" and board.gremium_id is not None
+            [_team_entry(None, teams[board.team_id], "edit", logos, fixed=True)]
+            if board.kind == "team" and board.team_id is not None and board.team_id in teams
             else []
         )
         outs = [
-            TodoBoardEntryOut(
+            _team_entry(r.id, teams[r.team_id], r.role, logos)
+            if r.team_id is not None and r.team_id in teams
+            else TodoBoardEntryOut(
                 id=r.id,
-                kind="gremium" if r.gremium_id is not None else "person",
-                target_id=r.gremium_id or r.principal_id,  # pyright: ignore[reportArgumentType]
-                name=(
-                    names.get(r.gremium_id, "")
-                    if r.gremium_id is not None
-                    else (people.get(r.principal_id) or DELETED_PERSON).display_name or ""  # pyright: ignore[reportArgumentType]
-                ),
+                kind="person",
+                target_id=r.principal_id,  # pyright: ignore[reportArgumentType]
+                name=(people.get(r.principal_id) or DELETED_PERSON).display_name or "",  # pyright: ignore[reportArgumentType]
                 role=r.role,  # pyright: ignore[reportArgumentType]
-                logo_url=logo.get(r.gremium_id) if r.gremium_id is not None else None,
             )
             for r in rows
         ]
         return own + sorted(
-            outs, key=lambda e: (e.kind != "gremium", e.name.casefold(), str(e.target_id))
+            outs, key=lambda e: (e.kind != "team", e.name.casefold(), str(e.target_id))
         )
 
     async def entry_options(self, principal: Principal, q: str) -> EntryOptionsOut:
-        """The hits of the shared picker of gremien and persons (spec 001074).
+        """The hits of the shared picker of teams and persons (spec 003071).
 
-        Every gremium whose name holds ``q`` (all for an empty ``q``) with its logo
-        path, and the active persons whose name holds ``q``, from two characters on and
-        at most ten, by name only. A scoped OAuth token finds nothing: the picker is a
-        page of the app, the MCP tools name the ids.
+        Every team whose name holds ``q`` (all for an empty ``q``) with its parent and
+        the logo of its Gremium, and the active persons whose name holds ``q``, from two
+        characters on and at most ten, by name only. A scoped OAuth token finds nothing:
+        the picker is a page of the app, the MCP tools name the ids.
         """
         if principal.scope_permissions is not None:
-            return EntryOptionsOut(gremien=[], persons=[])
+            return EntryOptionsOut(teams=[], persons=[])
         term = q.strip()
         pattern = f"%{escape_like(term)}%"
-        gremien = (
-            (
-                await self.session.execute(
-                    select(Gremium.id, Gremium.name, Gremium.cd_variant_id)
-                    .where(Gremium.name.ilike(pattern, escape="\\") if term else true())
-                    .order_by(Gremium.name, Gremium.id)
-                )
-            )
-            .tuples()
-            .all()
-        )
-        logos = await square_logo_variants(self.session, (v for _g, _n, v in gremien))
+        teams = await team_infos(self.session, pattern=pattern if term else None)
+        logos = await square_logo_variants(self.session, (t.cd_variant_id for t in teams))
         persons = (
             (
                 await self.session.execute(
@@ -315,17 +291,23 @@ class BoardOps(TodoServiceBase):
             else []
         )
         return EntryOptionsOut(
-            gremien=[
-                EntryGremiumOption(id=gid, name=name, logo_url=logo_url_of(gid, v, logos))
-                for gid, name, v in gremien
+            teams=[
+                EntryTeamOption(
+                    id=t.id,
+                    name=t.name,
+                    gremium_id=t.gremium_id,
+                    parent_name=t.parent_name,
+                    logo_url=_logo(t.gremium_id, t.cd_variant_id, logos),
+                )
+                for t in teams
             ],
             persons=[EntryPersonOption(id=pid, name=name or "") for pid, name in persons],
         )
 
     def _supports_entries(self, board: TodoBoard) -> None:
-        if board.kind not in ("gremium", "free"):
+        if board.kind not in ("team", "free"):
             raise _invalid(
-                "Only a gremium board or a free board has entries.",
+                "Only a team board or a free board has entries.",
                 "entries_not_supported",
                 "boardId",
             )
@@ -333,22 +315,22 @@ class BoardOps(TodoServiceBase):
     async def add_entry(
         self, board_id: uuid.UUID, payload: EntryIn, principal: Principal
     ) -> list[TodoBoardEntryOut]:
-        """Add a gremium or a person to a board (specs 001064, 001077).
+        """Add a team or a person to a board (specs 001064, 001077, 003068).
 
         Raises:
             ConflictError: The target is on the board already (409 ``entry_exists``) or
-                is the own gremium of the board (409 ``own_gremium_entry``).
+                is the own team of the board (409 ``own_team_entry``).
         """
         board = await self._configurable(board_id, principal)
         self._supports_entries(board)
         actor = await self._actor(principal)
         await self._lock_board(board.id)
         kind, target_id = await self._entry_target(payload)
-        if kind == "gremium" and target_id == board.gremium_id:
+        if kind == "team" and target_id == board.team_id:
             raise ConflictError(
-                "The own gremium is a fixed member of its board.", code="own_gremium_entry"
+                "The own team is a fixed member of its board.", code="own_team_entry"
             )
-        column = TodoBoardEntry.gremium_id if kind == "gremium" else TodoBoardEntry.principal_id
+        column = TodoBoardEntry.team_id if kind == "team" else TodoBoardEntry.principal_id
         present = await self.session.scalar(
             select(TodoBoardEntry.id).where(
                 TodoBoardEntry.board_id == board.id, column == target_id
@@ -467,7 +449,8 @@ class BoardOps(TodoServiceBase):
             id=board.id,
             name=board.name,
             kind=board.kind,  # pyright: ignore[reportArgumentType]
-            gremium_id=board.gremium_id,
+            team_id=board.team_id,
+            gremium_id=await self.access.gremium_of(board),
             can_write=await self.access.can_write(board, principal),
             can_configure=await self.access.can_configure(board, principal),
             archived=board.archived_at is not None,
@@ -558,3 +541,45 @@ class BoardOps(TodoServiceBase):
             limit=limit,
             offset=offset,
         )
+
+
+def _logo(
+    gremium_id: uuid.UUID | None, variant: uuid.UUID | None, logos: frozenset[uuid.UUID]
+) -> str | None:
+    """The square logo of the Gremium of an inherent team, else None."""
+    return logo_url_of(gremium_id, variant, logos) if gremium_id is not None else None
+
+
+def _team_entry(
+    entry_id: uuid.UUID | None,
+    team: TeamInfo,
+    role: str,
+    logos: frozenset[uuid.UUID],
+    *,
+    fixed: bool = False,
+) -> TodoBoardEntryOut:
+    """The entry of a team: its shown name, its Gremium and the logo of the Gremium."""
+    return TodoBoardEntryOut(
+        id=entry_id,
+        kind="team",
+        target_id=team.id,
+        name=team.name,
+        role=role,  # pyright: ignore[reportArgumentType]
+        fixed=fixed,
+        gremium_id=team.gremium_id,
+        logo_url=_logo(team.gremium_id, team.cd_variant_id, logos),
+    )
+
+
+def _agenda_ids(
+    board: TodoBoard,
+    entries: Iterable[uuid.UUID | None],
+    gremium_of: Mapping[uuid.UUID, uuid.UUID],
+) -> tuple[uuid.UUID, ...]:
+    """The Gremien of the own team and of the entry teams of a team or free board, sorted."""
+    if board.kind not in ("team", "free"):
+        return ()
+    teams = {board.team_id, *entries}
+    return tuple(
+        sorted({gremium_of[t] for t in teams if t is not None and t in gremium_of}, key=str)
+    )

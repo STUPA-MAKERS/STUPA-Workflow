@@ -76,7 +76,7 @@ export class TodoNewBoardDialogComponent {
   submit(): void {
     if (!this.valid() || this.saving()) return;
     const entries = this.entries().map((e) =>
-      e.kind === 'gremium' ? { gremiumId: e.targetId, role: e.role } : { principalId: e.targetId, role: e.role },
+      e.kind === 'team' ? { teamId: e.targetId, role: e.role } : { principalId: e.targetId, role: e.role },
     );
     this.saving.set(true);
     this.api.createBoard(this.name().trim(), entries).subscribe({

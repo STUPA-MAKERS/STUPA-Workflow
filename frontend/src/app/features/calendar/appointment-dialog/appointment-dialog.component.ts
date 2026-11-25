@@ -1,14 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import type { Observable } from 'rxjs';
+import { type Observable, forkJoin } from 'rxjs';
 import { FormsModule } from '@angular/forms';
-import { ApiClient } from '@core/api/api-client.service';
 import {
   type Appointment,
   CalendarApiService,
-  type CalendarGremium,
   type CalendarPerson,
+  type CalendarTeam,
 } from '@core/api/calendar.service';
 import { problemCode } from '@core/api/problem';
+import { TeamsApiService } from '@core/api/teams.service';
+import { TodosApiService } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -30,7 +31,7 @@ import {
 import { GremiumLogoComponent } from '../../gremien/gremium-logo/gremium-logo.component';
 import {
   GremiumPersonPickerComponent,
-  type PickerGremium,
+  type PickerTeam,
   type PickerHit,
 } from '../../gremien/gremium-person-picker/gremium-person-picker.component';
 import { type AppointmentForm, emptyForm, formError, toInput } from '../calendar.util';
@@ -53,7 +54,7 @@ function formOf(a: Appointment): AppointmentForm {
 
 /** The toast of a refused save, by the code of the server. */
 const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
-  calendar_gremium_forbidden: 'calendar.toast.gremiumForbidden',
+  calendar_team_forbidden: 'calendar.toast.teamForbidden',
   calendar_publish: 'calendar.toast.publishForbidden',
 };
 
@@ -61,8 +62,8 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
  * The dialog "Termin anlegen" and "Termin bearbeiten" (§ 000715-000718, 001074).
  *
  * A Termin has a title, a start and an end, all-day or with times, and can have a place
- * and a description. It invites Gremien (the Gremien whose meetings the person reads)
- * and persons (a search over the names of the active accounts), both in the one search
+ * and a description. It invites teams (the teams of the person, every team with
+ * `calendar.manage`, spec 003069) and persons (a search over the names of the active accounts), both in the one search
  * field of the shared picker, with the hits in a popover. The switch "Für alle
  * sichtbar" shows only with the permission `calendar.publish`. The server checks every
  * rule again.
@@ -92,7 +93,8 @@ const SAVE_ERRORS: Readonly<Record<string, TranslationKey>> = {
 })
 export class AppointmentDialogComponent {
   private readonly api = inject(CalendarApiService);
-  private readonly client = inject(ApiClient);
+  private readonly teamsApi = inject(TeamsApiService);
+  private readonly todos = inject(TodosApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -107,14 +109,14 @@ export class AppointmentDialogComponent {
   readonly saved = output<Appointment>();
 
   readonly form = signal<AppointmentForm>(emptyForm(''));
-  readonly gremien = signal<readonly CalendarGremium[]>([]);
+  readonly teams = signal<readonly CalendarTeam[]>([]);
   readonly persons = signal<readonly CalendarPerson[]>([]);
   readonly saving = signal(false);
 
-  /** The Gremien that the person can invite: those with a meeting that the person reads. */
-  readonly known = signal<readonly PickerGremium[]>([]);
-  /** The invited Gremien and persons: they leave the hits of the picker. */
-  readonly taken = computed(() => [...this.gremien().map((g) => g.id), ...this.persons().map((p) => p.id)]);
+  /** The teams that the person can invite: the own ones, every team with `calendar.manage`. */
+  readonly known = signal<readonly PickerTeam[]>([]);
+  /** The invited teams and persons: they leave the hits of the picker. */
+  readonly taken = computed(() => [...this.teams().map((g) => g.id), ...this.persons().map((p) => p.id)]);
   /** The search of the persons of the picker: the names of the active accounts. */
   readonly findPeople = (q: string): Observable<readonly CalendarPerson[]> => this.api.people(q);
 
@@ -130,9 +132,9 @@ export class AppointmentDialogComponent {
       const day = this.day();
       untracked(() => {
         this.form.set(current ? formOf(current) : emptyForm(day));
-        this.gremien.set(current?.gremien ?? []);
+        this.teams.set(current?.teams ?? []);
         this.persons.set(current?.persons ?? []);
-        this.loadGremien();
+        this.loadTeams();
       });
     });
   }
@@ -146,19 +148,19 @@ export class AppointmentDialogComponent {
     this.form.update((form) => ({ ...form, startsOn: day, endsOn: form.endsOn < day ? day : form.endsOn }));
   }
 
-  /** A pick of the picker: a Gremium or a person joins the invited. */
+  /** A pick of the picker: a team or a person joins the invited. */
   addHit(hit: PickerHit): void {
-    if (hit.kind === 'gremium') this.gremien.update((list) => [...list, { id: hit.id, name: hit.name }]);
+    if (hit.kind === 'team') this.teams.update((list) => [...list, { id: hit.id, name: hit.name }]);
     else this.persons.update((list) => [...list, { id: hit.id, name: hit.name }]);
   }
 
-  /** The logo of an invited Gremium, when the list of the picker knows it. */
+  /** The logo of an invited team, when the list of the picker knows it. */
   logoOf(id: string): string | null {
     return this.known().find((g) => g.id === id)?.logoUrl ?? null;
   }
 
-  removeGremium(id: string): void {
-    this.gremien.update((list) => list.filter((g) => g.id !== id));
+  removeTeam(id: string): void {
+    this.teams.update((list) => list.filter((g) => g.id !== id));
   }
 
   removePerson(id: string): void {
@@ -169,7 +171,7 @@ export class AppointmentDialogComponent {
     if (!this.valid() || this.saving()) return;
     const body = toInput(
       this.form(),
-      this.gremien().map((g) => g.id),
+      this.teams().map((g) => g.id),
       this.persons().map((p) => p.id),
     );
     const current = this.appointment();
@@ -193,9 +195,13 @@ export class AppointmentDialogComponent {
     });
   }
 
-  private loadGremien(): void {
-    this.client.listMeetingFilterGremien().subscribe({
-      next: (list) => this.known.set(list),
+  private loadTeams(): void {
+    const all = this.auth.can('calendar.manage');
+    forkJoin([this.todos.entryOptions(), this.teamsApi.list()]).subscribe({
+      next: ([options, teams]) => {
+        const own = new Set(teams.filter((t) => t.isMember).map((t) => t.id));
+        this.known.set(options.teams.filter((t) => all || own.has(t.id)));
+      },
       error: () => this.known.set([]),
     });
   }

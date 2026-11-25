@@ -1,4 +1,4 @@
-"""Board creation: the default columns, the gremium board and the personal board."""
+"""Board creation: the default columns, the team board and the personal board."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import uuid
 
 from app.modules.todos.boards import (
     add_default_columns,
-    ensure_gremium_board,
     ensure_personal_board,
+    ensure_team_board,
 )
 from app.modules.todos.models import TodoBoard, TodoColumn
 from tests.unit.modules.todos.fakes import ME, ScriptedSession
@@ -26,16 +26,16 @@ def test_default_columns_end_with_the_done_column() -> None:
     assert [c.position for c in cols] == [0, 1, 2, 3]
 
 
-async def test_a_gremium_board_is_created_once() -> None:
-    gid = uuid.uuid4()
+async def test_a_team_board_is_created_once() -> None:
+    tid = uuid.uuid4()
     session = ScriptedSession(scalar=[None])
-    assert await ensure_gremium_board(session, gid, "StuPa") is True  # type: ignore[arg-type]
+    assert await ensure_team_board(session, tid, "StuPa") is True  # type: ignore[arg-type]
     (created,) = [o for o in session.added if isinstance(o, TodoBoard)]
-    assert (created.name, created.kind, created.gremium_id) == ("StuPa", "gremium", gid)
+    assert (created.name, created.kind, created.team_id) == ("StuPa", "team", tid)
     assert len(_columns(session)) == 4
     assert session.committed == 0
     again = ScriptedSession(scalar=[uuid.uuid4()])
-    assert await ensure_gremium_board(again, gid, "StuPa") is False  # type: ignore[arg-type]
+    assert await ensure_team_board(again, tid, "StuPa") is False  # type: ignore[arg-type]
     assert again.added == []
 
 

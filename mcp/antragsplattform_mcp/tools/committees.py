@@ -231,7 +231,9 @@ async def get_appointment(appointment_id: str) -> dict:
 
 @group.tool
 async def create_appointment(appointment: S.AppointmentIn) -> dict:
-    """Create a Termin of the caller and invite its Gremien and persons.
+    """Create a Termin of the caller and invite its teams and persons.
+
+    The caller invites only own teams, or every team with `calendar.manage`.
 
     The invited persons get a mail with an `.ics` file.
     """
@@ -361,3 +363,58 @@ async def delete_vote(vote_id: str) -> dict:
 def register(mcp: FastMCP) -> None:
     """Register the Gremium, Kalender and vote tool group."""
     group.register(mcp)
+
+
+@group.tool
+async def list_teams() -> list:
+    """List every team by name with `isMember`, `canManage` and its own `boardId`.
+
+    A team with `gremiumId` is the team of that Gremium: its members are the members and
+    the substitute pool of the Gremium. `parentId` marks a sub-team.
+    """
+    return await api().get("/teams")
+
+
+@group.tool
+async def get_team(team_id: str) -> dict:
+    """Read a team with its sub-teams, and its members for a member or a manager."""
+    return await api().get(f"/teams/{team_id}")
+
+
+@group.tool
+async def create_team(team: S.TeamCreate) -> dict:
+    """Create a team with its board; the caller becomes its manager.
+
+    A team at the top needs `team.create`; a sub-team needs a manager of the parent.
+    """
+    return await api().post("/teams", json=dump_create(team))
+
+
+@group.tool
+async def update_team(team_id: str, team: S.TeamPatch) -> dict:
+    """Rename a team or move it under another parent (a manager of the team).
+
+    The team of a Gremium follows its Gremium: 409 `inherent_team`.
+    """
+    return await api().patch(f"/teams/{team_id}", json=dump_patch(team))
+
+
+@group.tool
+async def delete_team(team_id: str) -> dict:
+    """Delete a team without sub-teams and without cards on its board. Ask the user first."""
+    await api().delete(f"/teams/{team_id}")
+    return {"deleted": True}
+
+
+@group.tool
+async def set_team_member(
+    team_id: str, principal_id: str, role: Literal["member", "manager"] = "member"
+) -> dict:
+    """Add a person to a team or change the role (a manager; not the team of a Gremium)."""
+    return await api().put(f"/teams/{team_id}/members/{principal_id}", json={"role": role})
+
+
+@group.tool
+async def remove_team_member(team_id: str, principal_id: str) -> dict:
+    """Remove a person from a team; the last manager stays (409 `last_manager`)."""
+    return await api().delete(f"/teams/{team_id}/members/{principal_id}")

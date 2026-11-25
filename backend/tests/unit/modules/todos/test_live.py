@@ -113,7 +113,7 @@ def access(monkeypatch: pytest.MonkeyPatch) -> type[_Access]:
 
 def _session(*boards: uuid.UUID) -> ScriptedSession:
     session = ScriptedSession(
-        scalars=[[TodoBoard(id=b, kind="gremium", name="B") for b in boards] for _ in range(3)]
+        scalars=[[TodoBoard(id=b, kind="team", name="B") for b in boards] for _ in range(3)]
     )
     session.rolled_back = 0  # type: ignore[attr-defined]
 

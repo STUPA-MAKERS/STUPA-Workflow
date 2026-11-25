@@ -7,6 +7,7 @@ import {
   FETCH_INTERVALS,
   type FetchInterval,
 } from '@core/api/calendar.service';
+import { TeamsApiService } from '@core/api/teams.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -34,11 +35,10 @@ import {
   SearchPillComponent,
 } from '@stupa-makers/ui-kit';
 import { RecordsScreenComponent, ScreenRecordDirective, ScreenSearchDirective } from '@stupa-makers/ui-kit/screens';
-import { AdminOptionsService } from '../admin-options.service';
 import { hitCount, listSearch, searchedRows } from '../list-search';
 
 /** The scope choice of the dialog. */
-type Scope = 'all' | 'gremium';
+type Scope = 'all' | 'team';
 
 /** The fields of the dialog. `id` is null for a new calendar. */
 interface Draft {
@@ -46,7 +46,7 @@ interface Draft {
   readonly name: string;
   readonly url: string;
   readonly scope: Scope;
-  readonly gremiumId: string;
+  readonly teamId: string;
   readonly interval: string;
 }
 
@@ -59,7 +59,7 @@ interface FetchState {
 /** The client check of the address: `https://` with something after it, no blank. */
 const HTTPS_URL = /^https:\/\/\S+$/;
 
-const EMPTY: Draft = { id: null, name: '', url: '', scope: 'all', gremiumId: '', interval: '60' };
+const EMPTY: Draft = { id: null, name: '', url: '', scope: 'all', teamId: '', interval: '60' };
 
 /** The fetch state of a calendar: failed, fetched, or not fetched yet. */
 export function fetchState(calendar: ExternalCalendar): FetchState {
@@ -74,8 +74,8 @@ function draftOf(calendar: ExternalCalendar): Draft {
     id: calendar.id,
     name: calendar.name,
     url: calendar.url,
-    scope: calendar.gremiumId ? 'gremium' : 'all',
-    gremiumId: calendar.gremiumId ?? '',
+    scope: calendar.teamId ? 'team' : 'all',
+    teamId: calendar.teamId ?? '',
     interval: String(calendar.intervalMinutes),
   };
 }
@@ -84,7 +84,7 @@ function inputOf(draft: Draft): ExternalCalendarInput {
   return {
     name: draft.name.trim(),
     url: draft.url.trim(),
-    gremiumId: draft.scope === 'gremium' ? draft.gremiumId : null,
+    teamId: draft.scope === 'team' ? draft.teamId : null,
     intervalMinutes: Number(draft.interval) as FetchInterval,
   };
 }
@@ -144,7 +144,7 @@ function withSaved(
 })
 export class AdminCalendarsComponent {
   private readonly api = inject(ExternalCalendarsApiService);
-  private readonly options = inject(AdminOptionsService);
+  private readonly teamsApi = inject(TeamsApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
 
@@ -182,7 +182,7 @@ export class AdminCalendarsComponent {
   protected readonly actions = computed<readonly Action[]>(() => [
     { key: 'add', label: this.i18n.translate('fab.calendar'), priority: 'fab' },
   ]);
-  protected readonly gremien = signal<readonly SelectOption[]>([]);
+  protected readonly teams = signal<readonly SelectOption[]>([]);
   /** The calendar whose fetch details are open. */
   protected readonly openId = signal<string | null>(null);
   protected readonly draft = signal<Draft | null>(null);
@@ -192,7 +192,7 @@ export class AdminCalendarsComponent {
 
   protected readonly scopeOptions = computed<readonly SelectOption[]>(() => [
     { value: 'all', label: this.i18n.translate('admin.calendars.scope.all') },
-    { value: 'gremium', label: this.i18n.translate('admin.calendars.scope.gremium') },
+    { value: 'team', label: this.i18n.translate('admin.calendars.scope.team') },
   ]);
   protected readonly intervalOptions = computed<readonly SelectOption[]>(() =>
     FETCH_INTERVALS.map((minutes) => ({
@@ -226,15 +226,16 @@ export class AdminCalendarsComponent {
       !this.saving() &&
       d.name.trim().length > 0 &&
       HTTPS_URL.test(d.url.trim()) &&
-      (d.scope === 'all' || d.gremiumId !== '')
+      (d.scope === 'all' || d.teamId !== '')
     );
   });
 
   constructor() {
     this.load();
-    this.options.gremiumOptions().subscribe({
-      next: (list) => this.gremien.set(list),
-      error: () => this.gremien.set([]),
+    this.teamsApi.list().subscribe({
+      next: (list) =>
+        this.teams.set(list.map((t) => ({ value: t.id, label: t.parentName ? `${t.parentName} / ${t.name}` : t.name }))),
+      error: () => this.teams.set([]),
     });
   }
 
@@ -271,9 +272,9 @@ export class AdminCalendarsComponent {
     return this.tr(`admin.calendars.interval.${minutes}`);
   }
 
-  /** The scope of a calendar: "Alle" or the name of its Gremium. */
+  /** The scope of a calendar: "Alle" or the name of its team (spec 003070). */
   protected scopeLabel(calendar: ExternalCalendar): string {
-    return calendar.gremiumName ?? this.i18n.translate('admin.calendars.scope.all');
+    return calendar.teamName ?? this.i18n.translate('admin.calendars.scope.all');
   }
 
   /** The reason of a failure as a sentence. An unknown code of a newer backend reads raw. */

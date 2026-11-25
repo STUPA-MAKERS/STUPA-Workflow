@@ -9,7 +9,7 @@ import type { GremiumRole } from '../admin.models';
 import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 import { loadErrorToast, toastWith } from '../../../../testing/load-error';
 
-const ALL = ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize', 'info.write', 'members.notify', 'ticket.work'];
+const ALL = ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize', 'info.write', 'members.notify', 'ticket.work', 'team.manage'];
 const ROLES: GremiumRole[] = [
   {
     id: 'gr-p',
@@ -112,6 +112,7 @@ describe('GremiumRoleMatrixComponent', () => {
       'Info bearbeiten',
       'Mitglieder benachrichtigen',
       'Tickets bearbeiten',
+      'Team verwalten',
       'Aktionen',
     ]);
     const keys = [...document.querySelectorAll('.rm__colKey')].map((k) => k.textContent);

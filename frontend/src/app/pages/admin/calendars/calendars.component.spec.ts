@@ -9,7 +9,7 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { loadErrorToast, retryLoadError, toastWith } from '../../../../testing/load-error';
-import { AdminOptionsService } from '../admin-options.service';
+import { TeamsApiService } from '@core/api/teams.service';
 import { AdminCalendarsComponent, fetchState } from './calendars.component';
 import { toastMock } from '../../../../testing/toast';
 
@@ -18,8 +18,8 @@ function calendar(id: string, over: Partial<ExternalCalendar> = {}): ExternalCal
     id,
     name: `Kalender ${id}`,
     url: `https://example.org/${id}.ics`,
-    gremiumId: null,
-    gremiumName: null,
+    teamId: null,
+    teamName: null,
     intervalMinutes: 60,
     lastAttemptAt: '2026-11-11T18:00:00Z',
     lastSuccessAt: '2026-11-11T18:00:00Z',
@@ -30,7 +30,7 @@ function calendar(id: string, over: Partial<ExternalCalendar> = {}): ExternalCal
 }
 
 const UNI = calendar('uni', { name: 'Hochschulkalender', intervalMinutes: 1440 });
-const SENAT = calendar('senat', { name: 'Senatstermine', gremiumId: 'g-1', gremiumName: 'Studierendenparlament' });
+const SENAT = calendar('senat', { name: 'Senatstermine', teamId: 'g-1', teamName: 'Studierendenparlament' });
 const RAUM = calendar('raum', {
   name: 'Raumbelegung',
   intervalMinutes: 15,
@@ -43,7 +43,7 @@ const NEW = calendar('neu', { name: 'Neu', lastAttemptAt: null, lastSuccessAt: n
 interface Opts {
   listError?: boolean;
   writeError?: boolean;
-  gremienError?: boolean;
+  teamsError?: boolean;
 }
 
 async function setup(seed: readonly ExternalCalendar[] = [UNI, SENAT, RAUM], opts: Opts = {}) {
@@ -58,26 +58,33 @@ async function setup(seed: readonly ExternalCalendar[] = [UNI, SENAT, RAUM], opt
       opts.writeError ? fail() : of(calendar('made', { ...body, lastAttemptAt: null, lastSuccessAt: null })),
     ),
     update: jest.fn((id: string, body: ExternalCalendarInput) =>
-      opts.writeError ? fail() : of(calendar(id, { ...body, gremiumName: body.gremiumId ? 'AStA' : null })),
+      opts.writeError ? fail() : of(calendar(id, { ...body, teamName: body.teamId ? 'AStA' : null })),
     ),
     remove: jest.fn(() => (opts.writeError ? fail() : of(void 0))),
     fetchNow: jest.fn((id: string) => (opts.writeError ? fail() : of(calendar(id, { name: 'Raumbelegung' })))),
   };
-  const options = {
-    gremiumOptions: jest.fn(() =>
-      opts.gremienError
+  const team = (id: string, name: string, parentName: string | null = null) => ({
+    id,
+    name,
+    gremiumId: null,
+    parentId: null,
+    parentName,
+    boardId: null,
+    isMember: true,
+    canManage: true,
+  });
+  const teams = {
+    list: jest.fn(() =>
+      opts.teamsError
         ? fail()
-        : of([
-            { value: 'g-1', label: 'Studierendenparlament' },
-            { value: 'g-2', label: 'AStA' },
-          ]),
+        : of([team('g-1', 'Studierendenparlament'), team('g-2', 'AStA'), team('t-3', 'Erstiwoche', 'AStA')]),
     ),
   };
   const toast = toastMock();
   const view = await render(AdminCalendarsComponent, {
     providers: [
       { provide: ExternalCalendarsApiService, useValue: api },
-      { provide: AdminOptionsService, useValue: options },
+      { provide: TeamsApiService, useValue: teams },
       { provide: ToastService, useFactory: () => toastWith(toast) },
     ],
   });
@@ -160,12 +167,12 @@ describe('AdminCalendarsComponent', () => {
     expect(view.api.create).not.toHaveBeenCalled();
     view.c.patch('url', ' https://example.org/a.ics ');
     view.fixture.detectChanges();
-    expect(within(dialog).queryByLabelText('Gremium')).toBeNull();
+    expect(within(dialog).queryByLabelText('Team')).toBeNull();
     await userEvent.click(save);
     expect(view.api.create).toHaveBeenCalledWith({
       name: 'Senat',
       url: 'https://example.org/a.ics',
-      gremiumId: null,
+      teamId: null,
       intervalMinutes: 60,
     });
     expect(view.toast.success).toHaveBeenCalledWith('Gespeichert.');
@@ -173,8 +180,8 @@ describe('AdminCalendarsComponent', () => {
     expect(view.c.draft()).toBeNull();
   });
 
-  /** § 000729: "Ein Gremium" asks for the Gremium, and the interval is one of four. */
-  it('edits a calendar on a press on its row and saves a Gremium and an interval', async () => {
+  /** § 000729, 003070: "Ein Team" asks for the team, and the interval is one of four. */
+  it('edits a calendar on a press on its row and saves a team and an interval', async () => {
     const view = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Hochschulkalender' }));
     const dialog = await screen.findByRole('dialog', { name: 'Kalender bearbeiten' });
@@ -185,16 +192,16 @@ describe('AdminCalendarsComponent', () => {
       'Alle 6 Stunden',
       'Täglich',
     ]);
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ein Gremium' }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Ein Team' }));
     expect(within(dialog).getByRole('button', { name: 'Speichern' })).toBeDisabled();
-    view.c.patch('gremiumId', 'g-2');
+    view.c.patch('teamId', 'g-2');
     view.c.patch('interval', '360');
     view.fixture.detectChanges();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     expect(view.api.update).toHaveBeenCalledWith('uni', {
       name: 'Hochschulkalender',
       url: 'https://example.org/uni.ics',
-      gremiumId: 'g-2',
+      teamId: 'g-2',
       intervalMinutes: 360,
     });
     expect(rows()[0].textContent).toContain('AStA · Alle 6 Stunden');
@@ -202,11 +209,11 @@ describe('AdminCalendarsComponent', () => {
   });
 
   it('keeps the dialog open when the save fails, and closes it on cancel', async () => {
-    const view = await setup([SENAT], { writeError: true, gremienError: true });
-    expect(view.c.gremien()).toEqual([]);
+    const view = await setup([SENAT], { writeError: true, teamsError: true });
+    expect(view.c.teams()).toEqual([]);
     await menu('Senatstermine', 'Bearbeiten');
     const dialog = await screen.findByRole('dialog', { name: 'Kalender bearbeiten' });
-    expect(view.c.draft().scope).toBe('gremium');
+    expect(view.c.draft().scope).toBe('team');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     expect(view.toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
     expect(view.c.draft()).not.toBeNull();

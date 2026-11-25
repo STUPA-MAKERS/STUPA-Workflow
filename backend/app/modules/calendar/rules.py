@@ -2,8 +2,8 @@
 
 A Termin is readable by its creator, by its invited persons, by each signed-in person
 when its switch "Für alle" is on, and by a holder of ``calendar.manage``. An invited
-Gremium stands for the persons who read its meetings at the time of the read, so the
-rules take the Gremien of the viewer and not a stored list of persons.
+team stands for its members at the time of the read (F/collaboration/teams/003069), so
+the rules take the teams of the viewer and not a stored list of persons.
 
 A scoped OAuth token reads and writes no Termin, because no OAuth scope names the
 Kalender. `Viewer.id` is then None.
@@ -21,12 +21,12 @@ from uuid import UUID
 class Viewer:
     """The caller of a Kalender read or write.
 
-    ``gremium_ids`` holds the Gremien whose invitations reach the viewer: the
-    memberships and the substitute pools.
+    ``team_ids`` holds the teams whose invitations reach the viewer: the teams of which
+    the viewer is a member (``app.modules.teams.members``).
     """
 
     id: UUID | None
-    gremium_ids: frozenset[UUID] = frozenset()
+    team_ids: frozenset[UUID] = frozenset()
     manages: bool = False
     publishes: bool = False
 
@@ -35,7 +35,7 @@ class Viewer:
 class Targets:
     """The invitations of one Termin."""
 
-    gremium_ids: frozenset[UUID] = frozenset()
+    team_ids: frozenset[UUID] = frozenset()
     principal_ids: frozenset[UUID] = frozenset()
 
 
@@ -58,7 +58,7 @@ def is_creator(viewer: Viewer, creator_id: UUID | None) -> bool:
 def is_invited(viewer: Viewer, targets: Targets) -> bool:
     """Tell if an invitation of the Termin reaches the viewer."""
     return viewer.id is not None and (
-        viewer.id in targets.principal_ids or bool(viewer.gremium_ids & targets.gremium_ids)
+        viewer.id in targets.principal_ids or bool(viewer.team_ids & targets.team_ids)
     )
 
 
@@ -103,17 +103,13 @@ def has_ended(span: Span, today: date, now: time) -> bool:
     )
 
 
-def forbidden_gremien(
-    wanted: Collection[UUID], readable: Collection[UUID] | None, already: Collection[UUID]
+def forbidden_teams(
+    wanted: Collection[UUID], own: Collection[UUID] | None, already: Collection[UUID]
 ) -> frozenset[UUID]:
-    """The Gremien that the creator must not invite.
+    """The teams that the creator must not invite (F/collaboration/teams/003069).
 
-    ``readable`` is None for a person who reads the meetings of every Gremium. A
-    Gremium that the Termin invites already stays, so a person who changes the title
-    of a Termin does not lose an invitation that a manager made.
+    ``own`` holds the teams of the creator, or None for a holder of ``calendar.manage``,
+    who invites every team. A team that the Termin invites already stays, so a person
+    who changes the title of a Termin does not lose an invitation that a manager made.
     """
-    return (
-        frozenset()
-        if readable is None
-        else frozenset(wanted) - frozenset(readable) - frozenset(already)
-    )
+    return frozenset() if own is None else frozenset(wanted) - frozenset(own) - frozenset(already)

@@ -113,13 +113,15 @@ def _assigned_board(
     facts: _Facts,
     *,
     can_write: bool,
+    gremium_id: uuid.UUID | None = None,
 ) -> TodoAssignedBoard:
     """Build a board row of ``mine_boards`` or ``all_boards`` from cards in board order."""
     return TodoAssignedBoard(
         id=board.id,
         name=board.name,
         kind=board.kind,  # pyright: ignore[reportArgumentType]
-        gremium_id=board.gremium_id,
+        team_id=board.team_id,
+        gremium_id=gremium_id,
         can_write=can_write,
         columns=_column_outs(columns, Counter(c.column_id for c in cards)),
         labels=[_label_out(lab) for lab in labels],

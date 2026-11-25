@@ -33,10 +33,11 @@ export interface CalendarEntry {
   readonly endTime: string | null;
   readonly place: string | null;
   /**
-   * The Gremium of a meeting, the board of a card, the first invited Gremium of a Termin,
+   * The Gremium of a meeting, the board of a card, the first invited team of a Termin,
    * the name of an external calendar.
    */
   readonly source: string | null;
+  /** For the Gremium filter: the Gremium of a meeting, the Gremien of the inherent teams. */
   readonly gremiumIds: readonly Uuid[];
   /** A card assigned to the caller, a Termin that the caller created or is invited to. */
   readonly mine: boolean;
@@ -51,6 +52,13 @@ export interface CalendarPerson {
 export interface CalendarGremium {
   readonly id: Uuid;
   readonly name: string;
+}
+
+/** An invited team; `gremiumId` marks the inherent team of a Gremium (spec 003069). */
+export interface CalendarTeam {
+  readonly id: Uuid;
+  readonly name: string;
+  readonly gremiumId?: Uuid | null;
 }
 
 export interface AppointmentAnswer {
@@ -73,7 +81,7 @@ export interface Appointment {
   /** The public calendar shows the Termin without a sign-in. */
   readonly public: boolean;
   readonly creator: CalendarPerson | null;
-  readonly gremien: readonly CalendarGremium[];
+  readonly teams: readonly CalendarTeam[];
   readonly persons: readonly CalendarPerson[];
   readonly answers: readonly AppointmentAnswer[];
   /** The invited persons without an answer; empty for a reader who is not invited. */
@@ -95,7 +103,7 @@ export interface AppointmentInput {
   readonly forAll: boolean;
   /** The public calendar shows the Termin without a sign-in. */
   readonly public: boolean;
-  readonly gremiumIds: readonly Uuid[];
+  readonly teamIds: readonly Uuid[];
   readonly principalIds: readonly Uuid[];
 }
 
@@ -121,9 +129,9 @@ export interface ExternalCalendar {
   readonly id: Uuid;
   readonly name: string;
   readonly url: string;
-  /** Null: the calendar is for all persons. */
-  readonly gremiumId: Uuid | null;
-  readonly gremiumName: string | null;
+  /** Null: the calendar is for all persons (spec 003070). */
+  readonly teamId: Uuid | null;
+  readonly teamName: string | null;
   readonly intervalMinutes: FetchInterval;
   readonly lastAttemptAt: string | null;
   readonly lastSuccessAt: string | null;
@@ -135,7 +143,7 @@ export interface ExternalCalendar {
 export interface ExternalCalendarInput {
   readonly name: string;
   readonly url: string;
-  readonly gremiumId: Uuid | null;
+  readonly teamId: Uuid | null;
   readonly intervalMinutes: FetchInterval;
 }
 

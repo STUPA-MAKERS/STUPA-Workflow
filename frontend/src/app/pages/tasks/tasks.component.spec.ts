@@ -73,7 +73,7 @@ function todo(id: string, extra: Partial<TodoMineItem> = {}): TodoMineItem {
     createdAt: '2026-09-01T10:00:00Z',
     updatedAt: '2026-09-01T10:00:00Z',
     boardName: 'Studierendenparlament',
-    boardKind: 'gremium',
+    boardKind: 'team',
     columnName: 'Offen',
     labels: [],
     ...extra,

@@ -281,9 +281,12 @@ async def test_delete_for_application_also_removes_the_comment_files(
     own = _att(ticket_note_id=None, application_id=app_id)
     of_comment = _att(ticket_note_id=None, comment_id=comment_id)
     session = ScriptedSession(scalars=[[own, of_comment]])
-    assert await _svc(session, FakeStorage()).delete_for_application(
-        app_id, comments=select(Comment.id).where(Comment.application_id == app_id), actor="x"
-    ) == 2
+    assert (
+        await _svc(session, FakeStorage()).delete_for_application(
+            app_id, comments=select(Comment.id).where(Comment.application_id == app_id), actor="x"
+        )
+        == 2
+    )
     sql = str(session.statements[0])
     assert "attachment.comment_id IN" in sql
     assert "attachment.application_id IS NOT NULL" in sql
@@ -347,7 +350,7 @@ async def test_a_ticket_report_file_asks_no_note() -> None:
 
 
 def _board() -> TodoBoard:
-    return TodoBoard(id=uuid.uuid4(), name="B", kind="gremium", gremium_id=uuid.uuid4())
+    return TodoBoard(id=uuid.uuid4(), name="B", kind="team", team_id=uuid.uuid4())
 
 
 async def test_a_todo_comment_file_follows_the_board(monkeypatch: pytest.MonkeyPatch) -> None:

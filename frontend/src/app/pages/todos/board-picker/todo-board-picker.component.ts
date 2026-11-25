@@ -92,15 +92,15 @@ export class TodoBoardPickerComponent {
     if (!name) return this.i18n.translate('todos.board.pick');
     return this.compact() ? name : this.i18n.translate('todos.board.chip', { name });
   });
-  readonly chipIcon = computed<IconName>(() => (this.onAll() ? ALL_ICON : BOARD_ICON[this.currentBoard()?.kind ?? 'gremium']));
+  readonly chipIcon = computed<IconName>(() => (this.onAll() ? ALL_ICON : BOARD_ICON[this.currentBoard()?.kind ?? 'team']));
   readonly allIcon = ALL_ICON;
   readonly sections = computed<PickerSection[]>(() => {
     const of = (kind: TodoBoardKind) => this.boards().filter((b) => b.kind === kind);
     const all: PickerSection[] = [
       { kind: 'personal', label: 'todos.board.personal', boards: of('personal') },
-      { kind: 'gremium', label: 'todos.board.gremien', boards: of('gremium') },
+      { kind: 'team', label: 'todos.board.gremien', boards: of('team') },
       { kind: 'free', label: 'todos.board.free', boards: of('free') },
-      { kind: 'team', label: 'todos.board.team', boards: of('team') },
+      { kind: 'permission', label: 'todos.board.team', boards: of('permission') },
     ];
     return all.filter((s) => s.boards.length || (s.kind === 'personal' && this.allId() !== null));
   });
@@ -122,7 +122,7 @@ export class TodoBoardPickerComponent {
   /** The sub line of a board: who sees it. A picker shows no count (spec 000560). */
   sub(board: TodoBoardSummary): string | null {
     if (board.kind === 'personal') return this.i18n.translate('todos.board.onlyYou');
-    if (board.kind === 'team') return this.i18n.translate('todos.board.teamSub');
+    if (board.kind === 'permission') return this.i18n.translate('todos.board.teamSub');
     return null;
   }
 

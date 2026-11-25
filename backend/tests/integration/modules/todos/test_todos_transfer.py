@@ -63,8 +63,8 @@ async def test_a_card_moves_to_another_gremium_board_and_back(
     aid, aboard = await add_gremium(maker, "AStA")
     me, me_id = await add_person(maker, "Mia")
     _other, other_id = await add_person(maker, "Otto")
-    await add_member(maker, gid, me_id, "todo.write", "todo.configure")
-    await add_member(maker, aid, me_id, "todo.write", "todo.configure")
+    await add_member(maker, gid, me_id, "todo.write", "todo.configure", "team.manage")
+    await add_member(maker, aid, me_id, "todo.write", "todo.configure", "team.manage")
     await add_member(maker, gid, other_id, "todo.write")
     api.login(Principal(sub=me.sub, permissions={"ticket.manage"}))
     with TestClient(api.app) as client:
