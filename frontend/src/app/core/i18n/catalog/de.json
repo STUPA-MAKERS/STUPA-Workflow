@@ -1573,6 +1573,7 @@
   "budget.tree.colorInvalid": "Format #rrggbb",
   "budget.tree.colorClear": "Farbe entfernen",
   "budget.tree.active": "Aktiv",
+  "budget.tree.internal": "Intern",
   "budget.tree.deleteTitle": "Kostenstelle löschen?",
   "budget.tree.deleteConfirm": "„{name}“ ({path}) wird gelöscht. Das lässt sich nicht rückgängig machen.",
   "budget.tree.deleteBlocked": "Eine Kostenstelle mit Unter-Kostenstellen oder Zuteilungen lässt sich nicht löschen.",

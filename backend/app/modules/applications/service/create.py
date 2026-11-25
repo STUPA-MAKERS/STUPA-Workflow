@@ -18,7 +18,10 @@ from app.modules.applications.models import (
     SubmissionVersion,
 )
 from app.modules.applications.schemas import ApplicationCreate
-from app.modules.applications.service.form_checks import check_form_rules
+from app.modules.applications.service.form_checks import (
+    check_form_rules,
+    check_internal_cost_centres,
+)
 from app.modules.applications.service.links import check_predecessor, write_link
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
@@ -201,6 +204,7 @@ class CreateOps(ApplicationsServiceBase):
                 raise ValidationProblem("Invalid application data.", errors=errors) from exc
 
         check_form_rules(effective, answers)
+        await check_internal_cost_centres(self.session, effective, answers)
         if app_type.attachment_required and not payload.attachment_ids:
             raise ValidationProblem(
                 "This Antragsart needs a file.",

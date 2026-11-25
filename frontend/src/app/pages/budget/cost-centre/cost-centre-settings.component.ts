@@ -30,7 +30,7 @@ import { BudgetTreeApi, type BudgetTreeNode } from '../budget-tree.api';
 import { ColourFieldComponent } from './colour-field.component';
 import { costCentreError, keyProblem, NAME_MAX } from './cost-centre.util';
 
-type Field = 'key' | 'name' | 'color' | 'viewGremiumId' | 'decisionGremiumId' | 'active';
+type Field = 'key' | 'name' | 'color' | 'viewGremiumId' | 'decisionGremiumId' | 'active' | 'internal';
 type Value = string | boolean | null;
 
 /** A change of one field of a Kostenstelle that the person made. */
@@ -57,6 +57,8 @@ function savedValue(node: BudgetTreeNode, field: Field): Value {
       return node.decisionGremiumId ?? null;
     case 'active':
       return node.active;
+    case 'internal':
+      return node.internal ?? false;
   }
 }
 
@@ -67,8 +69,8 @@ interface Saved<T> {
 }
 
 /**
- * The settings of one Kostenstelle in the Budget tab: key, name, colour, the switch
- * "Aktiv" and its two Gremien. Each field saves when the person leaves it; `saved` then
+ * The settings of one Kostenstelle in the Budget tab: key, name, colour, the switches
+ * "Aktiv" and "Intern" and its two Gremien. Each field saves when the person leaves it; `saved` then
  * tells the page to read the tree again and a toast says that the change is saved. A failed
  * save shows its reason and the field takes the saved value again.
  */
@@ -215,6 +217,10 @@ export class CostCentreSettingsComponent {
   readonly decisionGremium = this.choice('decisionGremiumId', (node) => node.decisionGremiumId ?? '');
   /** The state that the switch shows: the last press, else the saved state. */
   readonly active = this.choice('active', (node) => node.active);
+  /** The state of the switch "Intern": the last press, else the saved state (003011). */
+  readonly internal = this.choice('internal', (node) => node.internal ?? false);
+  /** A node above is Intern: the switch shows on and cannot change here (003011). */
+  readonly internalInherited = computed(() => !!this.node().internalInherited);
   readonly gremien = computed<SelectOption[]>(() => [...this.gremiumOptions()]);
   /** The error under the key: only letters and digits, at most 64 characters. */
   readonly keyError = computed(() =>
@@ -252,6 +258,13 @@ export class CostCentreSettingsComponent {
   saveActive(active: boolean): void {
     this.active.set(active);
     this.change('active', active);
+  }
+
+  /** Save the switch "Intern" (003011). Below an Intern node the switch is disabled. */
+  saveInternal(internal: boolean): void {
+    if (this.internalInherited()) return;
+    this.internal.set(internal);
+    this.change('internal', internal);
   }
 
   /** The changes that wait for the save that runs, at most one for each field of a Kostenstelle. */
@@ -341,6 +354,8 @@ export class CostCentreSettingsComponent {
         return this.decisionGremium.set((value as string | null) ?? '');
       case 'active':
         return this.active.set(value as boolean);
+      case 'internal':
+        return this.internal.set(value as boolean);
     }
   }
 
@@ -366,7 +381,7 @@ export class CostCentreSettingsComponent {
     request
       .pipe(
         finalize(() => {
-          void [this.viewGremium(), this.decisionGremium(), this.active()];
+          void [this.viewGremium(), this.decisionGremium(), this.active(), this.internal()];
           this.running.set(false);
           this.current = null;
           this.next();

@@ -20,7 +20,10 @@ from app.modules.applications.schemas import (
     VersionOut,
     VersionTypeChangeOut,
 )
-from app.modules.applications.service.form_checks import check_form_rules
+from app.modules.applications.service.form_checks import (
+    check_form_rules,
+    check_internal_cost_centres,
+)
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
@@ -118,11 +121,9 @@ class EditOps(ApplicationsServiceBase):
             app.type_id, form_version_id=app.form_version_id
         )
         diff: DataDiff = compute_diff(app.data, clean)
-        check_form_rules(
-            effective,
-            clean,
-            changed=frozenset({*diff["added"], *diff["removed"], *diff["changed"]}),
-        )
+        changed = frozenset({*diff["added"], *diff["removed"], *diff["changed"]})
+        check_form_rules(effective, clean, changed=changed)
+        await check_internal_cost_centres(self.session, effective, clean, changed=changed)
 
         new_amount, new_currency = _amount_currency(fields, clean)
         if app.approved_amount is not None and (
