@@ -53,16 +53,18 @@ describe('timeline lines', () => {
   /** §F/finance/orders/002866: the create, a status change and the delete of a Bestellung. */
   it('names the event of a Bestellung with its Bezeichnung and its number', () => {
     const base = { orderId: 'o-1', number: 'B-7K3QX9MD', title: 'Beamer' };
-    expect(orderEventText({ ...base, change: 'created' }, t)).toEqual({
+    const names: Record<string, string> = { delivered: 'Geliefert' };
+    const name = (key: string): string => names[key] ?? key;
+    expect(orderEventText({ ...base, change: 'created' }, t, name)).toEqual({
       title: 'Bestellung angelegt',
       body: 'Beamer · B-7K3QX9MD',
     });
-    expect(orderEventText({ ...base, change: 'deleted', number: '' }, t)).toEqual({
+    expect(orderEventText({ ...base, change: 'deleted', number: '' }, t, name)).toEqual({
       title: 'Bestellung gelöscht',
       body: 'Beamer',
     });
-    expect(orderEventText({ ...base, change: 'status', toStatus: 'delivered' }, t).title).toBe('Bestellung: Geliefert');
-    expect(orderEventText({ ...base, change: 'status', toStatus: 'other' }, t).title).toBe('Bestellung: other');
-    expect(orderEventText({ ...base, change: 'status' }, t).title).toBe('Bestellung: ');
+    expect(orderEventText({ ...base, change: 'status', toStatus: 'delivered' }, t, name).title).toBe('Bestellung: Geliefert');
+    expect(orderEventText({ ...base, change: 'status', toStatus: 'other' }, t, name).title).toBe('Bestellung: other');
+    expect(orderEventText({ ...base, change: 'status' }, t, name).title).toBe('Bestellung: ');
   });
 });

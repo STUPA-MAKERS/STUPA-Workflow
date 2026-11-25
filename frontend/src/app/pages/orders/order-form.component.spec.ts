@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
@@ -71,6 +72,7 @@ async function setup(options: Options = {}) {
   };
   const view = await render(OrderFormComponent, {
     providers: [
+      provideTestStatuses(),
       provideRouter([]),
       { provide: OrdersApiService, useValue: api },
       { provide: ApiClient, useValue: client },

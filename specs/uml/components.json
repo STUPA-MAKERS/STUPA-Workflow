@@ -86,7 +86,7 @@
       "to": "applications"
     },
     {
-      "count": 20,
+      "count": 21,
       "from": "admin",
       "to": "audit"
     },
@@ -111,7 +111,7 @@
       "to": "calendar"
     },
     {
-      "count": 3,
+      "count": 4,
       "from": "admin",
       "to": "config_revision"
     },
@@ -126,7 +126,7 @@
       "to": "files"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "admin",
       "to": "flow"
     },
@@ -176,7 +176,7 @@
       "to": "protocol"
     },
     {
-      "count": 41,
+      "count": 43,
       "from": "admin",
       "to": "shared"
     },
@@ -184,6 +184,11 @@
       "count": 28,
       "from": "admin",
       "to": "site_config"
+    },
+    {
+      "count": 3,
+      "from": "admin",
+      "to": "statuses"
     },
     {
       "count": 3,
@@ -566,7 +571,7 @@
       "to": "todos"
     },
     {
-      "count": 4,
+      "count": 5,
       "from": "config_revision",
       "to": "admin"
     },
@@ -611,7 +616,7 @@
       "to": "orders"
     },
     {
-      "count": 7,
+      "count": 9,
       "from": "config_revision",
       "to": "shared"
     },
@@ -619,6 +624,11 @@
       "count": 1,
       "from": "config_revision",
       "to": "site_config"
+    },
+    {
+      "count": 1,
+      "from": "config_revision",
+      "to": "statuses"
     },
     {
       "count": 4,
@@ -1151,6 +1161,11 @@
       "to": "shared"
     },
     {
+      "count": 5,
+      "from": "orders",
+      "to": "statuses"
+    },
+    {
       "count": 1,
       "from": "orders",
       "to": "webhooks"
@@ -1493,6 +1508,11 @@
     {
       "count": 8,
       "from": "site_config",
+      "to": "shared"
+    },
+    {
+      "count": 5,
+      "from": "statuses",
       "to": "shared"
     },
     {
@@ -1988,6 +2008,12 @@
       "layer": 6,
       "name": "site_config",
       "path": "backend/app/modules/site_config"
+    },
+    {
+      "id": "statuses",
+      "layer": 5,
+      "name": "statuses",
+      "path": "backend/app/modules/statuses"
     },
     {
       "id": "team_pages",

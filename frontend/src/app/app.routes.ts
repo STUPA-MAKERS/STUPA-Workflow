@@ -778,6 +778,35 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'order-phases',
+            canMatch: [featureMatch('orders')],
+            data: {
+              title: 'admin.statuses.title.order',
+              permission: 'admin.order_phases',
+              parent: ['admin'],
+              statusList: 'order',
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/statuses/statuses.component').then(
+                (m) => m.AdminStatusesComponent,
+              ),
+          },
+          {
+            path: 'event-phases',
+            data: {
+              title: 'admin.statuses.title.event',
+              permission: 'admin.event_phases',
+              parent: ['admin'],
+              statusList: 'event',
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/statuses/statuses.component').then(
+                (m) => m.AdminStatusesComponent,
+              ),
+          },
+          {
             path: 'deadlines',
             data: { title: 'admin.deadlines.title', permission: 'admin.deadlines', parent: ['admin'] },
             canActivate: [authGuard],

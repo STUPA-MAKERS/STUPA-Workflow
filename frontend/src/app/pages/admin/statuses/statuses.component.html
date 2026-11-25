@@ -1,0 +1,100 @@
+<app-settings-screen
+  [head]="{ title: title() }"
+  [groups]="groups"
+  [state]="screenState()"
+  [save]="{ dirty: form.dirty(), busy: form.saving(), disabled: !body() }"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenGroup="list">
+    <form (submit)="$event.preventDefault(); save()">
+      <app-step-list>
+        @for (row of rows(); track $index; let i = $index; let first = $first; let last = $last) {
+          <app-step-row [number]="i + 1" [columns]="columns()" [attr.data-testid]="'status-' + i">
+            <app-input
+              stepMain
+              [label]="'admin.statuses.name' | t: { number: i + 1 }"
+              [required]="true"
+              [error]="nameError(row)"
+              [ngModel]="name(row)"
+              (ngModelChange)="setName(i, $event)"
+              [name]="'name' + i"
+            />
+            <span stepActions>
+              <app-move-buttons
+                [upDisabled]="first"
+                [downDisabled]="last"
+                (move)="move(i, $event)"
+              />
+              <app-button-group>
+                <app-button
+                  variant="text"
+                  [iconOnly]="true"
+                  [ariaLabel]="'admin.statuses.remove' | t: { number: i + 1 }"
+                  [title]="'admin.statuses.remove' | t: { number: i + 1 }"
+                  (click)="remove(i)"
+                >
+                  <app-icon name="trash" />
+                </app-button>
+              </app-button-group>
+            </span>
+            <app-select
+              stepField
+              [label]="'admin.statuses.phase' | t: { number: i + 1 }"
+              [clearable]="false"
+              [options]="phaseOptions()"
+              [error]="phaseError(i)"
+              [ngModel]="row.phase"
+              (ngModelChange)="patch(i, { phase: $event })"
+              [name]="'phase' + i"
+            />
+            <app-select
+              stepField
+              [label]="'admin.statuses.tone' | t: { number: i + 1 }"
+              [clearable]="false"
+              [options]="toneOptions()"
+              [ngModel]="row.tone"
+              (ngModelChange)="patch(i, { tone: $event })"
+              [name]="'tone' + i"
+            />
+            @if (kind === 'order') {
+              <app-select
+                stepField
+                [label]="'admin.statuses.date' | t: { number: i + 1 }"
+                [clearable]="false"
+                [options]="dateOptions()"
+                [ngModel]="row.setsDate ?? ''"
+                (ngModelChange)="patch(i, { setsDate: $event || null })"
+                [name]="'date' + i"
+              />
+            }
+          </app-step-row>
+        }
+        @if (missing(); as text) {
+          <app-note kind="warn" icon="alert">{{ text }}</app-note>
+        }
+        @if (canAdd()) {
+          <app-button-group>
+            <app-button variant="tonal" (click)="add()"
+              ><app-icon name="plus" /> {{ 'admin.statuses.add' | t }}</app-button
+            >
+          </app-button-group>
+        }
+      </app-step-list>
+      <button type="submit" hidden></button>
+    </form>
+  </ng-template>
+</app-settings-screen>
+
+<app-select-sheet
+  [open]="deleting() !== null"
+  (openChange)="$event ? null : cancelDelete()"
+  [heading]="deleteTitle()"
+  [subtitle]="deleteSub()"
+  [options]="targets()"
+  [listLabel]="'admin.statuses.delete.list' | t"
+  [emptyHeading]="'admin.statuses.delete.empty' | t"
+  [submitLabel]="'admin.statuses.delete.submit' | t"
+  submitIcon="trash"
+  (picked)="replaceWith($event)"
+/>

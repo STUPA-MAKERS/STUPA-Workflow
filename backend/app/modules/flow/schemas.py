@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Literal, get_args
+from typing import Annotated, Literal, get_args
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from app.modules.applications.decision import DecisionIn
 from app.shared.i18n import I18nMap
 from app.shared.schemas import FrozenCamelModel, FrozenStrictCamelModel
 
-#: The statuses of a Bestellung that can offer a transition (F/finance/orders/002931).
-OrderOfferStatus = Literal["ordered", "delivered"]
+#: The key of a status of the list of the Bestellungen that offers a transition
+#: (F/finance/orders/002931, F/administration/admin/003035).
+OrderOfferStatus = Annotated[str, StringConstraints(max_length=40, pattern=r"^[a-z][a-z0-9_]*$")]
 
 
 def offered_on(

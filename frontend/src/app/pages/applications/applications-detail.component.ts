@@ -23,6 +23,7 @@ import { API_BASE_URL } from '@core/api/api.config';
 import { FileOpenService } from '@shared/viewer/file-open.service';
 import { AuthService } from '@core/auth/auth.service';
 import { FeatureService } from '@core/features/feature.service';
+import { StatusCatalog } from '@core/api/statuses.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -133,7 +134,7 @@ import {
   outsideDecisionLines,
 } from '@shared/decision/timeline-lines';
 import { type OrderList, OrdersApiService } from '@core/api/orders.service';
-import { ORDER_STATUS_LABEL, shownPrice } from '../orders/orders.util';
+import { shownPrice } from '../orders/orders.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
@@ -291,6 +292,7 @@ export class ApplicationsDetailComponent {
   });
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
   private readonly toast = inject(ToastService);
   private readonly railStatus = inject(RailStatusService);
   private readonly route = inject(ActivatedRoute);
@@ -606,7 +608,7 @@ export class ApplicationsDetailComponent {
       title: order.title,
       sub: [
         t('orders.kind.order'),
-        t(ORDER_STATUS_LABEL[order.status]),
+        this.statuses.label('order', order.status),
         formatMoney(shownPrice(order).amount, this.i18n.formatLocale(), {
           currency: this.app()?.currency,
         }),
@@ -989,7 +991,7 @@ export class ApplicationsDetailComponent {
             {
               at: e.at,
               icon: 'package' as const,
-              ...orderEventText(e.order, t),
+              ...orderEventText(e.order, t, (key) => this.statuses.label('order', key)),
               actor: this.actor(e.actorInfo, e.actor),
             },
           ]

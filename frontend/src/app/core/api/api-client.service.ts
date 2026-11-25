@@ -616,7 +616,7 @@ export class ApiClient {
    */
   transitions(
     id: Uuid,
-    opts: { detail?: boolean; orderStatus?: 'ordered' | 'delivered' } = {},
+    opts: { detail?: boolean; orderStatus?: string } = {},
   ): Observable<Transition[]> {
     const lang = this.i18n.uiLocale();
     return this.http

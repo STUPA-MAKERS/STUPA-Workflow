@@ -1,6 +1,6 @@
 ---
 name: be-orders
-description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the statuses planned/ordered/delivered/cancelled, the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend page "Bestellungen" (/orders: list, detail and form in the pane). Use when working on backend/app/modules/orders or frontend/src/app/pages/orders.
+description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the status of the configured list `order` (module `statuses`: phases open/done/void, pages Bestellphasen/Veranstaltungsphasen), the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend page "Bestellungen" (/orders: list, detail and form in the pane). Use when working on backend/app/modules/orders or frontend/src/app/pages/orders.
 ---
 
 # Bestellungen — `backend/app/modules/orders`
@@ -20,12 +20,16 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   `created_by`) and `ApplicationOrderEvent` (`purchase_order_event`: the events that the
   timeline of the Antrag shows; it outlives the Bestellung, so a delete stays in the story).
 - `rules.py` — pure rules: `url_valid` (http/https only), `buyer_missing` (an Auslage needs a
-  buyer), `status_dates` (a status sets its date when it is empty), `price` (real, else
-  planned), `orders_sum` (without cancelled), `over_by`.
+  buyer), `status_dates` (a status with `sets_date` sets that date when it is empty), `price`
+  (real, else planned), `orders_sum` (without the phase `void`), `segment_of` (by phase), `over_by`.
+- Statuses: the keys come from the list `order` of `app/modules/statuses` (`status_def`,
+  F/administration/admin/003035-003040). Code reads only the phase (`StatusReader`,
+  `in_phase`), never a key. Admin pages `/admin/order-phases` (`admin.order_phases`) and `/admin/event-phases` (`admin.event_phases`); frontend
+  `StatusCatalog` (`core/api/statuses.service.ts`) names and colors a key.
 - `numbers.py` — the number `B-` plus eight random characters.
 - `service.py` — `OrderService`: list, create, update, set status, delete. It checks the
   approved state and the type with money on create, the positions against the answers of the
-  Antrag (unknown id, id of another Bestellung that is not cancelled), the version, and
+  Antrag (unknown id, id of another Bestellung whose status is not in the phase `void`), the version, and
   writes the audit entry and the timeline event. It does not commit. `buyer_names` gives the
   display name of the buyer accounts.
 - `privacy.py` — `erase_buyer`, `clear_buyer_names`, `order_export`.

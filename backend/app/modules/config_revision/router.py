@@ -24,9 +24,11 @@ from app.modules.config_revision.service import (
     ENTITY_FLOW,
     ENTITY_FORM,
     ENTITY_SITE_CONFIG,
+    ENTITY_STATUS_LIST,
     ConfigRevisionService,
 )
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
+from app.shared.permissions import STATUS_LIST_PERMISSIONS
 
 router = APIRouter(prefix="/admin/config-revisions", tags=["config-revision"])
 
@@ -53,8 +55,12 @@ def get_service(session: DbSession) -> ConfigRevisionService:
 ServiceDep = Annotated[ConfigRevisionService, Depends(get_service)]
 
 
-def _require_restore_perm(principal: Principal, entity_type: str) -> None:
-    perm = _RESTORE_PERM.get(entity_type)
+def _require_restore_perm(principal: Principal, entity_type: str, entity_id: str) -> None:
+    perm = (
+        STATUS_LIST_PERMISSIONS.get(entity_id)
+        if entity_type == ENTITY_STATUS_LIST
+        else _RESTORE_PERM.get(entity_type)
+    )
     if perm is None or not principal.has(perm):
         raise ForbiddenError(f"Missing permission to restore {entity_type} config.")
 
@@ -133,7 +139,7 @@ async def restore_config_revision(
     revision: ConfigRevision | None = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")
-    _require_restore_perm(principal, revision.entity_type)
+    _require_restore_perm(principal, revision.entity_type, revision.entity_id)
     await reapply_snapshot(
         service.session,
         entity_type=revision.entity_type,

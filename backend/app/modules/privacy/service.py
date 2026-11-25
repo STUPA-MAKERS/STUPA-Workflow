@@ -1084,7 +1084,7 @@ def build_auskunft_workbook(
                 o.get("number") or "",
                 o.get("title") or "",
                 _ORDER_KIND_LABELS.get(str(o.get("kind")), ""),
-                _ORDER_STATUS_LABELS.get(str(o.get("status")), ""),
+                str(o.get("statusName") or o.get("status") or ""),
                 _fmt_day(o.get("orderedOn"), None),
                 _fmt_day(o.get("deliveredOn"), None),
                 _fmt_dt(o.get("createdAt")),
@@ -1111,14 +1111,8 @@ def build_auskunft_workbook(
     return buf.getvalue()
 
 
-#: The kinds and the statuses of a Bestellung as the German UI names them.
+#: The kinds of a Bestellung as the German UI names them.
 _ORDER_KIND_LABELS: dict[str, str] = {"order": "Bestellung", "outlay": "Auslage"}
-_ORDER_STATUS_LABELS: dict[str, str] = {
-    "planned": "Geplant",
-    "ordered": "Bestellt",
-    "delivered": "Geliefert",
-    "cancelled": "Storniert",
-}
 
 #: The answers to a Termin as the German UI names them.
 _ANSWER_LABELS: dict[str, str] = {

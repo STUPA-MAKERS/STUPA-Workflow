@@ -62,6 +62,7 @@ _BUDGET_NODE = "budget.tree_router._require_node_view"
 _SELF = "self: the data of the caller only"
 _TERMIN_READ = "calendar.rules.can_read (AppointmentService._readable_row)"
 _TERMIN_EDIT = "calendar.rules.can_edit"
+_STATUS_LIST = "admin.statuses_router._list_admin (STATUS_LIST_PERMISSIONS of the list)"
 
 _TEAM_MANAGE = "TeamService (managed_team_ids: team.manage or a manager row, spec 003066)"
 
@@ -69,6 +70,8 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/admin/config-revisions/{revision_id}/restore"): (
         "config_revision.router._require_restore_perm (permission of the entity type)"
     ),
+    ("GET", "/api/admin/statuses/{kind}"): _STATUS_LIST,
+    ("PUT", "/api/admin/statuses/{kind}"): _STATUS_LIST,
     ("GET", "/api/applications"): "applications.access.principal_reads_all + read_scope_for",
     ("GET", "/api/applications/tasks"): "ApplicationService.list_tasks (read_scope_for)",
     ("POST", "/api/applications/{application_id}/votes"): (

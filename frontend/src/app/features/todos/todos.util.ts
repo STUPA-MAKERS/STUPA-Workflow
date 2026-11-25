@@ -1,3 +1,4 @@
+import type { StatusListKind } from '@core/api/statuses.service';
 import type { PersonRef, Uuid } from '@core/api/models';
 import type {
   TodoBoardSummary,
@@ -157,6 +158,7 @@ function linkFacts(
   locale: string,
   lang: string,
   t: Translate,
+  statusName: StatusName,
 ): readonly (string | null | undefined)[] {
   switch (kind) {
     case 'application':
@@ -181,7 +183,7 @@ function linkFacts(
       return [d.costCentre, d.amount ? formatMoney(d.amount, locale) : null];
     case 'order':
       return [
-        d.orderStatus ? t(`orders.status.${d.orderStatus}`) : null,
+        d.orderStatus ? statusName('order', d.orderStatus) : null,
         d.counterparty,
         d.amount ? formatMoney(d.amount, locale) : null,
       ];
@@ -203,6 +205,9 @@ function linkFacts(
   }
 }
 
+/** The name of a status key of a status list (`StatusCatalog.label`, spec 003035). */
+export type StatusName = (kind: StatusListKind, key: string) => string;
+
 /**
  * The facts of a link below its title: "TOP · 33. Sitzung · TOP 2". A number or a TOP
  * position that the title already starts with is not repeated.
@@ -214,11 +219,12 @@ export function linkSub(
   locale: string,
   lang: string,
   t: Translate,
+  statusName: StatusName,
 ): string {
   const kind = t(LINK_KIND_LABEL[link.kind]);
   const d = link.detail;
   const hidden = !d || ('accessible' in link && !link.accessible);
-  const facts = hidden ? [] : linkFacts(link.kind, d, link.title ?? '', locale, lang, t);
+  const facts = hidden ? [] : linkFacts(link.kind, d, link.title ?? '', locale, lang, t, statusName);
   return hidden ? kind : [kind, ...facts].filter(Boolean).join(' · ');
 }
 

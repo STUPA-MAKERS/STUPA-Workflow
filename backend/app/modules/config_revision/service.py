@@ -25,6 +25,7 @@ from app.modules.config_revision.models import ConfigRevision
 ENTITY_FORM = "form"
 ENTITY_FLOW = "flow"
 ENTITY_SITE_CONFIG = "site_config"
+ENTITY_STATUS_LIST = "status_list"
 
 #: Entities that do not belong to one type share this ``entity_id``.
 GLOBAL_ID = "global"
@@ -100,6 +101,12 @@ def _flatten(entity_type: str, snapshot: dict[str, Any]) -> dict[str, Any]:
             return _form_entries(snapshot)
         case "flow":
             return _flow_entries(snapshot)
+        case "status_list":
+            return {
+                f"status:{status.get('key')}": status
+                for status in snapshot.get("statuses", []) or []
+                if isinstance(status, dict)
+            }
         case _:
             return dict(snapshot)
 

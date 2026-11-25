@@ -1,3 +1,4 @@
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -107,6 +108,7 @@ async function setup(
 ) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
+      provideTestStatuses(),
       NO_LINKED_TODOS,
       NO_ORDERS,
       provideRouter([]),
@@ -511,6 +513,7 @@ describe('ApplicationsDetailComponent', () => {
   it('draws the tabs while it loads in one column', async () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        provideTestStatuses(),
         NO_LINKED_TODOS,
         NO_ORDERS,
         provideRouter([]),
@@ -2448,6 +2451,7 @@ describe('ApplicationsDetailComponent', () => {
   it('outlines the detail layout while it loads, never a bare sentence', async () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        provideTestStatuses(),
         NO_LINKED_TODOS,
         NO_ORDERS,
         provideRouter([]),

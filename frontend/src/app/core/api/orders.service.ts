@@ -17,12 +17,10 @@ import type { Attachment, AttachmentOutWire, IsoDateTime, Uuid } from '@core/api
 import { skipLoading } from '@stupa-makers/ui-kit';
 import { httpParams } from './http-params';
 
-export type OrderStatus = 'planned' | 'ordered' | 'delivered' | 'cancelled';
+/** The key of a status of the list of the Bestellungen (`StatusCatalog`, spec 003035). */
+export type OrderStatus = string;
 /** `order`: the Gremium buys. `outlay`: a person pays and gets the money back. */
 export type OrderKind = 'order' | 'outlay';
-
-/** The statuses in the order of the purchase. */
-export const ORDER_STATUSES: readonly OrderStatus[] = ['planned', 'ordered', 'delivered', 'cancelled'];
 
 /** One Bestellung. The applicant view holds only the fields without `?`. */
 export interface Order {

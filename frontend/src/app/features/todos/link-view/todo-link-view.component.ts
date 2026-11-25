@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, signal, untracked } from '@angular/core';
 import type { Subscription } from 'rxjs';
 import type { Uuid } from '@core/api/models';
@@ -19,7 +20,7 @@ import {
   FactsComponent,
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
-import { LINK_ICON, linkSub, VOTE_RESULT_LABEL, VOTE_STATUS_LABEL } from '../todos.util';
+import { LINK_ICON, linkSub, type StatusName, VOTE_RESULT_LABEL, VOTE_STATUS_LABEL } from '../todos.util';
 
 /** The values of a fact that the sheet translates, by the key of the fact. */
 const VALUE_LABEL: Record<string, Record<string, TranslationKey>> = {
@@ -78,6 +79,8 @@ const ROWS_HEADING: Partial<Record<TodoLink['kind'], TranslationKey>> = {
 export class TodoLinkViewComponent {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
+  private readonly statusName: StatusName = (kind, key) => this.statuses.label(kind, key);
   private readonly t = this.i18n.translate.bind(this.i18n);
 
   readonly open = model(false);
@@ -91,7 +94,7 @@ export class TodoLinkViewComponent {
   readonly heading = computed(() => this.view()?.title ?? this.link()?.title ?? '');
   readonly sub = computed(() => {
     const link = this.link();
-    return link ? linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t) : '';
+    return link ? linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t, this.statusName) : '';
   });
 
   /** The read of the open link; a read for another link drops it. */

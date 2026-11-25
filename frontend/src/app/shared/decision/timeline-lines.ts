@@ -4,7 +4,6 @@ import {
   type OutsideDecision,
   type TimelineOrderEvent,
 } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonthYear } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
@@ -71,29 +70,22 @@ export function forcedLine(reason: string | null | undefined, t: Translate): str
   return t('applications.history.forced', { reason: label });
 }
 
-/** The names of the statuses of a Bestellung in the timeline. */
-const ORDER_STATUS: Readonly<Record<string, TranslationKey>> = {
-  planned: 'orders.status.planned',
-  ordered: 'orders.status.ordered',
-  delivered: 'orders.status.delivered',
-  cancelled: 'orders.status.cancelled',
-};
-
 /**
  * The title and the line of an event of a Bestellung in the timeline of its Antrag: what
  * happened, then the Bezeichnung with the number. The event holds no price, so the
- * applicant reads the same text.
+ * applicant reads the same text. `statusName` gives the name of a status key of the list
+ * of the Bestellungen (spec 003035).
  */
 export function orderEventText(
   e: TimelineOrderEvent,
   t: Translate,
+  statusName: (key: string) => string,
 ): { readonly title: string; readonly body: string } {
-  const status = ORDER_STATUS[e.toStatus ?? ''];
   const title =
     e.change === 'created'
       ? t('orders.history.created')
       : e.change === 'deleted'
         ? t('orders.history.deleted')
-        : t('orders.history.status', { status: status ? t(status) : (e.toStatus ?? '') });
+        : t('orders.history.status', { status: statusName(e.toStatus ?? '') });
   return { title, body: [e.title, e.number].filter((part) => !!part).join(' · ') };
 }

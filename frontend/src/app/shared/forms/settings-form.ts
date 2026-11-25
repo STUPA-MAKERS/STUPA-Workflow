@@ -32,6 +32,8 @@ export interface SettingsFormOptions<S, D, B> {
   readonly allowed?: () => boolean;
   /** Called after each read and each write with the stored state. */
   readonly onApply?: (saved: S) => void;
+  /** The toast text of a failed write, or `null` for "Speichern fehlgeschlagen". */
+  readonly errorText?: (err: unknown) => string | null;
 }
 
 /** The state and the actions of a settings form. Make it with {@link settingsForm}. */
@@ -154,9 +156,9 @@ export function settingsForm<S, D extends object, B>(opts: SettingsFormOptions<S
           apply(s);
           toast.show(i18n.translate('admin.common.saved'), 'success');
         },
-        error: () => {
+        error: (err: unknown) => {
           saving.set(false);
-          toast.show(i18n.translate('admin.common.saveFailed'), 'error');
+          toast.show(opts.errorText?.(err) ?? i18n.translate('admin.common.saveFailed'), 'error');
         },
       });
     },

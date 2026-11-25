@@ -54,7 +54,8 @@ TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
 VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 InvoiceStatus = Literal["open", "paid"]
-OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
+#: The key of a status of the list of the Bestellungen (F/administration/admin/003035).
+OrderStatus = str
 BookingKind = Literal["expense", "income"]
 
 

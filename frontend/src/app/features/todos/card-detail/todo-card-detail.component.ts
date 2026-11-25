@@ -1,3 +1,4 @@
+import { StatusCatalog } from '@core/api/statuses.service';
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
@@ -99,6 +100,7 @@ import {
   eventDays,
   eventText,
   linkSub,
+  type StatusName,
   linkTitle,
   relativeDays,
   sheetMove,
@@ -212,6 +214,8 @@ export class TodoCardDetailComponent {
   private readonly files = inject(ApiClient);
   private readonly apiBase = inject(API_BASE_URL);
   private readonly i18n = inject(I18nService);
+  private readonly statuses = inject(StatusCatalog);
+  private readonly statusName: StatusName = (kind, key) => this.statuses.label(kind, key);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -648,7 +652,7 @@ export class TodoCardDetailComponent {
   }
 
   linkSub(link: TodoLink): string {
-    return linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t);
+    return linkSub(link, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t, this.statusName);
   }
 
   /** Read the card again (after a refusal, or from outside). */

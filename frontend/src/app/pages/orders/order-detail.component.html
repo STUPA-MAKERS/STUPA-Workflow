@@ -99,12 +99,12 @@
 </app-detail-screen>
 
 <app-confirm-dialog
-  [open]="cancelling()"
-  [title]="'orders.cancel.title' | t"
+  [open]="!!cancelling()"
+  [title]="cancelTitle()"
   [body]="cancelBody()"
-  [confirmLabel]="'orders.menu.cancel' | t"
+  [confirmLabel]="cancelLabel()"
   (confirm)="confirmCancel()"
-  (cancel)="cancelling.set(false)"
+  (cancel)="cancelling.set(null)"
 />
 <app-confirm-dialog
   [open]="deleting()"

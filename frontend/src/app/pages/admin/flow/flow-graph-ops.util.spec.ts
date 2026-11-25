@@ -26,7 +26,7 @@ describe('flow-graph-ops.util', () => {
     expect(ordered.transitions[0].offerOnOrderStatus).toBe('ordered');
     expect(setOrderOffer(ordered, 0, 'delivered').transitions[0].offerOnOrderStatus).toBe('delivered');
     expect(setOrderOffer(ordered, 0, '').transitions[0]).not.toHaveProperty('offerOnOrderStatus');
-    expect(setOrderOffer(ordered, 0, 'planned').transitions[0]).not.toHaveProperty('offerOnOrderStatus');
+    expect(setOrderOffer(ordered, 0, 'returned').transitions[0].offerOnOrderStatus).toBe('returned');
   });
 
   /** § 000571: a state is approved or denied, never both, and a vote state neither. */

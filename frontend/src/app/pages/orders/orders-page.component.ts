@@ -9,6 +9,7 @@ import {
   OrdersApiService,
   type PendingApplication,
 } from '@core/api/orders.service';
+import { StatusCatalog } from '@core/api/statuses.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -26,7 +27,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ListDetailScreenComponent } from '@stupa-makers/ui-kit/screens';
 import { BudgetTreeApi, flattenBudgetOptions } from '../budget/budget-tree.api';
-import { ORDER_KIND_LABEL, ORDER_STATUS_KIND, ORDER_STATUS_LABEL, shownPrice } from './orders.util';
+import { ORDER_KIND_LABEL, shownPrice } from './orders.util';
 import { OrdersRefresh } from './orders-refresh';
 
 /** How many rows one read of the list brings. */
@@ -84,6 +85,7 @@ export class OrdersPageComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly statuses = inject(StatusCatalog);
 
   protected readonly canManage = computed(() => this.auth.can('order.manage'));
   /** `finance.export`: the XLSX file of the list (spec 002886). */
@@ -271,8 +273,8 @@ export class OrdersPageComponent {
       title: order.title,
       meta: [order.applicationTitle, order.supplier].filter((part): part is string => !!part),
       status: {
-        label: this.i18n.translate(ORDER_STATUS_LABEL[order.status]),
-        kind: ORDER_STATUS_KIND[order.status],
+        label: this.statuses.label('order', order.status),
+        kind: this.statuses.tone('order', order.status),
       },
       trailing: this.money(price.amount) || undefined,
       link: { commands: ['/orders', order.id] },

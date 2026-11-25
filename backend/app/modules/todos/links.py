@@ -242,7 +242,7 @@ def _order_target(order: PurchaseOrder) -> Resolved:
             amount=_money(order_price(order.actual_amount, order.planned_amount)),
             counterparty=order.supplier,
             date=_iso(order.ordered_on),
-            order_status=order.status,  # type: ignore[arg-type]
+            order_status=order.status,
         ),
     )
 
