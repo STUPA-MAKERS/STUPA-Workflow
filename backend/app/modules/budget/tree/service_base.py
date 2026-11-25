@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, Select, or_, select
+from sqlalchemy import ColumnElement, Select, func, or_, select
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.application_types.service import type_has_budget
 from app.modules.applications.models import Application
@@ -67,6 +68,17 @@ def _applied(*clauses: ColumnElement[bool] | None) -> tuple[ColumnElement[bool],
     because the truth value of a SQL clause is undefined.
     """
     return tuple(clause for clause in clauses if clause is not None)
+
+
+def _day_or_entry(
+    day: InstrumentedAttribute[Any], created_at: InstrumentedAttribute[Any]
+) -> ColumnElement[Any]:
+    """The day that sorts a row of a list by month: `day`, or the day of the entry without it.
+
+    The frontend puts a row under the month of the same value (`day ?? createdAt`), so the
+    order and the month headings read one date, and each month is one run of rows (spec 003021).
+    """
+    return func.coalesce(day, func.date(created_at))
 
 
 def _subtree_ids(node: Budget) -> Select[UUID]:

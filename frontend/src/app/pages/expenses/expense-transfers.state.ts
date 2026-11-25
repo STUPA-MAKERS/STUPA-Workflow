@@ -76,6 +76,8 @@ export class ExpenseTransfersState {
       amountMax: this.list.amountMax().trim() || undefined,
       createdFrom: this.list.createdFrom() || undefined,
       createdTo: this.list.createdTo() || undefined,
+      /** The month headings read the payment date, so the order reads it too (spec 003021). */
+      sort: 'paymentDate' as const,
     };
   }
 
