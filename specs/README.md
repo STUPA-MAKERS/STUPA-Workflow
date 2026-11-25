@@ -639,7 +639,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mollie/003094](requirements/functional/integrations/mollie/003094_read-payments.md) | The worker reads the Mollie payments | draft |
 | [F/integrations/mollie/003095](requirements/functional/integrations/mollie/003095_assign-to-event.md) | A Mollie payment belongs to the Event of its pretix shop | draft |
 | [F/integrations/mollie/003096](requirements/functional/integrations/mollie/003096_money-in-detail.md) | The detail of an Event shows the Mollie money | draft |
-| [F/integrations/mollie/003097](requirements/functional/integrations/mollie/003097_booking-suggestion.md) | The Mollie money becomes suggested bookings | draft |
+| [F/integrations/mollie/003097](requirements/functional/integrations/mollie/003097_book-settlements.md) | Each Mollie settlement is booked automatically | draft |
 | [F/integrations/mollie/003098](requirements/functional/integrations/mollie/003098_only-money.md) | The platform keeps only the money data of Mollie | draft |
 | [F/integrations/mollie/003099](requirements/functional/integrations/mollie/003099_no-change-in-mollie.md) | The platform changes nothing in Mollie | draft |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
@@ -678,7 +678,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/pretix/003083](requirements/functional/integrations/pretix/003083_event-link.md) | An Event links one pretix event | draft |
 | [F/integrations/pretix/003084](requirements/functional/integrations/pretix/003084_sales-in-detail.md) | The detail of an Event shows the pretix sales | draft |
 | [F/integrations/pretix/003085](requirements/functional/integrations/pretix/003085_refresh-in-worker.md) | The worker reads the pretix sales | draft |
-| [F/integrations/pretix/003086](requirements/functional/integrations/pretix/003086_income-suggestion.md) | The paid sales become a suggested income booking | draft |
+| [F/integrations/pretix/003086](requirements/functional/integrations/pretix/003086_book-sales.md) | The pretix sales are booked automatically | draft |
 | [F/integrations/pretix/003088](requirements/functional/integrations/pretix/003088_only-sums.md) | The platform keeps only sums of pretix orders | draft |
 | [F/integrations/pretix/003089](requirements/functional/integrations/pretix/003089_no-change-in-pretix.md) | The platform changes nothing in pretix | draft |
 | [F/integrations/pretix/003090](requirements/functional/integrations/pretix/003090_audit.md) | The pretix actions write audit entries | draft |
