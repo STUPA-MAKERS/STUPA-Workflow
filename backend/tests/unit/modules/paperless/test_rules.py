@@ -32,7 +32,7 @@ def _settings(**values: object) -> PaperlessSettings:
 
 
 def test_only_the_paperless_scope_carries_a_paperless_permission() -> None:
-    """§F/integrations/mcp/002920: `paperless:use` alone carries `paperless.use`."""
+    """§F/integrations/mcp/002920: `paperless:use` alone carries it; the default asks for it."""
     assert {"admin.paperless", "paperless.use"} <= set(PERMISSION_CATALOGUE)
     carriers = {
         name for name, scope in oauth.SCOPES.items() if scope & {"admin.paperless", "paperless.use"}
@@ -48,7 +48,7 @@ def test_only_the_paperless_scope_carries_a_paperless_permission() -> None:
         roles=["admin"],
         scope_permissions=oauth.scope_permissions(list(oauth.SCOPES)),
     )
-    assert not default.has("paperless.use")
+    assert default.has("paperless.use")
     assert not everything.has("admin.paperless")
     assert everything.has("paperless.use")
 
