@@ -2,7 +2,7 @@
 id: "003018"
 title: The page Rollen & Rechte shows the name of a permission with its key
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:
