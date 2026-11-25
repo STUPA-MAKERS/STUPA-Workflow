@@ -15,6 +15,7 @@ import {
   vatRate,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
+import { InvoiceOrdersComponent } from '../invoice-orders/invoice-orders.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
@@ -24,7 +25,8 @@ import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.
  * The detail of an invoice:
  * "Rechnung · <Nummer>", the supplier, "Status · fällig … · in n Tagen · Brutto", the
  * actions "Als bezahlt markieren" and "Buchung anlegen", then the receipt, the amounts
- * (net, VAT with its rate, gross), the data and the bookings with the booked share.
+ * (net, VAT with its rate, gross) with the Bestellungen that name the invoice, the data
+ * and the bookings with the booked share.
  *
  * The receipt shows as a file to open: a click opens it in the file viewer of the app
  * (spec 001080), and the page shows no PDF inline.
@@ -35,6 +37,7 @@ import { RowChevronComponent } from '../../../shared/ui/row-chevron/row-chevron.
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FactsComponent,
+    InvoiceOrdersComponent,
     RowChevronComponent,
     MetaLineComponent,
     SectionComponent,
@@ -61,8 +64,10 @@ export class InvoiceDetailComponent {
 
   readonly invoice = input.required<Invoice>();
   readonly costCentres = input<ReadonlyMap<string, CostCentreLabel>>(new Map());
-  /** `budget.book`: edit, delete, mark paid, add a booking. */
+  /** `invoice.manage` or `budget.book`: edit, delete, mark paid. */
   readonly canManage = input(false);
+  /** `budget.book`: add a booking. */
+  readonly canBook = input(false);
   readonly split = input(false);
   readonly phone = input(false);
   /** "Als bezahlt markieren" runs. */
@@ -134,7 +139,7 @@ export class InvoiceDetailComponent {
       ],
     };
     const items: RowMenuItem[] = [
-      ...(this.canManage() ? [book] : []),
+      ...(this.canBook() ? [book] : []),
       ...(this.phone() && i.hasFile ? [file] : []),
     ];
     return [

@@ -56,6 +56,22 @@ describe('TodoLinkedListComponent', () => {
     expect(document.querySelectorAll('app-avatar-stack')).toHaveLength(1);
   });
 
+  /** §F/finance/orders/002869: rows of the page with and without a link, and a button of the page. */
+  it('shows a row of the page without a link, one with query parameters, and the button of the page', async () => {
+    await setup(() => of(linksOf([])), {
+      rows: [
+        { icon: 'package', title: 'Beamer', sub: 'Bestellung · Geplant', link: null },
+        { icon: 'receipt', title: 'RE-7', sub: 'Rechnung', link: ['/invoices'], queryParams: { id: 'i-1' } },
+      ],
+      extra: { label: 'Bestellung anlegen', icon: 'package', link: ['/orders', 'new'], queryParams: { application: 'a-1' } },
+    });
+    expect(screen.getByText('Beamer')).not.toHaveAttribute('href');
+    expect(screen.getByRole('link', { name: 'RE-7' })).toHaveAttribute('href', '/invoices?id=i-1');
+    const extra = screen.getByTestId('tl-extra');
+    expect(extra).toHaveAttribute('href', '/orders/new?application=a-1');
+    expect(extra).toHaveAttribute('aria-label', 'Bestellung anlegen');
+  });
+
   /** §F/collaboration/links/001407: the section shows the links of every kind. */
   it('lists the links of the other kinds with their page or "kein Zugriff"', async () => {
     await setup(() =>

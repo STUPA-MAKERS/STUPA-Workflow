@@ -33,6 +33,7 @@ import { FileOpenService } from '@shared/viewer/file-open.service';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService, type ApplicationChange } from './applications-page.service';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_ORDERS } from '../../../testing/order-fixtures';
 import { kindSpies } from '../../../testing/toast';
 
 const SUBMITTED: StateOutWire = {
@@ -148,6 +149,7 @@ async function setup(opts: Opts = {}) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
       NO_LINKED_TODOS,
+      NO_ORDERS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),

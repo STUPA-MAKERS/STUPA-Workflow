@@ -158,6 +158,11 @@
     {
       "count": 1,
       "from": "admin",
+      "to": "orders"
+    },
+    {
+      "count": 1,
+      "from": "admin",
       "to": "paperless"
     },
     {
@@ -231,7 +236,7 @@
       "to": "auth"
     },
     {
-      "count": 12,
+      "count": 13,
       "from": "applications",
       "to": "budget"
     },
@@ -299,6 +304,11 @@
       "count": 1,
       "from": "attachments",
       "to": "flow"
+    },
+    {
+      "count": 2,
+      "from": "attachments",
+      "to": "orders"
     },
     {
       "count": 5,
@@ -586,6 +596,11 @@
       "to": "meetings"
     },
     {
+      "count": 1,
+      "from": "config_revision",
+      "to": "orders"
+    },
+    {
       "count": 7,
       "from": "config_revision",
       "to": "shared"
@@ -814,6 +829,11 @@
       "count": 1,
       "from": "graph",
       "to": "meetings"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "orders"
     },
     {
       "count": 3,
@@ -1071,6 +1091,56 @@
       "to": "site_config"
     },
     {
+      "count": 2,
+      "from": "orders",
+      "to": "application_types"
+    },
+    {
+      "count": 10,
+      "from": "orders",
+      "to": "applications"
+    },
+    {
+      "count": 5,
+      "from": "orders",
+      "to": "audit"
+    },
+    {
+      "count": 5,
+      "from": "orders",
+      "to": "auth"
+    },
+    {
+      "count": 6,
+      "from": "orders",
+      "to": "budget"
+    },
+    {
+      "count": 4,
+      "from": "orders",
+      "to": "files"
+    },
+    {
+      "count": 2,
+      "from": "orders",
+      "to": "flow"
+    },
+    {
+      "count": 1,
+      "from": "orders",
+      "to": "gremien"
+    },
+    {
+      "count": 9,
+      "from": "orders",
+      "to": "shared"
+    },
+    {
+      "count": 1,
+      "from": "orders",
+      "to": "webhooks"
+    },
+    {
       "count": 4,
       "from": "paperless",
       "to": "audit"
@@ -1199,6 +1269,11 @@
       "count": 7,
       "from": "privacy",
       "to": "notifications"
+    },
+    {
+      "count": 1,
+      "from": "privacy",
+      "to": "orders"
     },
     {
       "count": 3,
@@ -1376,6 +1451,11 @@
       "to": "livevote"
     },
     {
+      "count": 2,
+      "from": "search",
+      "to": "orders"
+    },
+    {
       "count": 4,
       "from": "search",
       "to": "shared"
@@ -1481,7 +1561,7 @@
       "to": "auth"
     },
     {
-      "count": 6,
+      "count": 7,
       "from": "todos",
       "to": "budget"
     },
@@ -1524,6 +1604,11 @@
       "count": 6,
       "from": "todos",
       "to": "notifications"
+    },
+    {
+      "count": 6,
+      "from": "todos",
+      "to": "orders"
     },
     {
       "count": 5,
@@ -1783,6 +1868,12 @@
       "layer": 5,
       "name": "notifications",
       "path": "backend/app/modules/notifications"
+    },
+    {
+      "id": "orders",
+      "layer": 3,
+      "name": "orders",
+      "path": "backend/app/modules/orders"
     },
     {
       "id": "paperless",

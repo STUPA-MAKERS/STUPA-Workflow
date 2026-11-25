@@ -9,6 +9,19 @@
     @if (showActions()) {
       <span sectionAction class="tl__actions">
         <app-button-group>
+          @if (extra(); as more) {
+            <a
+              appButton="text"
+              size="sm"
+              [routerLink]="more.link"
+              [queryParams]="more.queryParams ?? null"
+              [attr.aria-label]="more.label"
+              [title]="more.label"
+              data-testid="tl-extra"
+            >
+              <app-icon [name]="more.icon" />
+            </a>
+          }
           @if (showLink()) {
             <app-button
               variant="text"
@@ -54,7 +67,7 @@
           <li class="tl__row" data-testid="tl-row">
             <app-icon class="tl__icon" [name]="row.icon" [size]="18" />
             <span class="tl__text">
-              <a class="tl__link" [routerLink]="row.link">{{ row.title }}</a>
+              <a class="tl__link" [routerLink]="row.link" [queryParams]="row.queryParams ?? null">{{ row.title }}</a>
               <span class="tl__sub">{{ row.sub }}</span>
             </span>
           </li>

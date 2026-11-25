@@ -215,7 +215,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly split = this.listDetail.split;
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
-  readonly canExport = computed(() => this.auth.can('budget.export'));
+  readonly canExport = computed(() => this.auth.can('finance.export'));
 
   readonly budgetTree = this.list.budgetTree;
   readonly items = this.list.items;
@@ -700,18 +700,23 @@ export class ExpensesComponent implements OnDestroy {
 
   /**
    * `?new=booking&invoice=<id>` ("Buchung anlegen" on the invoices page) opens the form
-   * of a new booking with that invoice. The page then takes the two parameters away, so
-   * a reload does not open the form again.
+   * of a new booking with that invoice, and `?new=booking&order=<id>` ("Buchung anlegen"
+   * at a Bestellung) with the values of that Bestellung. The page then takes the
+   * parameters away, so a reload does not open the form again.
    */
   private adoptCreateLink(qp: ParamMap): void {
     if (qp.get('new') !== 'booking') return;
     if (this.canManage()) {
       const invoiceId = qp.get('invoice');
-      this.dialogs.openCreate(invoiceId ? { invoiceId } : {});
+      const orderId = qp.get('order');
+      this.dialogs.openCreate({
+        ...(invoiceId ? { invoiceId } : {}),
+        ...(orderId ? { orderId } : {}),
+      });
     }
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { new: null, invoice: null },
+      queryParams: { new: null, invoice: null, order: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

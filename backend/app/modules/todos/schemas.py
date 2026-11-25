@@ -32,6 +32,7 @@ TodoLinkKind = Literal[
     "gremium",
     "invoice",
     "expense",
+    "order",
     "budget",
     "ticket",
     "todo",
@@ -53,6 +54,7 @@ TicketStatus = Literal["new", "in_progress", "waiting", "done", "rejected"]
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]
 VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 InvoiceStatus = Literal["open", "paid"]
+OrderStatus = Literal["planned", "ordered", "delivered", "cancelled"]
 BookingKind = Literal["expense", "income"]
 
 
@@ -115,6 +117,7 @@ class TodoLinkDetail(FrozenCamelModel, frozen=True):
     end_time: str | None = Field(default=None, serialization_alias="endTime")
     place: str | None = None
     document_type: str | None = Field(default=None, serialization_alias="documentType")
+    order_status: OrderStatus | None = Field(default=None, serialization_alias="orderStatus")
 
 
 class TodoLinkOut(FrozenCamelModel, frozen=True):

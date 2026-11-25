@@ -24,7 +24,7 @@ from app.modules.flow.router import (
     get_action_dispatcher,
     get_flow_service,
 )
-from app.modules.flow.schemas import TransitionOut, TransitionResult
+from app.modules.flow.schemas import TransitionOut, TransitionResult, offered_on
 from app.modules.flow.service import FlowService
 from app.shared.errors import ForbiddenError
 
@@ -88,9 +88,7 @@ class _FakeService:
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         return [
-            TransitionOut(
-                id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={"de": "OK"}
-            )
+            TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={"de": "OK"})
         ]
 
     async def fire_as_applicant(
@@ -107,10 +105,7 @@ class _FakeService:
             "transition_id": transition_id,
             "note": note,
         }
-        return TransitionResult(
-            newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=[]
-        )
-
+        return TransitionResult(newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=[])
 
     async def list_states(self, application_id, *, allow_unconfirmed=True):
         self.allow_unconfirmed.append(allow_unconfirmed)
@@ -196,9 +191,7 @@ def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> 
     assert r.headers["content-type"] == "application/problem+json"
 
 
-def test_list_transitions_ok(
-    app: FastAPI, client: TestClient, fake_service: _FakeService
-) -> None:
+def test_list_transitions_ok(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     """List the transitions and hide an unconfirmed guest application."""
     _as_principal(app, "application.transition")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
@@ -207,16 +200,43 @@ def test_list_transitions_ok(
     assert fake_service.allow_unconfirmed == [False]
 
 
+def test_list_transitions_keeps_the_offered_ones(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """§ F/finance/orders/002931: ``orderStatus`` keeps the transitions with the setting."""
+    _as_principal(app, "application.transition")
+    url = f"/api/applications/{uuid4()}/transitions"
+    assert client.get(url, params={"orderStatus": "delivered"}).json() == []
+    assert client.get(url, params={"orderStatus": "paid"}).status_code == 422
+
+
+def test_the_offer_of_a_status_change_of_a_bestellung() -> None:
+    """§ F/finance/orders/002931: a flow with the setting, one without, and no right."""
+
+    def out(offer: str | None) -> TransitionOut:
+        return TransitionOut.model_validate(
+            {
+                "id": str(uuid4()),
+                "fromStateId": str(uuid4()),
+                "toStateId": str(uuid4()),
+                "label": {"de": "Weiter"},
+                "offerOnOrderStatus": offer,
+            }
+        )
+
+    with_setting = [out("delivered"), out("ordered"), out(None)]
+    assert offered_on(with_setting, "delivered") == [with_setting[0]]
+    assert offered_on(with_setting, "ordered") == [with_setting[1]]
+    assert offered_on([out(None), out(None)], "delivered") == []
+    assert offered_on([], "delivered") == []
+
+
 def test_fire_requires_auth_401(client: TestClient) -> None:
-    r = client.post(
-        f"/api/applications/{uuid4()}/transition", json={"transitionId": str(uuid4())}
-    )
+    r = client.post(f"/api/applications/{uuid4()}/transition", json={"transitionId": str(uuid4())})
     assert r.status_code == 401
 
 
-def test_fire_ok_passes_note(
-    app: FastAPI, client: TestClient, fake_service: _FakeService
-) -> None:
+def test_fire_ok_passes_note(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     _as_principal(app, "application.transition")
     app_id, transition_id = uuid4(), uuid4()
     r = client.post(
@@ -297,9 +317,7 @@ def test_fire_refuses_a_bad_decision_422(app: FastAPI, client: TestClient) -> No
 
 def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "application.transition")
-    r = client.post(
-        f"/api/applications/{uuid4()}/transition", json={"transitionId": "not-a-uuid"}
-    )
+    r = client.post(f"/api/applications/{uuid4()}/transition", json={"transitionId": "not-a-uuid"})
     assert r.status_code == 422
 
 
@@ -308,9 +326,7 @@ def test_list_applicant_transitions_ok(
 ) -> None:
     """List the applicant transitions through a magic link."""
     app_id = uuid4()
-    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
-        application_id=app_id
-    )
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(application_id=app_id)
     r = client.get(f"/api/applications/{app_id}/applicant-transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
@@ -321,9 +337,7 @@ def test_fire_applicant_transition_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id, transition_id = uuid4(), uuid4()
-    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
-        application_id=app_id
-    )
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(application_id=app_id)
     r = client.post(
         f"/api/applications/{app_id}/applicant-transition",
         json={"transitionId": str(transition_id), "note": "los"},
@@ -340,9 +354,7 @@ def test_fire_applicant_transition_refuses_a_decision(
 ) -> None:
     """The applicant never sets a decision (422 `decision_not_allowed`)."""
     app_id = uuid4()
-    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
-        application_id=app_id
-    )
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(application_id=app_id)
     r = client.post(
         f"/api/applications/{app_id}/applicant-transition",
         json={"transitionId": str(uuid4()), "decision": {"conditions": ["x"]}},
@@ -423,9 +435,7 @@ def test_transition_routes_check_read_access(
     r = client.get(f"/api/applications/{app_id}/transitions")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
-    r = client.post(
-        f"/api/applications/{app_id}/transition", json={"transitionId": str(uuid4())}
-    )
+    r = client.post(f"/api/applications/{app_id}/transition", json={"transitionId": str(uuid4())})
     assert r.status_code == 403
     assert fake_service.fired is None
 

@@ -16,6 +16,7 @@ from app.modules.applications.models import (
     ApplicationLink,
     ApplicationLinkEvent,
     ApplicationObserver,
+    ApplicationOrderEvent,
     Comment,
     GuestApplicationSettings,
     MagicLink,
@@ -78,6 +79,7 @@ from app.modules.notifications.push_models import (
     PushSubscription,
     PushVapidKey,
 )
+from app.modules.orders.models import PurchaseOrder, PurchaseOrderPosition
 from app.modules.paperless.models import (
     PaperlessDocument,
     PaperlessFiling,
@@ -110,6 +112,9 @@ from app.modules.voting.models import SecretBallot, Vote, VotedMarker
 from app.modules.webhooks.models import Webhook, WebhookDelivery
 
 __all__ = [
+    "ApplicationOrderEvent",
+    "PurchaseOrder",
+    "PurchaseOrderPosition",
     "ActivityVisit",
     "Applicant",
     "Application",

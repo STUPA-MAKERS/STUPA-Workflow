@@ -146,18 +146,20 @@ describe('TodoLinkPickerComponent', () => {
       { kind: 'gremium', targetId: 'g-1', title: 'StuPa', detail: {} },
       { kind: 'invoice', targetId: 'i-1', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus' } },
       { kind: 'expense', targetId: 'e-1', title: 'Plakate', detail: { costCentre: 'VS-800' } },
+      { kind: 'order', targetId: 'o-1', title: 'Beamer', detail: { orderStatus: 'ordered' } },
     ];
     const { open, type, linkSearch, picked, fixture } = await setup();
     linkSearch.mockReturnValue(of(found(hits)));
     await open();
     type('Pla');
     const groups = [...document.querySelectorAll('.lp__group')].map((g) => g.textContent?.trim());
-    expect(groups).toEqual(['Abstimmungen', 'Termine', 'Gremien', 'Rechnungen', 'Buchungen']);
+    expect(groups).toEqual(['Abstimmungen', 'Termine', 'Gremien', 'Rechnungen', 'Buchungen', 'Bestellungen']);
+    expect(screen.getByText('Bestellung · Bestellt')).toBeInTheDocument();
     expect(screen.getByText('Termin · Mi, 18.11.2026 · Aula')).toBeInTheDocument();
     expect(screen.getByText('Abstimmung · Offen')).toBeInTheDocument();
     expect(screen.getByText('Rechnung · Druckhaus')).toBeInTheDocument();
     expect(screen.getByText('Buchung · VS-800')).toBeInTheDocument();
-    expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'cal', 'landmark', 'receipt', 'swap']);
+    expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'cal', 'landmark', 'receipt', 'swap', 'package']);
     fireEvent.click(screen.getByRole('button', { name: /StuPa/ }));
     expect(picked).toHaveBeenCalledWith(hits[2]);
     for (const [label, kind] of [
@@ -166,6 +168,7 @@ describe('TodoLinkPickerComponent', () => {
       ['Gremien', 'gremium'],
       ['Rechnungen', 'invoice'],
       ['Buchungen', 'expense'],
+      ['Bestellungen', 'order'],
     ] as const) {
       fireEvent.click(screen.getByRole('button', { name: label }));
       expect(linkSearch).toHaveBeenLastCalledWith('Pla', kind, { kind: 'todo', id: 'k-1' });

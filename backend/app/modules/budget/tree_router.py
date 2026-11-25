@@ -6,7 +6,10 @@ Permission scope:
 2. A structure change (node, fiscal year, allocation) needs
    ``budget.structure``.
 3. A booking or a transfer moves money and needs ``budget.book``.
-4. Assign-budget and move-fiscal-year need ``application.manage``.
+4. A write of an invoice needs ``invoice.manage`` or ``budget.book``
+   (F/finance/invoices/003015).
+5. A file export needs ``finance.export`` (F/finance/budget/003016).
+6. Assign-budget and move-fiscal-year need ``application.manage``.
 
 A constraint violation gives 422. The checked constraints are children <=
 parent and fiscal-year disjointness. A delete of a node that still has children
@@ -32,7 +35,12 @@ from app.deps import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.budget.access import BUDGET_READ_PERMISSIONS, has_budget_read
+from app.modules.budget.access import (
+    BUDGET_READ_PERMISSIONS,
+    EXPORT_PERMISSION,
+    INVOICE_WRITE_PERMISSIONS,
+    has_budget_read,
+)
 from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,
@@ -180,7 +188,7 @@ def _find_subtree(roots: Sequence[BudgetTreeNodeOut], node_id: UUID) -> BudgetTr
 )
 async def export_budget_xlsx(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.export"))],
+    principal: Annotated[Principal, Depends(require_principal(EXPORT_PERMISSION))],
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     node_id: Annotated[UUID | None, Query(alias="node")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
@@ -432,7 +440,7 @@ async def list_expenses(
 )
 async def export_expenses_xlsx(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.export"))],
+    principal: Annotated[Principal, Depends(require_principal(EXPORT_PERMISSION))],
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
     kind: Annotated[ExpenseKind | None, Query()] = None,
@@ -594,7 +602,9 @@ async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
     await service.delete_transfer(transfer_id)
 
 
-#: Every budget role may read an invoice. A write needs budget.book.
+#: A write of an invoice needs ``invoice.manage`` or ``budget.book``.
+_INVOICE_WRITE = Depends(require_any_permission(*INVOICE_WRITE_PERMISSIONS))
+#: Every budget role may read an invoice.
 _INVOICE_READ = Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
 
 
@@ -674,7 +684,7 @@ async def get_invoice(
 async def create_invoice(
     payload: InvoiceCreate,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+    principal: Annotated[Principal, _INVOICE_WRITE],
 ) -> InvoiceOut:
     """Create an invoice, optionally with the receipt of a ZUGFeRD import."""
     return await service.create_invoice(payload, actor=principal.sub)
@@ -683,7 +693,7 @@ async def create_invoice(
 @router.patch(
     "/invoices/{invoice_id}",
     response_model=InvoiceOut,
-    dependencies=[Depends(require_principal("budget.book"))],
+    dependencies=[_INVOICE_WRITE],
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def update_invoice(
@@ -696,7 +706,7 @@ async def update_invoice(
 @router.delete(
     "/invoices/{invoice_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.book"))],
+    dependencies=[_INVOICE_WRITE],
     responses=_errors(401, 403, 404),
 )
 async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
@@ -712,7 +722,7 @@ async def delete_invoice(invoice_id: UUID, service: ServiceDep) -> None:
 )
 async def parse_invoice(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+    principal: Annotated[Principal, _INVOICE_WRITE],
     file: Annotated[UploadFile, File()],
 ) -> InvoiceParseResult:
     """Parse a ZUGFeRD/Factur-X PDF into fields plus a file handle for the dialog.
@@ -746,7 +756,7 @@ async def parse_invoice(
 )
 async def upload_invoice_file(
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
+    principal: Annotated[Principal, _INVOICE_WRITE],
     file: Annotated[UploadFile, File()],
 ) -> InvoiceFileResult:
     """Store a receipt PDF without ZUGFeRD parsing.

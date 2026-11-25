@@ -22,6 +22,7 @@ from app.modules.calendar.models import Appointment, Invitation
 from app.modules.graph.build import Ref, Relation
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessDocument
 from app.modules.tickets.models import Ticket
 from app.modules.todos.models import Link, TodoCard
@@ -49,6 +50,9 @@ def builtin_reads() -> tuple[Builtin, ...]:
         ("application", "vote", select(Vote.application_id, Vote.id)),
         ("application", "budget", select(Application.id, Application.budget_id)),
         ("application", "expense", select(BudgetExpense.application_id, BudgetExpense.id)),
+        ("application", "order", select(PurchaseOrder.application_id, PurchaseOrder.id)),
+        ("order", "invoice", select(PurchaseOrder.id, PurchaseOrder.invoice_id)),
+        ("order", "expense", select(BudgetExpense.order_id, BudgetExpense.id)),
         ("meeting", "agenda_item", select(item.meeting_id, item.id)),
         ("meeting", "gremium", select(Meeting.id, Meeting.gremium_id)),
         ("meeting", "vote", select(Vote.meeting_id, Vote.id).where(Vote.agenda_item_id.is_(None))),
@@ -101,6 +105,7 @@ def _id_reads() -> Mapping[str, Select[Any]]:
         "gremium": select(Gremium.id),
         "invoice": select(Invoice.id),
         "expense": select(BudgetExpense.id),
+        "order": select(PurchaseOrder.id),
         "budget": select(Budget.id),
         "ticket": select(Ticket.id),
         "todo": select(TodoCard.id).where(TodoCard.archived_at.is_(None)),
@@ -122,7 +127,8 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
     """The read ``(id, date, fallback date)`` of the elements of one kind.
 
     The date of a node (spec 001425): the date of a meeting and of its TOPs, the start of
-    a Termin, the invoice date of an invoice and of a Buchung, the due date of a card,
+    a Termin, the invoice date of an invoice and of a Buchung, the order date of a
+    Bestellung, the due date of a card,
     the date of a Paperless document, and else the creation. A Gremium and a cost centre
     have no date.
     """
@@ -157,6 +163,10 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
             return select(
                 BudgetExpense.id, BudgetExpense.invoice_date, BudgetExpense.created_at
             ).where(BudgetExpense.id.in_(wanted))
+        case "order":
+            return select(
+                PurchaseOrder.id, PurchaseOrder.ordered_on, PurchaseOrder.created_at
+            ).where(PurchaseOrder.id.in_(wanted))
         case "budget":
             return select(Budget.id, none, none).where(Budget.id.in_(wanted))
         case "ticket":

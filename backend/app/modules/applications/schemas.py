@@ -426,6 +426,23 @@ class AmountChangeOut(FrozenCamelModel, frozen=True):
     gremium_name: str | None = Field(default=None, alias="gremiumName")
 
 
+class OrderEventOut(FrozenCamelModel, frozen=True):
+    """An event of a Bestellung, as the timeline shows it (F/finance/orders/002866).
+
+    Attributes:
+        change: ``created``, ``status`` or ``deleted``.
+        from_status: The status before a status change, else null.
+        to_status: The status after a status change, else null.
+    """
+
+    order_id: UUID = Field(alias="orderId")
+    number: str
+    title: str
+    change: Literal["created", "status", "deleted"]
+    from_status: str | None = Field(default=None, alias="fromStatus")
+    to_status: str | None = Field(default=None, alias="toStatus")
+
+
 class TimelineEventOut(FrozenCamelModel, frozen=True):
     """One status change of the timeline.
 
@@ -452,6 +469,8 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
         outside_decision: The decision made outside the platform that fired this
             branch, else null.
         amount_change: The change of the approved amount of an ``amountChange`` entry.
+        order: The event of a Bestellung of an ``order`` entry. Such an entry changes no
+            state either.
     """
 
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
@@ -465,11 +484,12 @@ class TimelineEventOut(FrozenCamelModel, frozen=True):
     vote_id: UUID | None = Field(default=None, alias="voteId")
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
     decision: TimelineDecisionOut | None = None
-    kind: Literal["status", "amountChange"] = "status"
+    kind: Literal["status", "amountChange", "order"] = "status"
     forced: bool = False
     force_reason: str | None = Field(default=None, alias="forceReason")
     outside_decision: OutsideDecisionOut | None = Field(default=None, alias="outsideDecision")
     amount_change: AmountChangeOut | None = Field(default=None, alias="amountChange")
+    order: OrderEventOut | None = None
 
 
 class VersionOut(FrozenCamelModel, frozen=True):

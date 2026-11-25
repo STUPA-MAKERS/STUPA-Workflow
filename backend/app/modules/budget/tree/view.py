@@ -280,7 +280,7 @@ class TreeViewOps(BudgetTreeServiceBase):
             planned=await self._planned_amounts(),
         )
         forest = plan_rules.with_plan_fields(
-            plain,
+            tree_rules.with_internal(plain, {n.id: bool(n.internal) for n in nodes}),
             {n.id: bool(n.plan_enabled) for n in nodes},
             await self._planned_in(),
             {n.id: bool(n.plan_coverable_default) for n in nodes},

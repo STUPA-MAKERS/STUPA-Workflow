@@ -4,10 +4,13 @@ import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { featureMatch } from '@core/features/feature.guard';
 import { FeatureService } from '@core/features/feature.service';
+import { leaveUnsaved } from '@stupa-makers/ui-kit';
 import { ShellComponent } from './layout/shell.component';
+import { orderAddress } from './pages/orders/order-address.guard';
 import {
   ADMIN_AREA_PERMISSIONS,
   BUDGET_PERMISSIONS,
+  ORDER_PERMISSIONS,
   VOTING_GREMIUM_PERMISSIONS,
 } from './layout/nav.service';
 
@@ -389,6 +392,44 @@ export const routes: Routes = [
           import('./pages/expenses/expenses.component').then((m) => m.ExpensesComponent),
       },
       {
+        path: 'orders',
+        canMatch: [featureMatch('orders')],
+        data: { title: 'nav.orders', permission: ORDER_PERMISSIONS, wide: true },
+        canActivate: [authGuard, orderAddress],
+        loadComponent: () =>
+          import('./pages/orders/orders-page.component').then((m) => m.OrdersPageComponent),
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            data: { none: { icon: 'package', heading: '', emptyHeading: '' } },
+            loadComponent: () =>
+              import('./pages/orders/order-none').then((m) => m.OrderNoneComponent),
+          },
+          {
+            path: 'new',
+            data: { permission: ['order.manage'] },
+            canActivate: [authGuard],
+            canDeactivate: [leaveUnsaved],
+            loadComponent: () =>
+              import('./pages/orders/order-form.component').then((m) => m.OrderFormComponent),
+          },
+          {
+            path: ':id/edit',
+            data: { permission: ['order.manage'] },
+            canActivate: [authGuard],
+            canDeactivate: [leaveUnsaved],
+            loadComponent: () =>
+              import('./pages/orders/order-form.component').then((m) => m.OrderFormComponent),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./pages/orders/order-detail.component').then((m) => m.OrderDetailComponent),
+          },
+        ],
+      },
+      {
         path: 'invoices',
         canMatch: [featureMatch('invoices')],
         data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
@@ -690,7 +731,7 @@ export const routes: Routes = [
           },
           {
             path: 'committees/:id/roles',
-            data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/committees'] },
+            data: { title: 'admin.gremiumRoles.title', permission: 'gremien.gremium_roles', parent: ['admin', 'admin/committees'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/gremium-roles/gremium-roles.component').then(

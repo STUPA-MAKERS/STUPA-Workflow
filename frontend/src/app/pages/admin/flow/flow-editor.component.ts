@@ -743,6 +743,10 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setGuard(g, index, guard));
   }
 
+  protected setOrderOffer(index: number, status: string): void {
+    this.graph.update((g) => ops.setOrderOffer(g, index, status));
+  }
+
   protected setGuardOp(index: number, op: string): void {
     this.graph.update((g) => ops.setGuardOp(g, index, op));
   }

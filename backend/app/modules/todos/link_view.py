@@ -39,6 +39,7 @@ from app.modules.calendar.models import Appointment
 from app.modules.forms.models import FormField
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
+from app.modules.orders.models import PurchaseOrder
 from app.modules.todos.links import GRANT_KINDS, LinkResolver
 from app.modules.todos.models import TodoBoard, TodoCard, TodoCheckItem, TodoColumn
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkView, TodoViewFact, TodoViewRow
@@ -135,6 +136,7 @@ class LinkViewer:
             "appointment": self._appointment,
             "invoice": self._invoice,
             "expense": self._expense,
+            "order": self._order,
             "todo": self._todo,
         }
         facts, rows = await builders[kind](target_id)
@@ -275,6 +277,23 @@ class LinkViewer:
                 _fact("grossAmount", _money(inv.gross_amount), "money"),
                 _fact("invoiceStatus", inv.status),
                 _fact("note", inv.note, "markdown"),
+            ),
+            [],
+        )
+
+    async def _order(self, target_id: uuid.UUID) -> Built:
+        order = await self.session.get(PurchaseOrder, target_id)
+        if order is None:  # pragma: no cover - the resolver found it
+            return (), []
+        return (
+            _facts(
+                _fact("orderStatus", order.status),
+                _fact("orderKind", order.kind),
+                _fact("counterparty", order.supplier),
+                _fact("plannedAmount", _money(order.planned_amount), "money"),
+                _fact("actualAmount", _money(order.actual_amount), "money"),
+                _fact("orderedOn", order.ordered_on, "date"),
+                _fact("deliveredOn", order.delivered_on, "date"),
             ),
             [],
         )

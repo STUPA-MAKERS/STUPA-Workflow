@@ -107,6 +107,7 @@ def _transition(
         automatic=False,
         branch=branch,
         requires_action=requires_action,
+        offer_on_order_status=None,
     )
 
 

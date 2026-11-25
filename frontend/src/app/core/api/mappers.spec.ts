@@ -246,6 +246,7 @@ describe('mapTimelineEvent', () => {
       forceReason: null,
       outsideDecision: null,
       amountChange: null,
+      order: null,
     });
   });
 

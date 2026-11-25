@@ -171,3 +171,15 @@
     </app-button-group>
   </div>
 </section>
+
+@if (ordersOn()) {
+  <app-select
+    data-testid="td-order-offer"
+    [label]="'admin.flow.transition.offerOnOrderStatus' | t"
+    [placeholder]="'admin.flow.transition.offerOnOrderStatus.none' | t"
+    [hint]="'admin.flow.transition.offerOnOrderStatus.hint' | t"
+    [options]="orderOfferOptions()"
+    [ngModel]="transition().offerOnOrderStatus ?? ''"
+    (ngModelChange)="orderOfferChange.emit($event ?? '')"
+  />
+}

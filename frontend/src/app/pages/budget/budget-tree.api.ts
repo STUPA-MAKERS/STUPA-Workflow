@@ -59,6 +59,8 @@ export interface Expense {
   readonly referenceNumber: string | null;
   readonly paymentMethod: PaymentMethod | null;
   readonly category: string | null;
+  /** The Bestellung that the expense paid, else null. */
+  readonly orderId?: Uuid | null;
   /** The linked invoice. One invoice can back many bookings. */
   readonly invoiceId: Uuid | null;
   readonly invoiceNumber: string | null;
@@ -178,6 +180,8 @@ export interface ExpenseCreate extends ExpenseMetadata {
   readonly budgetId?: Uuid | null;
   readonly fiscalYearId?: Uuid | null;
   readonly applicationId?: Uuid | null;
+  /** The Bestellung that the expense paid. It needs the Antrag of that Bestellung. */
+  readonly orderId?: Uuid | null;
 }
 
 /** Update a booking: amount, description, cost center and extra metadata. */
@@ -186,6 +190,8 @@ export interface ExpenseUpdate extends ExpenseMetadata {
   readonly description?: string;
   /** Rebook to another cost center. The fiscal year stays fixed. */
   readonly budgetId?: Uuid;
+  /** Set or remove the Bestellung; it names the Antrag of the booking, or both name none. */
+  readonly orderId?: Uuid | null;
 }
 
 /** Manually create a sub-booking. It carries only its own fields. The parent gives the rest. */
@@ -390,6 +396,10 @@ export interface BudgetTreeNode {
   /** The fiscal years whose plan version in force puts the node on the income side. An
    *  Antrag must not take the node in these years (spec 001030). */
   readonly incomeIn?: readonly Uuid[];
+  /** The own switch "Intern" (spec 003011). */
+  readonly internal?: boolean;
+  /** A node above is Intern, so this one is Intern too (spec 003011). */
+  readonly internalInherited?: boolean;
   readonly byFiscalYear: readonly BudgetAllocationView[];
   readonly children: readonly BudgetTreeNode[];
 }
@@ -457,6 +467,8 @@ export interface BudgetNodeUpdate {
   readonly fiscalStartMonth?: number;
   readonly fiscalStartDay?: number;
   readonly planCoverableDefault?: boolean;
+  /** The own switch "Intern" (spec 003011). */
+  readonly internal?: boolean;
 }
 
 /** A top-level budget with one fiscal year that a new booking can take (spec 000879). */
@@ -759,7 +771,7 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/invoices/${id}/file`, { responseType: 'blob' });
   }
 
-  /** Filtered bookings as ``.xlsx`` (P(``budget.export``)). The content matches the
+  /** Filtered bookings as ``.xlsx`` (P(``finance.export``)). The content matches the
    *  list. Optional ``ids`` exports exactly the selected bookings
    *  (#expenses-ux: bulk export). */
   exportExpensesXlsx(
@@ -781,7 +793,7 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/expenses/export.xlsx`, { params, responseType: 'blob' });
   }
 
-  /** Budget tree as ``.xlsx`` (P(``budget.export``)), filtered like the dashboard. */
+  /** Budget tree as ``.xlsx`` (P(``finance.export``)), filtered like the dashboard. */
   exportXlsx(
     opts: { node?: string; fiscalYear?: string; gremium?: string } = {},
   ): Observable<Blob> {

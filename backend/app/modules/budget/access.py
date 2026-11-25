@@ -30,6 +30,12 @@ if TYPE_CHECKING:
 
 #: The permissions that read the invoice and booking lists (the full view).
 BUDGET_READ_PERMISSIONS: tuple[str, ...] = ("budget.view", "budget.structure", "budget.book")
+#: The permissions of which one writes an invoice (F/finance/invoices/003015). The second
+#: is the booking right, so that a role that books keeps the invoices.
+INVOICE_WRITE_PERMISSIONS: tuple[str, ...] = ("invoice.manage", "budget.book")
+#: The permission of every file export of the finance pages: the Haushalt, the bookings
+#: and the Bestellungen (F/finance/budget/003016).
+EXPORT_PERMISSION = "finance.export"
 
 
 def has_budget_read(principal: Principal) -> bool:

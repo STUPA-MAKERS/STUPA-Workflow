@@ -189,6 +189,10 @@ export const AUDIT_ACTIONS = [
   'paperless_filed',
   'paperless_inserted',
   'ticket_mailbox',
+  'order_create',
+  'order_update',
+  'order_status',
+  'order_delete',
   'link_add',
   'link_remove',
 ] as const;

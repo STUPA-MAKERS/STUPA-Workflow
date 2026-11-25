@@ -143,6 +143,10 @@ describe('todos.util', () => {
         `Buchung · VS-800 · ${eur('42.50')}`,
       );
       expect(sub(link({ kind: 'expense', detail: {} }))).toBe('Buchung');
+      expect(
+        sub(link({ kind: 'order', detail: { orderStatus: 'ordered', counterparty: 'Technikhaus', amount: '42.50' } })),
+      ).toBe(`Bestellung · Bestellt · Technikhaus · ${eur('42.50')}`);
+      expect(sub(link({ kind: 'order', detail: {} }))).toBe('Bestellung');
       expect(sub(link({ kind: 'budget', title: 'Lerncafé', detail: { costCentre: 'VS-800' } }))).toBe(
         'Kostenstelle · VS-800',
       );

@@ -95,6 +95,7 @@ class FlowOps(ConfigServiceBase):
                         "automatic": t.automatic,
                         "branch": t.branch,
                         "requiresAction": t.requires_action,
+                        "offerOnOrderStatus": t.offer_on_order_status,
                     }
                     for t in transitions
                 ],
@@ -208,6 +209,7 @@ class FlowOps(ConfigServiceBase):
                     automatic=trans.automatic,
                     branch=trans.branch,
                     requires_action=trans.requires_action,
+                    offer_on_order_status=trans.offer_on_order_status,
                 )
             )
 

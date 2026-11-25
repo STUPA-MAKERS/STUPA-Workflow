@@ -1,0 +1,13 @@
+<app-list-detail-screen
+  [head]="{ title: 'nav.orders' | t }"
+  [rows]="rows()"
+  [search]="{ placeholder: 'orders.page.search' | t }"
+  [filters]="filters()"
+  [filtersLabel]="'orders.page.filters' | t"
+  [actions]="actions()"
+  [none]="{ heading: 'orders.page.none' | t, icon: 'package' }"
+  [config]="{ reset: true }"
+  (query)="onQuery($event)"
+  (action)="onAction($event.key)"
+  (more)="more()"
+/>

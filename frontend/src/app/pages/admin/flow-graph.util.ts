@@ -301,6 +301,7 @@ function normalizeTransition(t: TransitionDef): TransitionDef {
     ...(t.automatic ? { automatic: true } : {}),
     ...(t.branch ? { branch: t.branch } : {}),
     ...(t.requiresAction === false ? { requiresAction: false } : {}),
+    ...(t.offerOnOrderStatus ? { offerOnOrderStatus: t.offerOnOrderStatus } : {}),
   };
 }
 

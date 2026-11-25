@@ -1,6 +1,6 @@
 import { de } from '@core/i18n/translations';
 import type { Translate } from '@core/i18n/translations';
-import { amountChangeLines, forcedLine, outsideDecisionLines } from './timeline-lines';
+import { amountChangeLines, forcedLine, orderEventText, outsideDecisionLines } from './timeline-lines';
 
 const t: Translate = (key, params) =>
   Object.entries(params ?? {}).reduce(
@@ -48,5 +48,21 @@ describe('timeline lines', () => {
     expect(forcedLine('applicant_error', t)).toBe('Status erzwungen · Fehlbedienung Antragsteller:in');
     expect(forcedLine(null, t)).toBe('Status erzwungen · Ohne Grund');
     expect(forcedLine('gone', t)).toBe('Status erzwungen · Ohne Grund');
+  });
+
+  /** §F/finance/orders/002866: the create, a status change and the delete of a Bestellung. */
+  it('names the event of a Bestellung with its Bezeichnung and its number', () => {
+    const base = { orderId: 'o-1', number: 'B-7K3QX9MD', title: 'Beamer' };
+    expect(orderEventText({ ...base, change: 'created' }, t)).toEqual({
+      title: 'Bestellung angelegt',
+      body: 'Beamer · B-7K3QX9MD',
+    });
+    expect(orderEventText({ ...base, change: 'deleted', number: '' }, t)).toEqual({
+      title: 'Bestellung gelöscht',
+      body: 'Beamer',
+    });
+    expect(orderEventText({ ...base, change: 'status', toStatus: 'delivered' }, t).title).toBe('Bestellung: Geliefert');
+    expect(orderEventText({ ...base, change: 'status', toStatus: 'other' }, t).title).toBe('Bestellung: other');
+    expect(orderEventText({ ...base, change: 'status' }, t).title).toBe('Bestellung: ');
   });
 });

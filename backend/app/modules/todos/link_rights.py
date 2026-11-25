@@ -9,7 +9,9 @@ one of them. The change right of an end is the right that changes the element it
   else its eligible group);
 * appointment — the creator of the Termin or ``calendar.manage`` (``rules.can_edit``);
 * gremium — ``admin.gremien``;
-* invoice, expense — ``budget.book``;
+* invoice — ``budget.book`` or ``invoice.manage`` (F/finance/invoices/003015);
+* expense — ``budget.book``;
+* order (a Bestellung) — ``order.manage`` (F/finance/orders/002887);
 * budget — ``budget.structure``;
 * ticket — the work right in the Bereich of the ticket;
 * todo — the write right on the board of the card (``BoardAccess.can_write``);
@@ -30,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.access import require_app_edit
 from app.modules.auth.policy import has_gremium_permission
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import INVOICE_WRITE_PERMISSIONS
 from app.modules.calendar import rules as calendar_rules
 from app.modules.calendar.appointments import AppointmentService
 from app.modules.calendar.models import Appointment
@@ -40,12 +43,13 @@ from app.modules.todos.models import TodoBoard, TodoCard
 from app.modules.voting.models import Vote
 from app.shared.errors import ForbiddenError, NotFoundError, UnauthorizedError
 
-#: The global right that changes an element of the kind.
-GLOBAL_RIGHT: dict[str, str] = {
-    "gremium": "admin.gremien",
-    "invoice": "budget.book",
-    "expense": "budget.book",
-    "budget": "budget.structure",
+#: The global rights of which one changes an element of the kind.
+GLOBAL_RIGHT: dict[str, tuple[str, ...]] = {
+    "gremium": ("admin.gremien",),
+    "invoice": INVOICE_WRITE_PERMISSIONS,
+    "expense": ("budget.book",),
+    "order": ("order.manage",),
+    "budget": ("budget.structure",),
 }
 #: The rights of which one is needed for any link with an end of the kind (spec 001410).
 GATE_RIGHTS: dict[str, tuple[str, ...]] = {
@@ -80,7 +84,7 @@ class LinkRights:
     async def can_change(self, kind: str, target_id: uuid.UUID, principal: Principal) -> bool:
         """Tell if the principal changes the element ``(kind, target_id)``."""
         if kind in GLOBAL_RIGHT:
-            return principal.has(GLOBAL_RIGHT[kind])
+            return any(principal.has(right) for right in GLOBAL_RIGHT[kind])
         match kind:
             case "application":
                 return await self._application(target_id, principal)

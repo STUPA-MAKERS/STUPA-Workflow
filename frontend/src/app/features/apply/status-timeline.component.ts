@@ -42,7 +42,11 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { type ActorLabelOptions, actorLabel } from '@shared/actor-label.util';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
 import { decisionHistoryLine } from '@shared/decision/decision.util';
-import { amountChangeLines, outsideDecisionLines } from '@shared/decision/timeline-lines';
+import {
+  amountChangeLines,
+  orderEventText,
+  outsideDecisionLines,
+} from '@shared/decision/timeline-lines';
 import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
@@ -374,7 +378,7 @@ export class StatusTimelineComponent {
           ]
         : [],
     );
-    const statusEntries: readonly HistoryEntry[] = events.filter((e) => e.kind !== 'amountChange').map((e, i) => {
+    const statusEntries: readonly HistoryEntry[] = events.filter((e) => (e.kind ?? 'status') === 'status').map((e, i) => {
       const decision = e.decision ? decisionHistoryLine(e.decision, locale, currency, t) : null;
       const lines = [
         ...(e.transitionLabel
@@ -410,7 +414,19 @@ export class StatusTimelineComponent {
             : null,
         };
       });
-    return [...statusEntries, ...amountEntries, ...versionEntries];
+    const orderEntries: readonly HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'order' && e.order
+        ? [
+            {
+              at: e.at,
+              icon: 'package' as const,
+              ...orderEventText(e.order, t),
+              actor: actor(e.actorInfo, e.actor),
+            },
+          ]
+        : [],
+    );
+    return [...statusEntries, ...amountEntries, ...orderEntries, ...versionEntries];
   });
 
   /**

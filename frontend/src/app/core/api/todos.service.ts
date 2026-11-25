@@ -30,6 +30,7 @@ export type TodoLinkKind =
   | 'gremium'
   | 'invoice'
   | 'expense'
+  | 'order'
   | 'budget'
   | 'ticket'
   | 'todo'
@@ -98,6 +99,8 @@ export interface TodoLinkDetail {
   readonly place?: string | null;
   /** The name of the document type of a Paperless document. */
   readonly documentType?: string | null;
+  /** The status of a Bestellung. */
+  readonly orderStatus?: 'planned' | 'ordered' | 'delivered' | 'cancelled' | null;
 }
 
 export interface TodoLink {

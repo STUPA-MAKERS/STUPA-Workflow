@@ -93,6 +93,7 @@ from app.modules.applications.models import (
     ApplicationLink,
     ApplicationLinkEvent,
     ApplicationObserver,
+    ApplicationOrderEvent,
     Comment,
     GuestApplicationSettings,
     StatusEvent,
@@ -130,6 +131,7 @@ from app.modules.meetings.models import (
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.notifications.push_models import PushPreference, PushSubscription
+from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
@@ -195,6 +197,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
     ("timeline", ApplicationLinkEvent.actor),
+    ("timeline", ApplicationOrderEvent.actor),
     ("comments", Comment.author),
     ("votes", VotedMarker.voter_sub),
     ("delegations", MeetingDelegation.created_by),
@@ -204,6 +207,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", Protocol.approved_by),
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),
+    ("budget", PurchaseOrder.created_by),
     ("config", SiteConfigVersion.created_by),
     ("config", PdfAsset.created_by),
     ("config", GuestApplicationSettings.updated_by),
@@ -241,6 +245,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", Link.created_by),
     ("todos", TodoEventSeries.created_by),
     ("calendar", CalendarAppointment.creator_id),
+    ("budget", PurchaseOrder.buyer_id),
 )
 
 #: The rows of the source that the merge deletes, by area. Rights never move to the

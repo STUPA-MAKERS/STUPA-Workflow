@@ -172,12 +172,17 @@ async def book_expense(
     payment_method: Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"] | None = None,
     category: str | None = None,
     invoice_id: str | None = None,
+    order_id: str | None = None,
 ) -> dict:
     """Book an expense or an income on a cost center.
 
     You can link the booking to an application and to an invoice. You can also give a
     correspondent, a note, a reference number, a payment method, a category and the
     invoice and payment dates. Requires budget.book.
+
+    `order_id` names the Bestellung that the expense paid. It needs the
+    `application_id` of that Bestellung (422 `order_application_mismatch`), and an
+    income cannot name one.
 
     Args:
         amount: The amount as a decimal string.
@@ -192,6 +197,7 @@ async def book_expense(
             invoiceDate=invoice_date, paymentDate=payment_date,
             correspondent=correspondent, note=note, referenceNumber=reference_number,
             paymentMethod=payment_method, category=category, invoiceId=invoice_id,
+            orderId=order_id,
         ),
     )
 

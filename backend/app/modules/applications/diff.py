@@ -13,6 +13,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, TypedDict
 
+from app.modules.applications.position_ids import without_position_ids
+
 
 class FieldChange(TypedDict):
     """The old and the new value of one changed field."""
@@ -35,8 +37,10 @@ def compute_diff(old: Mapping[str, Any], new: Mapping[str, Any]) -> DataDiff:
     Returns:
         ``added`` holds the keys only in ``new``. ``removed`` holds the keys
         only in ``old``. ``changed`` holds the keys in both maps whose values
-        differ.
+        differ. The ids of the positions of a Kostenaufstellung are left out, because
+        an id is no answer of the applicant (F/finance/orders/002932).
     """
+    old, new = without_position_ids(old), without_position_ids(new)
     added: dict[str, Any] = {k: new[k] for k in new.keys() - old.keys()}
     removed: dict[str, Any] = {k: old[k] for k in old.keys() - new.keys()}
     changed: dict[str, FieldChange] = {

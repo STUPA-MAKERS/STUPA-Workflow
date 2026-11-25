@@ -2540,3 +2540,57 @@ def test_the_tickets_get_random_numbers(alembic_cfg: Config, engine: Engine) -> 
         }
         conn.execute(text("DELETE FROM ticket"))
     command.upgrade(alembic_cfg, "head")
+
+
+def test_finance_export_permission_rename(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration c3ee58a9d4df renames `budget.export` to `finance.export` in every role.
+
+    A role with the old key gets the new one, a role with both keeps one row, and a role
+    without the key gets nothing (§ 003016). The downgrade gives the old key back.
+    """
+    command.downgrade(alembic_cfg, "7b3d9e5a2c18")
+
+    def _perms(conn: Connection, role: object) -> list[str]:
+        return list(
+            conn.execute(
+                text(
+                    "SELECT permission FROM role_permission WHERE role_id = :r "
+                    "AND permission IN ('budget.export', 'finance.export', 'budget.view') "
+                    "ORDER BY permission"
+                ),
+                {"r": role},
+            ).scalars()
+        )
+
+    with engine.begin() as conn:
+        roles = {
+            key: conn.execute(
+                text("INSERT INTO role (key) VALUES (:k) RETURNING id"), {"k": key}
+            ).scalar_one()
+            for key in ("kasse-export", "kasse-both", "kasse-view")
+        }
+        for key, perm in (
+            ("kasse-export", "budget.export"),
+            ("kasse-both", "budget.export"),
+            ("kasse-both", "finance.export"),
+            ("kasse-view", "budget.view"),
+        ):
+            conn.execute(
+                text("INSERT INTO role_permission (role_id, permission) VALUES (:r, :p)"),
+                {"r": roles[key], "p": perm},
+            )
+
+    command.upgrade(alembic_cfg, "c3ee58a9d4df")
+    with engine.connect() as conn:
+        assert _perms(conn, roles["kasse-export"]) == ["finance.export"]
+        assert _perms(conn, roles["kasse-both"]) == ["finance.export"]
+        assert _perms(conn, roles["kasse-view"]) == ["budget.view"]
+        assert conn.execute(
+            text("SELECT count(*) FROM role_permission WHERE permission = 'budget.export'")
+        ).scalar_one() == 0
+
+    command.downgrade(alembic_cfg, "7b3d9e5a2c18")
+    with engine.begin() as conn:
+        assert _perms(conn, roles["kasse-export"]) == ["budget.export"]
+        conn.execute(text("DELETE FROM role WHERE key LIKE 'kasse-%'"))
+    command.upgrade(alembic_cfg, "head")

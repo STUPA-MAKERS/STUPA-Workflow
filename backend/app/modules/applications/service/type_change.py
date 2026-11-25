@@ -23,6 +23,7 @@ from app.modules.application_types.models import ApplicationType
 from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import compute_diff, is_empty_diff
 from app.modules.applications.models import Application, SubmissionVersion
+from app.modules.applications.position_ids import with_position_ids
 from app.modules.applications.schemas import (
     TypeChangeFieldOut,
     TypeChangeIn,
@@ -218,7 +219,9 @@ class TypeChangeOps(ApplicationsServiceBase):
         old_fields = tuple(f for s in old_form.sections for f in s.fields)
         data = app.data or {}
         context = {"has_budget": new_type.has_budget}
-        carried = with_computed(new_fields, carry_values(old_fields, new_fields, data), context)
+        carried = with_position_ids(
+            with_computed(new_fields, carry_values(old_fields, new_fields, data), context), data
+        )
         return _Plan(
             app=app,
             new_type=new_type,

@@ -132,6 +132,11 @@
                 (choose)="s.pickApp($event)"
                 (cleared)="s.clearApp()"
               />
+              @if (s.newOrder(); as order) {
+                <app-locked-field filled data-testid="bf-order" [label]="'orders.booking.order' | t">{{
+                  order.label
+                }}</app-locked-field>
+              }
             }
             <app-select
               name="event"
@@ -294,6 +299,17 @@
               [ngModel]="s.editInvoiceId()"
               (ngModelChange)="s.onPickEditInvoice($event)"
             />
+            @if (s.editOrderOptions().length) {
+              <app-select
+                name="eorder"
+                data-testid="bf-edit-order"
+                [label]="'orders.booking.order' | t"
+                [placeholder]="'orders.booking.none' | t"
+                [options]="s.editOrderOptions()"
+                [ngModel]="s.editOrderId()"
+                (ngModelChange)="s.editOrderId.set($event ?? '')"
+              />
+            }
             <div class="mf__grid">
               <app-input
                 name="ecorr"

@@ -55,6 +55,7 @@ _REQUIRED_NODE_FIELDS = frozenset(
         "fiscal_start_day",
         "planCoverableDefault",
         "plan_coverable_default",
+        "internal",
     }
 )
 
@@ -78,6 +79,8 @@ class BudgetNodeCreate(FrozenStrictCamelModel, frozen=True):
     currency: Literal["EUR"] = "EUR"
     active: bool = True
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
     #: 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
     #: `date(...)` ValueError. The 500 that follows leaves the budget unusable.
@@ -98,6 +101,8 @@ class BudgetNodeUpdate(FrozenStrictCamelModel, frozen=True):
     name: NodeName | None = None
     active: bool | None = None
     color: str | None = None
+    #: The own switch "Intern" (003011). It changes no figure, so a plan in force takes it.
+    internal: bool | None = None
     #: Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: Deciding Gremium. `None` in the payload clears it; the node then inherits the
@@ -134,6 +139,8 @@ class BudgetNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the
@@ -188,6 +195,8 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     currency: str
     active: bool
     color: str | None = None
+    #: The own switch "Intern" (003011).
+    internal: bool = False
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
     #: node that holds the effective value. The UI shows "inherited from ..." when the
@@ -210,6 +219,8 @@ class BudgetTreeNodeOut(FrozenCamelModel, frozen=True):
     #: The fiscal years whose version in force puts the node on the income side. An
     #: Antrag must not take the node in these years (001030).
     income_in: tuple[UUID, ...] = Field(default=(), alias="incomeIn")
+    #: A node above this one is Intern, so this one is Intern too (003011).
+    internal_inherited: bool = Field(default=False, alias="internalInherited")
     by_fiscal_year: tuple[AllocationView, ...] = Field(default_factory=tuple, alias="byFiscalYear")
     #: Read-only `Sequence`, because a caller builds a node with a list of children.
     children: Sequence[BudgetTreeNodeOut] = Field(default_factory=tuple)
@@ -370,7 +381,9 @@ class ExpenseCreate(FrozenCamelModel, frozen=True):
     replaces its binding pro rata. It is allowed for `kind='expense'` only.
     `fiscalYearId` is optional for a standalone expense. Without it the server
     picks the current fiscal year of the top budget (`tree_rules.pick_fiscal_year`).
-    An ambiguous or missing year gives a 422.
+    An ambiguous or missing year gives a 422. `orderId` names the Bestellung that the
+    expense paid. It needs the `applicationId` of that Bestellung, and an income cannot
+    name one (F/finance/orders/002878).
     """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -387,11 +400,14 @@ class ExpenseCreate(FrozenCamelModel, frozen=True):
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    order_id: UUID | None = Field(default=None, alias="orderId")
 
     @model_validator(mode="after")
     def _income_not_linkable(self) -> ExpenseCreate:
         if self.kind == "income" and self.application_id is not None:
             raise ValueError("income cannot be linked to an application")
+        if self.kind == "income" and self.order_id is not None:
+            raise ValueError("income cannot name a Bestellung")
         return self
 
 
@@ -421,7 +437,9 @@ class ExpenseUpdate(FrozenCamelModel, frozen=True):
     editable. The fiscal year and the application binding stay fixed to keep
     the booking stable. The server writes the set fields only. An explicit
     `null` clears an optional field. `budgetId` is the exception, because the
-    FK is required.
+    FK is required. `orderId` sets or removes the Bestellung that the booking names
+    (F/finance/orders/002878), so a booking from the time before the Bestellungen can
+    name one.
     """
 
     amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -435,6 +453,7 @@ class ExpenseUpdate(FrozenCamelModel, frozen=True):
     payment_method: PaymentMethod | None = Field(default=None, alias="paymentMethod")
     category: str | None = Field(default=None)
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
+    order_id: UUID | None = Field(default=None, alias="orderId")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> ExpenseUpdate:
@@ -471,6 +490,8 @@ class ExpenseOut(FrozenCamelModel, frozen=True):
     category: str | None = None
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
     invoice_number: str | None = Field(default=None, alias="invoiceNumber")
+    #: The Bestellung that the expense paid, else null.
+    order_id: UUID | None = Field(default=None, alias="orderId")
     #: A set `parentExpenseId` means this booking IS a sub-booking. A
     #: `childCount` above 0 means the booking HAS sub-bookings. The UI can
     #: expand them. The `amount` is then the sum of the children and read-only.

@@ -223,6 +223,8 @@ describe('BookingFormComponent', () => {
   });
   afterEach(() => {
     window.matchMedia = realMatchMedia;
+    // The edit form reads the Bestellungen that the booking can name.
+    TestBed.inject(HttpTestingController).match((r) => r.url.endsWith('/orders'));
     TestBed.inject(HttpTestingController).verify();
   });
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, require_principal
 from app.modules.applications.access import (
@@ -35,9 +35,11 @@ from app.modules.flow.schemas import (
     BulkTransitionOption,
     BulkTransitionRequest,
     ForceStatusRequest,
+    OrderOfferStatus,
     TransitionOut,
     TransitionRequest,
     TransitionResult,
+    offered_on,
 )
 from app.modules.flow.service import FlowService
 from app.modules.meetings.publisher import MeetingPublisher, get_meeting_publisher
@@ -142,9 +144,15 @@ async def list_transitions(
     application_id: UUID,
     service: ServiceDep,
     principal: PrincipalDep,
+    order_status: Annotated[OrderOfferStatus | None, Query(alias="orderStatus")] = None,
 ) -> list[TransitionOut]:
-    """List the transitions whose guard the principal satisfies."""
-    return await service.available_transitions(application_id, principal, allow_unconfirmed=False)
+    """List the transitions whose guard the principal satisfies.
+
+    ``orderStatus`` keeps the transitions that a Bestellung with this new status offers
+    (F/finance/orders/002931).
+    """
+    found = await service.available_transitions(application_id, principal, allow_unconfirmed=False)
+    return found if order_status is None else offered_on(found, order_status)
 
 
 @router.post(

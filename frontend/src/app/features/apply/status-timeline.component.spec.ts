@@ -297,6 +297,21 @@ describe('StatusTimelineComponent', () => {
     expect(plain.body).toBeNull();
   });
 
+  /** §F/finance/orders/002866: the applicant reads the events of the Bestellungen. */
+  it('shows the events of the Bestellungen in the history', async () => {
+    const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    const base = { toStateId: 's9', toState: null, label: 'Bewilligt', actor: null, at: '2026-06-05T10:00:00Z', note: null, voteId: null, voteDeleted: false };
+    comp.timeline.set([
+      base,
+      { ...base, at: '2026-06-06T10:00:00Z', kind: 'order', order: { orderId: 'o-1', number: 'B-1', title: 'Beamer', change: 'status', toStatus: 'ordered' } },
+      { ...base, at: '2026-06-07T10:00:00Z', kind: 'order', order: null },
+    ]);
+    const entries = comp.historyEntries();
+    expect(entries.map((e) => e.title)).toEqual(['Bewilligt', 'Bestellung: Bestellt']);
+    expect(entries[1]).toMatchObject({ icon: 'package', body: 'Beamer · B-1' });
+  });
+
   it('translates vote notes and keeps other notes', async () => {
     const { comp } = await setup(fakeApi());
     expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');

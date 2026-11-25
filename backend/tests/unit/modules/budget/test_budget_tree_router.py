@@ -515,7 +515,7 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
     app = create_app()
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
     app.dependency_overrides[get_current_principal] = lambda: Principal(
-        sub="fin", permissions={"budget.export"}
+        sub="fin", permissions={"finance.export"}
     )
     app.dependency_overrides[get_current_applicant] = lambda: None
     resp = TestClient(app).get("/api/budget/export.xlsx", params={"gremium": str(_GID)})

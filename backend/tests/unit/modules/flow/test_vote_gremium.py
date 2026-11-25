@@ -155,6 +155,7 @@ def _t(app: Any, to_id: UUID, *, actions: list[Any] | None = None, automatic: bo
         id=uuid4(), flow_version_id=app.flow_version_id, from_state_id=app.current_state_id,
         to_state_id=to_id, label_i18n={}, color=None, guard=None,
         actions=actions or [], automatic=automatic, branch=None, requires_action=True,
+        offer_on_order_status=None,
     )
 
 

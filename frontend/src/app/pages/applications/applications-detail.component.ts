@@ -129,14 +129,18 @@ import { decisionHistoryLine } from '@shared/decision/decision.util';
 import {
   amountChangeLines,
   forcedLine,
+  orderEventText,
   outsideDecisionLines,
 } from '@shared/decision/timeline-lines';
+import { type OrderList, OrdersApiService } from '@core/api/orders.service';
+import { ORDER_STATUS_LABEL, shownPrice } from '../orders/orders.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { OutsideDecisionDialogComponent } from './outside-decision-dialog/outside-decision-dialog.component';
 import { AmendAmountDialogComponent } from './amend-amount-dialog/amend-amount-dialog.component';
 import { TypeChangeDialogComponent } from './type-change-dialog/type-change-dialog.component';
 import {
+  type LinkedAction,
   type LinkedLead,
   TodoLinkedListComponent,
 } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -268,6 +272,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 })
 export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
+  private readonly ordersApi = inject(OrdersApiService);
   private readonly apiBase = inject(API_BASE_URL);
   private readonly files = inject(FileOpenService);
   private readonly budgetApi = inject(BudgetTreeApi);
@@ -578,7 +583,54 @@ export class ApplicationsDetailComponent {
    * Anträge the reader may open; an Antrag can have many Folgeanträge, so they show only
    * there, while the Vorgänger also has its row in the details.
    */
-  readonly linkedRows = computed<readonly LinkedLead[]>(() => {
+  readonly linkedRows = computed<readonly LinkedLead[]>(() => [
+    ...this.linkedApplications(),
+    ...this.orderRows(),
+  ]);
+
+  /** The Bestellungen of the Antrag; null until they loaded. */
+  private readonly orderList = signal<OrderList | null>(null);
+
+  /**
+   * Each Bestellung as a row of "Verknüpft": the Bezeichnung, the status and the price.
+   * The row opens the Bestellung on the page "Bestellungen"; in the applicant view, which
+   * has no prices, it is no link.
+   */
+  private readonly orderRows = computed<readonly LinkedLead[]>(() => {
+    const list = this.orderList();
+    if (!list) return [];
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const member = list.total !== null;
+    return list.items.map((order) => ({
+      icon: 'package' as const,
+      title: order.title,
+      sub: [
+        t('orders.kind.order'),
+        t(ORDER_STATUS_LABEL[order.status]),
+        formatMoney(shownPrice(order).amount, this.i18n.formatLocale(), {
+          currency: this.app()?.currency,
+        }),
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      link: member ? ['/orders', order.id] : null,
+    }));
+  });
+
+  /** "Bestellung anlegen" in the head of "Verknüpft", where the server allows a create. */
+  readonly orderAction = computed<LinkedAction | null>(() => {
+    const id = this.app()?.id;
+    return id && this.orderList()?.canCreate
+      ? {
+          label: this.i18n.translate('orders.dialog.create'),
+          icon: 'package',
+          link: ['/orders', 'new'],
+          queryParams: { application: id },
+        }
+      : null;
+  });
+
+  private readonly linkedApplications = computed<readonly LinkedLead[]>(() => {
     const l = this.links();
     if (!l) return [];
     const t = (key: TranslationKey) => this.i18n.translate(key);
@@ -842,7 +894,7 @@ export class ApplicationsDetailComponent {
         : [],
     );
     const statusEntries: HistoryEntry[] = events
-      .filter((e) => e.kind !== 'amountChange')
+      .filter((e) => (e.kind ?? 'status') === 'status')
       .map((e, i) => {
         const first = i === 0;
         const intake = capture?.intake
@@ -931,7 +983,19 @@ export class ApplicationsDetailComponent {
         ? { label: t('applications.predecessor.open'), route: ['/applications', e.predecessor.id] }
         : null,
     }));
-    return [...statusEntries, ...amountEntries, ...versionEntries, ...linkEntries];
+    const orderEntries: HistoryEntry[] = events.flatMap((e) =>
+      e.kind === 'order' && e.order
+        ? [
+            {
+              at: e.at,
+              icon: 'package' as const,
+              ...orderEventText(e.order, t),
+              actor: this.actor(e.actorInfo, e.actor),
+            },
+          ]
+        : [],
+    );
+    return [...statusEntries, ...amountEntries, ...orderEntries, ...versionEntries, ...linkEntries];
   });
 
   private id: Uuid = '';
@@ -1398,6 +1462,15 @@ export class ApplicationsDetailComponent {
         if (seq === this.loadSeq) this.commentsLoading.set(false);
       },
     });
+    this.orderList.set(null);
+    if (this.features.isOn('orders')) {
+      this.ordersApi.list(this.id).subscribe({
+        next: (list) => {
+          if (seq === this.loadSeq) this.orderList.set(list);
+        },
+        error: () => {},
+      });
+    }
     this.api.timeline(this.id, { quiet: true, detail }).subscribe({
       next: (events) => {
         if (seq === this.loadSeq) this.timeline.set(events);

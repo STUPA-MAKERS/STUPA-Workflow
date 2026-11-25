@@ -9,6 +9,7 @@ export const FEATURES = [
   'voting',
   'budget',
   'invoices',
+  'orders',
   'tickets',
   'graph',
   'public',
@@ -28,6 +29,7 @@ export type FeatureStates = Readonly<Partial<Record<FeatureKey, boolean>>>;
  */
 export const FEATURE_REQUIRES: Readonly<Partial<Record<FeatureKey, readonly FeatureKey[]>>> = {
   invoices: ['budget'],
+  orders: ['budget'],
 };
 
 /**

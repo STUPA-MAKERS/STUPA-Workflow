@@ -6,7 +6,7 @@ import {
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
@@ -28,6 +28,7 @@ import type {
   VersionOutWire,
 } from '@core/api/models';
 import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
+import { NO_ORDER_LIST, NO_ORDERS, order } from '../../../testing/order-fixtures';
 import { loadErrorToast, retryLoadError } from '../../../testing/load-error';
 import { kindSpies } from '../../../testing/toast';
 
@@ -107,6 +108,7 @@ async function setup(
   const view = await render(ApplicationsDetailComponent, {
     providers: [
       NO_LINKED_TODOS,
+      NO_ORDERS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -510,6 +512,7 @@ describe('ApplicationsDetailComponent', () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
         NO_LINKED_TODOS,
+        NO_ORDERS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -1337,6 +1340,103 @@ describe('ApplicationsDetailComponent', () => {
     expect(plain.body).toBeNull();
     flushAttachments(http);
     http.verify();
+  });
+
+  /** §F/finance/orders/002866: the events of the Bestellungen in the history. */
+  it('shows the events of the Bestellungen in the history', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([]);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-05T10:00:00Z' },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-06T10:00:00Z',
+        kind: 'order',
+        order: { orderId: 'o-1', number: 'B-1', title: 'Beamer', change: 'created' },
+      },
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-07T10:00:00Z', kind: 'order' },
+    ]);
+    flushForm(http);
+    detectChanges();
+    expect(cmp.historyEntries().map((e) => e.title)).toEqual(['Eingereicht', 'Bestellung angelegt']);
+    expect(cmp.historyEntries()[1]).toMatchObject({ icon: 'package', body: 'Beamer · B-1' });
+    expect(screen.queryByRole('heading', { name: 'Bestellungen' })).not.toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  /** §F/finance/orders/002869: the Bestellungen are rows of "Verknüpft", with "Bestellung anlegen". */
+  it('lists the Bestellungen under "Verknüpft" and offers a new one', async () => {
+    const list = jest.spyOn(NO_ORDERS.useValue, 'list').mockReturnValue(
+      of({
+        ...NO_ORDER_LIST,
+        items: [order(), order({ id: 'o-2', title: 'Kabel', status: 'delivered', actualAmount: '12.50' })],
+        total: '112.50',
+        canCreate: true,
+      }),
+    );
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    detectChanges();
+    expect(list).toHaveBeenCalledWith('app-1');
+    const rows = cmp.linkedRows().filter((row) => row.icon === 'package');
+    expect(rows.map((row) => row.title)).toEqual(['Beamer', 'Kabel']);
+    expect(rows[0].sub).toMatch(/^Bestellung · Geplant · 100,00\s€$/);
+    expect(rows[1].sub).toMatch(/^Bestellung · Geliefert · 12,50\s€$/);
+    expect(rows.map((row) => row.link)).toEqual([
+      ['/orders', 'o-1'],
+      ['/orders', 'o-2'],
+    ]);
+    expect(cmp.orderAction()).toEqual({
+      label: 'Bestellung anlegen',
+      icon: 'package',
+      link: ['/orders', 'new'],
+      queryParams: { application: 'app-1' },
+    });
+    expect(screen.getByTestId('tl-extra')).toHaveAttribute('href', '/orders/new?application=app-1');
+    list.mockRestore();
+  });
+
+  /** §F/finance/orders/002869: the applicant view has no prices, so its rows are no links. */
+  it('shows the Bestellungen of the applicant view without a link and without a create', async () => {
+    const list = jest
+      .spyOn(NO_ORDERS.useValue, 'list')
+      .mockReturnValue(of({ ...NO_ORDER_LIST, items: [order({ plannedAmount: null })] }));
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    detectChanges();
+    const rows = cmp.linkedRows().filter((row) => row.icon === 'package');
+    expect(rows).toEqual([{ icon: 'package', title: 'Beamer', sub: 'Bestellung · Geplant', link: null }]);
+    expect(cmp.orderAction()).toBeNull();
+    list.mockRestore();
+  });
+
+  /** §F/finance/orders/003013: while `Bestellungen` is off the Antrag reads and shows none. */
+  it('reads no Bestellungen while the feature is off', async () => {
+    localStorage.setItem('ap.features.off', JSON.stringify(['orders']));
+    const list = jest.spyOn(NO_ORDERS.useValue, 'list');
+    list.mockClear();
+    const { http, detectChanges, cmp } = await setup();
+    localStorage.removeItem('ap.features.off');
+    http.expectOne(url('')).flush(appWire());
+    detectChanges();
+    expect(list).not.toHaveBeenCalled();
+    expect(cmp.orderAction()).toBeNull();
+    list.mockRestore();
+  });
+
+  /** A list of Bestellungen that fails leaves "Verknüpft" without them. */
+  it('leaves the Bestellungen out when their read fails', async () => {
+    const list = jest.spyOn(NO_ORDERS.useValue, 'list').mockReturnValue(throwError(() => ({ status: 500 })));
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    detectChanges();
+    expect(cmp.linkedRows().filter((row) => row.icon === 'package')).toEqual([]);
+    expect(cmp.orderAction()).toBeNull();
+    list.mockRestore();
   });
 
   /** Specs 001602, 001621, 001650: the outside decision, the forced state, the amount change. */
@@ -2349,6 +2449,7 @@ describe('ApplicationsDetailComponent', () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
         NO_LINKED_TODOS,
+        NO_ORDERS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
