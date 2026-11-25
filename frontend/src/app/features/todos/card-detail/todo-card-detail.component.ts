@@ -71,10 +71,8 @@ import {
   SheetBarTitleDirective,
   SideSheetComponent,
   SkeletonComponent,
-  TimeInputComponent,
   ToastService,
   SectionComponent,
-  ConfirmDialogComponent,
   FactsComponent,
   SheetBodyDirective,
 } from '@stupa-makers/ui-kit';
@@ -93,7 +91,6 @@ import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfe
 import {
   LINK_ICON,
   LINK_KIND_LABEL,
-  eventDays,
   eventText,
   linkSub,
   type StatusName,
@@ -101,8 +98,7 @@ import {
   relativeDays,
   sheetMove,
 } from '../todos.util';
-import { dayMonthYear, isoDay, weekdayDate } from '@shared/date-format';
-import { formatMoney, moneyNumber } from '@shared/format-money';
+import { isoDay, weekdayDate } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 import { LoadErrorComponent } from '@shared/ui/load-error/load-error.component';
 
@@ -162,7 +158,6 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SheetBodyDirective,
     FactsComponent,
     LoadErrorComponent,
-    ConfirmDialogComponent,
     SectionComponent,
     ChipComponent,
     FormsModule,
@@ -189,7 +184,6 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SheetBarTitleDirective,
     SideSheetComponent,
     SkeletonComponent,
-    TimeInputComponent,
     TodoDueChipViewComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetViewComponent,

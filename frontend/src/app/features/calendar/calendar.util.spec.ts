@@ -115,7 +115,7 @@ describe('calendar.util', () => {
     it('opens a meeting and a card on their page, and a Termin in the dialog', () => {
       expect(entryLink(entry('m', { kind: 'meeting' }))).toEqual({ commands: ['/meetings', 'm'] });
       expect(entryLink(entry('c', { kind: 'card' }))).toEqual({ commands: ['/todos'], queryParams: { card: 'c' } });
-      expect(entryLink(entry('e', { kind: 'event' }))).toEqual({ commands: ['/todos'], queryParams: { card: 'e' } });
+      expect(entryLink(entry('e', { kind: 'event' }))).toEqual({ commands: ['/events'], queryParams: { id: 'e' } });
       expect(entryLink(entry('a'))).toBeNull();
       expect(entryLink(entry('x', { kind: 'external' }))).toBeNull();
     });

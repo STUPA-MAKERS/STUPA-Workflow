@@ -1,0 +1,94 @@
+<app-detail-screen [head]="head()" [state]="state()" [actions]="actions()" (action)="onAction($event.key)">
+  <ng-template screenBody>
+    @if (event(); as current) {
+      <app-section [heading]="current.title" [hideHeading]="true">
+        @if (step(); as next) {
+          <app-button-group>
+            <app-button variant="primary" [loading]="busy()" data-testid="ed-step" (click)="setStatus(next.status)">
+              {{ next.label }}
+            </app-button>
+          </app-button-group>
+        }
+        <app-section data-testid="ed-section" [heading]="'events.dialog.details' | t" [hideHeading]="true">
+          <app-field-group>
+            @for (fact of facts(); track fact.label) {
+              <app-field-row data-testid="ed-fact" [label]="fact.label">
+                @if (fact.href) {
+                  <a data-testid="ed-shop" [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
+                } @else {
+                  {{ fact.value }}
+                }
+              </app-field-row>
+            }
+          </app-field-group>
+          @if (current.descriptionMd) {
+            <app-markdown-view [src]="current.descriptionMd" />
+          }
+        </app-section>
+        <app-section data-testid="ed-section" [heading]="'events.money.title' | t">
+          <app-field-group>
+            @for (line of totals(); track line.label) {
+              <app-field-row data-testid="ed-total" [label]="line.label" [value]="line.value" [mono]="true" />
+            }
+          </app-field-group>
+        </app-section>
+        @if (current.decisions.length) {
+          <app-section data-testid="ed-section" [heading]="'events.decisions.title' | t">
+            <div class="rowgroup" role="list">
+              @for (d of current.decisions; track d.kind + d.targetId) {
+                <app-list-item
+                  role="listitem"
+                  data-testid="ed-decision"
+                  [title]="decisionTitle(d)"
+                  [sub]="decisionSub(d)"
+                  [link]="decisionLink(d)"
+                >
+                  <app-icon lead [name]="d.kind === 'vote' ? 'vote' : 'file'" [size]="18" />
+                </app-list-item>
+              }
+            </div>
+          </app-section>
+        }
+        @if (current.editions.length || current.hiddenEditions) {
+          <app-section data-testid="ed-section" [heading]="'events.editions.title' | t">
+            @if (current.editions.length) {
+            <div class="rowgroup" role="list">
+              @for (e of current.editions; track e.id) {
+                <app-list-item
+                  role="listitem"
+                  data-testid="ed-edition"
+                  [title]="e.title"
+                  [sub]="editionSub(e)"
+                  [link]="['/events', e.id]"
+                >
+                  <app-icon lead name="history" [size]="18" />
+                </app-list-item>
+              }
+            </div>
+            }
+            @if (current.hiddenEditions) {
+              <app-note data-testid="ed-hidden" icon="lock">{{ 'events.editions.hidden' | t: { n: current.hiddenEditions } }}</app-note>
+            }
+          </app-section>
+        }
+        <app-todo-linked-list
+          data-testid="ed-section"
+          kind="event"
+          headingId="ed-linked"
+          [targetId]="current.id"
+          [actions]="true"
+          [linkLabel]="current.title"
+        />
+      </app-section>
+    }
+  </ng-template>
+</app-detail-screen>
+
+<app-confirm-dialog
+  [open]="deleting()"
+  [title]="'events.delete.title' | t"
+  [body]="'events.delete.body' | t: { title: event()?.title ?? '' }"
+  [busy]="busy()"
+  (confirm)="confirmDelete()"
+  (cancel)="deleting.set(false)"
+/>

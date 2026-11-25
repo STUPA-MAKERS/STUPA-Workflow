@@ -1,0 +1,13 @@
+<app-list-detail-screen
+  [head]="{ title: 'nav.events' | t }"
+  [rows]="rows()"
+  [search]="{ placeholder: 'events.page.search' | t }"
+  [filters]="filters()"
+  [filtersLabel]="'events.page.filters' | t"
+  [actions]="actions()"
+  [none]="{ heading: 'events.page.none' | t, icon: 'mappin' }"
+  [config]="{ reset: true }"
+  (query)="onQuery($event)"
+  (action)="onAction($event.key)"
+  (more)="more()"
+/>

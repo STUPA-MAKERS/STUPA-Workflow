@@ -1638,8 +1638,6 @@ describe('BudgetDashboardComponent Verknüpft (spec 000552)', () => {
             isDone: false,
             dueDate: null,
             assignees: [],
-            event: null,
-            balance: null,
           },
         ], [linkRow({ kind: 'invoice', title: 'RE-2026-17' })])),
       ),

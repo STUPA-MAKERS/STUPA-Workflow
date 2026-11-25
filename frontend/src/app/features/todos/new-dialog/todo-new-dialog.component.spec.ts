@@ -56,75 +56,6 @@ async function setup(opts: Opts = {}) {
 describe('TodoNewDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('creates an Event with the switch: a shared board, the dates, the place and a new series', async () => {
-    const { cmp, api, open, fixture } = await setup({ inputs: { boardId: 'b-0' } });
-    open();
-    expect(screen.getByRole('radio', { name: 'Veranstaltung' })).toBeInTheDocument();
-    cmp.setKind('event');
-    fixture.detectChanges();
-    expect(screen.getByRole('dialog', { name: 'Neue Veranstaltung' })).toBeInTheDocument();
-    expect(cmp.selectedBoard()).toBe('b-1');
-    expect(cmp.boardOptions().map((o) => o.value)).not.toContain('b-0');
-    expect(cmp.seriesOptions().map((o) => o.label)).toEqual(['Keine Reihe', 'Erstiparty', 'Neue Reihe …']);
-    cmp.title.set('Erstiparty WiSe');
-    cmp.startsOn.set('2026-11-21');
-    cmp.endsOn.set('2026-11-20');
-    expect(cmp.datesError()).toBe('Das Ende liegt vor dem Beginn.');
-    expect(cmp.canSave()).toBe(false);
-    cmp.endsOn.set('2026-11-21');
-    cmp.startTime.set('20:00');
-    cmp.endTime.set('19:00');
-    expect(cmp.datesError()).toBe('Das Ende liegt vor dem Beginn.');
-    cmp.endsOn.set('2026-11-22');
-    expect(cmp.datesError()).toBe('');
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(screen.getByLabelText('Uhrzeit Beginn')).toHaveValue('20:00');
-    expect(screen.getByLabelText('Uhrzeit Ende')).toBeEnabled();
-    cmp.endTime.set('02:00');
-    cmp.place.set(' Mensa ');
-    cmp.seriesId.set('__new');
-    expect(cmp.canSave()).toBe(false);
-    cmp.seriesName.set('Erstiparty Nord');
-    cmp.save();
-    expect(api.createSeries).toHaveBeenCalledWith('Erstiparty Nord');
-    expect(api.createCard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        boardId: 'b-1',
-        title: 'Erstiparty WiSe',
-        event: {
-          startsOn: '2026-11-21',
-          endsOn: '2026-11-22',
-          startTime: '20:00:00',
-          endTime: '02:00:00',
-          place: 'Mensa',
-          seriesId: 's-2',
-        },
-      }),
-    );
-  });
-
-  it('sends no time without its day', async () => {
-    const { cmp, api, open, fixture } = await setup({ inputs: { boardId: 'b-1' } });
-    open();
-    cmp.setKind('event');
-    cmp.title.set('Vortrag');
-    cmp.startTime.set('18:00');
-    cmp.endTime.set('19:00');
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(screen.getByLabelText('Uhrzeit Beginn')).toBeDisabled();
-    expect(screen.getByLabelText('Uhrzeit Ende')).toBeDisabled();
-    cmp.save();
-    expect(api.createCard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: { startsOn: null, endsOn: null, startTime: null, endTime: null, place: null, seriesId: null },
-      }),
-    );
-  });
-
   /** Only boards that take cards show, and people get a fallback name. */
   it('starts on the given board and column with the given title and links', async () => {
     const links: NewTodoLink[] = [{ kind: 'agenda_item', targetId: 't-1', label: 'TOP 5 · Haushalt' }];
@@ -548,7 +479,6 @@ describe('TodoNewDialogComponent duplicate (spec 000554)', () => {
     expect(cmp.description()).toBe('Raum **A 101**');
     expect(cmp.due()).toBe('2026-10-23');
     expect(cmp.assignee()).toBe('p-1');
-    expect(cmp.canEvent()).toBe(false);
     cmp.save();
     expect(api.createCard).toHaveBeenCalledWith(
       expect.objectContaining({

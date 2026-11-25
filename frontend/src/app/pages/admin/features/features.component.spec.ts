@@ -20,6 +20,7 @@ const ALL_ON: FeatureSwitches = {
   budget: true,
   invoices: true,
   orders: true,
+  events: true,
   tickets: true,
   graph: true,
   public: true,

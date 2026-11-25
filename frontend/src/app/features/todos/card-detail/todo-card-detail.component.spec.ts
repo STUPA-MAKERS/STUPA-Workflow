@@ -26,36 +26,6 @@ const COMMENT: TodoComment = {
   attachments: [{ id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20, scanState: 'quarantined' }],
 };
 
-const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: 450, seriesId: 's-1', seriesName: 'Erstiparty' };
-const FACTS = {
-  totals: { requested: '800.00', approved: '500.00', expenses: '300.00', income: '75.00', balance: '-225.00' },
-  decisions: [
-    {
-      kind: 'decision' as const,
-      targetId: 'a-1',
-      title: 'Technik',
-      decidedAt: '2026-11-01T19:00:00Z',
-      meetingTitle: 'StuPa 3',
-      result: 'passed',
-      amount: '500.00',
-      conditions: ['Belege bis 31.12.'],
-    },
-  ],
-  editions: [
-    {
-      id: 'k-0',
-      boardId: 'b-1',
-      boardName: 'AStA',
-      title: 'Erstiparty SoSe',
-      startsOn: '2026-04-23',
-      endsOn: null,
-      archived: true,
-      totals: { requested: '0.00', approved: '0.00', expenses: '0.00', income: '312.00', balance: '312.00' },
-    },
-  ],
-  hiddenEditions: 1,
-};
-
 const http = (status: number, code?: string) =>
   throwError(() => new HttpErrorResponse({ status, error: code ? { code } : null }));
 
@@ -86,9 +56,6 @@ function makeApi(card: TodoCardDetail) {
     addLink: answer(),
     removeLink: answer(),
     archiveCard: jest.fn(() => of(undefined)),
-    setEvent: answer({ event: EVENT, eventFacts: FACTS }),
-    followUp: jest.fn((): Observable<TodoCardDetail> => of({ ...card, id: 'k-9', boardId: 'b-1' })),
-    series: jest.fn(() => of([{ id: 's-1', name: 'Erstiparty' }])),
     createSeries: jest.fn((name: string) => of({ id: 's-2', name })),
     boards: jest.fn(() => of(BOARDS)),
     transferCard: jest.fn(
@@ -769,82 +736,6 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
   });
 
-  it('makes a to-do an Event after the confirmation, and offers no way back (spec 000488)', async () => {
-    const { cmp, api, detect } = await setup();
-    cmp.onMenu({ id: 'makeEvent', label: '' });
-    detect();
-    expect(screen.getByText('Aus „Raum buchen“ wird eine Veranstaltung. Dies lässt sich nicht rückgängig machen.')).toBeInTheDocument();
-    cmp.makeEvent();
-    expect(api.setEvent).toHaveBeenCalledWith('k-1', {});
-    detect();
-    const items = cmp.menuSections()[0].items.map((i) => i.id);
-    expect(items).toContain('followUp');
-    expect(items).not.toContain('makeEvent');
-  });
-
-  it('shows the event fields, the money, the decisions and the earlier editions of an Event', async () => {
-    const { cmp, api } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
-    expect(screen.getByText('Beginn')).toBeInTheDocument();
-    expect(screen.getByText('Mensa')).toBeInTheDocument();
-    const money = document.querySelector('[data-testid=cd-money]');
-    expect(money).toHaveTextContent('800,00');
-    expect(money?.querySelector('.cd__evNeg')?.textContent).toContain('−225,00');
-    expect(screen.getByRole('link', { name: 'Technik: Angenommen' })).toHaveAttribute('href', '/applications/a-1');
-    expect(screen.getByText('StuPa 3 · 01.11.2026 · 500,00 € · Auflage: Belege bis 31.12.')).toBeInTheDocument();
-    expect(screen.getByText('23.04.2026 · AStA · archiviert · Saldo +312,00 €')).toBeInTheDocument();
-    expect(screen.getByText('1 weitere ohne Zugriff')).toBeInTheDocument();
-    cmp.editEventText('place');
-    cmp.draft.set('Aula');
-    cmp.saveEventText();
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', {
-      ...{ startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, participants: 450, seriesId: 's-1' },
-      place: 'Aula',
-    });
-    cmp.editEventText('participants');
-    cmp.draft.set('');
-    cmp.saveEventText();
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ participants: null }));
-    cmp.pickSeries('__new');
-    expect(cmp.eventEdit()).toBe('series');
-    cmp.draft.set('Erstiparty Nord');
-    cmp.saveEventText();
-    expect(api.createSeries).toHaveBeenCalledWith('Erstiparty Nord');
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ seriesId: 's-2' }));
-    cmp.onMenu({ id: 'followUp', label: '' });
-    expect(api.followUp).toHaveBeenCalledWith('k-1');
-  });
-
-  /** § 000736: the start and the end of an Event each have an optional time next to the date. */
-  it('shows and sets the times of an Event next to its dates', async () => {
-    const timed = { ...EVENT, startTime: '20:00:00', endTime: null };
-    const { cmp, api, fixture } = await setup({ card: detail({ event: timed, eventFacts: FACTS }) });
-    expect(screen.getByRole('button', { name: 'Uhrzeit Beginn' })).toHaveTextContent('20:00');
-    cmp.editEventTime('startTime');
-    cmp.saveEventTime('startTime', '20:00');
-    expect(api.setEvent).not.toHaveBeenCalled();
-    const end = screen.getByRole('button', { name: 'Uhrzeit Ende' });
-    expect(end).toHaveTextContent('Uhrzeit angeben');
-    fireEvent.click(end);
-    fixture.detectChanges();
-    const field = await screen.findByRole('textbox', { name: 'Uhrzeit Ende' });
-    fireEvent.input(field, { target: { value: '2' } });
-    fireEvent.blur(field);
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ startTime: '20:00:00', endTime: '02:00:00' }));
-    expect(cmp.eventEdit()).toBeNull();
-    cmp.saveEventTime('endTime', '');
-    expect(api.setEvent).toHaveBeenCalledTimes(1);
-    cmp.setEvent({ startsOn: null, endsOn: null, startTime: '20:00:00', endTime: '21:00:00' });
-    expect(api.setEvent).toHaveBeenLastCalledWith('k-1', expect.objectContaining({ startsOn: null, startTime: null, endTime: null }));
-  });
-
-  it('shows the times of an Event read-only and no empty time without the write right', async () => {
-    const timed = { ...EVENT, startTime: '20:00:00', endTime: null };
-    await setup({ card: detail({ event: timed, eventFacts: FACTS, canWrite: false }) });
-    expect(screen.getByText('20:00')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Uhrzeit Beginn' })).toBeNull();
-    expect(screen.queryByText('Uhrzeit angeben')).toBeNull();
-  });
-
   /**
    * Neither the current board nor, for a card of a gremium board, the personal board is a target.
    * The page learns of the transfer first, with the board the card left.
@@ -855,7 +746,6 @@ describe('TodoCardDetailComponent', () => {
       ['rename', 'edit'],
       ['transfer', 'arrow'],
       ['duplicate', 'copy'],
-      ['makeEvent', 'cal'],
     ]);
     expect(cmp.menuSections()[1].items[0].id).toBe('archive');
     cmp.onMenu({ id: 'transfer', label: '' });
@@ -1605,12 +1495,6 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
     expect(screen.getByRole('dialog', { name: 'To-Do duplizieren' })).toBeInTheDocument();
   });
 
-  it('offers no duplicate of an Event; it has "Folgeveranstaltung anlegen"', async () => {
-    const { cmp } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
-    expect(ids(cmp)).not.toContain('duplicate');
-    expect(ids(cmp)).toContain('followUp');
-  });
-
   it('puts a meeting without a date after the dated ones', async () => {
     jest.useFakeTimers({ now: new Date('2026-10-16T10:00:00') });
     const { cmp } = await setup({
@@ -1658,12 +1542,6 @@ describe('TodoCardDetailComponent board work (specs 000553-000555)', () => {
     const { cmp } = await setup({ card });
     cmp.duplicate();
     expect(cmp.copy()).toEqual(expect.objectContaining({ descriptionMd: '', dueDate: '', assigneeIds: [] }));
-  });
-
-  it('does not duplicate an Event', async () => {
-    const { cmp } = await setup({ card: detail({ event: EVENT, eventFacts: FACTS }) });
-    cmp.duplicate();
-    expect(cmp.copyOpen()).toBe(false);
   });
 
   it('links no card while the card loads', async () => {

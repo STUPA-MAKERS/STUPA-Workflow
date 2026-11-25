@@ -28,6 +28,7 @@ export const GRAPH_KINDS: readonly GraphKind[] = [
   'invoice',
   'expense',
   'order',
+  'event',
   'budget',
   'ticket',
   'todo',

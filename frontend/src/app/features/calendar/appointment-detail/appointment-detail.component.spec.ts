@@ -82,8 +82,6 @@ describe('AppointmentDetailComponent', () => {
       isDone: false,
       dueDate: null,
       assignees: [],
-      event: null,
-      balance: null,
     };
     const view = await setup(appointment(), undefined, [card]);
     const dialog = screen.getByRole('dialog', { name: 'Jour fixe' });
