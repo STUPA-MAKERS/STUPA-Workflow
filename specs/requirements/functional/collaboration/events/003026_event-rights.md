@@ -1,6 +1,6 @@
 ---
 id: "003026"
-title: The board of an Event gives its rights
+title: The team of an Event gives its rights
 kind: functional
 status: draft
 owner: frederikbeimgraben
@@ -12,17 +12,16 @@ scope:
   - frontend/src/app/pages/events
 ---
 
-# The board of an Event gives its rights
+# The team of an Event gives its rights
 
-Each Event must belong to one board that is not a personal board. A
-person must read an Event when the person reads its board, and must write it when the person
-writes its board, with the same rules as a card of that board (`todo.write`, `todo.all`, the
-entries of the board). Writing is create, change, status and delete. The OAuth scopes of the
-to-dos must give the same access to the Events. A person who writes an Event can move it to
-another board that the person writes.
+Each Event must belong to one team (003060), not to a board. Each member of the team must read
+and write the Event: create, change, status and delete. A person who is not a member must not
+read the Event, and the API must answer 404. A member of the parent team or of a sub-team must
+not get access by this alone (003064). A member who writes an Event can move it to another team
+that the person is a member of. The OAuth scopes of the to-dos must give the same access.
 
-Reason: Today the rights of an Event are the rights of its board, and the Gremien and teams
-already set them there. One set of rights for the work and for the Event keeps them the same.
+Reason: The team decides who works together, for the board as for the Event. An Event that
+hangs on a team stays where it is when the board of the team changes.
 
-Test: A backend unit test reads an Event as a reader of its board, gets 404 without access to
-the board and 403 as a reader who tries to change it, and changes it as a writer of the board.
+Test: A backend unit test reads and changes an Event as a member of its team, and gets 404 as a
+member of its parent team only.

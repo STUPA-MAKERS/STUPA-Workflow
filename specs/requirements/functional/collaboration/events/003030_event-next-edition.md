@@ -16,7 +16,7 @@ scope:
 # Folgeveranstaltung anlegen copies the plan
 
 The menu of an Event must have `Folgeveranstaltung anlegen`. It must open the form for a new
-Event with the name, the description, the place, the shop, the board and the series of the
+Event with the name, the description, the place, the shop, the team and the series of the
 Event. The new Event must not get the dates, the status or the links.
 
 Reason: The plan of a recurring Event repeats each time. The Anträge, Buchungen and decisions

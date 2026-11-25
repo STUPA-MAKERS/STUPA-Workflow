@@ -23,7 +23,7 @@ new Event must get the number `V-` followed by eight random characters, like a B
 
 Reason: An Event has a date, a place, money and decisions, and it lives longer than the work on
 a board. On a board it hides between the to-dos, and it is hard to find. As an element of its own it
-is easy to find, like a Bestellung. It keeps the rights of its board (003026).
+is easy to find, like a Bestellung. It gets its rights from its team (003026).
 
 Test: A backend unit test creates an Event and reads its number. A backend unit test gets 422 for
 a new card with event data.

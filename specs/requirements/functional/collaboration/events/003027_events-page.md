@@ -20,8 +20,8 @@ The platform must have the page `Veranstaltungen` at `/events` with its own entr
 navigation, right after `Bestellungen`. It must be a list with a detail like the page
 `Bestellungen` (002883, 002936): a row shows the name, the status, the dates and the place, and
 opens the detail beside the list. The address `/events?id=<id>` must open the page with this
-Event. The button `Veranstaltung anlegen` must show only for a person who writes a board that is not personal.
-The list must hold the Events of the boards that the person reads.
+Event. The button `Veranstaltung anlegen` must show only for a member of a team.
+The list must hold the Events of the teams of the person.
 The form for a new Event and for a change must open in the pane (002937).
 
 Reason: An Event must be easy to find, like a Bestellung. A list with a detail is how the

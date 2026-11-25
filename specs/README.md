@@ -314,7 +314,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | draft |
 | [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | draft |
 | [F/collaboration/events/003025](requirements/functional/collaboration/events/003025_event-status.md) | An Event has a status of its status list | draft |
-| [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The board of an Event gives its rights | draft |
+| [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | draft |
 | [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | draft |
 | [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | draft |
 | [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | draft |
