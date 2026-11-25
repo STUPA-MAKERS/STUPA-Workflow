@@ -1,7 +1,7 @@
 """Build the file of one filing with the data of its document.
 
 A protocol gives its stored PDF, an attachment its stored file. The PDF of an Antrag and
-of a Haushaltsplan renders anew, as the export does (§F/integrations/paperless/002517,
+of a Haushaltsplan renders anew, as the export does (§F/integrations/paperless/003110,
 §F/integrations/paperless/002518). Each file carries the title, the date of its event,
 the document type, the name of its Gremium and the address of its element in the
 platform (§F/integrations/paperless/002519).

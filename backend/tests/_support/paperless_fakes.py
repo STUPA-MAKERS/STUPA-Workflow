@@ -32,11 +32,14 @@ class FakePaperless:
         files: The PDF version of a document, which the download route answers.
         consume: `ok` makes a document of an upload at the first task read, `fail`
             makes the task fail, `wait` keeps it open.
+        task_status: Each read of a consume task gets this error status, as for an
+            account without the right to read tasks.
     """
 
     down: bool = False
     status: int | None = None
     consume: str = "ok"
+    task_status: int | None = None
     requests: list[httpx.Request] = field(default_factory=list[httpx.Request])
     names: dict[str, dict[str, int]] = field(default_factory=lambda: {name: {} for name in _LISTS})
     uploads: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
@@ -168,6 +171,8 @@ class FakePaperless:
         if path == "documents/post_document":
             return self._upload(request)
         if path == "tasks":
+            if self.task_status is not None:
+                return httpx.Response(self.task_status, json={"detail": "error"})
             return self._task(request)
         if path == "documents":
             return self._search(request)

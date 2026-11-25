@@ -2,7 +2,7 @@
 id: "003110"
 title: The PDF of an Antrag is filed when the Antrag reaches an end state
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 tests:
