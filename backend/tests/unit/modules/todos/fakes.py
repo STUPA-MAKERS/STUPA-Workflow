@@ -24,7 +24,6 @@ from app.modules.todos.models import (
     Link,
     TodoBoard,
     TodoCard,
-    TodoCardEvent,
     TodoColumn,
     TodoComment,
     TodoEvent,
@@ -124,8 +123,6 @@ class ScriptedSession:
 
     async def scalars(self, stmt: Any) -> Rows:
         self.statements.append(stmt)
-        if _selects(stmt, TodoCardEvent):
-            return Rows([o for o in self.store.values() if isinstance(o, TodoCardEvent)])
         return Rows(self.scalars_q.pop(0))
 
     async def execute(self, stmt: Any, *_a: Any) -> Rows:

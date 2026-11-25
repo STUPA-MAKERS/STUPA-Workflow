@@ -12,6 +12,7 @@ one of them. The change right of an end is the right that changes the element it
 * invoice — ``budget.book`` or ``invoice.manage`` (F/finance/invoices/003015);
 * expense — ``budget.book``;
 * order (a Bestellung) — ``order.manage`` (F/finance/orders/002887);
+* event (a Veranstaltung) — a member of its team (F/collaboration/events/003026);
 * budget — ``budget.structure``;
 * ticket — the work right in the Bereich of the ticket;
 * todo — the write right on the board of the card (``BoardAccess.can_write``);
@@ -36,6 +37,8 @@ from app.modules.budget.access import INVOICE_WRITE_PERMISSIONS
 from app.modules.calendar import rules as calendar_rules
 from app.modules.calendar.appointments import AppointmentService
 from app.modules.calendar.models import Appointment
+from app.modules.events.access import event_team_ids
+from app.modules.events.models import Event
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.tickets.access import works_on_ticket
 from app.modules.todos.access import BoardAccess
@@ -99,6 +102,8 @@ class LinkRights:
                 return await self._appointment(target_id, principal)
             case "todo":
                 return await self._card(target_id, principal)
+            case "event":
+                return await self._event(target_id, principal)
             case "ticket":
                 return await works_on_ticket(self.session, principal, target_id)
             case _:
@@ -140,6 +145,10 @@ class LinkRights:
             return False
         viewer = await AppointmentService(self.session).viewer(principal)
         return calendar_rules.can_edit(viewer, row.creator_id)
+
+    async def _event(self, event_id: uuid.UUID, principal: Principal) -> bool:
+        event = await self.session.get(Event, event_id)
+        return event is not None and event.team_id in await event_team_ids(self.session, principal)
 
     async def _card(self, card_id: uuid.UUID, principal: Principal) -> bool:
         card = await self.session.get(TodoCard, card_id)

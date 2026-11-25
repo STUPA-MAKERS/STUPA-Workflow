@@ -2,13 +2,15 @@
 
 Each kind is read under the rule of its own module, so the Kalender never shows an
 entry that the list of that module does not show: the meetings through the read scope
-of the meeting list (`MeetingRules.meeting_read_scope`), the cards and the Events
-through the board scope of the to-dos, the Termine through `appointments.readable`,
-and the external entries through the scope of their calendar (`external`).
+of the meeting list (`MeetingRules.meeting_read_scope`), the cards through the board
+scope of the to-dos, the Events through the teams of the caller (`events.calendar`), the
+Termine through `appointments.readable`, and the external entries through the scope of
+their calendar (`external`).
 
-The filter "Nur meine" limits the cards and the Events to the assigned ones and the
-Termine to those that the caller created or is invited to. The meetings and the
-external entries stay, because neither has a person that it belongs to.
+The filter "Nur meine" limits the cards to the assigned ones and the Termine to those
+that the caller created or is invited to. The meetings, the Events and the external
+entries stay: a meeting and an external entry have no person that they belong to, and an
+Event belongs to each member of its team.
 """
 
 from __future__ import annotations
@@ -28,11 +30,13 @@ from app.modules.calendar.external import ExternalCalendarService, external_entr
 from app.modules.calendar.models import ExternalCalendar
 from app.modules.calendar.rules import Viewer
 from app.modules.calendar.schemas import EntryOut, TeamRefOut
+from app.modules.events.calendar import events_between
+from app.modules.events.models import Event
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting
 from app.modules.meetings.rules import MeetingRules
 from app.modules.site_config.features import Feature, feature_on
-from app.modules.todos.models import TodoBoard, TodoCard, TodoCardEvent
+from app.modules.todos.models import TodoBoard, TodoCard
 from app.modules.todos.service import TodoService
 from app.shared.search import escape_like
 
@@ -74,30 +78,25 @@ def card_entry(
     )
 
 
-def event_entry(
-    card: TodoCard,
-    board: TodoBoard,
-    event: TodoCardEvent,
-    mine: bool,
-    gremium_of: Mapping[UUID, UUID],
-) -> EntryOut:
-    """An Event as an entry from its start to its end, with its times.
+def event_entry(event: Event, team: str, gremium_of: Mapping[UUID, UUID]) -> EntryOut:
+    """An Event as an entry from its start to its end, with its times (003033).
 
-    An Event without an end takes a day. An end time shows only with a start time.
+    An Event without an end takes a day. An end time shows only with a start time. Each
+    member of the team works on the Event, so it is ``mine``.
     """
     start = cast(date, event.starts_on)
     return EntryOut(
         kind="event",
-        id=card.id,
-        title=card.title,
+        id=event.id,
+        title=event.title,
         starts_on=start,
         ends_on=max(event.ends_on or start, start),
         start_time=event.start_time,
         end_time=event.end_time if event.start_time is not None else None,
         place=event.place,
-        source=board.name,
-        gremium_ids=_board_gremien(board, gremium_of),
-        mine=mine,
+        source=team,
+        gremium_ids=(gremium_of[event.team_id],) if event.team_id in gremium_of else (),
+        mine=True,
     )
 
 
@@ -207,12 +206,14 @@ class CalendarEntries:
         self,
         boards: Sequence[TodoBoard],
         calendars: Sequence[ExternalCalendar],
+        events: Sequence[Event] = (),
     ) -> Mapping[UUID, UUID]:
-        """The Gremium of each inherent team of the boards and the external calendars."""
+        """The Gremium of each inherent team of the boards, the calendars and the Events."""
         return await self.appointments.gremium_of(
             {
                 *(b.team_id for b in boards if b.team_id is not None),
                 *(c.team_id for c in calendars if c.team_id is not None),
+                *(e.team_id for e in events),
             }
         )
 
@@ -221,8 +222,8 @@ class CalendarEntries:
     ) -> tuple[EntryOut, ...]:
         """The entries with a day in the span, both ends included, sorted by day.
 
-        The meetings stay out while `Sitzungen` is off, the cards and the Events while
-        `Boards` is off.
+        The meetings stay out while `Sitzungen` is off, the cards while `Boards` is off and
+        the Events while `Veranstaltungen` is off.
         """
         viewer = await self.appointments.viewer(principal)
         todos = TodoService(self.session)
@@ -236,26 +237,20 @@ class CalendarEntries:
             else []
         )
         events = (
-            await todos.calendar_events_between(
-                principal, start=start, end=end, only_mine=only_mine
-            )
-            if boards_on
+            await events_between(self.session, principal, start=start, end=end)
+            if await feature_on(self.session, Feature.EVENTS)
             else []
         )
         termine = await self.appointments.between(viewer, start, end, only_mine=only_mine)
         external = await ExternalCalendarService(self.session).between(principal, start, end)
         gremium_of = await self._gremium_of(
-            [*(b for _c, b, _m in cards), *(b for _c, b, _e, _m in events)],
-            [c for _e, c in external],
+            [b for _c, b, _m in cards], [c for _e, c in external], [e for e, _t in events]
         )
         return by_day(
             [
                 *meetings,
                 *(card_entry(card, board, mine, gremium_of) for card, board, mine in cards),
-                *(
-                    event_entry(card, board, event, mine, gremium_of)
-                    for card, board, event, mine in events
-                ),
+                *(event_entry(event, team, gremium_of) for event, team in events),
                 *(await self._appointment_entries(viewer, termine)),
                 *(external_entry(entry, calendar, gremium_of) for entry, calendar in external),
             ]
@@ -283,8 +278,8 @@ class CalendarEntries:
             else []
         )
         events = (
-            await todos.calendar_events_between(principal, pattern=pattern, limit=PER_KIND)
-            if boards_on
+            await events_between(self.session, principal, pattern=pattern, limit=PER_KIND)
+            if await feature_on(self.session, Feature.EVENTS)
             else []
         )
         termine = await self.appointments.matching(viewer, pattern, PER_KIND)
@@ -292,17 +287,13 @@ class CalendarEntries:
             principal, pattern, PER_KIND
         )
         gremium_of = await self._gremium_of(
-            [*(b for _c, b, _m in cards), *(b for _c, b, _e, _m in events)],
-            [c for _e, c in external],
+            [b for _c, b, _m in cards], [c for _e, c in external], [e for e, _t in events]
         )
         return nearest(
             [
                 *meetings,
                 *(card_entry(card, board, mine, gremium_of) for card, board, mine in cards),
-                *(
-                    event_entry(card, board, event, mine, gremium_of)
-                    for card, board, event, mine in events
-                ),
+                *(event_entry(event, team, gremium_of) for event, team in events),
                 *(await self._appointment_entries(viewer, termine)),
                 *(external_entry(entry, calendar, gremium_of) for entry, calendar in external),
             ],

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application, ApplicationLink
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.calendar.models import Appointment, Invitation
+from app.modules.events.models import Event
 from app.modules.graph.build import Ref, Relation
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
@@ -113,6 +114,7 @@ def _id_reads() -> Mapping[str, Select[Any]]:
         "invoice": select(Invoice.id),
         "expense": select(BudgetExpense.id),
         "order": select(PurchaseOrder.id),
+        "event": select(Event.id),
         "budget": select(Budget.id),
         "ticket": select(Ticket.id),
         "todo": select(TodoCard.id).where(TodoCard.archived_at.is_(None)),
@@ -135,7 +137,7 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
 
     The date of a node (spec 001425): the date of a meeting and of its TOPs, the start of
     a Termin, the invoice date of an invoice and of a Buchung, the order date of a
-    Bestellung, the due date of a card,
+    Bestellung, the start of an Event, the due date of a card,
     the date of a Paperless document, and else the creation. A Gremium and a cost centre
     have no date.
     """
@@ -174,6 +176,8 @@ def _date_read(kind: str, ids: Collection[uuid.UUID]) -> Select[Any, Any, Any]:
             return select(
                 PurchaseOrder.id, PurchaseOrder.ordered_on, PurchaseOrder.created_at
             ).where(PurchaseOrder.id.in_(wanted))
+        case "event":
+            return select(Event.id, Event.starts_on, Event.created_at).where(Event.id.in_(wanted))
         case "budget":
             return select(Budget.id, none, none).where(Budget.id.in_(wanted))
         case "ticket":

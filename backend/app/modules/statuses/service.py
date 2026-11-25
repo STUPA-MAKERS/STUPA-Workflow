@@ -31,7 +31,7 @@ from app.shared.errors import ConflictError, ValidationProblem
 
 #: The table of the elements of each list and its status column. The statuses module is a
 #: layer below the element modules, so it names the tables and never imports them.
-ELEMENT_TABLES: dict[str, str] = {"order": "purchase_order"}
+ELEMENT_TABLES: dict[str, str] = {"order": "purchase_order", "event": "event"}
 
 
 def _element_table(kind: str) -> TableClause:

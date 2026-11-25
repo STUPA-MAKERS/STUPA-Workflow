@@ -22,7 +22,6 @@ from app.modules.todos.models import (
     TodoBoard,
     TodoBoardEntry,
     TodoCard,
-    TodoCardEvent,
     TodoColumn,
     TodoComment,
 )
@@ -507,20 +506,14 @@ class BoardOps(TodoServiceBase):
         q: str | None = None,
         limit: int = 50,
         offset: int = 0,
-        events_only: bool = False,
     ) -> Page[TodoCardTile]:
-        """Page through the archived cards of a board, newest archive first.
-
-        ``events_only`` keeps the Events: the filter ``Veranstaltungen mit Archiv``.
-        """
+        """Page through the archived cards of a board, newest archive first."""
         board = await self._board(board_id, principal)
         term = (q or "").strip()
-        events = (TodoCard.id.in_(select(TodoCardEvent.card_id)),) if events_only else ()
         titled = (TodoCard.title.ilike(f"%{escape_like(term)}%", escape="\\"),) if term else ()
         conds = (
             TodoCard.board_id == board.id,
             TodoCard.archived_at.is_not(None),
-            *events,
             *titled,
         )
         total = await self.session.scalar(select(func.count()).select_from(TodoCard).where(*conds))

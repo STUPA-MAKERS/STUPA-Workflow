@@ -118,7 +118,7 @@ containers = ["app.modules"]
 exhaustive = true
 layers = [
     "admin : search : graph : activity : privacy : backup : config_revision : audit_log : account : gremien_overview : attachments : push_actions : paperless_filing : team_pages",
-    "protocol : livevote : todos : tickets : calendar",
+    "protocol : livevote : todos : tickets : calendar : events",
     "documents : orders",
     "voting : budget : applications : flow : meetings : delegations",
     "forms : application_types : notifications : webhooks : files : media : translations : avatars : paperless : statuses : teams",

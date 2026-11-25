@@ -11,13 +11,11 @@ from pydantic import JsonValue
 
 from app.modules.auth.people import DELETED_PERSON, PersonRef
 from app.modules.files.schemas import MessageAttachmentOut
-from app.modules.todos import events as todo_events
 from app.modules.todos.grouping import grouped
 from app.modules.todos.links import HIDDEN, Resolved
 from app.modules.todos.models import (
     TodoBoard,
     TodoCard,
-    TodoCardEvent,
     TodoCheckItem,
     TodoColumn,
     TodoComment,
@@ -26,7 +24,6 @@ from app.modules.todos.models import (
 )
 from app.modules.todos.schemas import (
     ChecklistCount,
-    EventIn,
     TodoAssignedBoard,
     TodoCardDetail,
     TodoCardTile,
@@ -34,44 +31,12 @@ from app.modules.todos.schemas import (
     TodoColumnOut,
     TodoColumnRef,
     TodoCommentOut,
-    TodoEventBrief,
-    TodoEventDecision,
-    TodoEventEdition,
-    TodoEventFacts,
     TodoEventOut,
-    TodoEventTotals,
     TodoLabelOut,
     TodoLinkOut,
     TodoMineItem,
 )
 from app.modules.todos.service.common import CardLink, _Facts, _person, _ref_of, _uuid_of
-
-
-def _event_brief(
-    row: TodoCardEvent | None, series: Mapping[uuid.UUID, str]
-) -> TodoEventBrief | None:
-    if row is None:
-        return None
-    return TodoEventBrief(
-        starts_on=row.starts_on,
-        ends_on=row.ends_on,
-        start_time=row.start_time,
-        end_time=row.end_time,
-        place=row.place,
-        participants=row.participants,
-        series_id=row.series_id,
-        series_name=series.get(row.series_id) if row.series_id is not None else None,
-    )
-
-
-def _totals_out(value: todo_events.Totals) -> TodoEventTotals:
-    return TodoEventTotals(
-        requested=todo_events.balance_text(value.requested),
-        approved=todo_events.balance_text(value.approved),
-        expenses=todo_events.balance_text(value.expenses),
-        income=todo_events.balance_text(value.income),
-        balance=todo_events.balance_text(value.balance),
-    )
 
 
 def _link_out(link: CardLink, resolved: Mapping[tuple[str, uuid.UUID], Resolved]) -> TodoLinkOut:
@@ -167,7 +132,6 @@ def _tile(card: TodoCard, facts: _Facts) -> TodoCardTile:
         comment_count=facts.comments.get(card.id, 0),
         primary_link=_link_out(links[0], facts.resolved) if links else None,
         link_count=len(links),
-        event=_event_brief(facts.events.get(card.id), facts.series),
         version=card.version,
         created_at=card.created_at,
         updated_at=card.updated_at,
@@ -177,23 +141,6 @@ def _tile(card: TodoCard, facts: _Facts) -> TodoCardTile:
 def _clean(value: str | None) -> str | None:
     text = (value or "").strip()
     return text or None
-
-
-def _event_fields(payload: EventIn) -> dict[str, object]:
-    """The columns of the event data of a card, from the request."""
-    return {
-        "starts_on": payload.starts_on,
-        "ends_on": payload.ends_on,
-        "start_time": payload.start_time,
-        "end_time": payload.end_time,
-        "place": _clean(payload.place),
-        "participants": payload.participants,
-        "series_id": payload.series_id,
-    }
-
-
-def _event_row(card_id: uuid.UUID, payload: EventIn) -> TodoCardEvent:
-    return TodoCardEvent(card_id=card_id, **_event_fields(payload))
 
 
 def _by_card[R: (TodoCheckItem, TodoEvent, TodoComment)](
@@ -247,40 +194,6 @@ def _detail_refs(
     return frozenset((*linked, *(ref for ref in logged if ref is not None)))
 
 
-def _decision_out(decision: todo_events.Decision) -> TodoEventDecision:
-    amount = decision.amount
-    return TodoEventDecision(
-        kind=decision.kind,  # pyright: ignore[reportArgumentType]
-        target_id=decision.target_id,
-        title=decision.title,
-        decided_at=decision.decided_at,
-        meeting_title=decision.meeting_title,
-        result=decision.result,
-        amount=todo_events.balance_text(amount) if amount is not None else None,
-        conditions=decision.conditions,
-    )
-
-
-def _edition_out(
-    other: TodoCard,
-    board: TodoBoard,
-    row: TodoCardEvent,
-    sums: Mapping[uuid.UUID, todo_events.Totals],
-) -> TodoEventEdition:
-    return TodoEventEdition(
-        id=other.id,
-        board_id=board.id,
-        board_name=board.name,
-        title=other.title,
-        starts_on=row.starts_on,
-        ends_on=row.ends_on,
-        start_time=row.start_time,
-        end_time=row.end_time,
-        archived=other.archived_at is not None,
-        totals=_totals_out(sums[other.id]),
-    )
-
-
 @dataclass(frozen=True, slots=True)
 class _DetailParts:
     """What the whole cards of one read show, loaded before the first card is built."""
@@ -296,7 +209,6 @@ class _DetailParts:
     persons: Mapping[uuid.UUID, PersonRef]
     me: uuid.UUID | None
     files: Mapping[uuid.UUID, list[MessageAttachmentOut]]
-    gathered: Mapping[uuid.UUID, TodoEventFacts]
 
     def detail(self, card: TodoCard, board: TodoBoard) -> TodoCardDetail:
         """Build the whole card of ``card`` on ``board``."""
@@ -331,7 +243,6 @@ class _DetailParts:
                 for c in self.comments.get(card.id, ())
             ),
             archived_at=card.archived_at,
-            event_facts=self.gathered.get(card.id),
         )
 
 

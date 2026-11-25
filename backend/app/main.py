@@ -63,6 +63,7 @@ from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.documents.router import router as application_pdf_router
+from app.modules.events.router import router as events_router
 from app.modules.files.storage import build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.forced_router import router as forced_status_router
@@ -177,6 +178,7 @@ api_router.include_router(graph_router)
 api_router.include_router(tickets_router)
 api_router.include_router(orders_list_router)
 api_router.include_router(orders_router)
+api_router.include_router(events_router)
 api_router.include_router(todos_router)
 api_router.include_router(links_router)
 api_router.include_router(todos_ws_router)

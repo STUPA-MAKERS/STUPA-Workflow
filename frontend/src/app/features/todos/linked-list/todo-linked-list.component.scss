@@ -62,11 +62,14 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.tl__row--event .tl__icon {
-  color: var(--color-accent-text);
-}
-.tl__neg {
-  color: var(--color-danger);
+// The folded Buchungen of an Event (003041): a button that looks like the link of a row.
+.tl__fold {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
 }
 .tl__actions {
   display: inline-flex;

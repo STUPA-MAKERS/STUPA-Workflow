@@ -1,6 +1,6 @@
 ---
 name: be-todos
-description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, links between any two elements (table link, /api/links, LinkService, LinkRights), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the live board pings (WS /api/ws/todos, GET cards/{id}/tile), the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
+description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables; an Event (Veranstaltung) is no card, see be-events). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, links between any two elements (table link, /api/links, LinkService, LinkRights), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the live board pings (WS /api/ws/todos, GET cards/{id}/tile), the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
 ---
 
 # To-dos — `backend/app/modules/todos`
@@ -27,13 +27,16 @@ done (`completed_at`).
   `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
   appointment (a Termin, `calendar_appointment`; read rule `calendar.appointments.readable`,
   a granted Termin gives title, start, end and place only), gremium, invoice, expense
-  (`budget_expense`), budget (the cost centre), ticket, todo, paperless (a Paperless
+  (`budget_expense`), budget (the cost centre), ticket, todo, order, event (an Event of
+  the module `events`; read and change rule: a member of its team), paperless (a Paperless
   document, row `paperless_document`, migration `b9e2c47f1a36`; `LinkResolver.prepare`
   stores the document before a new link, see be-paperless).
   Migration `527854b79d68` adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`;
   `b3b70dda7d08` adds `budget_id`; `d85b3e6a1f47` adds `appointment_id`.
-  `TodoCardEvent` has `start_time`/`end_time` (migration `c7d21f9a4e63`): a time needs its
-  day (`event_time_without_date`), and the end of one day is not before its start. Constants
+  A card carries no event data: the table `todo_card_event` is gone (migration
+  `7c4e2a9d1b85` made each event card an `event` row, F/collaboration/events/003031), and
+  `CardCreate` refuses an `event` field with 422. `TodoEventSeries` stays here as the
+  table of the series of the Events. Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
 - `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
@@ -46,8 +49,8 @@ done (`completed_at`).
   `base.TodoServiceBase` (access, locks, `_card`, `_event`, `_touch`, `_facts`, `_mail`):
   `boards.py`, `columns.py` (columns and labels), `details.py` (card reads), `cards.py`
   (create, patch, move, transfer, complete, archive, `card_for_agenda`,
-  `link_agenda_item`), `card_parts.py` (assignees, labels, checklist), `card_events.py`
-  (Event, follow-up, series), `comments.py`, `reads.py` (`mine`, board rows, linked,
+  `link_agenda_item`), `card_parts.py` (assignees, labels, checklist), `comments.py`,
+  `reads.py` (`mine`, board rows, linked,
   search), `calendar_reads.py`; pure helpers in `common.py`, `ranks.py` (lexorank),
   `rows.py` (serialization). A test that monkeypatches a name patches the submodule that
   uses it (e.g. `service.comments.bind_drafts`). Mails go to
@@ -338,7 +341,7 @@ be-auth, frontend
 - `links_router.py`: `GET /links?kind&id`, `POST /links` (`{a, b}`), `DELETE
   /links/{id}`, `GET /links/targets` (`q`, `kind`, `excludeKind`, `excludeId`), `GET
   /links/{id}/view`. A card end writes the card events `linked`/`unlinked` and touches
-  the board (`TodoService.note_link`); `check_new_link` keeps an Antrag, Buchung or
-  invoice to one Event.
+  the board (`TodoService.note_link`); `events.facts.check_one_event` keeps an Antrag,
+  Buchung or invoice to one Event (409 `event_link_taken`).
 - A card still takes `links` in `POST /cards`; the card detail lists its links as before.
 

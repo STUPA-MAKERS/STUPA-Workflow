@@ -39,15 +39,12 @@ from app.modules.todos.schemas import (
     TodoCardDetail,
     TodoCardTile,
     TodoCommentOut,
-    TodoEventRef,
-    TodoEventSeriesOut,
     TodoLabelOut,
     TodoMember,
     TodoMine,
 )
 from app.modules.todos.service import TodoMail, TodoService
 from app.settings import load_settings
-from app.shared.errors import ConflictError
 from app.shared.paging import Page
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
@@ -179,9 +176,7 @@ def test_board_routes(env: _Env) -> None:
     assert c.get(f"/api/todos/boards/{BID}/members").json()[0]["displayName"] == "Ada"
     page = c.get(f"/api/todos/boards/{BID}/archive?q=x&limit=10&offset=5")
     assert page.json()["total"] == 1
-    assert env.last()[2] == {"q": "x", "limit": 10, "offset": 5, "events_only": False}
-    c.get(f"/api/todos/boards/{BID}/archive?events=true")
-    assert env.last()[2]["events_only"] is True
+    assert env.last()[2] == {"q": "x", "limit": 10, "offset": 5}
     assert c.post(f"/api/todos/boards/{BID}/columns", json={"name": "N"}).status_code == 201
     order = c.put(f"/api/todos/boards/{BID}/columns/order", json={"columnIds": [str(XID)]})
     assert order.status_code == 200
@@ -312,47 +307,20 @@ def test_card_routes(env: _Env) -> None:
     assert env.sent == []
 
 
-def _event_permanent() -> Any:
-    raise ConflictError("An Event cannot become a to-do again.", code="event_permanent")
-
-
-def test_event_routes(env: _Env, monkeypatch: pytest.MonkeyPatch) -> None:
-    series = TodoEventSeriesOut(id=XID, name="Sommerfest")
-    answers: dict[str, Callable[[], Any]] = {
-        "cards": lambda: [_detail()],
-        "set_event": _detail,
-        "remove_event": _event_permanent,
-        "follow_up": _detail,
-        "series": lambda: [series],
-        "create_series": lambda: series,
-        "writable_events": lambda: [
-            TodoEventRef(id=CID, board_id=BID, board_name="B", title="Fest")
-        ],
-    }
-    for name, answer in answers.items():
-        monkeypatch.setitem(_ANSWERS, name, answer)
+def test_card_reads_and_the_removed_event_routes(
+    env: _Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A card holds no event data (F/collaboration/events/003022)."""
+    monkeypatch.setitem(_ANSWERS, "cards", lambda: [_detail()])
     c = env.client
     got = c.get(f"/api/todos/cards?ids={CID}&ids={XID}")
     assert [card["id"] for card in got.json()] == [str(CID)]
     assert env.last()[0:2] == ("cards", ([CID, XID], USER))
     assert c.get("/api/todos/cards").status_code == 422
-    event = c.put(f"/api/todos/cards/{CID}/event", json={"startsOn": "2026-06-01"})
-    assert event.status_code == 200
-    assert str(env.last()[1][1].starts_on) == "2026-06-01"
-    assert c.put(f"/api/todos/cards/{CID}/event", json={"participants": -1}).status_code == 422
-    removed = c.delete(f"/api/todos/cards/{CID}/event")
-    assert removed.status_code == 409
-    assert removed.json()["code"] == "event_permanent"
-    assert c.post(f"/api/todos/cards/{CID}/follow-up").status_code == 201
-    assert c.get("/api/todos/series?q=Som").json() == [{"id": str(XID), "name": "Sommerfest"}]
-    assert env.last()[1][0] == "Som"
-    created = c.post("/api/todos/series", json={"name": "Sommerfest"})
-    assert created.status_code == 201
-    assert env.last()[1][0] == "Sommerfest"
-    assert c.post("/api/todos/series", json={"name": ""}).status_code == 422
-    picker = c.get("/api/todos/events?q=Fe")
-    assert picker.json()[0]["boardName"] == "B"
-    assert env.last()[0:2] == ("writable_events", ("Fe", USER))
+    with_event = {"boardId": str(BID), "title": "t", "event": {"startsOn": "2026-06-01"}}
+    assert c.post("/api/todos/cards", json=with_event).status_code == 422
+    assert c.put(f"/api/todos/cards/{CID}/event", json={}).status_code in (404, 405)
+    assert c.get("/api/todos/series").status_code in (404, 405)
 
 
 @pytest.mark.parametrize(

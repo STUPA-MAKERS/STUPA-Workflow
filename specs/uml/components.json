@@ -121,6 +121,11 @@
       "to": "delegations"
     },
     {
+      "count": 1,
+      "from": "admin",
+      "to": "events"
+    },
+    {
       "count": 11,
       "from": "admin",
       "to": "files"
@@ -531,6 +536,11 @@
       "to": "auth"
     },
     {
+      "count": 3,
+      "from": "calendar",
+      "to": "events"
+    },
+    {
       "count": 4,
       "from": "calendar",
       "to": "gremien"
@@ -566,7 +576,7 @@
       "to": "teams"
     },
     {
-      "count": 5,
+      "count": 4,
       "from": "calendar",
       "to": "todos"
     },
@@ -716,6 +726,71 @@
       "to": "voting"
     },
     {
+      "count": 3,
+      "from": "events",
+      "to": "applications"
+    },
+    {
+      "count": 2,
+      "from": "events",
+      "to": "audit"
+    },
+    {
+      "count": 5,
+      "from": "events",
+      "to": "auth"
+    },
+    {
+      "count": 2,
+      "from": "events",
+      "to": "budget"
+    },
+    {
+      "count": 1,
+      "from": "events",
+      "to": "flow"
+    },
+    {
+      "count": 1,
+      "from": "events",
+      "to": "meetings"
+    },
+    {
+      "count": 2,
+      "from": "events",
+      "to": "orders"
+    },
+    {
+      "count": 8,
+      "from": "events",
+      "to": "shared"
+    },
+    {
+      "count": 3,
+      "from": "events",
+      "to": "statuses"
+    },
+    {
+      "count": 4,
+      "from": "events",
+      "to": "teams"
+    },
+    {
+      "count": 6,
+      "from": "events",
+      "to": "todos"
+    },
+    {
+      "count": 1,
+      "from": "events",
+      "to": "voting"
+    },
+    {
+      "count": 2,
+      "from": "events",
+      "to": "webhooks"
+    },
+    {
       "count": 4,
       "from": "files",
       "to": "audit"
@@ -839,6 +914,11 @@
       "count": 1,
       "from": "graph",
       "to": "calendar"
+    },
+    {
+      "count": 1,
+      "from": "graph",
+      "to": "events"
     },
     {
       "count": 1,
@@ -1471,6 +1551,11 @@
       "to": "budget"
     },
     {
+      "count": 3,
+      "from": "search",
+      "to": "events"
+    },
+    {
       "count": 2,
       "from": "search",
       "to": "gremien"
@@ -1496,12 +1581,22 @@
       "to": "site_config"
     },
     {
+      "count": 1,
+      "from": "search",
+      "to": "statuses"
+    },
+    {
+      "count": 1,
+      "from": "search",
+      "to": "teams"
+    },
+    {
       "count": 2,
       "from": "search",
       "to": "tickets"
     },
     {
-      "count": 4,
+      "count": 2,
       "from": "search",
       "to": "todos"
     },
@@ -1621,7 +1716,7 @@
       "to": "webhooks"
     },
     {
-      "count": 9,
+      "count": 7,
       "from": "todos",
       "to": "applications"
     },
@@ -1631,12 +1726,12 @@
       "to": "audit"
     },
     {
-      "count": 35,
+      "count": 34,
       "from": "todos",
       "to": "auth"
     },
     {
-      "count": 7,
+      "count": 6,
       "from": "todos",
       "to": "budget"
     },
@@ -1646,12 +1741,17 @@
       "to": "calendar"
     },
     {
+      "count": 5,
+      "from": "todos",
+      "to": "events"
+    },
+    {
       "count": 7,
       "from": "todos",
       "to": "files"
     },
     {
-      "count": 2,
+      "count": 1,
       "from": "todos",
       "to": "flow"
     },
@@ -1671,7 +1771,7 @@
       "to": "livevote"
     },
     {
-      "count": 4,
+      "count": 3,
       "from": "todos",
       "to": "meetings"
     },
@@ -1691,7 +1791,7 @@
       "to": "paperless"
     },
     {
-      "count": 31,
+      "count": 28,
       "from": "todos",
       "to": "shared"
     },
@@ -1711,7 +1811,7 @@
       "to": "tickets"
     },
     {
-      "count": 6,
+      "count": 5,
       "from": "todos",
       "to": "voting"
     },
@@ -1888,6 +1988,12 @@
       "layer": 3,
       "name": "documents",
       "path": "backend/app/modules/documents"
+    },
+    {
+      "id": "events",
+      "layer": 2,
+      "name": "events",
+      "path": "backend/app/modules/events"
     },
     {
       "id": "files",

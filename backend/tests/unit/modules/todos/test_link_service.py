@@ -13,7 +13,7 @@ from app.modules.auth.principal import Principal
 from app.modules.todos.link_service import LinkService
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import Link
-from app.modules.todos.schemas import TodoEventBrief, TodoLinkedCard, TodoLinkTarget
+from app.modules.todos.schemas import TodoLinkedCard, TodoLinkTarget
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests.unit.modules.todos.fakes import (
     ME,
@@ -54,8 +54,6 @@ class _Todos:
         self.col = column(self.b.id)
         self.cards: dict[uuid.UUID, Any] = {}
         self.notes: list[tuple[uuid.UUID, tuple[str, uuid.UUID], bool]] = []
-        self.checked: list[tuple[uuid.UUID, tuple[str, uuid.UUID]]] = []
-        self.taken = False
         self.linked: dict[uuid.UUID, TodoLinkedCard] = {}
 
     def add_card(self) -> Any:
@@ -66,11 +64,6 @@ class _Todos:
     async def card_end(self, card_id: uuid.UUID, _p: Any, *, write: bool) -> Any:
         assert write is False
         return self.cards[card_id], self.b
-
-    async def check_new_link(self, c: Any, other: tuple[str, uuid.UUID]) -> None:
-        self.checked.append((c.id, other))
-        if self.taken:
-            raise ConflictError("taken", code="event_link_taken")
 
     def note_link(self, c: Any, _b: Any, other: Any, _actor: Any, *, added: bool) -> None:
         self.notes.append((c.id, other, added))
@@ -107,7 +100,7 @@ async def test_the_list_puts_the_event_first_then_kinds_then_newest() -> None:
     session = ScriptedSession()
     own = ("application", APP)
     service, todos = _service(session, readable=[own], change=[own])
-    event_card, plain_card, hidden_card = (uuid.uuid4() for _ in range(3))
+    event, plain_card, hidden_card = (uuid.uuid4() for _ in range(3))
     later, earlier = uuid.uuid4(), uuid.uuid4()
     base = TodoLinkedCard(
         id=plain_card,
@@ -117,16 +110,13 @@ async def test_the_list_puts_the_event_first_then_kinds_then_newest() -> None:
         column_name="c",
         is_done=False,
     )
-    todos.linked = {
-        plain_card: base,
-        event_card: base.model_copy(update={"id": event_card, "event": TodoEventBrief()}),
-    }
+    todos.linked = {plain_card: base}
     session.execute_q.append(
         [
             _edge(own, ("invoice", earlier), NOW),
             _edge(own, ("todo", plain_card), NOW),
             _edge(own, ("invoice", later), NOW + timedelta(days=1)),
-            _edge(own, ("todo", event_card), NOW),
+            _edge(own, ("event", event), NOW),
             _edge(own, ("todo", hidden_card), NOW),
             _edge(own, ("meeting", uuid.uuid4()), NOW),
         ]
@@ -134,17 +124,18 @@ async def test_the_list_puts_the_event_first_then_kinds_then_newest() -> None:
     service.todos.links.resolved = {  # type: ignore[attr-defined]
         ("invoice", later): Resolved(True, "R-2", "/invoices"),
         ("invoice", earlier): Resolved(True, "R-1", "/invoices"),
+        ("event", event): Resolved(True, "V-1", "/events"),
     }
     out = await service.of(*own, USER)
     assert out.can_link is True
     assert [(row.kind, row.title) for row in out.links] == [
-        ("todo", None),
+        ("event", "V-1"),
         ("meeting", None),
         ("invoice", "R-2"),
         ("invoice", "R-1"),
         ("todo", None),
     ]
-    assert out.links[0].target_id == event_card and out.links[-1].target_id == plain_card
+    assert out.links[0].target_id == event and out.links[-1].target_id == plain_card
     assert all(row.removable for row in out.links)
     assert todos.links.grants is False
 
@@ -204,26 +195,47 @@ async def test_add_links_two_elements_and_notes_the_card_ends() -> None:
     await service.add(me, ticket, USER)
     (new,) = [o for o in session.added if isinstance(o, Link)]
     assert new.has_end(me) and new.has_end(ticket)
-    assert todos.checked == [(c.id, ticket)] and todos.notes == [(c.id, ticket, True)]
+    assert todos.notes == [(c.id, ticket, True)]
     assert session.committed == 0
 
 
-async def test_add_between_two_cards_notes_both_and_keeps_an_event_to_itself() -> None:
+async def test_add_between_two_cards_notes_both_ends() -> None:
     session = ScriptedSession()
     service, todos = _service(session)
     one, two = todos.add_card(), todos.add_card()
     a, b = ("todo", one.id), ("todo", two.id)
     todos.links.ok = {a, b}
     service = replace(service, rights=_Rights(a))
-    todos.taken = True
-    session.scalar_q.append(None)
-    with pytest.raises(ConflictError):
-        await service.add(a, b, USER)
-    assert session.added == []
-    todos.taken = False
     session.scalar_q.append(None)
     await service.add(a, b, USER)
     assert sorted(todos.notes) == sorted([(one.id, b, True), (two.id, a, True)])
+
+
+async def test_add_keeps_one_event_per_element(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§F/collaboration/events/003033: an Antrag links one Event at most."""
+    session = ScriptedSession()
+    service, todos = _service(session)
+    event, app = ("event", uuid.uuid4()), ("application", APP)
+    todos.links.ok = {event, app}
+    service = replace(service, rights=_Rights(event))
+    checked: list[tuple[uuid.UUID, list[Any]]] = []
+    taken = [True]
+
+    async def _check(_s: Any, event_id: uuid.UUID, refs: list[Any]) -> None:
+        checked.append((event_id, refs))
+        if taken[0]:
+            raise ConflictError("taken", code="event_link_taken")
+
+    monkeypatch.setattr("app.modules.todos.link_service.check_one_event", _check)
+    session.scalar_q.append(None)
+    with pytest.raises(ConflictError):
+        await service.add(app, event, USER)
+    assert session.added == []
+    taken[0] = False
+    session.scalar_q.append(None)
+    await service.add(app, event, USER)
+    assert checked[-1] == (event[1], [app])
+    assert [o for o in session.added if isinstance(o, Link)]
 
 
 async def test_add_refuses_a_kind_whose_feature_is_off(monkeypatch: pytest.MonkeyPatch) -> None:

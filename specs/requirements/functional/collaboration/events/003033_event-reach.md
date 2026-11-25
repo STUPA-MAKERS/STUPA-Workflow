@@ -9,7 +9,7 @@ implementation:
   - backend/app/modules/todos/links.py
   - backend/app/modules/search/service.py
   - backend/app/modules/calendar/entries.py
-  - backend/app/modules/graph/builtin_reads.py
+  - backend/app/modules/graph/relations.py
 scope:
   - backend/app/modules/events
   - frontend/src/app/pages/events

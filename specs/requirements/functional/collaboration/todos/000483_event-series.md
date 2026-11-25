@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
   - backend/app/modules/todos/models.py
-  - backend/app/modules/todos/events.py
+  - backend/app/modules/events/facts.py
   - backend/app/modules/todos/router.py
   - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
 scope:

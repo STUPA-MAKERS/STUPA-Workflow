@@ -73,6 +73,7 @@ ROUTE_PATTERNS: Final[tuple[tuple[Feature, re.Pattern[str]], ...]] = tuple(
         (Feature.ORDERS, r"/orders"),
         (Feature.ORDERS, rf"{_APPLICATION}/orders"),
         (Feature.ORDERS, r"/invoices/\{invoice_id\}/orders"),
+        (Feature.EVENTS, r"/events"),
         (Feature.TICKETS, r"/tickets"),
         (Feature.GRAPH, r"/graph"),
         (Feature.PUSH, r"/push"),

@@ -84,7 +84,7 @@ HIT_URL: Mapping[SearchKind, str] = {
     "principal": "/admin/users?q={id}",
     "ticket": "/tickets/{id}",
     "todo": "/todos?card={id}",
-    "event": "/todos?card={id}",
+    "event": "/events?id={id}",
 }
 
 #: The features a source needs. A source without an entry belongs to no feature.
@@ -96,7 +96,7 @@ SOURCE_FEATURE: Mapping[str, frozenset[Feature]] = {
     "budget": frozenset({Feature.BUDGET}),
     "ticket": frozenset({Feature.TICKETS}),
     "todo": frozenset({Feature.TODOS}),
-    "event": frozenset({Feature.TODOS}),
+    "event": frozenset({Feature.EVENTS}),
 }
 
 #: The status of a ticket hit, in the reader's language.
@@ -411,27 +411,43 @@ class SearchService:
         ]
 
     async def _events(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
-        """Reuses `TodoService.search_events`, behind the board read rule of the todos module.
+        """Reuses `EventListing`, behind the team rule of the events module (003026).
 
-        Archived Events are hits too, because the next edition is planned from them
-        (spec 000485).
+        Settled and dropped Events are hits too, because the next edition is planned from
+        them (000485, 003033). The palette marks them as archived.
         """
-        from app.modules.todos.links import card_url
-        from app.modules.todos.service import TodoService
+        from app.modules.events.access import event_team_ids
+        from app.modules.events.listing import EventFilter, EventListing
+        from app.modules.events.models import format_event_number
+        from app.modules.statuses.service import StatusReader
+        from app.modules.teams.members import team_names
 
-        rows = await TodoService(self.session).search_events(q, principal, limit=PER_KIND + 1)
+        rows, _ = await EventListing(self.session, date.today()).page(
+            await event_team_ids(self.session, principal),
+            EventFilter(q=q),
+            limit=PER_KIND + 1,
+            offset=0,
+        )
+        teams = await team_names(self.session, {row.team_id for row in rows})
+        phases = await StatusReader(self.session).phases("event")
         return [
             SearchHit(
                 kind="event",
-                id=str(card.id),
-                title=card.title,
+                id=str(row.id),
+                title=row.title,
                 subtitle=" · ".join(
-                    p for p in (_days(row.starts_on, row.ends_on), board.name) if p
+                    p
+                    for p in (
+                        format_event_number(row.number),
+                        _days(row.starts_on, row.ends_on),
+                        teams.get(row.team_id),
+                    )
+                    if p
                 ),
-                url=card_url(card.id),
-                archived=card.archived_at is not None,
+                url=HIT_URL["event"].format(id=row.id),
+                archived=phases.get(row.status, "open") != "open",
             )
-            for card, board, row in rows
+            for row in rows
         ]
 
 

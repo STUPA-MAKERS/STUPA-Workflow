@@ -52,7 +52,6 @@
   "backend/tests/unit/modules/search/test_search_service.py": 1,
   "backend/tests/unit/modules/tickets/fakes.py": 1,
   "backend/tests/unit/modules/todos/fakes.py": 1,
-  "backend/tests/unit/modules/todos/test_service_events.py": 1,
   "backend/tests/unit/modules/translations/test_translations_service_unit.py": 1,
   "backend/tests/unit/modules/voting/test_election_erasure.py": 1,
   "backend/tests/unit/modules/voting/test_update_draft_unit.py": 1,

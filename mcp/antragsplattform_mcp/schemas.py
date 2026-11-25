@@ -1035,20 +1035,6 @@ TodoEntryRole = Literal["read", "edit", "manage"]
 TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
 
 
-class TodoEventIn(WireModel, frozen=True):
-    """The event data of a card (Veranstaltung)."""
-
-    startsOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
-    endsOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
-    startTime: str | None = Field(default=None, description="HH:MM")
-    endTime: str | None = Field(default=None, description="HH:MM")
-    place: str | None = Field(default=None, description="Up to 200 characters")
-    participants: int | None = Field(default=None, description="Expected number of participants")
-    seriesId: str | None = Field(
-        default=None, description="The Reihe of the event (see `todo_series`)"
-    )
-
-
 class TodoBoardEntryIn(WireModel, frozen=True):
     teamId: str | None = Field(default=None, description="A team; or set principalId")
     principalId: str | None = Field(default=None, description="A person; or set teamId")
@@ -1072,9 +1058,6 @@ class TodoCardCreate(WireModel, frozen=True):
     links: list[TodoLinkIn] | None = None
     checklist: list[str] | None = Field(
         default=None, description="The texts of the first checklist items (subtasks), up to 100"
-    )
-    event: TodoEventIn | None = Field(
-        default=None, description="Event data: the card is an Event (Veranstaltung) for good"
     )
 
 
@@ -1229,6 +1212,42 @@ class OrderPatch(WireModel, frozen=True):
     buyerId: str | None = Field(default=None, description="Explicit null clears it")
     buyerName: str | None = Field(default=None, description="Explicit null clears it")
     note: str | None = Field(default=None, description="Explicit null clears it")
+
+
+class EventCreate(WireModel, frozen=True):
+    """The body of a new Event (Veranstaltung)."""
+
+    teamId: str = Field(description="A team of the caller (see `event_teams`)")
+    title: str = Field(description="1 to 300 characters")
+    status: OrderStatus | None = Field(
+        default=None, description="A key of the list `event`; empty for its start status"
+    )
+    descriptionMd: str | None = Field(default=None, description="Markdown")
+    startsOn: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    startTime: str | None = Field(default=None, description="HH:MM; needs startsOn")
+    endsOn: str | None = Field(default=None, description="ISO date; not before startsOn")
+    endTime: str | None = Field(default=None, description="HH:MM; needs endsOn")
+    place: str | None = Field(default=None, description="Up to 300 characters")
+    participants: int | None = Field(default=None, description="Expected number of participants")
+    seriesId: str | None = Field(default=None, description="The Reihe (see `event_series`)")
+    shopUrl: str | None = Field(default=None, description="An http or https address of the shop")
+
+
+class EventPatch(WireModel, frozen=True):
+    """A change of an Event: only the fields that the caller sets change."""
+
+    version: int = Field(description="The `version` of the Event as last read; 409 on a mismatch")
+    teamId: str | None = Field(default=None, description="Another team of the caller")
+    title: str | None = None
+    descriptionMd: str | None = Field(default=None, description="Explicit null clears it")
+    startsOn: str | None = Field(default=None, description="ISO date; explicit null clears it")
+    startTime: str | None = Field(default=None, description="HH:MM; explicit null clears it")
+    endsOn: str | None = Field(default=None, description="ISO date; explicit null clears it")
+    endTime: str | None = Field(default=None, description="HH:MM; explicit null clears it")
+    place: str | None = Field(default=None, description="Explicit null clears it")
+    participants: int | None = Field(default=None, description="Explicit null clears it")
+    seriesId: str | None = Field(default=None, description="Explicit null clears it")
+    shopUrl: str | None = Field(default=None, description="Explicit null clears it")
 
 
 def dump_create(model: BaseModel) -> dict[str, Any]:

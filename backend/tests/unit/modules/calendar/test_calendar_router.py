@@ -85,7 +85,7 @@ def test_feed_returns_ics_with_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
         end=date(2026, 11, 21),
         stamp=datetime(2026, 1, 1, tzinfo=UTC),
         place="Mensa",
-        board_name="Kultur",
+        team_name="Kultur",
     )
 
     async def _events(_db: object, _row: object) -> list[CardEvent]:

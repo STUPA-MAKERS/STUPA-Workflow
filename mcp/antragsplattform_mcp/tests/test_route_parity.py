@@ -92,8 +92,6 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("WEBSOCKET", "/ws/meetings/{}/projector"),
         ("WEBSOCKET", "/ws/todos"),
         ("GET", "/todos/cards/{}/tile"),
-        # A route that always refuses: an Event never becomes a to-do again.
-        ("DELETE", "/todos/cards/{}/event"),
         ("WEBSOCKET", "/public/meetings/{}/ws"),
         ("GET", "/calendar/{}.ics"),
         ("GET", "/public/calendar.ics"),

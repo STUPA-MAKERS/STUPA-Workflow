@@ -6,7 +6,7 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation:
-  - backend/alembic/versions
+  - backend/migrations/versions/7c4e2a9d1b85_events.py
 scope:
   - backend/app/modules/events
   - frontend/src/app/pages/events
