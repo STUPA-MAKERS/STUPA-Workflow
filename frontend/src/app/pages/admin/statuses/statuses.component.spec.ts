@@ -103,7 +103,7 @@ describe('AdminStatusesComponent', () => {
     c.setName('order', 3, 'Zurückgegeben');
     c.patch('order', 3, { phase: 'void', tone: 'muted' });
     expect(c.removed('order').map((r: { key: string }) => r.key)).toEqual(['cancelled']);
-    expect(c.removedLabel('order', c.removed('order')[0])).toBe('Ersatz für „Storniert“ (3 Bestellungen)');
+    expect(c.removedLabel('order', c.removed('order')[0])).toBe('Ersatz für „Storniert“ (Bestellungen: 3)');
     expect(c.replacementOptions('order').map((o: { value: string }) => o.value)).toEqual(['planned', 'ordered', 'delivered']);
     expect(c.body()).toBeNull();
     c.setReplacement('order', 'cancelled', 'delivered');

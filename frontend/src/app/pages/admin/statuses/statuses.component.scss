@@ -45,7 +45,7 @@
 .st__add {
   align-self: flex-start;
 }
-@include w.columns {
+@include w.fields {
   .st__selects,
   .st__selects--date {
     grid-template-columns: minmax(0, 1fr);
