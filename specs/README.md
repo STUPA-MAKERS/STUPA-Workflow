@@ -629,7 +629,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/integrations/mcp/001200](requirements/functional/integrations/mcp/001200_mcp-parity.md) | The MCP server has a tool for every app function | approved |
 | [F/integrations/mcp/001201](requirements/functional/integrations/mcp/001201_mcp-exclusions.md) | The MCP leaves out a closed list of functions | approved |
 | [F/integrations/mcp/001232](requirements/functional/integrations/mcp/001232_mcp-name.md) | The MCP server presents itself as workflow | approved |
-| [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | draft |
+| [F/integrations/mcp/002920](requirements/functional/integrations/mcp/002920_paperless-scope.md) | The scope paperless:use carries only paperless.use | approved |
 | [F/integrations/mcp/002921](requirements/functional/integrations/mcp/002921_no-paperless-copy-by-token.md) | A token does not copy documents into or out of Paperless | approved |
 | [F/integrations/mcp/002922](requirements/functional/integrations/mcp/002922_paperless-link-end-by-number.md) | An MCP link tool names a Paperless end by its document number | approved |
 | [F/integrations/paperless/002511](requirements/functional/integrations/paperless/002511_connection-page.md) | An admin connects one Paperless instance | approved |
