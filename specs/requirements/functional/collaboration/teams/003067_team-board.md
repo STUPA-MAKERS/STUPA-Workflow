@@ -2,7 +2,7 @@
 id: "003067"
 title: Every team has its own board
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

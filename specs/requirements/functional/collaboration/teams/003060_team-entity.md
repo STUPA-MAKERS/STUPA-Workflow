@@ -2,7 +2,7 @@
 id: "003060"
 title: A team is a named group of persons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

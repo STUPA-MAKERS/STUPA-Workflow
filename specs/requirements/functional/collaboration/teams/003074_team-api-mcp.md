@@ -2,7 +2,7 @@
 id: "003074"
 title: Teams have an API and MCP tools
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

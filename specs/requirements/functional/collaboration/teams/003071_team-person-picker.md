@@ -2,7 +2,7 @@
 id: "003071"
 title: The picker offers teams and persons
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

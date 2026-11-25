@@ -2,7 +2,7 @@
 id: "003070"
 title: An external calendar belongs to a team
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

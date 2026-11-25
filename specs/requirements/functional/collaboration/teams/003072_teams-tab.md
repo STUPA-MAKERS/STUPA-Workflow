@@ -2,7 +2,7 @@
 id: "003072"
 title: The tab Gremien is the tab Teams
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

@@ -2,7 +2,7 @@
 id: "003066"
 title: team.manage in a Gremium role manages the inherent team
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

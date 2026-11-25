@@ -2,7 +2,7 @@
 id: "003061"
 title: Every Gremium has exactly one inherent team
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null
@@ -15,8 +15,10 @@ scope:
 
 Every Gremium must have exactly one inherent team. The platform must create the team with the
 Gremium and delete it with the Gremium. The name of the team must follow the name of the
-Gremium. The members of the inherent team must be the active members of the Gremium at the time
-of the read, so a membership change in OIDC changes the team at once. Nobody must add or remove
+Gremium. The members of the inherent team must be the active members of the Gremium and the persons
+of its substitute pool at the time of the read, so a change in OIDC or in the pool changes the
+team at once. The inherent team therefore gives a pool person the same board access and the same
+Termine as a member. Nobody must add or remove
 a member of an inherent team by hand, and nobody must delete an inherent team alone. A data
 migration must create the inherent team of each existing Gremium.
 

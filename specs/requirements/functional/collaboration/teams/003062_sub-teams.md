@@ -2,7 +2,7 @@
 id: "003062"
 title: A team can have sub-teams
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null

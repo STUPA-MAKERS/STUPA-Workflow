@@ -2,7 +2,7 @@
 id: "003068"
 title: A board entry names a team or a person
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
 implementation: null
