@@ -137,11 +137,18 @@ def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
 
     The typst wrapper renders it as a data line on the title page.
     """
-    md = build_protocol_document(_doc(quorate=True, datalines=["Ort: R 1"]))
+    md = build_protocol_document(
+        _doc(quorate=True, datalines=["Ort: R 1"], signatures=("Kasse", "Vorsitz"))
+    )
     block = md.split("---")[1]
     assert "unterschriften:" in block
-    assert '- "Schriftführung"' in block and '- "Vorstand"' in block
+    assert block.index('- "Kasse"') < block.index('- "Vorsitz"')
     assert 'beschlussfaehigkeit: "Gegeben"' in block
+
+
+def test_signature_lines_come_from_the_gremium() -> None:
+    """§003007: the configured lines in order, and no block for an empty list."""
+    assert "unterschriften:" not in build_protocol_document(_doc())
 
 
 def test_frontmatter_quorum_not_given() -> None:

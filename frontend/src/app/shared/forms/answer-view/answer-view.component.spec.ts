@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import type { FormFieldDef, FormSection } from '@core/api/models';
 import { runAxe } from '../../../../testing/a11y';
 import { AnswerViewComponent } from './answer-view.component';
@@ -225,31 +225,25 @@ describe('AnswerViewComponent', () => {
     expect(screen.getByText(/^83,3\s%$/).closest('.mono, [class*="mono"]')).not.toBeNull();
   });
 
-  it('shows no cost line and the files of each position (specs 001632, 001730)', async () => {
+  it('shows no hint below the total (spec 001632)', async () => {
     const { container } = await view(
       one([
-        { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+        {
+          key: 'kosten',
+          type: 'positions',
+          label: { de: 'Kostenaufstellung' },
+          validation: { hints: { below: { de: 'Gesamtkosten {costTotal}' } } },
+        },
         { key: 'foerderung', type: 'funding', label: { de: 'Förderung' } },
-        { key: 'n', type: 'number', label: { de: 'Personen' }, validation: { participants: true } },
       ]),
       {
         kosten: [
           { id: 'p-1', label: 'Bus', offers: [{ label: 'Reisen AG', value: 1000, preferred: true }] },
         ],
         foerderung: 600,
-        n: 4,
-      },
-      {
-        files: [
-          { id: 'a1', filename: 'angebot.pdf', positionId: 'p-1' },
-          { id: 'a2', filename: 'sonst.pdf', positionId: null },
-        ],
       },
     );
-    expect(container.textContent).not.toContain('davon beantragt');
-    fireEvent.click(screen.getByRole('button', { name: /Bus/ }));
-    await screen.findByText('angebot.pdf');
-    expect(screen.queryByText('sonst.pdf')).toBeNull();
+    expect(container.textContent).not.toContain('Gesamtkosten');
   });
 
   it('renders the cost positions in their own block between the field groups', async () => {

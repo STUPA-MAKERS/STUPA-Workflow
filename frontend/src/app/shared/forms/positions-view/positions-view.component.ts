@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { IconComponent, MetaLineComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
+import { MetaLineComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { formatMoney } from '../../format-money';
@@ -15,13 +15,6 @@ import {
 } from '../positions';
 import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
-/** A file of a position as the view lists it. */
-export interface PositionFile {
-  readonly id: string;
-  readonly filename: string;
-  readonly positionId?: string | null;
-}
-
 /** One offer as the view draws it. */
 interface OfferRow extends PositionOffer {
   /** The link of an offer whose text is an http(s) URL, else null. */
@@ -36,8 +29,6 @@ interface PositionRow extends CostPosition {
   readonly count: string;
   /** The supplier of the preferred offer, or '' when none is preferred. */
   readonly preferred: string;
-  /** The files of the position (spec 001730). */
-  readonly files: readonly PositionFile[];
 }
 
 let nextId = 0;
@@ -54,14 +45,13 @@ let nextId = 0;
  * Names, suppliers and offer texts are never cut: they wrap. An offer text that is an
  * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
- * The files of a position (spec 001730) are listed in the open position by name; the
- * block "Anhänge" opens them. It shows no cost line below the total (spec 001632).
+ * It shows no hint below the total (spec 001632).
  */
 @Component({
   selector: 'app-positions-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RowChevronComponent, MetaLineComponent, IconComponent, StatusTextComponent, TranslatePipe],
+  imports: [RowChevronComponent, MetaLineComponent, StatusTextComponent, TranslatePipe],
   templateUrl: './positions-view.component.html',
   styleUrl: './positions-view.component.scss',
 })
@@ -76,8 +66,6 @@ export class PositionsViewComponent {
   readonly surface = input<1 | 2 | 3>(2);
   /** Open every position at the start, for example in the review step of the wizard. */
   readonly expanded = input(false);
-  /** The files of the application; the view lists those of each position. */
-  readonly files = input<readonly PositionFile[]>([]);
 
   protected readonly id = `pv-${nextId++}`;
 
@@ -95,7 +83,6 @@ export class PositionsViewComponent {
         { count: p.offers.length },
       ),
       preferred: preferredOffer(p)?.label.trim() ?? '',
-      files: p.id ? this.files().filter((f) => f.positionId === p.id) : [],
     }));
   });
 

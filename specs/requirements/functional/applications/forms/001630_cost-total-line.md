@@ -2,13 +2,10 @@
 id: "001630"
 title: The Kostenaufstellung shows the total cost and the requested amount
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - frontend/src/app/shared/forms/form-rules.ts
-  - frontend/src/app/shared/formly/types/formly-positions.type.ts
-  - frontend/src/app/shared/forms/formly-mapper.ts
+updated: 2026-11-24
+replaced_by: F/applications/forms/003010
 scope:
   - backend/app/modules/forms
   - frontend/src/app/features/apply

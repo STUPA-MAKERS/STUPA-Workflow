@@ -504,7 +504,7 @@ def validate_answers(
     fundings = tuple((f, value) for f, value in present if f.type == "funding")
     funding_errors = (
         _check_funding_total(fundings[-1][0], fundings[-1][1], cost_total, collected)
-        if fundings
+        if fundings and caps_at_cost(fundings[-1][0])
         else ()
     )
     errors = (*collected, *funding_errors)
@@ -677,6 +677,14 @@ def _validate_funding(field: FormFieldDef, value: object) -> tuple[FieldError, .
     return _validate_number(field, value) or _err_if(
         Decimal(str(value)) < 0, field.key, "must not be negative"
     )
+
+
+def caps_at_cost(field: FormFieldDef) -> bool:
+    """Tell whether a ``funding`` field caps its value at the cost total (spec 003004).
+
+    The setting ``validation.capAtCost`` is on when it is not set.
+    """
+    return field.validation is None or field.validation.cap_at_cost is not False
 
 
 def _check_funding_total(

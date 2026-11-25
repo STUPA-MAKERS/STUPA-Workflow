@@ -6,13 +6,11 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NgComponentOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import type { FormFieldDef } from '@core/api/models';
+import type { FieldHints, FormFieldDef, Lang } from '@core/api/models';
 import {
-  ButtonComponent,
-  ButtonGroupComponent,
+  AddRowComponent,
   IconComponent,
   SwitchComponent,
   parseMoney,
@@ -22,8 +20,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { formatMoney } from '@shared/format-money';
 import { withEntry, withoutEntry } from '@shared/util/immutable';
-import { type CostLine, costLine, placeholderReasons } from '@shared/forms/form-rules';
-import { POSITION_FILES, newPositionId } from '@shared/forms/position-files';
+import { type PlaceholderReason, placeholderReasons } from '@shared/forms/form-rules';
+import { type HintKey, fillHint, hintText } from '@shared/forms/form-hints';
 import { RowChevronComponent } from '../../ui/row-chevron/row-chevron.component';
 
 /** A comparison offer within a cost position. */
@@ -45,6 +43,18 @@ interface Position {
 }
 
 let nextUid = 0;
+
+/** The hint text of each placeholder reason (spec 003010). */
+const REASON_HINT: Readonly<Record<PlaceholderReason, HintKey>> = {
+  value: 'placeholderValue',
+  label: 'placeholderLabel',
+  duplicate: 'placeholderDuplicate',
+};
+
+/** A new id for a position: stable while the answer lives, unique on the page. */
+function newPositionId(): string {
+  return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * Formly field type `positions` (cost positions). The model value is an array of
@@ -68,22 +78,17 @@ let nextUid = 0;
  * `props.serverErrors` (index → text) holds the 422 messages of the last save; the
  * position shows its message and opens. The next change clears them.
  *
- * The last `positions` field of a form (`props.costLine`) shows below the positions the
- * line "Gesamtkosten X €, davon beantragt Y €" and, with a number of participants above 0,
- * "Z € pro Person" (specs 001630, 001631). It reads the other answers from the model and
- * updates on every change of the form.
+ * Every hint text comes from the form config (`props.hints`, spec 003010); the code holds
+ * none. Below the sum row the field shows the hint `below`. An offer that looks like a
+ * placeholder (0 € or 1 €, a supplier with fewer than 3 characters, the same supplier twice
+ * in a position, spec 001640) gets the hint of its reason, and the position the hint
+ * `useNoOffers`; a reason without a text shows no warning. A position without comparison
+ * offers shows the hint `noOffers`. The placeholders of a text read the other answers from
+ * the model, so the texts update on every change of the form. A warning never makes the
+ * field invalid (spec 001641).
  *
- * An offer that looks like a placeholder (0 € or 1 €, a supplier with fewer than 3
- * characters, the same supplier twice in a position) gets a warning below it (spec
- * 001640). The warning names the switch for "no comparison offers" when the field offers
- * it. It never makes the field invalid (spec 001641).
- *
- * A page that provides `POSITION_FILES` gets a files block below each open position
- * (spec 001730). A new position gets a stable `id`; on such a page an older position
- * without one gets it when the field starts.
- *
- * The legend must be the first child of the fieldset, so the legend and the sum float and the sum
- * sits at the end of the legend line.
+ * The sum of the positions is a row below them (spec 003008). A new position gets a stable
+ * `id`.
  */
 @Component({
   selector: 'app-formly-positions',
@@ -92,11 +97,9 @@ let nextUid = 0;
   imports: [
     ErrorTextComponent,
     RowChevronComponent,
-    ButtonComponent,
-    ButtonGroupComponent,
+    AddRowComponent,
     IconComponent,
     SwitchComponent,
-    NgComponentOutlet,
   ],
   templateUrl: './formly-positions.type.html',
   styleUrl: './formly-positions.type.scss',
@@ -105,9 +108,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   private readonly i18n = inject(I18nService);
   private readonly uid = `pos-${nextUid++}`;
   private readonly destroyRef = inject(DestroyRef);
-  /** The files of a position, when the page offers them. */
-  protected readonly positionFiles = inject(POSITION_FILES, { optional: true });
-  /** Counts the changes of the form, so the cost line reads the other answers again. */
+  /** Counts the changes of the form, so the hint texts read the other answers again. */
   private readonly formTick = signal(0);
 
   /** The open positions, by index. */
@@ -121,11 +122,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     this.formControl.root.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.formTick.update((n) => n + 1));
-    if (this.positionFiles && this.positions.some((p) => !p.id)) {
-      this.formControl.setValue(
-        this.positions.map((p) => (p.id ? p : { ...p, id: newPositionId() })),
-      );
-    }
     this.open.set(new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))));
     queueMicrotask(() => this.revalidate(this.positions));
   }
@@ -270,59 +266,42 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return '';
   }
 
-  /** The figures of the cost line, or null when this field does not show it. */
-  protected costLine(): CostLine | null {
+  /**
+   * One hint text of the form config with its placeholders filled in (spec 003010), or ''
+   * when the config has no text for it.
+   */
+  protected hint(key: HintKey, extra: Readonly<Record<string, string>> = {}): string {
     this.formTick();
-    if (this.props['costLine'] !== true) return null;
-    const fields = (this.props['costFields'] ?? []) as readonly FormFieldDef[];
+    const text = hintText(this.props['hints'] as FieldHints | undefined, key, this.props['hintLang'] as Lang);
+    if (!text) return '';
+    const fields = (this.props['formFields'] ?? []) as readonly FormFieldDef[];
     const model = (this.model ?? {}) as Record<string, unknown>;
-    return costLine(fields, { ...model, [String(this.key)]: this.formControl.value });
-  }
-
-  /** "Gesamtkosten 1.200,00 €, davon beantragt 800,00 €, 40,00 € pro Person". */
-  protected costLineText(line: CostLine): string {
-    const head = this.i18n.translate('forms.costLine.total', {
-      total: this.fmt(line.total),
-      requested: this.fmt(line.requested),
-    });
-    return line.perPerson === null
-      ? head
-      : `${head}, ${this.i18n.translate('forms.costLine.perPerson', { amount: this.fmt(line.perPerson) })}`;
+    const data = { ...model, [String(this.key)]: this.formControl.value };
+    return fillHint(text, fields, data, this.i18n.formatLocale(), extra);
   }
 
   /**
    * The placeholder warning under one field of an offer (spec 001640), or '': `label`
    * for the supplier (too short, or the same as another offer), `value` for the amount.
+   * Each reason shows its hint text; a reason without a text shows nothing.
    */
   protected offerWarning(p: Position, oi: number, field: 'label' | 'value'): string {
     const reasons = placeholderReasons(p.offers)[oi] ?? [];
     return reasons
       .filter((r) => (field === 'value' ? r === 'value' : r !== 'value'))
-      .map((r) => this.t(`forms.positions.placeholder.${r}`))
+      .map((r) => this.hint(REASON_HINT[r]))
+      .filter((text) => text !== '')
       .join(' ');
   }
 
   /**
-   * The hint under the offers of a position with a placeholder offer, when the field
-   * offers the switch for no comparison offers and it is off (spec 001641), or ''.
+   * The hint `useNoOffers` under the offers of a position with a placeholder offer, when
+   * the field offers the switch for no comparison offers and it is off (spec 001641), or ''.
    */
   protected switchHint(p: Position): string {
     if (!this.allowNoOffers || p.noOffers) return '';
     const any = placeholderReasons(p.offers).some((r) => r.length > 0);
-    return any
-      ? this.i18n.translate('forms.positions.placeholder.useSwitch', {
-          switch: this.t('apply.positions.noOffers'),
-        })
-      : '';
-  }
-
-  /** The inputs of the files block of one position. */
-  protected filesInputs(p: Position): Record<string, unknown> {
-    return {
-      fieldKey: String(this.key),
-      positionId: p.id,
-      heading: this.t('forms.positions.files'),
-    };
+    return any ? this.hint('useNoOffers', { noOffersSwitch: this.t('apply.positions.noOffers') }) : '';
   }
 
   protected fmt(value: number): string {
@@ -367,8 +346,6 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   removePosition(pi: number): void {
-    const id = this.positions[pi]?.id;
-    if (id) this.positionFiles?.removed(String(this.key), id);
     this.remapRaw((i, k) => (i === pi ? null : [i > pi ? i - 1 : i, k]));
     this.commit(this.positions.filter((_, i) => i !== pi));
     this.open.update(

@@ -18,6 +18,7 @@ from app.modules.admin.schemas import (
     ApplicationTypeGroupUpdate,
     ApplicationTypeOut,
     ApplicationTypeUpdate,
+    SignatureRow,
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.application_types.models import ApplicationType, ApplicationTypeGroup
@@ -27,10 +28,26 @@ from app.modules.site_config.features import Feature, feature_on
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
-def _set_pdf_signatures(row: ApplicationType, wanted: bool | None) -> None:
-    """Set the switch for the signature section of the Antrag PDF; ``None`` keeps it."""
-    if wanted is not None:
-        row.pdf_signatures = wanted
+def _rows_json(rows: list[SignatureRow]) -> list[dict[str, str]]:
+    """Store the signature rows as plain JSON (spec 003005)."""
+    return [{"label": r.label, "signer": r.signer} for r in rows]
+
+
+def _set_signature_rows(row: ApplicationType, rows: list[SignatureRow] | None) -> None:
+    """Replace the signature rows (spec 003005); ``None`` keeps them."""
+    if rows is not None:
+        row.signature_rows = _rows_json(rows)
+
+
+def _rows_out(raw: object) -> list[SignatureRow]:
+    """Read the stored signature rows; a broken entry drops."""
+    if not isinstance(raw, list):
+        return []
+    return [
+        SignatureRow(label=str(r["label"]), signer=str(r["signer"]))
+        for r in raw
+        if isinstance(r, dict) and r.get("label") and r.get("signer")
+    ]
 
 
 def _set_attachment_required(row: ApplicationType, wanted: bool | None) -> None:
@@ -47,7 +64,7 @@ def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTy
         key=row.key,
         name_i18n=row.name_i18n,
         has_budget=row.has_budget,
-        pdf_signatures=row.pdf_signatures,
+        signature_rows=_rows_out(row.signature_rows),
         attachment_required=row.attachment_required,
         comparison_offers=row.comparison_offers,
         retention_months=row.retention_months,
@@ -125,7 +142,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             name_i18n=payload.name_i18n,
             gremium_id=payload.gremium_id,
             has_budget=payload.has_budget,
-            pdf_signatures=payload.pdf_signatures,
+            signature_rows=_rows_json(payload.signature_rows),
             attachment_required=payload.attachment_required,
             comparison_offers=(
                 payload.comparison_offers.model_dump(by_alias=True)
@@ -170,7 +187,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.gremium_id = payload.gremium_id
         if payload.has_budget is not None:
             row.has_budget = payload.has_budget
-        _set_pdf_signatures(row, payload.pdf_signatures)
+        _set_signature_rows(row, payload.signature_rows)
         _set_attachment_required(row, payload.attachment_required)
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)

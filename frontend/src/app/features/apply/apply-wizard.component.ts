@@ -37,9 +37,9 @@ import type {
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields, toFormlySections } from '@shared/forms/formly-mapper';
+import { fillHint, hintText } from '@shared/forms/form-hints';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { brokenRules } from '@shared/forms/form-rules';
-import { POSITION_FILES, type PositionFiles } from '@shared/forms/position-files';
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
   ButtonComponent,
@@ -181,16 +181,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   providers: [
     DraftAttachmentsService,
     provideFormly(),
-    {
-      provide: POSITION_FILES,
-      useFactory: (): PositionFiles => {
-        const drafts = inject(DraftAttachmentsService);
-        return {
-          component: DraftFilesComponent,
-          removed: (fieldKey, positionId) => void drafts.dropPosition(fieldKey, positionId),
-        };
-      },
-    },
   ],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
@@ -318,6 +308,32 @@ export class ApplyWizardComponent {
   private readonly positionKeys = computed<ReadonlySet<string>>(
     () => new Set(this.allFields().filter((f) => f.type === 'positions').map((f) => f.key)),
   );
+  /**
+   * The question before a submit without a file (spec 001731): the hints `noFileTitle` and
+   * `noFileBody` of the first `positions` field that has one of them (spec 003010). Without
+   * both texts the form asks nothing. The placeholders read the answers at the submit.
+   */
+  protected readonly noFileHint = signal<{ readonly title: string; readonly body: string } | null>(null);
+  /** The texts of the question without a file, filled in with the answers, or null. */
+  private noFileQuestion(): { readonly title: string; readonly body: string } | null {
+    const fields = this.allFields();
+    const lang = this.i18n.uiLocale();
+    const locale = this.i18n.formatLocale();
+    const found = fields
+      .filter((f) => f.type === 'positions')
+      .map((f) => ({
+        title: hintText(f.validation?.hints, 'noFileTitle', lang),
+        body: hintText(f.validation?.hints, 'noFileBody', lang),
+      }))
+      .find((h) => h.title !== '' || h.body !== '');
+    return found
+      ? {
+          title: fillHint(found.title, fields, this.model, locale),
+          body: fillHint(found.body, fields, this.model, locale),
+        }
+      : null;
+  }
+
   /** Every field of the form, in form order. */
   private readonly allFields = computed<readonly FormFieldDef[]>(() =>
     (this.effForm()?.sections ?? []).flatMap((s) => s.fields),
@@ -751,9 +767,13 @@ export class ApplyWizardComponent {
     if (!this.canSubmit() || this.submitting()) return;
     const typeId = this.typeId();
     if (!typeId) return;
-    if (!withoutFile && this.positionKeys().size > 0 && this.drafts.count() === 0) {
-      this.confirmNoFile.set(true);
-      return;
+    if (!withoutFile && this.drafts.count() === 0) {
+      const hint = this.noFileQuestion();
+      if (hint) {
+        this.noFileHint.set(hint);
+        this.confirmNoFile.set(true);
+        return;
+      }
     }
     this.confirmNoFile.set(false);
     const altcha = this.altchaSolution();

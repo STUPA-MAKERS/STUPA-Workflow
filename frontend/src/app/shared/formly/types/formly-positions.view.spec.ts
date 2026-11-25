@@ -38,7 +38,7 @@ const cards = (container: Element) => [...container.querySelectorAll('.pos__card
 describe('FormlyPositionsType — view', () => {
   /**
    * The body of a collapsed position is not there, so the row controls nothing. Name and supplier
-   * wrap; they are never cut. The sum of the field sits beside its legend.
+   * wrap; they are never cut. The sum of the field is a row below the positions (spec 003008).
    */
   it('starts a complete position collapsed and an incomplete one open', async () => {
     const { container } = await setup([COMPLETE, INCOMPLETE]);
@@ -52,7 +52,7 @@ describe('FormlyPositionsType — view', () => {
     expect(summary.querySelector('.pos__sumValue')?.textContent?.replace(/\s/g, ' ')).toBe('450,00 €');
     expect(second).toHaveClass('pos__card--open');
     expect(within(second).getByLabelText('Position')).toHaveValue('');
-    expect(container.querySelector('.pos__sum')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Gesamt 450,00 €');
+    expect(container.querySelector('.pos__total')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Gesamt450,00 €');
   });
 
   /**

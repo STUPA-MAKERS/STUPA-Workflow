@@ -764,8 +764,6 @@ export interface AttachmentOutWire {
   readonly scanned: boolean;
   /** The form field of the file; absent or null for a general attachment. */
   readonly fieldKey?: string | null;
-  /** The position of a `positions` field that the file belongs to (spec 001730). */
-  readonly positionId?: string | null;
 }
 
 /**
@@ -1252,8 +1250,6 @@ export interface Attachment {
   readonly scanState: ScanState;
   /** The form field of the file, when it has one. */
   readonly fieldKey?: string | null;
-  /** The position of a `positions` field that the file belongs to (spec 001730). */
-  readonly positionId?: string | null;
 }
 
 /** Signed download URL, frontend view. */
@@ -1362,12 +1358,42 @@ export interface FieldValidation {
    *  user ticks a checkbox and must give a reason. Then one offer is enough. If
    *  unset, the opt-out is allowed. */
   readonly allowNoOffers?: boolean;
+  /** `positions`. The hint texts of the field (spec 003010); a hint without a text shows
+   *  nothing. */
+  readonly hints?: FieldHints;
+  /** `funding`. The value must not be above the cost total (specs 000135, 003004).
+   *  Unset = on. */
+  readonly capAtCost?: boolean;
   /** `number`. The field holds the number of participants (spec 001631); at most one
    *  field of a form. The cost line then shows the amount per person. */
   readonly participants?: boolean;
   /** `budget_select`. The path key of the Kostenstelle whose subtree the picker offers
    *  (spec 001680). The server sends only the options below it. */
   readonly rootPath?: string;
+}
+
+/**
+ * The hint texts of a `positions` field (spec 003010), per language. A text may hold
+ * placeholders in braces: `{key}` for the answer of a field, `{costTotal}`, `{amount}` and
+ * `{noOffersSwitch}`.
+ */
+export interface FieldHints {
+  /** Below the sum row of the field. */
+  readonly below?: I18nMap;
+  /** At an offer whose amount looks like a placeholder (0 € or 1 €). */
+  readonly placeholderValue?: I18nMap;
+  /** At an offer whose name has fewer than 3 characters. */
+  readonly placeholderLabel?: I18nMap;
+  /** At an offer whose name another offer of the position has. */
+  readonly placeholderDuplicate?: I18nMap;
+  /** Below the offers of a position with a placeholder offer. */
+  readonly useNoOffers?: I18nMap;
+  /** At a position without comparison offers. */
+  readonly noOffers?: I18nMap;
+  /** The title of the question before a submit without a file. */
+  readonly noFileTitle?: I18nMap;
+  /** The text of that question. */
+  readonly noFileBody?: I18nMap;
 }
 
 /** How a form rule acts when the answers break it (spec 001671). */
