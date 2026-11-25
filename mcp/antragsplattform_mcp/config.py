@@ -34,10 +34,12 @@ except Exception:
 # members.notify through (the Info tab of a Gremium and the message to its members). The
 # set mirrors the platform's `oauth.DEFAULT_SCOPE`. Narrow it with ANTRAGSPLATTFORM_SCOPE.
 # The opt-in scope `paperless:use` (the Paperless links and the address of a filed
-# document) is not in the default: add it to ANTRAGSPLATTFORM_SCOPE by name.
+# document) is in the default too: the consent page shows it only to a holder of
+# paperless.use and starts it unticked, so the person ticks it on purpose.
 DEFAULT_SCOPE = (
     "read applications:write votes:write budget:write meetings:write "
-    "tickets:write todos:write committees:write forms:write flows:write admin:write"
+    "tickets:write todos:write committees:write paperless:use forms:write flows:write "
+    "admin:write"
 )
 
 

@@ -7,11 +7,12 @@ from app.modules.auth.principal import Principal
 
 
 def test_the_scope_carries_only_paperless_use() -> None:
-    """The scope holds exactly `paperless.use`, no default holds it, none holds the admin key."""
+    """The scope holds exactly `paperless.use`, the default asks for it, no admin key."""
     assert oauth.SCOPES["paperless:use"] == frozenset({"paperless.use"})
     assert oauth.scope_permissions(["paperless:use"]) == frozenset({"paperless.use"})
-    assert "paperless:use" not in oauth.DEFAULT_SCOPE.split()
-    assert "paperless:use" not in oauth.parse_scope(None)
+    assert "paperless:use" in oauth.DEFAULT_SCOPE.split()
+    assert "paperless:use" in oauth.parse_scope(None)
+    assert {"paperless:use"} == oauth.OPT_IN_SCOPES
     assert oauth.parse_scope("read paperless:use") == ["read", "paperless:use"]
     assert all("admin.paperless" not in perms for perms in oauth.SCOPES.values())
     assert "paperless:use" in oauth.SCOPE_ORDER

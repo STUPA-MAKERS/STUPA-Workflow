@@ -37,9 +37,10 @@ through: the edit of the Info tab of a Gremium and the message to its members.
 ``tickets:write`` lets the gremium permission ``ticket.work`` through: the work on the
 tickets of the Bereiche of a Gremium.
 ``paperless:use`` holds exactly ``paperless.use``: the links with a Paperless end, their
-search and the address of a filed document (§F/integrations/mcp/002920). It is not part of
-``DEFAULT_SCOPE``, so a client asks for it by name, and the consent page offers it only to
-a holder of ``paperless.use``. No scope holds ``admin.paperless``.
+search and the address of a filed document (§F/integrations/mcp/002920). It is part of
+``DEFAULT_SCOPE``, so the MCP asks for it without a setting, but it is an opt-in scope: the
+consent page offers it only to a holder of ``paperless.use`` and shows it unticked, so the
+person gives it on purpose. No scope holds ``admin.paperless``.
 """
 
 from __future__ import annotations
@@ -106,13 +107,13 @@ SCOPES: dict[str, frozenset[str]] = {
     ),
 }
 
-#: The scopes that a client must ask for by name: the default scope leaves them out
+#: The opt-in scopes: the consent page shows them only to a holder and starts them unticked
 #: (§F/integrations/mcp/002920).
 OPT_IN_SCOPES: frozenset[str] = frozenset({"paperless:use"})
 
-#: The full curated range that MCP requests by default. The server caps it to the rights of
-#: the logged-in user. A non-admin gets only their own subset.
-DEFAULT_SCOPE = " ".join(k for k in SCOPES if k not in OPT_IN_SCOPES)
+#: The full curated range that MCP requests by default, the opt-in scopes included. The
+#: server caps it to the rights of the logged-in user. A non-admin gets only their own subset.
+DEFAULT_SCOPE = " ".join(SCOPES)
 
 #: Hard cap in seconds for every finite token lifetime. This value bounds even the
 #: longest finite selectable lifetime.

@@ -7,4 +7,4 @@ locally and refreshes it automatically. Set the platform URL at MCP setup with
 `ANTRAGSPLATTFORM_URL`.
 """
 
-__version__ = "0.13.0"
+__version__ = "0.13.1"

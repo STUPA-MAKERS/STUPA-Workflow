@@ -370,6 +370,17 @@ def test_consent_request_unheld_scope() -> None:
     assert held["admin:write"] is False
 
 
+def test_consent_request_marks_the_opt_in_scope() -> None:
+    """The default request holds `paperless:use`; a holder sees it marked opt-in (002920)."""
+    p = Principal(sub="u", permissions={"mcp.use", "application.read", "paperless.use"})
+    client = _build_client(ENABLED, principal=p)
+    client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope=oauth.DEFAULT_SCOPE))
+    body = client.get("/api/oauth/consent-request").json()
+    opt_in = {s["key"]: s["optIn"] for s in body["requestedScopes"]}
+    assert opt_in["paperless:use"] is True
+    assert opt_in["read"] is False
+
+
 def test_consent_request_counts_gremium_permissions_as_held(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
