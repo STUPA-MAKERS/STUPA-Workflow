@@ -40,6 +40,12 @@
   flex-direction: column;
   min-width: 0;
 }
+// The folded Buchungen of an Event (003041): a button that looks like the link of a row,
+// so it comes before `.tl__link`, which gives it the colour and the weight.
+.tl__fold {
+  all: unset;
+  cursor: pointer;
+}
 .tl__link {
   color: var(--color-text);
   font-weight: var(--fw-medium);
@@ -61,15 +67,6 @@
 .tl__sub {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-// The folded Buchungen of an Event (003041): a button that looks like the link of a row.
-.tl__fold {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
 }
 .tl__actions {
   display: inline-flex;

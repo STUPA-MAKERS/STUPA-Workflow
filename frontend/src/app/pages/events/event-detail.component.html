@@ -34,7 +34,7 @@
         </app-section>
         @if (current.decisions.length) {
           <app-section data-testid="ed-section" [heading]="'events.decisions.title' | t">
-            <div class="rowgroup" role="list">
+            <app-field-group role="list">
               @for (d of current.decisions; track d.kind + d.targetId) {
                 <app-list-item
                   role="listitem"
@@ -46,13 +46,13 @@
                   <app-icon lead [name]="d.kind === 'vote' ? 'vote' : 'file'" [size]="18" />
                 </app-list-item>
               }
-            </div>
+            </app-field-group>
           </app-section>
         }
         @if (current.editions.length || current.hiddenEditions) {
           <app-section data-testid="ed-section" [heading]="'events.editions.title' | t">
             @if (current.editions.length) {
-            <div class="rowgroup" role="list">
+            <app-field-group role="list">
               @for (e of current.editions; track e.id) {
                 <app-list-item
                   role="listitem"
@@ -64,7 +64,7 @@
                   <app-icon lead name="history" [size]="18" />
                 </app-list-item>
               }
-            </div>
+            </app-field-group>
             }
             @if (current.hiddenEditions) {
               <app-note data-testid="ed-hidden" icon="lock">{{ 'events.editions.hidden' | t: { n: current.hiddenEditions } }}</app-note>
