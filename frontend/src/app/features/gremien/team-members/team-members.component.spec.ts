@@ -59,9 +59,11 @@ describe('TeamMembersComponent (spec 003063)', () => {
     expect(s.api.setMember).toHaveBeenCalledWith('t-1', 'p-3', 'member');
     s.cmp.setRole(memberEntry(DETAIL.members[1], true), 'manage');
     expect(s.api.setMember).toHaveBeenLastCalledWith('t-1', 'p-2', 'manager');
+    s.cmp.setRole(memberEntry(DETAIL.members[0], true), 'edit');
+    expect(s.api.setMember).toHaveBeenLastCalledWith('t-1', 'p-1', 'member');
     s.cmp.remove(memberEntry(DETAIL.members[1], true));
     expect(s.api.removeMember).toHaveBeenCalledWith('t-1', 'p-2');
-    expect(changed).toHaveBeenCalledTimes(3);
+    expect(changed).toHaveBeenCalledTimes(4);
   });
 
   it('says that the team needs a manager', async () => {

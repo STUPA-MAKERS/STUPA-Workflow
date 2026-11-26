@@ -108,12 +108,8 @@ export class TodoBoardEntriesComponent {
 
   roleName(role: TodoEntryRole): string {
     const roles = this.roles();
-    const label =
-      roles.find((r) => r.role === role)?.label ??
-      roles.find((r) => r.role === NEW_ENTRY_ROLE)?.label ??
-      roles[0]?.label ??
-      'todos.entries.role.edit';
-    return this.i18n.translate(label);
+    const label = (roles.find((r) => r.role === role) ?? roles.find((r) => r.role === NEW_ENTRY_ROLE))?.label;
+    return this.i18n.translate(label ?? 'todos.entries.role.edit');
   }
 
   /** The key of a row: the id, or the target for the fixed team and a new entry. */
@@ -127,8 +123,6 @@ export class TodoBoardEntriesComponent {
   }
 
   add(hit: PickerHit): void {
-    const roles = this.roles();
-    const role = roles.some((r) => r.role === NEW_ENTRY_ROLE) ? NEW_ENTRY_ROLE : (roles[0]?.role ?? NEW_ENTRY_ROLE);
-    this.added.emit({ hit, role });
+    this.added.emit({ hit, role: NEW_ENTRY_ROLE });
   }
 }

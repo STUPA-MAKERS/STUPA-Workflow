@@ -31,6 +31,7 @@ describe('TeamSubTeamsComponent (spec 003062)', () => {
       [
         freeTeam({ id: 't-2', name: 'Party', parentId: 't-1' }),
         freeTeam({ id: 't-3', name: 'Presse', parentId: 't-1', isMember: false, canManage: false }),
+        freeTeam({ id: 't-4', name: 'Technik', parentId: 't-1', canManage: false }),
         freeTeam({ id: 't-9', name: 'Andere', parentId: 't-8' }),
       ],
       true,
@@ -38,6 +39,15 @@ describe('TeamSubTeamsComponent (spec 003062)', () => {
     expect(screen.getByRole('link', { name: 'Party' }).getAttribute('href')).toBe('/teams/t-2');
     expect(screen.getByRole('link', { name: 'Presse' })).toBeTruthy();
     expect(screen.queryByText('Andere')).toBeNull();
+    expect(s.cmp.rows()).toEqual(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({ title: 'Party', meta: ['Verwaltung'] }),
+          expect.objectContaining({ title: 'Presse', meta: undefined }),
+          expect.objectContaining({ title: 'Technik', meta: ['Mitglied'] }),
+        ],
+      }),
+    );
     screen.getByRole('button', { name: /^Sub-Team anlegen/ }).click();
     expect(s.cmp.createOpen()).toBe(true);
     expect(await runAxe(s.view.container)).toHaveNoViolations();

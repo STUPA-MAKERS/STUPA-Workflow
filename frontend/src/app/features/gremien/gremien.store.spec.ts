@@ -27,6 +27,13 @@ describe('GremienStore', () => {
     expect(store.find('g-1')).toEqual(gremium());
     expect(store.find('g-x')).toBeNull();
     expect(store.find(null)).toBeNull();
+    expect(store.team('g-1')?.gremiumId).toBe('g-1');
+    expect(store.team('t-x')).toBeNull();
+    expect(store.team(null)).toBeNull();
+    expect(store.teamOfGremium('g-1')?.id).toBe('g-1');
+    expect(store.teamOfGremium('g-x')).toBeNull();
+    expect(store.teamOfGremium(null)).toBeNull();
+    expect(store.subTeams(null)).toEqual([]);
   });
 
   it('reports a failed read and counts it as loaded', () => {
