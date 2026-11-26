@@ -263,6 +263,8 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/teams/{team_id}"): "TeamService.detail (members for a member or manager)",
     ("PATCH", "/api/teams/{team_id}"): _TEAM_MANAGE,
     ("DELETE", "/api/teams/{team_id}"): _TEAM_MANAGE,
+    ("GET", "/api/teams/{team_id}/info"): "TeamInfoService.read_info (member or manager, 003077)",
+    ("PUT", "/api/teams/{team_id}/info"): _TEAM_MANAGE,
     ("PUT", "/api/teams/{team_id}/members/{principal_id}"): _TEAM_MANAGE,
     ("DELETE", "/api/teams/{team_id}/members/{principal_id}"): _TEAM_MANAGE,
     ("GET", "/api/todos/all/boards"): _TODO_SCOPE,
