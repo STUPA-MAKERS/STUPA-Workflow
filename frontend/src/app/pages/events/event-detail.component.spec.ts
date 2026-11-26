@@ -75,7 +75,7 @@ describe('EventDetailComponent', () => {
   afterEach(() => localStorage.clear());
 
   /** §F/collaboration/events/003029: the sections in their order. */
-  it('shows the head, the fields, the description, the money, the decisions, the series and "Verknüpft" in this order', async () => {
+  it('shows the head, the fields, the money, the decisions, the series and "Verknüpft" in this order', async () => {
     const { cmp, api, container } = await setup();
     expect(api.get).toHaveBeenCalledWith('e-1');
     expect(cmp.head()).toMatchObject({ title: 'Erstiparty', kicker: 'V-7K3QX9MD', status: { label: 'Geplant', kind: 'neutral' } });
@@ -83,11 +83,11 @@ describe('EventDetailComponent', () => {
     const order = Array.from(container.querySelectorAll('[data-testid="ed-step"], [data-testid="ed-section"]')).map((el) =>
       el.getAttribute('data-testid') === 'ed-step' ? 'step' : (el.querySelector('h2, h3, h4')?.textContent?.trim() ?? el.tagName.toLowerCase()),
     );
-    expect(order).toEqual(['step', 'Angaben', 'Beschreibung', 'Finanzen', 'Beschlüsse', 'Weitere Veranstaltungen der Reihe', 'app-todo-linked-list']);
+    expect(order).toEqual(['step', 'Angaben', 'Finanzen', 'Beschlüsse', 'Weitere Veranstaltungen der Reihe', 'app-todo-linked-list']);
     expect(cmp.facts().map((f: { label: string }) => f.label)).toEqual(['Team', 'Beginn', 'Ort', 'Teilnehmende', 'Reihe', 'Shop']);
     expect(screen.getAllByTestId('ed-total')).toHaveLength(5);
     expect(cmp.totals()[4].value).toMatch(/^\+312,00\s€$/);
-    expect(container.textContent).toContain('Party im');
+    expect(screen.getByTestId('ed-description')).toHaveTextContent('Party im');
   });
 
   /** §F/collaboration/events/003024: the shop opens in a new tab. */

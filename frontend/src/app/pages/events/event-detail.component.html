@@ -20,13 +20,13 @@
                 }
               </app-field-row>
             }
+            @if (current.descriptionMd) {
+              <app-field-row data-testid="ed-description" [label]="'events.field.description' | t">
+                <app-markdown-view [src]="current.descriptionMd" />
+              </app-field-row>
+            }
           </app-field-group>
         </app-section>
-        @if (current.descriptionMd) {
-          <app-section data-testid="ed-section" [heading]="'events.field.description' | t">
-            <app-markdown-view [src]="current.descriptionMd" />
-          </app-section>
-        }
         <app-section data-testid="ed-section" [heading]="'events.money.title' | t">
           <app-field-group>
             @for (line of totals(); track line.label) {
