@@ -34,4 +34,17 @@ describe('TeamsApiService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({ team: {}, members: [], subTeams: [] });
   });
+
+  it('sends the writes of a team', () => {
+    api.create('Ersti', null).subscribe();
+    expect(http.expectOne({ method: 'POST', url: '/api/teams' }).request.body).toEqual({ name: 'Ersti', parentId: null });
+    api.patch('t-1', { name: 'Neu' }).subscribe();
+    expect(http.expectOne({ method: 'PATCH', url: '/api/teams/t-1' }).request.body).toEqual({ name: 'Neu' });
+    api.remove('t-1').subscribe();
+    http.expectOne({ method: 'DELETE', url: '/api/teams/t-1' }).flush(null);
+    api.setMember('t-1', 'p-1', 'manager').subscribe();
+    expect(http.expectOne({ method: 'PUT', url: '/api/teams/t-1/members/p-1' }).request.body).toEqual({ role: 'manager' });
+    api.removeMember('t-1', 'p-1').subscribe();
+    http.expectOne({ method: 'DELETE', url: '/api/teams/t-1/members/p-1' }).flush({});
+  });
 });

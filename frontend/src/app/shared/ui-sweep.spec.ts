@@ -45,7 +45,7 @@ describe('searchPlaceholder (§ui-kit:000661)', () => {
 
   it.each([
     ['Tickets', { plain: 'tickets.list.searchLabel', one: 'tickets.list.searchOne', many: 'tickets.list.search' }, 'Ticket'],
-    ['Gremien', { plain: 'gremien.list.searchLabel', one: 'gremien.list.searchOne', many: 'gremien.list.search' }, 'Gremium'],
+    ['Teams', { plain: 'gremien.list.searchLabel', one: 'gremien.list.searchOne', many: 'gremien.list.search' }, 'Team'],
     ['Aufgaben', { plain: 'tasks.search', one: 'tasks.searchCountOne', many: 'tasks.searchCount' }, 'Aufgabe'],
     ['Buchungen', { plain: 'expenses.searchLabel', one: 'expenses.searchCountOne', many: 'expenses.searchCount' }, 'Buchung'],
     ['Rechnungen', { plain: 'invoices.searchLabel', one: 'invoices.searchCountOne', many: 'invoices.searchCount' }, 'Rechnung'],

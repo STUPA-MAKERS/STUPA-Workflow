@@ -1,13 +1,18 @@
+import { TeamsApiService } from '@core/api/teams.service';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { GremienApiService } from '@core/api/gremien.service';
-import { gremienApiMock, gremium } from '../../../testing/gremien-fixtures';
+import { gremienApiMock, gremium, teamsApiMock } from '../../../testing/gremien-fixtures';
 import { GREMIEN_NOW, GremienStore } from './gremien.store';
 
 describe('GremienStore', () => {
   function setup(api = gremienApiMock()) {
     TestBed.configureTestingModule({
-      providers: [GremienStore, { provide: GremienApiService, useValue: api }],
+      providers: [
+        GremienStore,
+        { provide: GremienApiService, useValue: api },
+        { provide: TeamsApiService, useValue: teamsApiMock(api) },
+      ],
     });
     return { store: TestBed.inject(GremienStore), api };
   }

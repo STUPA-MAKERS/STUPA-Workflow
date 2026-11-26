@@ -1,3 +1,4 @@
+import { type Team, TeamsApiService } from '@core/api/teams.service';
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -7,9 +8,9 @@ import { NEVER, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { GremienApiService, type GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
-import { gremienApiMock, gremium } from '../../../../testing/gremien-fixtures';
+import { freeTeam, gremienApiMock, gremium, teamsApiMock } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -63,6 +64,8 @@ interface StartOptions {
   /** The boards the person reads in the Gremium. */
   boards?: readonly Partial<TodoBoardSummary>[];
   board?: TodoBoard;
+  /** Teams besides the inherent teams of the Gremien. */
+  teams?: readonly Team[];
 }
 
 async function start(url: string, opts: StartOptions = {}) {
@@ -80,6 +83,7 @@ async function start(url: string, opts: StartOptions = {}) {
     linked: jest.fn(() => of([])),
     links: jest.fn(() => of({ canLink: false, links: [] })),
   };
+  const teamsApi = teamsApiMock(api, opts.teams ?? []);
   TestBed.overrideComponent(GremiumDetailComponent, {
     remove: { imports: [CreateMeetingDialogComponent] },
     add: { imports: [CreateMeetingStub] },
@@ -88,7 +92,7 @@ async function start(url: string, opts: StartOptions = {}) {
     providers: [
       provideRouter([
         {
-          path: 'committees',
+          path: 'teams',
           component: GremienComponent,
           children: [{ path: ':id', component: GremiumDetailComponent }],
         },
@@ -99,6 +103,7 @@ async function start(url: string, opts: StartOptions = {}) {
         { path: 'admin/committees', component: TargetStub },
       ]),
       { provide: GremienApiService, useValue: api },
+      { provide: TeamsApiService, useValue: teamsApi },
       { provide: AuthService, useValue: auth },
       { provide: ApiClient, useValue: {} },
       { provide: TodosApiService, useValue: todos },
@@ -116,7 +121,7 @@ async function start(url: string, opts: StartOptions = {}) {
   const detail = () =>
     harness.fixture.debugElement.query((d) => d.componentInstance instanceof GremiumDetailComponent)
       ?.componentInstance as GremiumDetailComponent;
-  return { harness, api, auth, todos, restore, settle, router, detail, frame: TestBed.inject(PageFrameService) };
+  return { harness, api, teamsApi, auth, todos, restore, settle, router, detail, frame: TestBed.inject(PageFrameService) };
 }
 
 describe('GremiumDetailComponent', () => {
@@ -128,7 +133,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('shows the head with role, facts and actions, and the meetings tab', async () => {
-    const s = await start('/committees/g-1', { media: [MEDIA.wide] });
+    const s = await start('/teams/g-1', { media: [MEDIA.wide] });
     restore = s.restore;
     const d = s.detail();
     expect(d.split()).toBe(true);
@@ -144,8 +149,8 @@ describe('GremiumDetailComponent', () => {
     expect(d.tab()).toBe('meetings');
     expect(s.api.meetings).toHaveBeenCalledWith('g-1');
     expect(s.api.members).not.toHaveBeenCalled();
-    expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse']);
-    expect(s.frame.crumbLabel()).toEqual({ url: '/committees/g-1', label: 'Studierendenparlament' });
+    expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse', 'Sub-Teams']);
+    expect(s.frame.crumbLabel()).toEqual({ url: '/teams/g-1', label: 'Studierendenparlament' });
     const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
     expect(sheet.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Gremium verwalten' })).toBeNull();
@@ -160,12 +165,12 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('keeps the tab in the URL and the visited panels rendered', async () => {
-    const s = await start('/committees/g-1');
+    const s = await start('/teams/g-1');
     restore = s.restore;
     const d = s.detail();
     d.selectTab('members');
     await s.settle();
-    expect(s.router.url).toBe('/committees/g-1?tab=members');
+    expect(s.router.url).toBe('/teams/g-1?tab=members');
     expect(s.api.members).toHaveBeenCalledWith('g-1', false);
     d.selectTab('attendance');
     await s.settle();
@@ -176,22 +181,22 @@ describe('GremiumDetailComponent', () => {
     expect(s.api.decisions).toHaveBeenCalled();
     d.selectTab('meetings');
     await s.settle();
-    expect(s.router.url).toBe('/committees/g-1');
+    expect(s.router.url).toBe('/teams/g-1');
     expect(d.tab()).toBe('meetings');
   });
 
   it('opens an unknown tab of the URL as the meetings', async () => {
-    const s = await start('/committees/g-1?tab=uebersicht');
+    const s = await start('/teams/g-1?tab=uebersicht');
     restore = s.restore;
     expect(s.detail().tab()).toBe('meetings');
   });
 
   it('starts afresh for another gremium', async () => {
-    const s = await start('/committees/g-1?tab=members');
+    const s = await start('/teams/g-1?tab=members');
     restore = s.restore;
     const d = s.detail();
     expect([...d.visited()]).toEqual(['members']);
-    await s.router.navigateByUrl('/committees/g-2');
+    await s.router.navigateByUrl('/teams/g-2');
     await s.settle();
     expect([...d.visited()]).toEqual(['meetings']);
     expect(d.roleLabel()).toBe('');
@@ -200,7 +205,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('plans a meeting with session.manage and opens the Gremium in the administration with admin.gremien (002600)', async () => {
-    const s = await start('/committees/g-1', { plan: true, admin: true });
+    const s = await start('/teams/g-1', { plan: true, admin: true });
     restore = s.restore;
     const d = s.detail();
     screen.getByRole('button', { name: /Sitzung planen/ }).click();
@@ -219,7 +224,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('runs every entry of the ⋮ menu', async () => {
-    const s = await start('/committees/g-1');
+    const s = await start('/teams/g-1');
     restore = s.restore;
     const d = s.detail();
     const abo = { open: jest.fn() } as unknown as CalendarSubscribeComponent;
@@ -230,19 +235,19 @@ describe('GremiumDetailComponent', () => {
     await s.settle();
     expect(s.router.url).toBe('/voting?committee=g-1');
 
-    await s.router.navigateByUrl('/committees/g-1');
+    await s.router.navigateByUrl('/teams/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'admin', label: '' }, abo);
     await s.settle();
     expect(s.router.url).toBe('/admin/committees?open=g-1');
 
-    await s.router.navigateByUrl('/committees/g-1');
+    await s.router.navigateByUrl('/teams/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'next', label: '' }, abo);
     await s.settle();
     expect(s.router.url).toBe('/meetings/m-9');
 
-    await s.router.navigateByUrl('/committees/g-1');
+    await s.router.navigateByUrl('/teams/g-1');
     await s.settle();
     s.detail().onMenu({ id: 'meetings', label: '' }, abo);
     await s.settle();
@@ -251,7 +256,7 @@ describe('GremiumDetailComponent', () => {
 
   /** § 001850: "Mitglieder benachrichtigen" for `members.notify`, not for the admin. */
   it('offers "Mitglieder benachrichtigen" to a holder of members.notify only', async () => {
-    const s = await start('/committees/g-1', { media: [MEDIA.wide], notify: true });
+    const s = await start('/teams/g-1', { media: [MEDIA.wide], notify: true });
     restore = s.restore;
     const d = s.detail();
     expect(d.canNotify()).toBe(true);
@@ -262,20 +267,20 @@ describe('GremiumDetailComponent', () => {
     expect(d.notifyOpen()).toBe(true);
     expect(s.harness.fixture.nativeElement.querySelector('app-gremium-notify-dialog')).toBeTruthy();
 
-    await s.router.navigateByUrl('/committees/g-2');
+    await s.router.navigateByUrl('/teams/g-2');
     await s.settle();
     expect(s.detail().canNotify()).toBe(false);
   });
 
   it('keeps "Mitglieder benachrichtigen" from an admin without the gremium role', async () => {
-    const s = await start('/committees/g-1', { media: [MEDIA.wide], admin: true });
+    const s = await start('/teams/g-1', { media: [MEDIA.wide], admin: true });
     restore = s.restore;
     expect(s.detail().canNotify()).toBe(false);
     expect(s.detail().menu()[0].items.map((i) => i.id)).not.toContain('notify');
   });
 
   it('moves the actions into the ⋮ menu on a phone', async () => {
-    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, admin: true });
+    const s = await start('/teams/g-1', { media: [MEDIA.phone], plan: true, admin: true });
     restore = s.restore;
     const d = s.detail();
     expect(screen.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
@@ -285,7 +290,7 @@ describe('GremiumDetailComponent', () => {
   });
 
   it('keeps "Nächste Sitzung" as the one action on a phone without planning', async () => {
-    const s = await start('/committees/g-2', { media: [MEDIA.phone] });
+    const s = await start('/teams/g-2', { media: [MEDIA.phone] });
     restore = s.restore;
     const d = s.detail();
     expect(d.showNext()).toBe(true);
@@ -295,10 +300,10 @@ describe('GremiumDetailComponent', () => {
   /** Spec 000758: the detail leaves out the parts of a feature that is off. */
   it('opens on the members without Sitzungen, Abstimmungen, Boards and Kalender', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['meetings', 'voting', 'todos', 'calendar']));
-    const s = await start('/committees/g-1', { media: [MEDIA.phone], plan: true, boards: [{ id: 'b-1', kind: 'team' }] });
+    const s = await start('/teams/g-1', { media: [MEDIA.phone], plan: true, boards: [{ id: 'b-1', kind: 'team' }] });
     restore = s.restore;
     const d = s.detail();
-    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder']);
+    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder', 'Sub-Teams']);
     expect(d.tab()).toBe('members');
     expect(s.api.meetings).not.toHaveBeenCalled();
     expect(s.todos.boards).not.toHaveBeenCalled();
@@ -310,39 +315,39 @@ describe('GremiumDetailComponent', () => {
 
   it('keeps the first tab out of the URL while Sitzungen is off', async () => {
     localStorage.setItem('ap.features.off', JSON.stringify(['meetings']));
-    const s = await start('/committees/g-1?tab=attendance', { media: [MEDIA.wide] });
+    const s = await start('/teams/g-1?tab=attendance', { media: [MEDIA.wide] });
     restore = s.restore;
     const d = s.detail();
     expect(d.tab()).toBe('members');
-    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder', 'Beschlüsse']);
+    expect(d.tabs().map((t) => t.label)).toEqual(['Mitglieder', 'Beschlüsse', 'Sub-Teams']);
     d.selectTab('decisions');
     await s.settle();
-    expect(s.router.url).toBe('/committees/g-1?tab=decisions');
+    expect(s.router.url).toBe('/teams/g-1?tab=decisions');
     d.selectTab('members');
     await s.settle();
-    expect(s.router.url).toBe('/committees/g-1');
+    expect(s.router.url).toBe('/teams/g-1');
     const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
     expect(sheet.getByRole('button', { name: 'Sitzungen abonnieren' })).toBeTruthy();
   });
 
   it('says when the gremium is not there, or the list failed', async () => {
-    const s = await start('/committees/g-x');
+    const s = await start('/teams/g-x');
     restore = s.restore;
-    expect(screen.getByText('Gremium nicht gefunden')).toBeTruthy();
+    expect(screen.getByText('Team nicht gefunden')).toBeTruthy();
     s.detail().openNext();
     s.detail().openAdmin();
     await s.settle();
-    expect(s.router.url).toBe('/admin/committees?open=g-x');
+    expect(s.router.url).toBe('/teams/g-x');
   });
 
   it('shows the list error in the sheet', async () => {
-    const s = await start('/committees/g-1', { overview: jest.fn(() => throwError(() => new Error('x'))) });
+    const s = await start('/teams/g-1', { overview: jest.fn(() => throwError(() => new Error('x'))) });
     restore = s.restore;
-    expect(screen.getAllByText('Die Gremien konnten nicht geladen werden.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Die Teams konnten nicht geladen werden.').length).toBeGreaterThan(0);
   });
 
   it('shows a skeleton while the list loads', async () => {
-    const s = await start('/committees/g-1', { overview: jest.fn(() => NEVER) });
+    const s = await start('/teams/g-1', { overview: jest.fn(() => NEVER) });
     restore = s.restore;
     expect(s.harness.routeNativeElement?.querySelector('.gd--busy')).toBeTruthy();
   });
@@ -359,12 +364,12 @@ describe('GremiumDetailComponent', () => {
     });
 
     it('shows the open cards of the board of the Gremium, in board order', async () => {
-      const s = await start('/committees/g-1?tab=todos', { boards, board: gremiumBoard });
+      const s = await start('/teams/g-1?tab=todos', { boards, board: gremiumBoard });
       restore = s.restore;
       const d = s.detail();
       expect(s.todos.boards).toHaveBeenCalledWith('g-1');
       expect(d.tab()).toBe('todos');
-      expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse', 'To-Dos']);
+      expect(d.tabs().map((t) => t.label)).toEqual(['Sitzungen', 'Mitglieder', 'Anwesenheit', 'Beschlüsse', 'To-Dos', 'Sub-Teams']);
       expect(s.todos.board).toHaveBeenCalledWith('b-7');
       const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/todos?card='));
       expect(links.map((a) => a.textContent?.trim())).toEqual(['Raum buchen', 'In Arbeit zuerst?']);
@@ -376,7 +381,7 @@ describe('GremiumDetailComponent', () => {
     });
 
     it('has no tab To-Dos when the person reads no board of the Gremium', async () => {
-      const s = await start('/committees/g-1?tab=todos', { boards: [] });
+      const s = await start('/teams/g-1?tab=todos', { boards: [] });
       restore = s.restore;
       const d = s.detail();
       expect(d.tab()).toBe('meetings');
@@ -388,7 +393,7 @@ describe('GremiumDetailComponent', () => {
       TestBed.overrideProvider(TodosApiService, {
         useValue: { boards: jest.fn(() => throwError(() => new Error('x'))), board: jest.fn(), linked: jest.fn() },
       });
-      const s = await start('/committees/g-1?tab=todos');
+      const s = await start('/teams/g-1?tab=todos');
       restore = s.restore;
       expect(s.detail().tabs().map((t) => t.id)).not.toContain('todos');
     });
@@ -401,15 +406,80 @@ describe('GremiumDetailComponent', () => {
           linked: jest.fn(() => of([])),
         },
       });
-      const s = await start('/committees/g-1?tab=todos');
+      const s = await start('/teams/g-1?tab=todos');
       restore = s.restore;
       expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
     });
 
     it('says so when the board has no open card', async () => {
-      const s = await start('/committees/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
+      const s = await start('/teams/g-1?tab=todos', { boards, board: board({ id: 'b-7', cards: [] }) });
       restore = s.restore;
       expect(screen.getByText('Keine offenen To-Dos')).toBeTruthy();
     });
   });
+
+  describe('a team without a Gremium (spec 003072)', () => {
+    const team = freeTeam({ id: 't-1', name: 'Ersti-Woche', parentId: 'g-1', parentName: 'Studierendenparlament' });
+
+    it('has the tabs To-Dos, Mitglieder and Sub-Teams, and no Gremium actions', async () => {
+      const s = await start('/teams/t-1', { media: [MEDIA.wide], teams: [team] });
+      restore = s.restore;
+      const d = s.detail();
+      expect(d.free()).toBe(true);
+      expect(screen.getByRole('heading', { level: 2, name: 'Ersti-Woche' })).toBeTruthy();
+      expect(d.facts()).toEqual(['Verwaltung', 'Sub-Team von Studierendenparlament']);
+      expect(d.tabs().map((t) => t.label)).toEqual(['To-Dos', 'Mitglieder', 'Sub-Teams']);
+      expect(d.boardId()).toBe('b-t1');
+      expect(s.todos.boards).not.toHaveBeenCalled();
+      expect(d.canPlan()).toBe(false);
+      const sheet = within(s.harness.fixture.nativeElement.querySelector('app-gremium-detail') as HTMLElement);
+      expect(sheet.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
+      expect(d.menu()[0].items.map((i) => i.id)).toEqual(['board', 'rename', 'delete']);
+      expect(await runAxe(s.harness.fixture.nativeElement)).toHaveNoViolations();
+    });
+
+    it('shows no board and no manage items to a person outside the team', async () => {
+      const outside = freeTeam({ id: 't-1', isMember: false, canManage: false });
+      const s = await start('/teams/t-1', { teams: [outside] });
+      restore = s.restore;
+      const d = s.detail();
+      expect(d.boardId()).toBeNull();
+      expect(d.facts()).toEqual([]);
+      expect(d.menu()[0].items).toEqual([]);
+    });
+
+    it('renames and deletes the team from the ⋮ menu', async () => {
+      const s = await start('/teams/t-1', { media: [MEDIA.wide], teams: [team] });
+      restore = s.restore;
+      const d = s.detail();
+      d.onMenu({ id: 'rename', label: 'Umbenennen' }, {} as CalendarSubscribeComponent);
+      expect(d.renameOpen()).toBe(true);
+      d.onTeamChanged();
+      expect(s.teamsApi.list).toHaveBeenCalledTimes(2);
+      d.onMenu({ id: 'delete', label: 'Team löschen' }, {} as CalendarSubscribeComponent);
+      expect(d.deleteOpen()).toBe(true);
+      d.deleteTeam();
+      await s.settle();
+      expect(s.teamsApi.remove).toHaveBeenCalledWith('t-1');
+      expect(s.router.url).toBe('/teams');
+    });
+
+    it('says why the server keeps the team', async () => {
+      const s = await start('/teams/t-1', { teams: [team] });
+      restore = s.restore;
+      const toast = TestBed.inject(ToastService);
+      const show = jest.spyOn(toast, 'show');
+      for (const code of ['team_has_sub_teams', 'team_board_not_empty', 'x']) {
+        s.teamsApi.remove.mockReturnValueOnce(throwError(() => ({ error: { code } })));
+        s.detail().deleteTeam();
+      }
+      expect(show.mock.calls.map((c) => c[0])).toEqual([
+        'Das Team hat noch Sub-Teams. Lösche oder verschiebe sie zuerst.',
+        'Das Board des Teams hat noch Karten. Verschiebe oder lösche sie zuerst.',
+        'Die Änderung konnte nicht gespeichert werden.',
+      ]);
+      expect(s.detail().deleteOpen()).toBe(false);
+    });
+  });
 });
+

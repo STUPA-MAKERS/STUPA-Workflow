@@ -13,6 +13,14 @@
               (selected)="onPhoneMenu($event, abo)"
             />
           } @else {
+            @if (canCreate()) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'teams.create' | t"
+                (click)="createOpen.set(true)"
+              ><app-icon name="plus" /></app-button>
+            }
             <app-button
               variant="text"
               [iconOnly]="true"
@@ -22,6 +30,9 @@
             ><app-icon name="cal" /></app-button>
           }
           <app-calendar-subscribe #abo />
+          @if (canCreate()) {
+            <app-team-name-dialog [(open)]="createOpen" (saved)="created($event)" />
+          }
         </ng-container>
       </app-page-header>
 
@@ -103,27 +114,30 @@
 <ng-template #group let-rows let-label="label">
   <app-list-group [label]="label">
     <div class="grl__rows" [class.rowgroup]="!split()" role="list">
-      @for (row of rows; track row.item.id) {
+      @for (row of rows; track row.team.id) {
         <app-list-item
           role="listitem"
           class="grl__row"
-          [title]="row.item.name"
+          [title]="row.team.name"
           [sub]="row.sub"
-          [link]="['/committees', row.item.id]"
+          [depth]="row.depth"
+          [link]="['/teams', row.team.id]"
           linkQueryParamsHandling="preserve"
-          [selected]="row.item.id === selectedId()"
+          [selected]="row.team.id === selectedId()"
         >
-          <app-gremium-logo lead [name]="row.item.name" [logoUrl]="row.item.logoUrl" />
+          <app-gremium-logo lead [name]="row.team.name" [logoUrl]="row.item?.logoUrl ?? null" />
           <span trail class="grl__trail">
-            @switch (row.next.kind) {
-              @case ('live') {
-                <span class="grl__live">{{ 'gremien.list.live' | t }}</span>
-              }
-              @case ('date') {
-                <span class="grl__next num" [title]="row.next.title">{{ row.next.text }}</span>
-              }
-              @default {
-                <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
+            @if (row.item) {
+              @switch (row.next.kind) {
+                @case ('live') {
+                  <span class="grl__live">{{ 'gremien.list.live' | t }}</span>
+                }
+                @case ('date') {
+                  <span class="grl__next num" [title]="row.next.title">{{ row.next.text }}</span>
+                }
+                @default {
+                  <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
+                }
               }
             }
             @if (!split() && !phone()) {

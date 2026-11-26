@@ -58,8 +58,9 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('graph'),
   fixed('calendar'),
   { path: 'meetings/:id', url: (ids) => `/meetings/${ids.meeting}` },
-  fixed('committees'),
-  { path: 'committees/:id', url: (ids) => `/committees/${ids.gremium}` },
+  fixed('teams'),
+  // An old link to a Gremium opens its inherent team (spec 003072).
+  { path: 'teams/:id', url: (ids) => `/committees/${ids.gremium}` },
   fixed('budget'),
   fixed('budget/plan'),
   fixed('expenses'),

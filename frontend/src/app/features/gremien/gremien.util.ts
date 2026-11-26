@@ -322,3 +322,32 @@ export function infoTabShown(info: GremiumInfo | null | undefined): boolean {
 export function infoUrlShown(url: string): string {
   return url.toLowerCase().startsWith('mailto:') ? url.slice('mailto:'.length) : url;
 }
+
+/** A team in the tree order of the list, with its level under the shown parent. */
+export interface TeamNode<T extends { readonly id: string; readonly parentId: string | null }> {
+  readonly team: T;
+  readonly depth: number;
+}
+
+/**
+ * The teams in tree order (spec 003072): each team, then its sub-teams under it, each level
+ * in the order of `teams` (by name from the server). A team whose parent is not among
+ * `teams` starts a tree of its own at depth 0. A cycle cannot come from the server; a team
+ * shows at most once.
+ */
+export function teamTree<T extends { readonly id: string; readonly parentId: string | null }>(
+  teams: readonly T[],
+): readonly TeamNode<T>[] {
+  const ids = new Set(teams.map((t) => t.id));
+  const children = (parent: string): readonly T[] => teams.filter((t) => t.parentId === parent);
+  const walk = (team: T, depth: number, seen: ReadonlySet<string>): readonly TeamNode<T>[] =>
+    seen.has(team.id)
+      ? []
+      : [
+          { team, depth },
+          ...children(team.id).flatMap((c) => walk(c, depth + 1, new Set([...seen, team.id]))),
+        ];
+  return teams
+    .filter((t) => t.parentId === null || !ids.has(t.parentId))
+    .flatMap((t) => walk(t, 0, new Set()));
+}
