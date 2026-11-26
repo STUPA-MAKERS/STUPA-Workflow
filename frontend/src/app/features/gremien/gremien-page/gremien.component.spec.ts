@@ -251,7 +251,7 @@ describe('GremienComponent', () => {
   });
 
   describe('teams (spec 003072)', () => {
-    it('puts each sub-team one step in under its parent, with the own role', async () => {
+    it('puts each sub-team right under its parent, with the own role and the parent', async () => {
       const teams = [
         freeTeam({ id: 't-1', name: 'Ersti-Woche' }),
         freeTeam({ id: 't-2', name: 'Party', parentId: 't-1', parentName: 'Ersti-Woche', canManage: false }),
@@ -261,9 +261,9 @@ describe('GremienComponent', () => {
       restore = s.restore;
       expect(s.cmp.mine().map((r) => [r.team.name, r.depth, r.sub])).toEqual([
         ['Studierendenparlament', 0, 'Mitglied · 31 Mitglieder'],
-        ['Presse', 1, 'Mitglied'],
+        ['Presse', 1, 'Mitglied · Sub-Team von StuPa'],
         ['Ersti-Woche', 0, 'Verwaltung'],
-        ['Party', 1, 'Mitglied'],
+        ['Party', 1, 'Mitglied · Sub-Team von Ersti-Woche'],
       ]);
       const party = screen.getByRole('link', { name: 'Party' }).closest('app-list-item') as HTMLElement;
       expect(party.getAttribute('aria-level')).toBe('2');
