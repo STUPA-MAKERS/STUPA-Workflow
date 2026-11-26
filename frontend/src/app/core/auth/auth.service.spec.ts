@@ -185,6 +185,18 @@ describe('AuthService', () => {
     expect(auth.inSubstitutePool()).toBe(true);
   });
 
+  it('knows whether the person is in any team (spec 003076)', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, in_any_team: true });
+    expect(auth.inAnyTeam()).toBe(true);
+  });
+
+  it('counts a gremium membership as a team', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }] });
+    expect(auth.inAnyTeam()).toBe(true);
+  });
+
   it('checks gremium permissions per gremium and in any gremium', () => {
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush({

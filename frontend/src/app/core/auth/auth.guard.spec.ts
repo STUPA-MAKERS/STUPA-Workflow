@@ -159,6 +159,17 @@ describe('authGuard', () => {
     expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
   });
 
+  /** The route data mirrors the real /teams route (spec 003076). */
+  it('lets a member of any team onto allowTeamMember routes', () => {
+    const data = { permission: ['gremium.view_all', 'team.create'], allowTeamMember: true };
+    expect(run(data, { ...MEMBER, permissions: [], in_any_team: true })).toBe(true);
+  });
+
+  it('forbids allowTeamMember routes to a person in no team', () => {
+    const data = { permission: ['gremium.view_all', 'team.create'], allowTeamMember: true };
+    expect(run(data, { ...MEMBER, permissions: [], in_any_team: false })).toBeInstanceOf(UrlTree);
+  });
+
   it('allows gremiumPermission routes with the permission in any gremium', () => {
     const chair: Principal = {
       ...MEMBER,

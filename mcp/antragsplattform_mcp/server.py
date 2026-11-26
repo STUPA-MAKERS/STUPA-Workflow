@@ -133,8 +133,9 @@ TYPICAL FLOWS:
   `export_events_xlsx`. The money comes from links: `link_add` an Antrag, a Buchung or
   an invoice to the kind `event`; each of them links at most one Event.
 - Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
-  `gremium_attendance`, `get_gremium_info`/`set_gremium_info`; `calendar_entries`,
-  `create_appointment` (a Termin with invitations), `answer_appointment`.
+  `gremium_attendance`, `get_gremium_info`/`set_gremium_info`, `get_team_info`/
+  `set_team_info`; `calendar_entries`, `create_appointment` (a Termin with invitations),
+  `answer_appointment`.
 - Votes without a meeting: `create_gremium_vote` (a poll, or `kind: "circular"` for an
   Umlaufverfahren), `list_votes`.
 - Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →

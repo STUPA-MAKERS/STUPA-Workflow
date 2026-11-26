@@ -124,7 +124,7 @@ Veranstaltungen of the teams of the caller (a write needs the scope `todos:write
 `export_events_xlsx`. The money of an Event comes from its links (`link_add` with kind
 `event`).
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
-`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `notify_gremium_members`,
+`gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `get_team_info`, `set_team_info`, `notify_gremium_members`,
 `calendar_entries`, `create_appointment`, `answer_appointment`.
 Search and profile: `search`, `get_profile`.
 Activity: `list_activity`, `get_activity_status`, `get_navigation_status`, `mark_activity_seen`.

@@ -2,7 +2,8 @@ import { render } from '@testing-library/angular';
 import { throwError } from 'rxjs';
 import { GremienApiService } from '@core/api/gremien.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { gremienApiMock, gremiumInfo } from '../../../../testing/gremien-fixtures';
+import { TeamsApiService } from '@core/api/teams.service';
+import { gremienApiMock, gremiumInfo, teamsApiMock } from '../../../../testing/gremien-fixtures';
 import {
   GremiumInfoDialogComponent,
   draftLinks,
@@ -21,17 +22,19 @@ const INFO = gremiumInfo({
   canEdit: true,
 });
 
-async function setup(api = gremienApiMock()) {
+async function setup(api = gremienApiMock(), teamId: string | null = null) {
   localStorage.setItem('ap.locale', 'de');
   const toast = toastMock();
+  const teamsApi = teamsApiMock(api);
   const view = await render(GremiumInfoDialogComponent, {
-    inputs: { open: true, gremiumId: 'g-1', gremiumName: 'STUPA', info: INFO },
+    inputs: { open: true, gremiumId: 'g-1', teamId, gremiumName: 'STUPA', info: INFO },
     providers: [
       { provide: GremienApiService, useValue: api },
+      { provide: TeamsApiService, useValue: teamsApi },
       { provide: ToastService, useValue: toast },
     ],
   });
-  return { ...view, api, toast, cmp: view.fixture.componentInstance };
+  return { ...view, api, teamsApi, toast, cmp: view.fixture.componentInstance };
 }
 
 describe('gremium info drafts', () => {
@@ -101,6 +104,13 @@ describe('GremiumInfoDialogComponent', () => {
     expect(saved).toHaveBeenCalled();
     expect(closed).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('saves the Info of a free team to the team (spec 003077)', async () => {
+    const { cmp, api, teamsApi } = await setup(gremienApiMock(), 't-1');
+    cmp.save();
+    expect(teamsApi.saveInfo).toHaveBeenCalledWith('t-1', expect.objectContaining({ version: 2 }));
+    expect(api.saveInfo).not.toHaveBeenCalled();
   });
 
   it('does not save an invalid row and shows its error', async () => {

@@ -9,16 +9,6 @@
       </app-button-group>
     </app-empty-state>
   } @else {
-    @if (i.canEdit) {
-      <div class="gi__tools">
-        <app-button-group>
-          <app-button variant="tonal" (click)="editOpen.set(true)">
-            <app-icon name="edit" />
-            {{ 'gremien.info.edit' | t }}
-          </app-button>
-        </app-button-group>
-      </div>
-    }
     @if (i.bodyMd.trim()) {
       <app-markdown-view class="gi__text" [src]="i.bodyMd" />
     }
@@ -43,11 +33,22 @@
     @if (changedLine()) {
       <p class="gi__meta">{{ changedLine() }}</p>
     }
+    @if (i.canEdit) {
+      <div class="gi__more">
+        <app-button-group>
+          <app-button variant="text" size="sm" (click)="editOpen.set(true)">
+            <app-icon name="edit" />
+            {{ 'gremien.info.editShort' | t }}
+          </app-button>
+        </app-button-group>
+      </div>
+    }
   }
   @if (i.canEdit) {
     <app-gremium-info-dialog
       [open]="editOpen()"
       [gremiumId]="gremiumId()"
+      [teamId]="teamId()"
       [gremiumName]="gremiumName()"
       [info]="i"
       (closed)="editOpen.set(false)"

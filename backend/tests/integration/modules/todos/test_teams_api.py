@@ -166,3 +166,34 @@ async def test_a_team_with_cards_stays(api: Api, maker: async_sessionmaker[Async
             )
         ).scalar_one()
         assert left == 0
+
+
+async def test_the_info_of_a_free_team(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:
+    """A member reads the Info, only a manager saves it, an old version gives 409 (003077)."""
+    creator, _ = await add_person(maker, "Clara")
+    plain, plain_id = await add_person(maker, "Paul")
+    outsider, _ = await add_person(maker, "Olga")
+    gid, _ = await add_gremium(maker, "AStA")
+    inherent = await team_of(maker, gid)
+    with TestClient(api.app) as client:
+        api.login(_with(creator, "team.create"))
+        tid = _ok(client.post("/api/teams", json={"name": "Ersti"}), 201)["team"]["id"]
+        _ok(client.put(f"/api/teams/{tid}/members/{plain_id}", json={}))
+        empty = _ok(client.get(f"/api/teams/{tid}/info"))
+        assert empty["version"] == 0 and empty["bodyMd"] == "" and empty["canEdit"] is True
+        body = {"bodyMd": "# Hallo", "links": [{"label": "Wiki", "url": "https://x"}], "version": 0}
+        saved = _ok(client.put(f"/api/teams/{tid}/info", json=body))
+        assert saved["version"] == 1 and saved["updatedByName"] == "Clara"
+        _problem(client.put(f"/api/teams/{tid}/info", json=body), 409, "team_info_version_conflict")
+        _problem(client.get(f"/api/teams/{inherent}/info"), 404)
+
+        api.login(plain)
+        read = _ok(client.get(f"/api/teams/{tid}/info"))
+        assert read["bodyMd"] == "# Hallo" and read["canEdit"] is False
+        body["version"] = 1
+        _problem(client.put(f"/api/teams/{tid}/info", json=body), 403, "team_manage_required")
+        assert _ok(client.get("/api/auth/me"))["in_any_team"] is True
+
+        api.login(outsider)
+        _problem(client.get(f"/api/teams/{tid}/info"), 403, "team_member_required")
+        assert _ok(client.get("/api/auth/me"))["in_any_team"] is False

@@ -101,6 +101,7 @@ async def me(
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
         has_reported_tickets=await _has_reported_tickets(db, principal.sub),
         works_on_tickets=await _works_on_tickets(db, principal),
+        in_any_team=await _in_any_team(db, principal),
     )
 
 
@@ -172,6 +173,13 @@ async def _has_reported_tickets(db: DbSession, sub: str) -> bool:
     from app.modules.tickets.service import has_reported_tickets
 
     return await has_reported_tickets(db, sub)
+
+
+async def _in_any_team(db: DbSession, principal: Principal) -> bool:
+    """Tell if the principal is a member of at least one team (003076)."""
+    from app.modules.teams.members import member_team_ids
+
+    return bool(await member_team_ids(db, principal))
 
 
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:

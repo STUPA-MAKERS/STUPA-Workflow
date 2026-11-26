@@ -21,6 +21,7 @@ describe('PageIndexService', () => {
             canAny: () => false,
             canInAnyGremium: () => false,
             gremien: () => [],
+            inAnyTeam: () => false,
             hasScopedBudgetView: () => false,
             ...auth,
           },
@@ -89,10 +90,15 @@ describe('PageIndexService', () => {
     expect(svc.visible().map((e) => e.path)).toContain('/meetings');
   });
 
+  it('offers the teams to a member of a free team (spec 003076)', () => {
+    expect(setup({ inAnyTeam: () => true }).visible().map((e) => e.path)).toContain('/teams');
+  });
+
   it('withholds the gremium-gated pages from a user in no gremium', () => {
     const paths = setup({}).visible().map((e) => e.path);
     expect(paths).not.toContain('/meetings');
     expect(paths).not.toContain('/voting/projector');
+    expect(paths).not.toContain('/teams');
   });
 
   it('offers a gremium-gated page for the gremium permission in any gremium', () => {

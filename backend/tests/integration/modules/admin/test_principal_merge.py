@@ -88,7 +88,7 @@ from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
-from app.modules.teams.models import Team
+from app.modules.teams.models import Team, TeamInfo
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     Link,
@@ -515,6 +515,9 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         role = await _role(session, "member")
         admin_id = await _admin_actor(session)
         await session.execute(delete(PdfAsset).where(PdfAsset.slot == "footer"))
+        info_team = Team(name=f"merge-{tag}")
+        session.add(info_team)
+        await session.flush()
         session.add_all(
             [
                 SiteConfigVersion(version=secrets.randbelow(10**8) + 10**6, created_by=old.sub),
@@ -524,6 +527,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                 ),
                 FormVersion(application_type_id=seed.type_id, version=99, created_by=old.id),
                 GremiumInfo(gremium_id=seed.gremium_id, updated_by=old.id),
+                TeamInfo(team_id=info_team.id, updated_by=old.id),
                 RoleAssignment(principal_id=old.id, role_id=role.id, granted_by="bootstrap"),
                 RoleAssignment(
                     principal_id=other.id,

@@ -185,6 +185,7 @@ export const AUDIT_ACTIONS = [
   'backup_restore',
   'gremium_info_update',
   'gremium_notify',
+  'team_info_update',
   'paperless_connection',
   'paperless_filed',
   'paperless_inserted',

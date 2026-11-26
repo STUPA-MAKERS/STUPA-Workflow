@@ -1,3 +1,4 @@
+@use 'list-pane' as lp;
 :host {
   display: flex;
   flex-direction: column;
@@ -5,10 +6,9 @@
   min-width: 0;
 }
 
-.gi__tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.gi__more {
+  @include lp.more;
+  margin-top: 0;
 }
 
 .gi__text {

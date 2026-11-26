@@ -187,6 +187,9 @@ class AuditAction(StrEnum):
         GREMIUM_INFO_UPDATE: A save of the Info tab of a Gremium (``info.write``).
             ``data`` carries the gremium id, the new version, the length of the text
             and the number of links, never the text or a link.
+        TEAM_INFO_UPDATE: A save of the Info tab of a free team (a manager of the team).
+            ``data`` carries the team id, the new version, the length of the text and the
+            number of links, never the text or a link.
         GREMIUM_NOTIFY: A message of a Gremium to its members (``members.notify``).
             ``data`` carries the gremium id, the subject and the number of recipients,
             never an address or the text.
@@ -304,6 +307,7 @@ class AuditAction(StrEnum):
     BACKUP_RESTORE = "backup_restore"
     GREMIUM_INFO_UPDATE = "gremium_info_update"
     GREMIUM_NOTIFY = "gremium_notify"
+    TEAM_INFO_UPDATE = "team_info_update"
     PAPERLESS_CONNECTION = "paperless_connection"
     PAPERLESS_FILED = "paperless_filed"
     PAPERLESS_INSERTED = "paperless_inserted"

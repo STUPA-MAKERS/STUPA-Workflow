@@ -9,10 +9,14 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
+import type { GremiumInfo, GremiumInfoSave } from '@core/api/gremien.service';
 import type { Uuid } from '@core/api/models';
 import { skipLoading } from '@stupa-makers/ui-kit';
 
 export type TeamRole = 'member' | 'manager';
+
+/** The Info of a free team has the shape of the Info of a Gremium. */
+export type TeamInfo = GremiumInfo;
 
 /** A team in the list, with the rights of the caller. */
 export interface Team {
@@ -80,4 +84,14 @@ export class TeamsApiService {
   removeMember(teamId: Uuid, principalId: Uuid): Observable<TeamDetail> {
     return this.http.delete<TeamDetail>(`${this.base}/${teamId}/members/${principalId}`);
   }
+  /** The Info tab of a free team (003077): text, links and `canEdit`; members only. */
+  info(teamId: Uuid): Observable<TeamInfo> {
+    return this.http.get<TeamInfo>(`${this.base}/${teamId}/info`, { context: skipLoading() });
+  }
+
+  /** Save text and links (a manager); a stale `version` gives 409 `team_info_version_conflict`. */
+  saveInfo(teamId: Uuid, body: GremiumInfoSave): Observable<TeamInfo> {
+    return this.http.put<TeamInfo>(`${this.base}/${teamId}/info`, body);
+  }
+
 }

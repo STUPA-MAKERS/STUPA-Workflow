@@ -356,6 +356,7 @@ def test_me_returns_principal() -> None:
         "in_substitute_pool": False,
         "has_reported_tickets": False,
         "works_on_tickets": False,
+        "in_any_team": False,
     }
 
 

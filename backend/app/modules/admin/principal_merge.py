@@ -136,7 +136,7 @@ from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
-from app.modules.teams.models import TeamMember
+from app.modules.teams.models import TeamInfo, TeamMember
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
@@ -236,6 +236,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", MeetingGuest.decided_by),
     ("config", FormVersion.created_by),
     ("config", GremiumInfo.updated_by),
+    ("config", TeamInfo.updated_by),
     ("tickets", Ticket.reporter_principal_id),
     ("tickets", Ticket.assignee_id),
     ("tickets", TicketNote.author_id),

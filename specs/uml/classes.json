@@ -995,6 +995,20 @@
       "to": "Team"
     },
     {
+      "column": "updated_by",
+      "from": "TeamInfo",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "team_id",
+      "from": "TeamInfo",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Team"
+    },
+    {
       "column": "principal_id",
       "from": "TeamMember",
       "multiplicity": "*",
@@ -7203,6 +7217,51 @@
       "name": "Team",
       "path": "backend/app/modules/teams/models.py",
       "table": "team"
+    },
+    {
+      "attributes": [
+        {
+          "name": "team_id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "body_md",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "links",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        }
+      ],
+      "id": "TeamInfo",
+      "module": "teams",
+      "name": "TeamInfo",
+      "path": "backend/app/modules/teams/models.py",
+      "table": "team_info"
     },
     {
       "attributes": [

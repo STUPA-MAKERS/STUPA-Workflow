@@ -166,6 +166,19 @@ describe('NavService', () => {
     expect(keys).not.toContain('meetings');
   });
 
+  /** Spec 003076: the tab Teams also opens for a member of a free team and for team.create. */
+  it('opens the teams for a member of a free team', () => {
+    expect(keysFor({ ...BASE, in_any_team: true })).toContain('gremien');
+  });
+
+  it('opens the teams with team.create', () => {
+    expect(keysFor({ ...BASE, permissions: ['team.create'] })).toContain('gremien');
+  });
+
+  it('keeps the teams from a person in no team and without the rights', () => {
+    expect(keysFor(BASE)).not.toContain('gremien');
+  });
+
   /** § F/public/public-pages/001303: the public pages form the group "Öffentlich". */
   it('groups the public pages as "Öffentlich" after the other main entries', () => {
     const grouped = NAV_ITEMS.filter((i) => i.group === 'public');
