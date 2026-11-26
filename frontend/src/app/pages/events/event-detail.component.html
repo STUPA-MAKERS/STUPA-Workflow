@@ -2,13 +2,15 @@
   <ng-template screenBody>
     @if (event(); as current) {
       <app-section [heading]="current.title" [hideHeading]="true">
-        @if (step(); as next) {
-          <app-button-group>
-            <app-button variant="primary" [loading]="busy()" data-testid="ed-step" (click)="setStatus(next.status)">
-              {{ next.label }}
-            </app-button>
-          </app-button-group>
-        }
+        <app-select
+          data-testid="ed-status"
+          [label]="'events.field.status' | t"
+          [options]="statusOptions()"
+          [clearable]="false"
+          [disabled]="busy()"
+          [(value)]="statusPick"
+          (valueChange)="setStatus($event)"
+        />
         <app-section data-testid="ed-section" [heading]="'events.dialog.details' | t" [hideHeading]="true">
           <app-field-group>
             @for (fact of facts(); track fact.label) {

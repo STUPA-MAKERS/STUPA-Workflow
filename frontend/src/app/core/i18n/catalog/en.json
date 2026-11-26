@@ -5464,7 +5464,6 @@
   "events.editions.title": "Other events of the series",
   "events.editions.hidden": "{n} more without access",
   "events.editions.balance": "Balance {amount}",
-  "events.menu.toStatus": "Mark as “{status}”",
   "events.menu.followUp": "Create the next edition",
   "events.delete.title": "Delete event",
   "events.delete.body": "“{title}” and its links will be deleted.",

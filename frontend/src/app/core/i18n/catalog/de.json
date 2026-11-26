@@ -5464,7 +5464,6 @@
   "events.editions.title": "Weitere Veranstaltungen der Reihe",
   "events.editions.hidden": "{n} weitere ohne Zugriff",
   "events.editions.balance": "Saldo {amount}",
-  "events.menu.toStatus": "Als „{status}“ markieren",
   "events.menu.followUp": "Folgeveranstaltung anlegen",
   "events.delete.title": "Veranstaltung löschen",
   "events.delete.body": "„{title}“ wird mit ihren Verknüpfungen gelöscht.",

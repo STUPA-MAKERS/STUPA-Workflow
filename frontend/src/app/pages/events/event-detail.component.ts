@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -8,7 +8,7 @@ import {
   type EventStatus,
   EventsApiService,
 } from '@core/api/events.service';
-import { type StatusDef, StatusCatalog, nextStatus } from '@core/api/statuses.service';
+import { StatusCatalog } from '@core/api/statuses.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -17,8 +17,6 @@ import { formatMoney } from '@shared/format-money';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import {
   type Action,
-  ButtonComponent,
-  ButtonGroupComponent,
   ConfirmDialogComponent,
   FieldGroupComponent,
   FieldRowComponent,
@@ -28,6 +26,8 @@ import {
   NoteComponent,
   type ScreenHead,
   SectionComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { DetailScreenComponent, ScreenBodyDirective } from '@stupa-makers/ui-kit/screens';
@@ -36,9 +36,6 @@ import { eventDays } from '../../features/todos/todos.util';
 import { pageItemTitle } from '../../layout/page-title.service';
 import { eventWhen } from './events.util';
 import { EventsRefresh } from './events-refresh';
-
-/** The prefix of the menu items that set a status. */
-const STATUS_ACTION = 'status:';
 
 /** One field of the detail. `href` makes the value a link to another site. */
 export interface EventFact {
@@ -50,9 +47,9 @@ export interface EventFact {
 /**
  * The detail of one Event in the pane of the page "Veranstaltungen" (spec 003029).
  *
- * In this order: the head with the name, the number and the status; the next status of
- * the list `event` as the main button and the other statuses, "Bearbeiten",
- * "Folgeveranstaltung anlegen" (003030) and "Löschen" in the ⋮ menu; the fields (003023)
+ * In this order: the head with the name, the number and the status; "Bearbeiten",
+ * "Folgeveranstaltung anlegen" (003030) and "Löschen" in the ⋮ menu; the field "Status" as
+ * a dropdown of the list `event` that saves a pick at once (003042); the fields (003023)
  * with the shop as a link that opens a new tab (003024); the totals (000479); the
  * decisions (000482); the other Events of the series and how many of them the person does
  * not read (000483); the list "Verknüpft". Only a member of the team reads an Event, so
@@ -64,8 +61,6 @@ export interface EventFact {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
-    ButtonComponent,
-    ButtonGroupComponent,
     ConfirmDialogComponent,
     DetailScreenComponent,
     FieldGroupComponent,
@@ -76,6 +71,7 @@ export interface EventFact {
     NoteComponent,
     ScreenBodyDirective,
     SectionComponent,
+    SelectFieldComponent,
     TodoLinkedListComponent,
   ],
   templateUrl: './event-detail.component.html',
@@ -118,43 +114,33 @@ export class EventDetailComponent {
     };
   });
 
-  /** The next status of the list: the main button of the detail. */
-  protected readonly step = computed(() => {
-    const event = this.event();
-    const next = event ? nextStatus(this.statuses(), event.status) : null;
-    return next ? { status: next.key, label: this.toLabel(next) } : null;
-  });
+  /** The statuses of the list `event`, in the order of the list (003042). */
+  protected readonly statusOptions = computed<readonly SelectFieldOption[]>(() =>
+    this.statuses().map((s) => ({ value: s.key, label: this.catalog.name(s) })),
+  );
+
+  /** The pick of the field "Status"; it goes back to the saved status after a failed save. */
+  protected readonly statusPick = linkedSignal(() => this.event()?.status ?? '');
 
   protected readonly actions = computed<readonly Action[]>(() => {
     const event = this.event();
     if (!event) return [];
-    const main = this.step()?.status ?? null;
-    const item = (key: string, label: string, more: Partial<Action> = {}): Action => ({
-      key,
-      label,
-      priority: 'menu',
-      ...more,
-    });
-    const others = this.statuses().filter((s) => s.key !== event.status && s.key !== main);
     return [
-      ...others
-        .filter((s) => s.phase !== 'void')
-        .map((s) =>
-          item(`${STATUS_ACTION}${s.key}`, this.toLabel(s), { icon: s.phase === 'done' ? 'check' : 'send' }),
-        ),
-      item('edit', this.t('action.edit'), {
+      {
+        key: 'edit',
+        label: this.t('action.edit'),
         icon: 'edit',
         priority: 'head',
         route: { commands: ['/events', event.id, 'edit'] },
-      }),
-      item('followUp', this.t('events.menu.followUp'), {
+      },
+      {
+        key: 'followUp',
+        label: this.t('events.menu.followUp'),
         icon: 'repeat',
+        priority: 'menu',
         route: { commands: ['/events', 'new'], query: { from: event.id } },
-      }),
-      ...others
-        .filter((s) => s.phase === 'void')
-        .map((s) => item(`${STATUS_ACTION}${s.key}`, this.toLabel(s), { icon: 'x' })),
-      item('delete', this.t('action.delete'), { icon: 'trash', kind: 'danger' }),
+      },
+      { key: 'delete', label: this.t('action.delete'), icon: 'trash', kind: 'danger', priority: 'menu' },
     ];
   });
 
@@ -213,13 +199,12 @@ export class EventDetailComponent {
   }
 
   protected onAction(key: string): void {
-    if (key.startsWith(STATUS_ACTION)) return this.setStatus(key.slice(STATUS_ACTION.length));
     if (key === 'delete') this.deleting.set(true);
   }
 
   protected setStatus(status: EventStatus): void {
     const event = this.event();
-    if (!event || this.busy()) return;
+    if (!event || this.busy() || status === event.status) return;
     this.busy.set(true);
     this.api.setStatus(event.id, status, event.version).subscribe({
       next: (saved) => {
@@ -229,6 +214,7 @@ export class EventDetailComponent {
       },
       error: (err: { error?: { code?: string } | null }) => {
         this.busy.set(false);
+        this.statusPick.set(event.status);
         const stale = err.error?.code === 'event_version_conflict';
         this.toast.show(this.t(stale ? 'events.error.version' : 'events.error.save'), 'error');
         if (stale) this.load();
@@ -289,11 +275,6 @@ export class EventDetailComponent {
     ]
       .filter(Boolean)
       .join(' · ');
-  }
-
-  /** "Als „Abgerechnet“ markieren". */
-  private toLabel(status: StatusDef): string {
-    return this.t('events.menu.toStatus', { status: this.catalog.name(status) });
   }
 
   private money(value: string, signed = false): string {

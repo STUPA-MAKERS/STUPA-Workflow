@@ -80,10 +80,10 @@ describe('EventDetailComponent', () => {
     expect(api.get).toHaveBeenCalledWith('e-1');
     expect(cmp.head()).toMatchObject({ title: 'Erstiparty', kicker: 'V-7K3QX9MD', status: { label: 'Geplant', kind: 'neutral' } });
     expect(screen.getByRole('heading', { name: 'Erstiparty', level: 1 })).toBeInTheDocument();
-    const order = Array.from(container.querySelectorAll('[data-testid="ed-step"], [data-testid="ed-section"]')).map((el) =>
-      el.getAttribute('data-testid') === 'ed-step' ? 'step' : (el.querySelector('h2, h3, h4')?.textContent?.trim() ?? el.tagName.toLowerCase()),
+    const order = Array.from(container.querySelectorAll('[data-testid="ed-status"], [data-testid="ed-section"]')).map((el) =>
+      el.getAttribute('data-testid') === 'ed-status' ? 'status' : (el.querySelector('h2, h3, h4')?.textContent?.trim() ?? el.tagName.toLowerCase()),
     );
-    expect(order).toEqual(['step', 'Angaben', 'Finanzen', 'Beschlüsse', 'Weitere Veranstaltungen der Reihe', 'app-todo-linked-list']);
+    expect(order).toEqual(['status', 'Angaben', 'Finanzen', 'Beschlüsse', 'Weitere Veranstaltungen der Reihe', 'app-todo-linked-list']);
     expect(cmp.facts().map((f: { label: string }) => f.label)).toEqual(['Team', 'Beginn', 'Ort', 'Teilnehmende', 'Reihe', 'Shop']);
     expect(screen.getAllByTestId('ed-total')).toHaveLength(5);
     expect(cmp.totals()[4].value).toMatch(/^\+312,00\s€$/);
@@ -138,26 +138,29 @@ describe('EventDetailComponent', () => {
     expect(screen.getByTestId('ed-hidden')).toBeInTheDocument();
   });
 
-  /** §F/administration/admin/003035 and 003030: the next status, the menu and the follow-up. */
-  it('offers the next status as the button and the rest in the menu', async () => {
+  /** §F/collaboration/events/003042 and 003030: the field "Status", the menu and the follow-up. */
+  it('offers every status in the field "Status" and keeps the menu free of statuses', async () => {
     const { cmp, keys } = await setup();
-    expect(cmp.step()).toEqual({ status: 'settled', label: 'Als „Abgerechnet“ markieren' });
-    expect(keys()).toEqual(['edit', 'followUp', 'status:cancelled', 'delete']);
+    expect(cmp.statusOptions()).toEqual([
+      { value: 'planned', label: 'Geplant' },
+      { value: 'settled', label: 'Abgerechnet' },
+      { value: 'cancelled', label: 'Abgesagt' },
+    ]);
+    expect(cmp.statusPick()).toBe('planned');
+    expect(screen.getByTestId('ed-status')).toBeInTheDocument();
+    expect(keys()).toEqual(['edit', 'followUp', 'delete']);
     const follow = cmp.actions().find((a: { key: string }) => a.key === 'followUp');
     expect(follow.route).toEqual({ commands: ['/events', 'new'], query: { from: 'e-1' } });
   });
 
-  it('offers no next status for a void Event', async () => {
-    const done = await setup(eventDetail({ status: 'cancelled' }));
-    expect(done.cmp.step()).toBeNull();
-    expect(done.keys()).toEqual(['status:planned', 'status:settled', 'edit', 'followUp', 'delete']);
-  });
-
   it('sets a status and tells the list', async () => {
     const { cmp, api, touched } = await setup();
-    cmp.onAction('status:cancelled');
+    cmp.setStatus('planned');
+    expect(api.setStatus).not.toHaveBeenCalled();
+    cmp.setStatus('cancelled');
     expect(api.setStatus).toHaveBeenCalledWith('e-1', 'cancelled', 1);
     expect(cmp.event().status).toBe('cancelled');
+    expect(cmp.statusPick()).toBe('cancelled');
     expect(touched).toHaveBeenCalled();
     cmp.onAction('edit');
   });
@@ -169,8 +172,10 @@ describe('EventDetailComponent', () => {
     expect(toast).toHaveBeenCalledWith('Die Veranstaltung wurde inzwischen geändert. Sie ist neu geladen.', 'error');
     expect(api.get).toHaveBeenCalledTimes(2);
     api.setStatus.mockReturnValueOnce(throwError(() => ({ error: null })));
+    cmp.statusPick.set('settled');
     cmp.setStatus('settled');
     expect(toast).toHaveBeenLastCalledWith('Die Veranstaltung konnte nicht gespeichert werden.', 'error');
+    expect(cmp.statusPick()).toBe('planned');
   });
 
   /** The decision "Dialog beim Löschen": the delete asks first. */

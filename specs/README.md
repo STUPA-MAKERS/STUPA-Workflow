@@ -324,6 +324,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | approved |
 | [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
 | [F/collaboration/events/003041](requirements/functional/collaboration/events/003041_event-bookings-collapsed.md) | Many bookings of an Event fold into one row | approved |
+| [F/collaboration/events/003042](requirements/functional/collaboration/events/003042_event-status-field.md) | The detail of an Event changes the status in a dropdown | draft |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -623,7 +624,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | approved |
 | [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | approved |
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | approved |
-| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | approved |
+| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | draft |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |
 | [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | approved |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | approved |
