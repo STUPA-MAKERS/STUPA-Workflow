@@ -813,11 +813,11 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'order-phases',
+            path: 'order-statuses',
             canMatch: [featureMatch('orders')],
             data: {
               title: 'admin.statuses.title.order',
-              permission: 'admin.order_phases',
+              permission: 'admin.order_statuses',
               parent: ['admin'],
               statusList: 'order',
             },
@@ -828,10 +828,10 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'event-phases',
+            path: 'event-statuses',
             data: {
               title: 'admin.statuses.title.event',
-              permission: 'admin.event_phases',
+              permission: 'admin.event_statuses',
               parent: ['admin'],
               statusList: 'event',
             },

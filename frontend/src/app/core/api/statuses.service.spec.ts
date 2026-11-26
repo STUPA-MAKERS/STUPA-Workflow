@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_BASE_URL } from './api.config';
-import { DEFAULT_STATUS_LISTS, StatusCatalog, nextStatus, provideTestStatuses } from './statuses.service';
+import { DEFAULT_STATUS_LISTS, StatusCatalog, provideTestStatuses } from './statuses.service';
 
 describe('StatusCatalog', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -52,12 +52,5 @@ describe('StatusCatalog', () => {
     catalog.set('event', [{ key: 'x', name: { en: 'X' }, tone: 'accent', phase: 'open', start: true }]);
     expect(catalog.label('event', 'x')).toBe('x');
     TestBed.inject(HttpTestingController).verify();
-  });
-
-  it('names the next status that is not void', () => {
-    const list = DEFAULT_STATUS_LISTS.event;
-    expect(nextStatus(list, 'planned')?.key).toBe('settled');
-    expect(nextStatus(list, 'settled')).toBeNull();
-    expect(nextStatus(list, 'cancelled')).toBeNull();
   });
 });

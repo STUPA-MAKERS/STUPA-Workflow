@@ -1,6 +1,6 @@
 ---
 name: be-orders
-description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the status of the configured list `order` (module `statuses`: phases open/done/void, pages Bestellphasen/Veranstaltungsphasen), the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend page "Bestellungen" (/orders: list, detail and form in the pane). Use when working on backend/app/modules/orders or frontend/src/app/pages/orders.
+description: Bestellungen (orders) of an Antrag — one purchase at one supplier for an approved Antrag of a type with money (purchase_order, purchase_order_event, number B-7K3QX9MD). Covers the kinds Bestellung/Auslage, the status of the configured list `order` (module `statuses`: phases open/done/void, pages Bestellzustände/Veranstaltungszustände), the positions of the Kostenaufstellung by their fixed id, the buyer (account or typed name), the sum against the approved amount (warns, never blocks), the optimistic lock (version, 409 order_version_conflict), the right order.manage, the applicant view, the files of a Bestellung, the audit actions order_* with their revert, the timeline entries of the Antrag, privacy and the account merge, the MCP tools order_* and the frontend page "Bestellungen" (/orders: list, detail and form in the pane). Use when working on backend/app/modules/orders or frontend/src/app/pages/orders.
 ---
 
 # Bestellungen — `backend/app/modules/orders`
@@ -24,7 +24,7 @@ the flag `is_approved` of the current state, "with money" is `has_budget` of the
   (real, else planned), `orders_sum` (without the phase `void`), `segment_of` (by phase), `over_by`.
 - Statuses: the keys come from the list `order` of `app/modules/statuses` (`status_def`,
   F/administration/admin/003035-003040). Code reads only the phase (`StatusReader`,
-  `in_phase`), never a key. Admin pages `/admin/order-phases` (`admin.order_phases`) and `/admin/event-phases` (`admin.event_phases`); frontend
+  `in_phase`), never a key. Admin pages `/admin/order-statuses` (`admin.order_statuses`) and `/admin/event-statuses` (`admin.event_statuses`); frontend
   `StatusCatalog` (`core/api/statuses.service.ts`) names and colors a key.
 - `numbers.py` — the number `B-` plus eight random characters.
 - `service.py` — `OrderService`: list, create, update, set status, delete. It checks the

@@ -21,7 +21,6 @@ import {
   ButtonGroupComponent,
   IconComponent,
   InputComponent,
-  MoveButtonsComponent,
   NoteComponent,
   SelectFieldComponent,
   type SelectOption,
@@ -46,10 +45,10 @@ import {
   elementsOf,
   listValid,
   missingPhases,
-  moveRow,
   nameText,
   newRow,
   removeRow,
+  startRow,
   unchanged,
 } from './statuses.util';
 
@@ -58,8 +57,8 @@ export const MAX_STATUSES = 30;
 
 /** The permission of the page of each list (spec 003035). */
 export const STATUS_LIST_PERMISSION: Readonly<Record<StatusListKind, string>> = {
-  order: 'admin.order_phases',
-  event: 'admin.event_phases',
+  order: 'admin.order_statuses',
+  event: 'admin.event_statuses',
 };
 
 /** The route data that names the list of the page. */
@@ -74,15 +73,15 @@ interface Deleting {
 }
 
 /**
- * "Bestellphasen" (`/admin/order-phases`) and "Veranstaltungsphasen" (`/admin/event-phases`):
+ * "Bestellzustände" (`/admin/order-statuses`) and "Veranstaltungszustände" (`/admin/event-statuses`):
  * one page per status list (spec 003035-003040). The route data `statusList` names the list,
  * and each page needs its own permission.
  *
- * The page edits the list like the steps of a Haushaltsplan under Budgets: the kit step list
- * with per row the name, the buttons up and down and the delete, under it the selects of the
- * kind (`open`, `done`, `void`), the color and, for a Bestellung, the date that the status
- * sets; the add button under the list. The order of the list is the position, and the first
- * row is the start of a new element, so it needs the kind `open`.
+ * Above the list the field "Startzustand" picks the start status of a new element among the
+ * statuses of the kind `open`. The list is the kit step list without numbers, because the
+ * statuses have no sequence (003040): per row the name and the delete, under it the selects of
+ * the kind (`open`, `done`, `void`), the color and, for a Bestellung, the date that the status
+ * sets; the add button under the list. A new status goes to the end.
  *
  * The delete of a stored row that elements have opens a select sheet: the admin picks the
  * row that takes the elements, and only the pick removes the row (003038). "Speichern" sends
@@ -101,8 +100,7 @@ interface Deleting {
     ButtonGroupComponent,
     IconComponent,
     InputComponent,
-    MoveButtonsComponent,
-    NoteComponent,
+      NoteComponent,
     SelectFieldComponent,
     SelectSheetComponent,
     StepListComponent,
@@ -248,11 +246,30 @@ export class AdminStatusesComponent {
     return this.name(row).trim() ? '' : this.i18n.translate('admin.statuses.nameRequired');
   }
 
-  /** The first status is the start status, so its phase is `open` (spec 003035). */
-  protected phaseError(index: number): string {
-    return index === 0 && this.rows()[0]?.phase !== 'open'
-      ? this.i18n.translate('admin.statuses.startOpen')
-      : '';
+  /** The statuses of the kind `open`: the choices of the start status (spec 003040). */
+  protected readonly startOptions = computed<SelectOption[]>(() =>
+    this.rows()
+      .map((row, i) => ({ row, i }))
+      .filter(({ row }) => row.phase === 'open')
+      .map(({ row, i }) => ({ value: String(i), label: this.name(row) || row.key || '…' })),
+  );
+
+  /** The index of the start row as the value of the field, or '' while none is valid. */
+  protected readonly startValue = computed(() => {
+    const start = startRow(this.rows());
+    return start ? String(this.rows().indexOf(start)) : '';
+  });
+
+  protected readonly startError = computed(() =>
+    this.startValue() ? '' : this.i18n.translate('admin.statuses.startRequired'),
+  );
+
+  protected setStart(value: string): void {
+    const index = Number(value);
+    this.draft.update((list) => ({
+      ...list,
+      rows: list.rows.map((row, i) => (row.start === (i === index) ? row : { ...row, start: i === index })),
+    }));
   }
 
   protected add(): void {
@@ -281,10 +298,6 @@ export class AdminStatusesComponent {
 
   protected cancelDelete(): void {
     this.deleting.set(null);
-  }
-
-  protected move(index: number, by: -1 | 1): void {
-    this.draft.update((list) => ({ ...list, rows: moveRow(list.rows, index, by) }));
   }
 
   protected setName(index: number, text: string): void {

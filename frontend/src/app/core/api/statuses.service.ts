@@ -2,9 +2,10 @@
  * The status lists of the elements (`GET /api/statuses/{kind}`, spec
  * F/administration/admin/003035).
  *
- * An admin names the statuses of the Bestellungen and of the Events on the page "Status &
- * Phasen". Each status has a key, a name per language, a tone, a phase and, for a
- * Bestellung, the date that it sets. The code reads the phase of a status and never names a
+ * An admin names the statuses of the Bestellungen and of the Events on the pages
+ * "Bestellzustände" and "Veranstaltungszustände". Each status has a key, a name per language,
+ * a tone, a kind (`phase`) and, for a Bestellung, the date that it sets. The statuses have no
+ * sequence (003035). The code reads the phase of a status and never names a
  * key (003036). The catalog loads each list once and keeps it in a signal, so every view
  * shows the same names and tones.
  */
@@ -85,16 +86,6 @@ export const STATUS_LIST_SEED = new InjectionToken<Readonly<Record<StatusListKin
   { providedIn: 'root', factory: () => (inject(USE_MOCK_API) ? DEFAULT_STATUS_LISTS : null) },
 );
 
-/**
- * The status that follows `key` in the work: the next status of the list that is not in
- * the phase `void`, or null at the end. A status in the phase `void` has no next one.
- */
-export function nextStatus(list: readonly StatusDef[], key: string): StatusDef | null {
-  const index = list.findIndex((s) => s.key === key);
-  if (index < 0 || list[index].phase === 'void') return null;
-  return list.slice(index + 1).find((s) => s.phase !== 'void') ?? null;
-}
-
 @Injectable({ providedIn: 'root' })
 export class StatusCatalog {
   private readonly http = inject(HttpClient);
@@ -121,7 +112,7 @@ export class StatusCatalog {
     return this.lists[kind].asReadonly();
   }
 
-  /** Read a list again, after a save on the page Bestellphasen or Veranstaltungsphasen. */
+  /** Read a list again, after a save on the page Bestellzustände or Veranstaltungszustände. */
   reload(kind: StatusListKind): void {
     this.started[kind].set(true);
     if (this.seed) return;

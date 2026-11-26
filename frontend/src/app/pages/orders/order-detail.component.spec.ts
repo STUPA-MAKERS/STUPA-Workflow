@@ -1,4 +1,4 @@
-import { DEFAULT_STATUS_LISTS, nextStatus, provideTestStatuses } from '@core/api/statuses.service';
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject, type Observable, Subject, of, throwError } from 'rxjs';
@@ -105,18 +105,6 @@ describe('OrderDetailComponent', () => {
   afterEach(() => {
     localStorage.clear();
     jest.useRealTimers();
-  });
-
-  /** §F/administration/admin/003035: the next status of the list that is not void. */
-  it('names the status that follows in the list of the Bestellungen', () => {
-    const list = DEFAULT_STATUS_LISTS.order;
-    expect(['planned', 'ordered', 'delivered', 'cancelled', 'gone'].map((key) => nextStatus(list, key)?.key ?? null)).toEqual([
-      'ordered',
-      'delivered',
-      null,
-      null,
-      null,
-    ]);
   });
 
   /** §F/finance/orders/002936: head, fields, positions, sum and the built-in rows of "Verknüpft". */
