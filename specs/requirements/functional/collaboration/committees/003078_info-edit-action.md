@@ -15,7 +15,7 @@ scope:
 
 When an Info has a text or a link, an editor must find its edit action under the Info, after the
 line of the last change, centred. The action must be a small text button with the pencil icon
-and the label "Bearbeiten", in the same form as "Frühere Sitzungen laden" of the meetings list.
+and the label "Bearbeiten" in a button group, in the same form as "Frühere Sitzungen laden" of the meetings list.
 The Info of a Gremium and the Info of a free team (003077) must use the same component, so both
 show the action in the same place. An empty Info keeps its empty state with the action
 "Info bearbeiten" (001015).
