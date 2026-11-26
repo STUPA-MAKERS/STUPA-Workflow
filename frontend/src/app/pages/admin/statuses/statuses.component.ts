@@ -147,8 +147,11 @@ export class AdminStatusesComponent {
       : null;
   });
 
-  /** One group without a head: the page holds one list. */
-  protected readonly groups: SettingsGroup[] = [{ key: 'list', rows: [] }];
+  /** Two groups without a head: the start status, then the list. */
+  protected readonly groups: SettingsGroup[] = [
+    { key: 'start', rows: [] },
+    { key: 'list', rows: [] },
+  ];
 
   protected readonly title = computed(() =>
     this.i18n.translate(`admin.statuses.title.${this.kind}`),

@@ -6,19 +6,21 @@
   (save)="save()"
   (discard)="discard()"
 >
+  <ng-template screenGroup="start">
+    <app-select
+      data-testid="status-start"
+      [label]="'admin.statuses.start' | t"
+      [hint]="'admin.statuses.startHint' | t"
+      [clearable]="false"
+      [options]="startOptions()"
+      [error]="startError()"
+      [ngModel]="startValue()"
+      (ngModelChange)="setStart($event)"
+      name="start"
+    />
+  </ng-template>
   <ng-template screenGroup="list">
     <form (submit)="$event.preventDefault(); save()">
-      <app-select
-        data-testid="status-start"
-        [label]="'admin.statuses.start' | t"
-        [hint]="'admin.statuses.startHint' | t"
-        [clearable]="false"
-        [options]="startOptions()"
-        [error]="startError()"
-        [ngModel]="startValue()"
-        (ngModelChange)="setStart($event)"
-        name="start"
-      />
       <app-step-list>
         @for (row of rows(); track $index; let i = $index) {
           <app-step-row [columns]="columns()" [attr.data-testid]="'status-' + i">
