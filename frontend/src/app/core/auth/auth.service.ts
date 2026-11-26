@@ -97,6 +97,11 @@ export class AuthService {
    * the gremium permission `ticket.work` in the Gremium of a Bereich. The tab "Tickets"
    * then shows the work list of the team.
    */
+  /** A member of at least one team, inherent or free (003076): the tab "Teams" shows. */
+  readonly inAnyTeam = computed(
+    () => this._principal()?.in_any_team === true || this.gremien().length > 0,
+  );
+
   readonly worksOnTickets = computed(
     () => this.can('ticket.manage') || this._principal()?.works_on_tickets === true,
   );

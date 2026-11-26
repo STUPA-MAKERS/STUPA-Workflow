@@ -13,6 +13,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 
 from app.deps import DbSession, Principal, require_principal
+from app.modules.gremien_overview.schemas import GremiumInfoIn, GremiumInfoOut
+from app.modules.team_pages.info import TeamInfoService
 from app.modules.team_pages.schemas import (
     TeamCreate,
     TeamDetailOut,
@@ -110,3 +112,30 @@ async def remove_team_member(
     out = await TeamService(db).remove_member(team_id, principal_id, principal)
     await db.commit()
     return out
+
+
+@router.get("/{team_id}/info", response_model=GremiumInfoOut, responses=_errors(401, 403, 404))
+async def read_team_info(team_id: UUID, principal: ReaderDep, db: DbSession) -> GremiumInfoOut:
+    """Give the Info tab of a free team: the Markdown text, the links and ``canEdit``.
+
+    A member or a manager reads it (403 else). An inherent team gives 404: its Gremium
+    carries the Info. A team without a saved Info gives the empty Info with version 0.
+    """
+    return await TeamInfoService(db).read_info(team_id, principal)
+
+
+@router.put(
+    "/{team_id}/info", response_model=GremiumInfoOut, responses=_errors(401, 403, 404, 409, 422)
+)
+async def save_team_info(
+    team_id: UUID, body: GremiumInfoIn, principal: ReaderDep, db: DbSession
+) -> GremiumInfoOut:
+    """Save the text and the links of the Info tab of a free team together.
+
+    Only a manager of the team saves (403 ``team_manage_required``). ``version`` is the
+    version that the editor read: another version gives 409 ``team_info_version_conflict``.
+    The save writes a ``team_info_update`` audit entry.
+    """
+    saved = await TeamInfoService(db).save_info(team_id, principal, body)
+    await db.commit()
+    return saved

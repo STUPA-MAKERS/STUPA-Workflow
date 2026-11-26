@@ -166,6 +166,8 @@ export interface Principal {
   readonly has_reported_tickets?: boolean;
   /** The principal works on tickets in at least one Bereich. */
   readonly works_on_tickets?: boolean;
+  /** The principal is a member of at least one team: the tab "Teams" shows (003076). */
+  readonly in_any_team?: boolean;
 }
 
 /** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */

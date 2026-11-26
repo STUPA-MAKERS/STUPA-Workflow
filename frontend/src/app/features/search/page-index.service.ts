@@ -93,6 +93,7 @@ export class PageIndexService {
     if (required.length > 0 && this.auth.canAny(...required)) return true;
     if (gremiumRequired.some((p) => this.auth.canInAnyGremium(p))) return true;
     if (data['allowCommitteeMember'] === true && this.auth.gremien().length > 0) return true;
+    if (data['allowTeamMember'] === true && this.auth.inAnyTeam()) return true;
     if (data['allowScopedBudgetView'] === true && this.auth.hasScopedBudgetView()) return true;
     return data['allowAuthenticated'] === true;
   }

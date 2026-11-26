@@ -48,6 +48,8 @@ export class GremiumInfoComponent {
   private readonly i18n = inject(I18nService);
 
   readonly gremiumId = input.required<string>();
+  /** A free team (003077): the editor saves to the team. */
+  readonly teamId = input<string | null>(null);
   readonly gremiumName = input('');
   /** `undefined` while it loads, `null` after a load error. */
   readonly info = input<GremiumInfo | null | undefined>(undefined);

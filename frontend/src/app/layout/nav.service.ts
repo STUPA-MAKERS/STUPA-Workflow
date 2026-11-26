@@ -85,6 +85,8 @@ export interface NavItem {
   readonly gremiumPermissions?: readonly string[];
   /** Also visible to a member of any gremium. */
   readonly inAnyCommittee?: boolean;
+  /** Shows for a member of at least one team, inherent or free (003076). */
+  readonly inAnyTeam?: boolean;
   /** Also visible with a scoped budget view. */
   readonly scopedBudgetView?: boolean;
   /** Also visible to a principal who reported a ticket. */
@@ -135,9 +137,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: '/teams',
     labelKey: 'nav.gremien',
     icon: 'network',
-    /** A member sees the own gremien; `gremium.view_all` (and the admin) sees every one. */
-    permissions: ['gremium.view_all'],
-    inAnyCommittee: true,
+    /**
+     * A member of any team sees the own teams; `team.create` may add one; `gremium.view_all`
+     * (and the admin) sees every one (003076).
+     */
+    permissions: ['gremium.view_all', 'team.create'],
+    inAnyTeam: true,
     place: 'main',
   },
   {
@@ -210,6 +215,7 @@ export class NavService {
         this.globalAllows(item) ||
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
+        (!!item.inAnyTeam && this.auth.inAnyTeam()) ||
         (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()) ||
         (!!item.reportedTickets && (this.auth.hasReportedTickets() || this.auth.worksOnTickets())),
     );

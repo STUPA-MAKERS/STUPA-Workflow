@@ -21,6 +21,11 @@
       "to": "shared"
     },
     {
+      "count": 1,
+      "from": "account",
+      "to": "teams"
+    },
+    {
       "count": 2,
       "from": "account",
       "to": "tickets"
@@ -1611,22 +1616,27 @@
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 4,
       "from": "team_pages",
       "to": "audit"
     },
     {
-      "count": 4,
+      "count": 6,
       "from": "team_pages",
       "to": "auth"
     },
     {
-      "count": 3,
+      "count": 2,
+      "from": "team_pages",
+      "to": "gremien_overview"
+    },
+    {
+      "count": 4,
       "from": "team_pages",
       "to": "shared"
     },
     {
-      "count": 2,
+      "count": 3,
       "from": "team_pages",
       "to": "teams"
     },

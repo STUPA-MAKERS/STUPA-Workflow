@@ -41,7 +41,7 @@ describe('GremiumInfoComponent', () => {
     expect(links.every((a) => a.getAttribute('rel') === 'noopener')).toBe(true);
     expect(screen.getByText('vorsitz@example.org')).toBeTruthy();
     expect(screen.getByText(/Zuletzt geändert von Mara Keller am/)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Info bearbeiten/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /bearbeiten/i })).toBeNull();
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
@@ -56,13 +56,18 @@ describe('GremiumInfoComponent', () => {
     expect(screen.getByText(/^Zuletzt geändert am/)).toBeTruthy();
   });
 
-  it('gives an editor the edit action, and the empty state when empty (§ 001015)', async () => {
+  it('gives an editor the empty state when empty (§ 001015) and the small action under the Info (§ 003078)', async () => {
     const { cmp, rerender } = await setup(gremiumInfo({ canEdit: true }));
     expect(screen.getByText('Noch keine Info')).toBeTruthy();
     screen.getByRole('button', { name: /Info bearbeiten/ }).click();
     expect(cmp.editOpen()).toBe(true);
     await rerender({ partialUpdate: true, inputs: { info: { ...FILLED, canEdit: true } } });
-    expect(screen.getByRole('button', { name: /Info bearbeiten/ })).toBeTruthy();
+    const edit = screen.getByRole('button', { name: 'Bearbeiten' });
+    expect(screen.queryByRole('button', { name: /Info bearbeiten/ })).toBeNull();
+    const meta = screen.getByText(/Zuletzt geändert/);
+    expect(meta.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.closest('.gi__more')).toBeTruthy();
+    edit.click();
     expect(cmp.empty()).toBe(false);
   });
 

@@ -121,3 +121,6 @@ class MeOut(FrozenModel, frozen=True):
     #: or `ticket.work` in the Gremium of a Bereich. The frontend uses this to show the
     #: work list of the tab "Tickets".
     works_on_tickets: bool = False
+    #: True if the principal is a member of at least one team, an inherent or a free one
+    #: (F/collaboration/teams/003076). The frontend uses this to show the tab "Teams".
+    in_any_team: bool = False

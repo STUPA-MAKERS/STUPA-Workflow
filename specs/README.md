@@ -310,6 +310,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
+| [F/collaboration/committees/003078](requirements/functional/collaboration/committees/003078_info-edit-action.md) | The edit action of a filled Info sits under it | approved |
 | [F/collaboration/events/003022](requirements/functional/collaboration/events/003022_event-element.md) | An Event is an element of its own | approved |
 | [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | approved |
 | [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | approved |
@@ -392,6 +393,8 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/teams/003072](requirements/functional/collaboration/teams/003072_teams-tab.md) | The tab Gremien is the tab Teams | approved |
 | [F/collaboration/teams/003073](requirements/functional/collaboration/teams/003073_permission-board-kind.md) | The board kind of a permission is called permission | approved |
 | [F/collaboration/teams/003074](requirements/functional/collaboration/teams/003074_team-api-mcp.md) | Teams have an API and MCP tools | approved |
+| [F/collaboration/teams/003076](requirements/functional/collaboration/teams/003076_teams-tab-visibility.md) | Every team member sees the tab Teams | approved |
+| [F/collaboration/teams/003077](requirements/functional/collaboration/teams/003077_free-team-info.md) | A free team has an Info tab | approved |
 | [F/collaboration/tickets/000150](requirements/functional/collaboration/tickets/000150_public-report.md) | Anyone can report a help ticket | approved |
 | [F/collaboration/tickets/000313](requirements/functional/collaboration/tickets/000313_reporter-view.md) | A reporter account follows its tickets | approved |
 | [F/collaboration/tickets/000314](requirements/functional/collaboration/tickets/000314_team-work.md) | The team works on tickets | replaced |
