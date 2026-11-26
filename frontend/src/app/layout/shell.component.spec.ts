@@ -299,7 +299,7 @@ describe('ShellComponent', () => {
         'Boards',
         'Kalender',
         'Sitzungen',
-        'Gremien',
+        'Teams',
         'Abstimmungen',
         'Haushalt',
         'Buchungen',

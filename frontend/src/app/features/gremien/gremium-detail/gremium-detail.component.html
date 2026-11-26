@@ -1,12 +1,12 @@
-@if (gremium(); as g) {
+@if (head(); as h) {
   <article class="gd" [class.gd--split]="split()" aria-labelledby="gd-title">
     <header class="gd__head">
       <app-sheet-bar class="gd__bar" [bleed]="split()">
         <div appSheetBarTitle class="gd__titleRow">
-          <app-gremium-logo [name]="g.name" [logoUrl]="g.logoUrl" [size]="phone() ? 'md' : 'lg'" />
-          <h2 id="gd-title" class="sheet-title gd__title">{{ g.name }}</h2>
+          <app-gremium-logo [name]="h.name" [logoUrl]="h.logoUrl" [size]="phone() ? 'md' : 'lg'" />
+          <h2 id="gd-title" class="sheet-title gd__title">{{ h.name }}</h2>
         </div>
-        @if (!phone()) {
+        @if (!phone() && !free()) {
           @if (canSubscribe()) {
             <app-button
               variant="text"
@@ -26,7 +26,7 @@
           }
         }
         <app-row-menu
-          [label]="('gremien.detail.menu' | t) + ': ' + g.name"
+          [label]="('gremien.detail.menu' | t) + ': ' + h.name"
           [sections]="menu()"
           (selected)="onMenu($event, abo)"
         />
@@ -56,7 +56,7 @@
                 [class.gd__grow]="phone()"
                 (click)="openNext()"
               >
-                {{ (g.live ? 'gremien.detail.live' : 'gremien.detail.next') | t }}
+                {{ (gremium()?.live ? 'gremien.detail.live' : 'gremien.detail.next') | t }}
               </app-button>
             }
           </app-button-group>
@@ -83,7 +83,7 @@
             [attr.aria-labelledby]="tabBar.tabId(t.id)"
             [hidden]="tab() !== t.id"
           >
-            <ng-container *ngTemplateOutlet="page; context: { $implicit: t.id, g }" />
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: t.id, g: gremium() }" />
           </section>
         }
       </div>
@@ -99,14 +99,28 @@
       >
         <ng-template appTabPage let-id>
           <section class="gd__panel">
-            <ng-container *ngTemplateOutlet="page; context: { $implicit: id, g }" />
+            <ng-container *ngTemplateOutlet="page; context: { $implicit: id, g: gremium() }" />
           </section>
         </ng-template>
       </app-tab-pager>
     }
 
     <ng-template #page let-id let-g="g">
-      @if (visited().has(id)) {
+      @if (visited().has(id) && free()) {
+        @switch (id) {
+          @case ('members') {
+            <app-team-members [teamId]="team()!.id" [canManage]="canManageTeam()" (changed)="onTeamChanged()" />
+          }
+          @case ('subTeams') {
+            <app-team-sub-teams [teamId]="team()!.id" [canManage]="canManageTeam()" />
+          }
+          @case ('todos') {
+            @if (boardId(); as board) {
+              <app-gremium-todos [gremiumId]="team()!.id" [boardId]="board" />
+            }
+          }
+        }
+      } @else if (visited().has(id) && g) {
         @switch (id) {
           @case ('info') {
             <app-gremium-info
@@ -134,21 +148,44 @@
               <app-gremium-todos [gremiumId]="g.id" [boardId]="board" />
             }
           }
+          @case ('subTeams') {
+            <app-team-sub-teams [teamId]="team()!.id" [canManage]="canManageTeam()" />
+          }
         }
       }
     </ng-template>
   </article>
 
-  @if (canNotify()) {
-    <app-gremium-notify-dialog
-      [open]="notifyOpen()"
-      [gremiumId]="g.id"
-      [gremiumName]="g.name"
-      (closed)="notifyOpen.set(false)"
+  @if (free() && canManageTeam()) {
+    <app-team-name-dialog
+      [(open)]="renameOpen"
+      [renameId]="team()!.id"
+      [current]="h.name"
+      (saved)="onTeamChanged()"
+    />
+    <app-confirm-dialog
+      [open]="deleteOpen()"
+      [title]="'teams.deleteHeading' | t: { name: h.name }"
+      [body]="'teams.deleteBody' | t"
+      [confirmLabel]="'teams.delete' | t"
+      [busy]="deleting()"
+      (confirm)="deleteTeam()"
+      (cancel)="deleteOpen.set(false)"
     />
   }
-  @if (canPlan()) {
-    <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
+
+  @if (gremium(); as g) {
+    @if (canNotify()) {
+      <app-gremium-notify-dialog
+        [open]="notifyOpen()"
+        [gremiumId]="g.id"
+        [gremiumName]="g.name"
+        (closed)="notifyOpen.set(false)"
+      />
+    }
+    @if (canPlan()) {
+      <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
+    }
   }
 } @else if (store.loading()) {
   <article class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
@@ -186,7 +223,7 @@
   </article>
 } @else {
   <div class="gd gd--none" [class.gd--split]="split()" role="alert">
-    <app-empty-state plain icon="landmark"
+    <app-empty-state plain icon="network"
       fill
       [heading]="(store.error() ? 'gremien.list.error' : 'gremien.detail.notFound') | t"
       [body]="store.error() ? null : ('gremien.detail.notFoundBody' | t)"

@@ -130,6 +130,23 @@ class TeamService:
             .tuples()
             .all()
         )
+        free = [t.id for t in infos if t.gremium_id is None]
+        counts = dict(
+            (
+                await self.session.execute(
+                    select(TeamMember.team_id, func.count())
+                    .join(PrincipalRow, PrincipalRow.id == TeamMember.principal_id)
+                    .where(
+                        TeamMember.team_id.in_(free),
+                        PrincipalRow.active.is_(True),
+                        PrincipalRow.merged_into.is_(None),
+                    )
+                    .group_by(TeamMember.team_id)
+                )
+            )
+            .tuples()
+            .all()
+        )
         mine = await self._my_teams(principal)
         return [
             TeamOut(
@@ -139,6 +156,7 @@ class TeamService:
                 parent_id=t.parent_id,
                 parent_name=t.parent_name,
                 board_id=boards.get(t.id),
+                member_count=counts.get(t.id, 0) if t.gremium_id is None else None,
                 is_member=t.id in mine,
                 can_manage=await self.can_manage(t.id, principal),
             )

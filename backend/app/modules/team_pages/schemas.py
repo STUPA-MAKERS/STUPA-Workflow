@@ -17,7 +17,8 @@ class TeamOut(FrozenCamelModel, frozen=True):
 
     ``gremiumId`` marks an inherent team, ``parentId`` a sub-team. ``isMember`` and
     ``canManage`` are the own rights of the caller (``canManage`` includes the admin).
-    ``boardId`` is the own board of the team.
+    ``boardId`` is the own board of the team. ``memberCount`` is the number of active members
+    of a free team; an inherent team leaves it null, because its Gremium carries the count.
     """
 
     id: UUID
@@ -26,6 +27,7 @@ class TeamOut(FrozenCamelModel, frozen=True):
     parent_id: UUID | None = Field(default=None, serialization_alias="parentId")
     parent_name: str | None = Field(default=None, serialization_alias="parentName")
     board_id: UUID | None = Field(default=None, serialization_alias="boardId")
+    member_count: int | None = Field(default=None, serialization_alias="memberCount")
     is_member: bool = Field(default=False, serialization_alias="isMember")
     can_manage: bool = Field(default=False, serialization_alias="canManage")
 

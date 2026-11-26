@@ -1,4 +1,4 @@
-<ul class="be rowgroup" [attr.aria-label]="'todos.entries.title' | t">
+<ul class="be rowgroup" [attr.aria-label]="listLabel() | t">
   @for (entry of entries(); track key(entry)) {
     <li class="be__row">
       @if (entry.kind === 'team') {
@@ -31,11 +31,13 @@
     </li>
   }
 </ul>
-<app-gremium-person-picker
-  class="be__picker"
-  [placeholder]="'todos.entries.add' | t"
-  [teams]="teams()"
-  [persons]="findPeople"
-  [taken]="taken()"
-  (picked)="add($event)"
-/>
+@if (editable()) {
+  <app-gremium-person-picker
+    class="be__picker"
+    [placeholder]="addLabel() | t"
+    [teams]="pickerTeams()"
+    [persons]="findPeople"
+    [taken]="taken()"
+    (picked)="add($event)"
+  />
+}

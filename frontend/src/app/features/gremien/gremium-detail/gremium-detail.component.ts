@@ -15,6 +15,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
 import { GremienApiService, type GremiumInfo, type GremiumOverview } from '@core/api/gremien.service';
+import type { Uuid } from '@core/api/models';
+import { problemCode } from '@core/api/problem';
+import { type Team, TeamsApiService } from '@core/api/teams.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -22,6 +25,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ButtonGroupComponent,
+  ConfirmDialogComponent,
   EmptyStateComponent,
   IconComponent,
   MEDIA,
@@ -36,6 +40,7 @@ import {
   TabPageDirective,
   TabPagerComponent,
   TabsComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -52,13 +57,29 @@ import { GremiumMeetingsComponent } from '../gremium-meetings/gremium-meetings.c
 import { GremiumMembersComponent } from '../gremium-members/gremium-members.component';
 import { GremiumNotifyDialogComponent } from '../gremium-notify-dialog/gremium-notify-dialog.component';
 import { GremiumTodosComponent } from '../gremium-todos/gremium-todos.component';
+import { TeamMembersComponent } from '../team-members/team-members.component';
+import { TeamNameDialogComponent } from '../team-name-dialog/team-name-dialog.component';
+import { TeamSubTeamsComponent } from '../team-sub-teams/team-sub-teams.component';
 
-/** The sub-tabs of a gremium, as they stand in `?tab=`. */
-export const GREMIUM_TABS = ['info', 'meetings', 'members', 'attendance', 'decisions', 'todos'] as const;
+/** The sub-tabs of a team, as they stand in `?tab=`. */
+export const GREMIUM_TABS = [
+  'info',
+  'meetings',
+  'members',
+  'attendance',
+  'decisions',
+  'todos',
+  'subTeams',
+] as const;
 export type GremiumTab = (typeof GREMIUM_TABS)[number];
+/** The sub-tabs of a team without a Gremium (spec 003072), in their order. */
+export const FREE_TEAM_TABS: readonly GremiumTab[] = ['todos', 'members', 'subTeams'];
 
 /**
- * One gremium (`/committees/:id`): the detail sheet beside the list.
+ * One team (`/teams/:id`, spec 003072): the detail sheet beside the list. The page of an
+ * inherent team is the page of its Gremium with the tab Sub-Teams; the page of another team
+ * has the tabs To-Dos (its board), Mitglieder and Sub-Teams, and its ⋮ menu renames or
+ * deletes it for a manager.
  *
  * The header holds the kicker "Gremium · Deine Rolle: X", the calendar subscription, "In
  * der Verwaltung öffnen" (only with `admin.gremien`) and the ⋮ menu; then the logo, the
@@ -105,6 +126,10 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
     GremiumDecisionsComponent,
     GremiumInfoComponent,
     GremiumNotifyDialogComponent,
+    ConfirmDialogComponent,
+    TeamMembersComponent,
+    TeamNameDialogComponent,
+    TeamSubTeamsComponent,
   ],
   templateUrl: './gremium-detail.component.html',
   styleUrl: './gremium-detail.component.scss',
@@ -119,13 +144,27 @@ export class GremiumDetailComponent {
   private readonly todos = inject(TodosApiService);
   private readonly features = inject(FeatureService);
   private readonly gremienApi = inject(GremienApiService);
+  private readonly teamsApi = inject(TeamsApiService);
+  private readonly toast = inject(ToastService);
 
   readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the sheet: the sheet fills the pane and scrolls inside. */
   readonly split = computed(() => this.page?.split() ?? false);
 
-  readonly id = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), {
+  /** The team of the route `/teams/:id`. */
+  readonly teamId = toSignal(this.route.paramMap.pipe(map((p) => p.get('id'))), {
     initialValue: this.route.snapshot.paramMap.get('id'),
+  });
+  readonly team = computed<Team | null>(() => this.store.team(this.teamId()));
+  /** The Gremium of an inherent team, else null. */
+  readonly id = computed<Uuid | null>(() => this.team()?.gremiumId ?? null);
+  /** A team without a Gremium: a free team or a sub-team. */
+  readonly free = computed(() => !!this.team() && !this.team()?.gremiumId);
+  /** The name and the image of the header, for both kinds of team. */
+  readonly head = computed(() => {
+    const t = this.team();
+    const g = this.gremium();
+    return t ? { name: t.name, logoUrl: g?.logoUrl ?? null } : null;
   });
   private readonly tabParam = toSignal(this.route.queryParamMap.pipe(map((q) => q.get('tab'))), {
     initialValue: this.route.snapshot.queryParamMap.get('tab'),
@@ -136,7 +175,7 @@ export class GremiumDetailComponent {
    * The board of the Gremium when the person reads it (spec 000551): `undefined` while it
    * loads, `null` without one. Only then the detail has the tab "To-Dos".
    */
-  readonly boardId = toSignal(
+  private readonly gremiumBoardId = toSignal(
     toObservable(this.id).pipe(
       switchMap((id) =>
         id && this.features.isOn('todos')
@@ -149,6 +188,15 @@ export class GremiumDetailComponent {
     ),
     { initialValue: undefined },
   );
+  /**
+   * The board of the team when the person reads it: for a free team its members and its
+   * managers (spec 003067).
+   */
+  readonly boardId = computed<Uuid | null | undefined>(() => {
+    const t = this.team();
+    if (!t || t.gremiumId) return this.gremiumBoardId();
+    return this.features.isOn('todos') && (t.isMember || t.canManage) ? t.boardId : null;
+  });
   /** A new read of the Info: after a load error and after a 409 of the editor. */
   private readonly infoReads = signal(0);
   /** The Info as loaded: `undefined` while it loads, `null` after a load error. */
@@ -183,6 +231,7 @@ export class GremiumDetailComponent {
   /** The widths of the tab labels in the skeleton: Info, Sitzungen, Mitglieder, Anwesenheit, Beschlüsse. */
   protected readonly skelTabs = ['2rem', '4rem', '4.5rem', '5.5rem', '4.5rem'] as const;
   readonly shownTabs = computed<readonly GremiumTab[]>(() => {
+    if (this.free()) return FREE_TEAM_TABS.filter((t) => t !== 'todos' || this.features.isOn('todos'));
     const on: Record<GremiumTab, boolean> = {
       info: infoTabShown(this.info()),
       meetings: this.features.isOn('meetings'),
@@ -190,6 +239,7 @@ export class GremiumDetailComponent {
       attendance: this.features.isOn('meetings'),
       decisions: this.features.isOn('voting'),
       todos: this.features.isOn('todos'),
+      subTeams: true,
     };
     return GREMIUM_TABS.filter((t) => on[t]);
   });
@@ -217,7 +267,14 @@ export class GremiumDetailComponent {
   /** The facts that are true, in display order. */
   readonly facts = computed<string[]>(() => {
     const g = this.gremium();
-    if (!g) return [];
+    const t = this.team();
+    if (!g) {
+      const parent = t?.parentName ? [this.i18n.translate('teams.subTeamOf', { name: t.parentName })] : [];
+      const role = t?.isMember
+        ? [this.i18n.translate(t.canManage ? 'teams.role.manager' : 'teams.role.member')]
+        : [];
+      return [...role, ...parent];
+    }
     const role = this.roleLabel();
     const i18n = this.i18n;
     return [
@@ -262,7 +319,14 @@ export class GremiumDetailComponent {
   /** The calendar subscription needs `Kalender`. */
   readonly canSubscribe = computed(() => this.features.isOn('calendar'));
 
+  /** Rename or delete: a manager of a free team (spec 003066 for the admin). */
+  readonly canManageTeam = computed(() => !!this.team()?.canManage);
+  readonly renameOpen = signal(false);
+  readonly deleteOpen = signal(false);
+  readonly deleting = signal(false);
+
   readonly menu = computed<RowMenuSection[]>(() => {
+    if (this.free()) return this.freeMenu();
     const g = this.gremium();
     const t = (k: Parameters<I18nService['translate']>[0]) => this.i18n.translate(k);
     const phoneItems = this.phone() ? this.phoneMenu(g, t) : [];
@@ -281,6 +345,21 @@ export class GremiumDetailComponent {
     ];
     return [{ items }];
   });
+
+  /** The ⋮ menu of a free team: the board, and rename and delete for a manager. */
+  private freeMenu(): RowMenuSection[] {
+    const t = (k: TranslationKey) => this.i18n.translate(k);
+    const board: RowMenuItem[] = this.boardId()
+      ? [{ id: 'board', label: t('gremien.detail.openBoard'), icon: 'kanban' }]
+      : [];
+    const manage: RowMenuItem[] = this.canManageTeam()
+      ? [
+          { id: 'rename', label: t('teams.rename'), icon: 'edit' },
+          { id: 'delete', label: t('teams.delete'), icon: 'trash', danger: true },
+        ]
+      : [];
+    return [{ items: [...board, ...manage] }];
+  }
 
   /** The menu items only the phone shows: calendar, the next meeting and the admin page. */
   private phoneMenu(
@@ -312,7 +391,7 @@ export class GremiumDetailComponent {
    */
   constructor() {
     effect(() => {
-      const id = this.id();
+      const id = this.teamId();
       const tab = this.tab();
       const shown = this.shownTabs();
       const i = shown.indexOf(tab);
@@ -328,10 +407,42 @@ export class GremiumDetailComponent {
 
     const frame = inject(PageFrameService);
     effect(() => {
-      const g = this.gremium();
-      frame.crumbLabel.set(g ? { url: `/committees/${g.id}`, label: g.name } : null);
+      const t = this.team();
+      frame.crumbLabel.set(t ? { url: `/teams/${t.id}`, label: t.name } : null);
     });
     inject(DestroyRef).onDestroy(() => frame.crumbLabel.set(null));
+  }
+
+  /** A write of the team changed its name, its members or the own role: read the list again. */
+  onTeamChanged(): void {
+    this.store.reloadTeams();
+  }
+
+  /** Delete a free team after the confirmation; the server refuses one with sub-teams or cards. */
+  deleteTeam(): void {
+    const t = this.team();
+    if (!t) return;
+    this.deleting.set(true);
+    this.teamsApi.remove(t.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.deleteOpen.set(false);
+        this.store.reloadTeams();
+        void this.router.navigate(['/teams']);
+      },
+      error: (err: unknown) => {
+        this.deleting.set(false);
+        this.deleteOpen.set(false);
+        const code = problemCode(err);
+        const key: TranslationKey =
+          code === 'team_has_sub_teams'
+            ? 'teams.toast.hasSubTeams'
+            : code === 'team_board_not_empty'
+              ? 'teams.toast.boardNotEmpty'
+              : 'teams.toast.failed';
+        this.toast.show(this.i18n.translate(key), 'error');
+      },
+    });
   }
 
   selectTab(id: string | null): void {
@@ -371,6 +482,12 @@ export class GremiumDetailComponent {
         break;
       case 'board':
         void this.router.navigate(['/todos', this.boardId()]);
+        break;
+      case 'rename':
+        this.renameOpen.set(true);
+        break;
+      case 'delete':
+        this.deleteOpen.set(true);
         break;
       case 'meetings':
         void this.router.navigate(['/meetings'], { queryParams: { committee: this.id() } });

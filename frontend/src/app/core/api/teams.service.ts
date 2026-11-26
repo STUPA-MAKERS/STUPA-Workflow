@@ -24,6 +24,8 @@ export interface Team {
   readonly parentName: string | null;
   /** The own board of the team. */
   readonly boardId: Uuid | null;
+  /** The active members of a free team; null for an inherent team (its Gremium counts). */
+  readonly memberCount: number | null;
   readonly isMember: boolean;
   readonly canManage: boolean;
 }
@@ -54,5 +56,28 @@ export class TeamsApiService {
 
   detail(teamId: Uuid): Observable<TeamDetail> {
     return this.http.get<TeamDetail>(`${this.base}/${teamId}`, { context: skipLoading() });
+  }
+
+  /** A new free team (null parent: at the top, needs `team.create`); the caller manages it. */
+  create(name: string, parentId: Uuid | null): Observable<TeamDetail> {
+    return this.http.post<TeamDetail>(this.base, { name, parentId });
+  }
+
+  /** Rename a free team, or move a team (`parentId` null: to the top). */
+  patch(teamId: Uuid, body: { readonly name?: string; readonly parentId?: Uuid | null }): Observable<TeamDetail> {
+    return this.http.patch<TeamDetail>(`${this.base}/${teamId}`, body);
+  }
+
+  remove(teamId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${teamId}`);
+  }
+
+  /** Add a person to a free team or change the role. */
+  setMember(teamId: Uuid, principalId: Uuid, role: TeamRole): Observable<TeamDetail> {
+    return this.http.put<TeamDetail>(`${this.base}/${teamId}/members/${principalId}`, { role });
+  }
+
+  removeMember(teamId: Uuid, principalId: Uuid): Observable<TeamDetail> {
+    return this.http.delete<TeamDetail>(`${this.base}/${teamId}/members/${principalId}`);
   }
 }
