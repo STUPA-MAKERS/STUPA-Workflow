@@ -5464,7 +5464,7 @@
   "teams.createSub": "Sub-Team anlegen",
   "teams.createAction": "Anlegen",
   "teams.subTeams.empty": "Keine Sub-Teams",
-  "teams.subTeamOf": "Sub-Team von {name}",
+  "teams.subTeamOf": "↳ {name}",
   "teams.delete": "Team löschen",
   "teams.deleteHeading": "„{name}“ löschen?",
   "teams.deleteBody": "Das Team und sein leeres Board werden gelöscht."

@@ -261,9 +261,9 @@ describe('GremienComponent', () => {
       restore = s.restore;
       expect(s.cmp.mine().map((r) => [r.team.name, r.depth, r.sub])).toEqual([
         ['Studierendenparlament', 0, 'Mitglied · 31 Mitglieder'],
-        ['Presse', 1, 'Mitglied · Sub-Team von StuPa'],
+        ['Presse', 1, '↳ StuPa · Mitglied'],
         ['Ersti-Woche', 0, 'Verwaltung'],
-        ['Party', 1, 'Mitglied · Sub-Team von Ersti-Woche'],
+        ['Party', 1, '↳ Ersti-Woche · Mitglied'],
       ]);
       const party = screen.getByRole('link', { name: 'Party' }).closest('app-list-item') as HTMLElement;
       expect(party.getAttribute('aria-level')).toBe('2');

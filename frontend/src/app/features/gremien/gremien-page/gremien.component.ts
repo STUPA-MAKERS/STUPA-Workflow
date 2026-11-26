@@ -80,7 +80,7 @@ export interface GremiumRow {
  * - Left: the title with the calendar subscription and "Team anlegen" (`team.create`), the
  *   search and, with `gremium.view_all`, the chip "Anzeigen: Meine Teams | Alle Teams". Then
  *   the groups "Meine Teams" and "Weitere Teams", each sub-team right under its parent,
- *   without a step in: its row names the parent ("Sub-Team von AStA", spec 003075 of the kit). The row of an inherent team shows the logo of its Gremium, the role and the number
+ *   without a step in: its row names the parent ("↳ AStA", spec 003075 of the kit). The row of an inherent team shows the logo of its Gremium, the role and the number
  *   of members, and the next meeting ("Läuft", a date or "keine geplant"). The row of
  *   another team shows the own role in it.
  * - Right: the child route `/teams/:id` with the open team (`GremiumDetailComponent`).
@@ -284,7 +284,7 @@ export class GremienComponent {
     if (!item) {
       const role = team.canManage ? 'teams.role.manager' : 'teams.role.member';
       const parent = team.parentName ? this.i18n.translate('teams.subTeamOf', { name: team.parentName }) : '';
-      const sub = [team.isMember ? this.i18n.translate(role) : '', parent].filter(Boolean).join(' · ');
+      const sub = [parent, team.isMember ? this.i18n.translate(role) : ''].filter(Boolean).join(' · ');
       return { team, item: null, depth, sub, next: { kind: 'none' } };
     }
     const locale = this.i18n.uiLocale();

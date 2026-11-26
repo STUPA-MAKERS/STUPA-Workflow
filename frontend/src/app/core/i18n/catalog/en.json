@@ -5464,7 +5464,7 @@
   "teams.createSub": "Create sub-team",
   "teams.createAction": "Create",
   "teams.subTeams.empty": "No sub-teams",
-  "teams.subTeamOf": "Sub-team of {name}",
+  "teams.subTeamOf": "↳ {name}",
   "teams.delete": "Delete team",
   "teams.deleteHeading": "Delete “{name}”?",
   "teams.deleteBody": "The team and its empty board are deleted."

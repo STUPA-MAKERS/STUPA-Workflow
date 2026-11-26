@@ -427,7 +427,7 @@ describe('GremiumDetailComponent', () => {
       const d = s.detail();
       expect(d.free()).toBe(true);
       expect(screen.getByRole('heading', { level: 2, name: 'Ersti-Woche' })).toBeTruthy();
-      expect(d.facts()).toEqual(['Verwaltung', 'Sub-Team von Studierendenparlament']);
+      expect(d.facts()).toEqual(['Verwaltung', '↳ Studierendenparlament']);
       expect(d.tabs().map((t) => t.label)).toEqual(['To-Dos', 'Mitglieder', 'Sub-Teams']);
       expect(d.boardId()).toBe('b-t1');
       expect(s.todos.boards).not.toHaveBeenCalled();
