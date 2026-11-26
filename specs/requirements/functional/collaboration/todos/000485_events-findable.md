@@ -2,12 +2,10 @@
 id: "000485"
 title: Archived Events stay findable
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - backend/app/modules/search/service.py
-  - frontend/src/app/pages/todos/todos.component.ts
+updated: 2026-11-25
+replaced_by: F/collaboration/events/003033
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

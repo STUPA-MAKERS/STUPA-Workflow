@@ -18,6 +18,8 @@ of its own module:
 * order (a Bestellung) — the member read of its Antrag (F/finance/orders/002863): the
   creator and an observer of the Antrag get the short view of the orders routes only, so
   they do not link a Bestellung;
+* event (a Veranstaltung) — a member of its team (F/collaboration/events/003026,
+  ``events.access.event_team_ids``);
 * budget (a cost centre) — every reader of the card sees its name and path key (spec
   000552); the url to the cost centre page and the link picker follow the gate of the
   budget pages (``has_budget_read``), so only a budget reader links one;
@@ -33,7 +35,8 @@ cannot read by the rule of its kind resolves as ``granted`` when a card on a boa
 that the viewer reads links it. A granted target has no url, the card opens it in a
 read-only sheet (``link_view``). The grant stops after one step: it comes only from
 cards that the viewer reads by the board rule, never from a granted card. A ticket, a
-gremium and a Paperless document give no grant. A granted Termin gives its title, its
+gremium, an Event and a Paperless document give no grant: an Event is for the members
+of its team only (003026). A granted Termin gives its title, its
 start, its end and its place only, never its description, its invitations or its
 answers. The link picker and
 the link check of ``POST .../links`` use the rule of the kind only, so a person links
@@ -69,6 +72,8 @@ from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.calendar.appointments import AppointmentService
 from app.modules.calendar.appointments import readable as appointment_readable
 from app.modules.calendar.models import Appointment
+from app.modules.events.access import event_team_ids
+from app.modules.events.models import Event, format_event_number
 from app.modules.flow.models import State
 from app.modules.gremien.models import Gremium
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
@@ -120,7 +125,13 @@ LinkRef = tuple[str, uuid.UUID]
 #: which holds the report of a person outside the team, the gremium, and the cost centre,
 #: which every reader of the card sees anyway, and the Paperless document, which needs
 #: its permission (§F/integrations/paperless/002764).
-GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {"ticket", "gremium", "budget", PAPERLESS}
+GRANT_KINDS: frozenset[str] = frozenset(LINK_KINDS) - {
+    "ticket",
+    "gremium",
+    "budget",
+    "event",
+    PAPERLESS,
+}
 #: The feature that a link kind belongs to; a kind without an entry has no switch.
 LINK_FEATURE: dict[str, Feature] = {
     "meeting": Feature.MEETINGS,
@@ -129,6 +140,7 @@ LINK_FEATURE: dict[str, Feature] = {
     "appointment": Feature.CALENDAR,
     "invoice": Feature.INVOICES,
     "order": Feature.ORDERS,
+    "event": Feature.EVENTS,
     "expense": Feature.BUDGET,
     "budget": Feature.BUDGET,
     "ticket": Feature.TICKETS,
@@ -247,6 +259,24 @@ def _order_target(order: PurchaseOrder) -> Resolved:
     )
 
 
+def _event_target(event: Event) -> Resolved:
+    """An Event; it opens in the pane of the page "Veranstaltungen" (003027)."""
+    return Resolved(
+        accessible=True,
+        title=event.title,
+        url=f"/events?id={event.id}",
+        detail=TodoLinkDetail(
+            number=format_event_number(event.number),
+            date=_iso(event.starts_on),
+            end_date=_iso(event.ends_on),
+            start_time=_iso(event.start_time),
+            end_time=_iso(event.end_time),
+            place=event.place,
+            event_status=event.status,
+        ),
+    )
+
+
 def card_url(card_id: uuid.UUID) -> str:
     """The app route of a card: the card id only.
 
@@ -293,6 +323,7 @@ class LinkResolver:
         self.access = access
         self._meeting_scope: tuple[set[uuid.UUID] | None, set[uuid.UUID]] | None = None
         self._gremium_scope: tuple[set[uuid.UUID] | None] | None = None
+        self._event_teams: dict[str, frozenset[uuid.UUID]] = {}
         #: Paperless did not answer the newest search over all kinds (002766).
         self.paperless_down: bool = False
 
@@ -402,6 +433,7 @@ class LinkResolver:
             "invoice": self._invoices,
             "expense": self._expenses,
             "order": self._orders,
+            "event": self._events,
             "budget": self._budgets,
             "ticket": self._tickets,
             "todo": self._todos,
@@ -791,6 +823,27 @@ class LinkResolver:
         ]
         return {order.id: _order_target(order) for order in readable}
 
+    async def teams_of(self, principal: Principal) -> frozenset[uuid.UUID]:
+        """The teams whose Events the principal reads, cached per request (003026)."""
+        if principal.sub not in self._event_teams:
+            self._event_teams[principal.sub] = await event_team_ids(self.session, principal)
+        return self._event_teams[principal.sub]
+
+    async def _events(
+        self,
+        ids: AbstractSet[uuid.UUID],
+        principal: Principal,
+        open_ids: frozenset[uuid.UUID] = NONE,
+    ) -> dict[uuid.UUID, Resolved]:
+        """Resolve the Events of the teams of the principal."""
+        teams = await self.teams_of(principal)
+        events = (await self.session.scalars(select(Event).where(Event.id.in_(ids)))).all()
+        return {
+            event.id: _event_target(event)
+            for event in events
+            if event.id in open_ids or event.team_id in teams
+        }
+
     async def _reads_as_member(self, application_id: uuid.UUID, principal: Principal) -> bool:
         """Tell whether the principal reads the Antrag in the member view."""
         try:
@@ -966,6 +1019,8 @@ class LinkResolver:
                 return await self._expense_candidates(term, principal)
             case "order":
                 return await self._order_candidates(term, principal)
+            case "event":
+                return await self._event_candidates(pattern, principal)
             case "budget":
                 return await self._budget_candidates(pattern, principal)
             case "ticket":
@@ -1089,6 +1144,26 @@ class LinkResolver:
             principal, OrderFilter(q=term), limit=PER_KIND, offset=0
         )
         return [row.id for row in rows]
+
+    async def _event_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
+        """The Events of the teams of the principal by number, name or place."""
+        teams = await self.teams_of(principal)
+        if not teams:
+            return []
+        stmt = (
+            select(Event.id)
+            .where(
+                Event.team_id.in_(list(teams)),
+                or_(
+                    Event.title.ilike(pattern, escape="\\"),
+                    Event.place.ilike(pattern, escape="\\"),
+                    func.concat("V-", Event.number).ilike(pattern, escape="\\"),
+                ),
+            )
+            .order_by(Event.starts_on.desc().nulls_last(), Event.id)
+            .limit(PER_KIND)
+        )
+        return list((await self.session.scalars(stmt)).all())
 
     async def _budget_candidates(self, pattern: str, principal: Principal) -> list[uuid.UUID]:
         """Cost centres by name or path key, behind the gate of the budget pages."""

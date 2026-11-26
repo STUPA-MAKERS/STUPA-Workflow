@@ -6,14 +6,27 @@
   (save)="save()"
   (discard)="discard()"
 >
+  <ng-template screenGroup="start">
+    <app-select
+      data-testid="status-start"
+      [label]="'admin.statuses.start' | t"
+      [hint]="'admin.statuses.startHint' | t"
+      [clearable]="false"
+      [options]="startOptions()"
+      [error]="startError()"
+      [ngModel]="startValue()"
+      (ngModelChange)="setStart($event)"
+      name="start"
+    />
+  </ng-template>
   <ng-template screenGroup="list">
     <form (submit)="$event.preventDefault(); save()">
       <app-step-list>
-        @for (row of rows(); track $index; let i = $index; let first = $first; let last = $last) {
-          <app-step-row [number]="i + 1" [columns]="columns()" [attr.data-testid]="'status-' + i">
+        @for (row of rows(); track $index; let i = $index) {
+          <app-step-row [columns]="columns()" [attr.data-testid]="'status-' + i">
             <app-input
               stepMain
-              [label]="'admin.statuses.name' | t: { number: i + 1 }"
+              [label]="'admin.statuses.name' | t"
               [required]="true"
               [error]="nameError(row)"
               [ngModel]="name(row)"
@@ -21,17 +34,12 @@
               [name]="'name' + i"
             />
             <span stepActions>
-              <app-move-buttons
-                [upDisabled]="first"
-                [downDisabled]="last"
-                (move)="move(i, $event)"
-              />
               <app-button-group>
                 <app-button
                   variant="text"
                   [iconOnly]="true"
-                  [ariaLabel]="'admin.statuses.remove' | t: { number: i + 1 }"
-                  [title]="'admin.statuses.remove' | t: { number: i + 1 }"
+                  [ariaLabel]="'admin.statuses.remove' | t: { name: name(row) || row.key }"
+                  [title]="'admin.statuses.remove' | t: { name: name(row) || row.key }"
                   (click)="remove(i)"
                 >
                   <app-icon name="trash" />
@@ -40,17 +48,16 @@
             </span>
             <app-select
               stepField
-              [label]="'admin.statuses.phase' | t: { number: i + 1 }"
+              [label]="'admin.statuses.phase' | t"
               [clearable]="false"
               [options]="phaseOptions()"
-              [error]="phaseError(i)"
               [ngModel]="row.phase"
               (ngModelChange)="patch(i, { phase: $event })"
               [name]="'phase' + i"
             />
             <app-select
               stepField
-              [label]="'admin.statuses.tone' | t: { number: i + 1 }"
+              [label]="'admin.statuses.tone' | t"
               [clearable]="false"
               [options]="toneOptions()"
               [ngModel]="row.tone"
@@ -60,7 +67,7 @@
             @if (kind === 'order') {
               <app-select
                 stepField
-                [label]="'admin.statuses.date' | t: { number: i + 1 }"
+                [label]="'admin.statuses.date' | t"
                 [clearable]="false"
                 [options]="dateOptions()"
                 [ngModel]="row.setsDate ?? ''"

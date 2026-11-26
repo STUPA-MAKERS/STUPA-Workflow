@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
@@ -11,7 +11,7 @@ import {
   type OrderStatus,
   OrdersApiService,
 } from '@core/api/orders.service';
-import { type StatusDef, StatusCatalog, nextStatus } from '@core/api/statuses.service';
+import { type StatusDef, StatusCatalog } from '@core/api/statuses.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -20,8 +20,6 @@ import { formatMoney } from '@shared/format-money';
 import { positionValue } from '@shared/forms/positions';
 import {
   type Action,
-  ButtonComponent,
-  ButtonGroupComponent,
   ConfirmDialogComponent,
   DialogBodyDirective,
   DialogComponent,
@@ -32,6 +30,8 @@ import {
   NoteComponent,
   type ScreenHead,
   SectionComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
   ToastService,
   liveSearch,
 } from '@stupa-makers/ui-kit';
@@ -58,7 +58,6 @@ import { OrdersRefresh } from './orders-refresh';
 import {
   ORDER_KIND_LABEL,
   type OrderAction,
-  STATUS_ACTION,
   type OrderFact,
   factRows,
   orderFacts,
@@ -77,10 +76,11 @@ const HEAD_FACTS: readonly TranslationKey[] = [
 /**
  * The detail of one Bestellung in the pane of the page "Bestellungen".
  *
- * The head holds the Bezeichnung, the number, the status and the marks of the invoice and
- * of the bookings. Below it, for a person with `order.manage`, the next status of the
- * status list (spec 003035) is the main button, and every other status and action is in
- * the ⋮ menu. The body shows the fields with the
+ * The head holds the Bezeichnung, the number, the marks of the invoice and of the bookings,
+ * and the status chip only for a person without `order.manage`, because the field "Status"
+ * shows it to the others. Below it, for a person with `order.manage`, the field "Status" is a
+ * dropdown of the status list `order` that saves a pick at once (002870), and the other
+ * actions are in the ⋮ menu. The body shows the fields with the
  * planned price, the real price and their signed difference, the positions of the Antrag
  * that the Bestellung covers, the sum of the Bestellungen of the Antrag against its
  * approved amount (a sum above it warns and blocks nothing), the files, the list
@@ -98,8 +98,6 @@ const HEAD_FACTS: readonly TranslationKey[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslatePipe,
-    ButtonComponent,
-    ButtonGroupComponent,
     ConfirmDialogComponent,
     DetailScreenComponent,
     DialogBodyDirective,
@@ -114,6 +112,7 @@ const HEAD_FACTS: readonly TranslationKey[] = [
     ScreenBodyDirective,
     ScreenCommentsDirective,
     SectionComponent,
+    SelectFieldComponent,
     TodoLinkedListComponent,
     TodoPickDialogComponent,
   ],
@@ -185,10 +184,9 @@ export class OrderDetailComponent {
     return {
       title: order.title,
       kicker: order.number,
-      status: {
-        label: this.catalog.label('order', order.status),
-        kind: this.catalog.tone('order', order.status),
-      },
+      ...(this.canManage()
+        ? {}
+        : { status: { label: this.catalog.label('order', order.status), kind: this.catalog.tone('order', order.status) } }),
       meta: [
         ...(order.kind === 'outlay' ? [{ label: this.i18n.translate(ORDER_KIND_LABEL.outlay) }] : []),
         ...marks.map((label) => ({ label })),
@@ -197,37 +195,26 @@ export class OrderDetailComponent {
     };
   });
 
-  /** The next status of the list: the main button of the detail. */
-  protected readonly step = computed(() => {
-    const order = this.order();
-    const next = order && this.canManage() ? nextStatus(this.statuses(), order.status) : null;
-    return next ? { status: next.key, label: this.toLabel(next) } : null;
-  });
+  /** The statuses of the list `order`, in the order of the list (002870). */
+  protected readonly statusOptions = computed<readonly SelectFieldOption[]>(() =>
+    this.statuses().map((status) => ({ value: status.key, label: this.catalog.name(status) })),
+  );
+
+  /** The pick of the field "Status"; it goes back to the saved status when a pick does not save. */
+  protected readonly statusPick = linkedSignal(() => this.order()?.status ?? '');
 
   protected readonly actions = computed<readonly Action[]>(() => {
     const order = this.order();
     if (!order || !this.canManage()) return [];
     const t = (key: TranslationKey): string => this.i18n.translate(key);
-    const main = this.step()?.status ?? null;
-    const item = (key: OrderAction | 'invoiceUnlink' | `${typeof STATUS_ACTION}${string}`, label: string, more: Partial<Action> = {}): Action => ({
+    const item = (key: OrderAction | 'invoiceUnlink', label: string, more: Partial<Action> = {}): Action => ({
       key,
       label,
       priority: 'menu',
       ...more,
     });
-    const steps = this.statuses()
-      .filter((status) => status.key !== order.status && status.key !== main && status.phase !== 'void')
-      .map((status) =>
-        item(`${STATUS_ACTION}${status.key}`, this.toLabel(status), {
-          icon: status.phase === 'done' ? 'check' : 'send',
-        }),
-      );
-    const voids = this.statuses()
-      .filter((status) => status.key !== order.status && status.phase === 'void')
-      .map((status) => item(`${STATUS_ACTION}${status.key}`, this.toLabel(status), { icon: 'x' }));
     const book = this.auth.can('budget.book');
     return [
-      ...steps,
       ...(this.auth.canAny(...BUDGET_PERMISSIONS)
         ? [item('invoiceLink', t('orders.menu.invoiceLink'), { icon: 'link' })]
         : []),
@@ -251,7 +238,6 @@ export class OrderDetailComponent {
         priority: 'head',
         route: { commands: ['/orders', order.id, 'edit'] },
       }),
-      ...voids,
       item('delete', t('action.delete'), { icon: 'trash', kind: 'danger' }),
     ];
   });
@@ -420,7 +406,6 @@ export class OrderDetailComponent {
   protected onAction(key: string): void {
     const order = this.order();
     if (!order) return;
-    if (key.startsWith(STATUS_ACTION)) return this.pickStatus(order, key.slice(STATUS_ACTION.length));
     switch (key as OrderAction | 'invoiceUnlink') {
       case 'delete':
         return this.deleting.set(true);
@@ -438,14 +423,21 @@ export class OrderDetailComponent {
     }
   }
 
-  /** Set a status; one of the phase `void` asks first while the Bestellung has a booking. */
-  private pickStatus(order: Order, key: string): void {
+  /** A pick of the field "Status"; one of the phase `void` asks first while the Bestellung has a booking. */
+  protected pickStatus(key: string): void {
+    const order = this.order();
+    if (!order || key === order.status) return;
     const status = this.catalog.find('order', key);
     if (status?.phase === 'void' && Number(order.bookedAmount) > 0) {
       this.cancelling.set(status);
       return;
     }
     this.setStatus(key);
+  }
+
+  protected keepStatus(): void {
+    this.cancelling.set(null);
+    this.statusPick.set(this.order()?.status ?? '');
   }
 
   protected confirmCancel(): void {
@@ -578,6 +570,7 @@ export class OrderDetailComponent {
   /** A write failed: say why, and read again after a change of another person. */
   private fail(err: { error?: { code?: string } | null }): void {
     this.busy.set(false);
+    this.statusPick.set(this.order()?.status ?? '');
     const stale = err.error?.code === 'order_version_conflict';
     this.toast.show(this.i18n.translate(stale ? 'orders.error.version' : 'orders.error.save'), 'error');
     if (stale) this.load();

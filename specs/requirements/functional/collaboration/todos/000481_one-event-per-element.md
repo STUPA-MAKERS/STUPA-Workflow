@@ -6,8 +6,8 @@ status: approved
 owner: frederikbeimgraben
 updated: 2026-11-10
 implementation:
-  - backend/app/modules/todos/events.py
-  - backend/app/modules/todos/service/card_events.py
+  - backend/app/modules/events/facts.py
+  - backend/app/modules/events/service.py
   - backend/app/modules/todos/service/base.py
 scope:
   - backend/app/modules/todos

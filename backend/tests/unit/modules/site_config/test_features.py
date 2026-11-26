@@ -164,6 +164,8 @@ def test_uses_of_keeps_the_uses_of_the_given_features() -> None:
         ("/api/invoices/{invoice_id}/file", {Feature.INVOICES}),
         ("/api/invoices/{invoice_id}/orders", {Feature.INVOICES, Feature.ORDERS}),
         ("/api/orders", {Feature.ORDERS}),
+        ("/api/events", {Feature.EVENTS}),
+        ("/api/events/{event_id}/status", {Feature.EVENTS}),
         ("/api/orders/{order_id}/attachments/{attachment_id}", {Feature.ORDERS}),
         ("/api/applications/{application_id}/orders", {Feature.ORDERS}),
         ("/api/tickets/mine", {Feature.TICKETS}),
@@ -211,6 +213,7 @@ def test_every_route_of_the_app_is_in_the_expected_feature() -> None:
     assert all(
         p.startswith("/api/orders") or p.endswith("/orders") for p in by_feature[Feature.ORDERS]
     )
+    assert all(p.startswith("/api/events") for p in by_feature[Feature.EVENTS])
     assert all(p.startswith("/api/tickets") for p in by_feature[Feature.TICKETS])
     assert all(p.startswith("/api/activity") for p in by_feature[Feature.ACTIVITY])
     assert all(p.startswith("/api/graph") for p in by_feature[Feature.GRAPH])

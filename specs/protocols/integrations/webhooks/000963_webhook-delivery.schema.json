@@ -27,6 +27,10 @@
         "invoice.created",
         "order.created",
         "order.status_changed",
+        "event.created",
+        "event.updated",
+        "event.status_changed",
+        "event.deleted",
         "ticket.created",
         "ticket.message",
         "ticket.status",
@@ -89,6 +93,11 @@
     },
     "orderId": {
       "description": "The ID of the Bestellung.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventId": {
+      "description": "The ID of the Veranstaltung.",
       "type": "string",
       "format": "uuid"
     },
@@ -305,6 +314,25 @@
         "required": [
           "orderId",
           "applicationId"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "enum": [
+              "event.created",
+              "event.updated",
+              "event.status_changed",
+              "event.deleted"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "eventId"
         ]
       }
     },

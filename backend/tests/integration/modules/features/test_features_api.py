@@ -68,6 +68,12 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
         ("GET", "/api/orders/pending-applications"),
         ("GET", f"/api/applications/{uuid.uuid4()}/orders"),
     ),
+    #: §F/collaboration/events/003022.
+    Feature.EVENTS: (
+        ("GET", "/api/events"),
+        ("POST", "/api/events"),
+        ("GET", "/api/events/refs"),
+    ),
     Feature.TICKETS: (("GET", "/api/tickets"), ("POST", "/api/tickets")),
     Feature.GRAPH: (("GET", "/api/graph"),),
     Feature.PUSH: (("GET", "/api/push/key"), ("GET", "/api/push/devices")),

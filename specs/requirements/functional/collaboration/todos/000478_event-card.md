@@ -2,15 +2,10 @@
 id: "000478"
 title: An Event is a card with event data
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - backend/app/modules/todos/models.py
-  - backend/app/modules/todos/events.py
-  - backend/app/modules/todos/service/card_events.py
-  - backend/app/modules/todos/service/base.py
-  - frontend/src/app/features/todos/card-detail/todo-card-detail.component.ts
+updated: 2026-11-25
+replaced_by: F/collaboration/events/003022
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

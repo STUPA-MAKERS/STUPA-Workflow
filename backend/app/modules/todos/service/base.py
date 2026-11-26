@@ -14,7 +14,6 @@ from app.modules.auth.people import person_refs
 from app.modules.auth.principal import Principal
 from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
-from app.modules.todos import events as todo_events
 from app.modules.todos import link_store
 from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.grouping import grouped
@@ -30,10 +29,9 @@ from app.modules.todos.models import (
     TodoColumn,
     TodoComment,
     TodoEvent,
-    TodoEventSeries,
     TodoLabel,
 )
-from app.modules.todos.schemas import EventIn, TodoBoardOut, TodoCardTile
+from app.modules.todos.schemas import TodoBoardOut, TodoCardTile
 from app.modules.todos.service.common import (
     CardLink,
     MailKind,
@@ -299,10 +297,6 @@ class TodoServiceBase:
             self.session, {pid for pids in assignees.values() for pid in pids}
         )
         links, resolved = await self._card_links(set(ids), link_rows, principal)
-        events = await todo_events.event_rows(self.session, ids)
-        series = await todo_events.series_names(
-            self.session, (row.series_id for row in events.values())
-        )
         return _Facts(
             labels=grouped((card_id, label_id) for card_id, label_id in label_rows),
             assignees=assignees,
@@ -311,8 +305,6 @@ class TodoServiceBase:
             links=links,
             people=people,
             resolved=resolved,
-            events=events,
-            series=series,
         )
 
     async def _card_links(
@@ -413,40 +405,6 @@ class TodoServiceBase:
             raise _invalid(
                 "Assignees must be members of the board.", "assignee_not_allowed", "assigneeIds"
             )
-
-    async def _check_event(self, board: TodoBoard, payload: EventIn) -> None:
-        """Check the event data of a card on ``board``.
-
-        Raises:
-            ValidationProblem: ``event_personal_board`` (a personal board has no Events),
-                ``event_dates_invalid`` (an end without a start or before the start),
-                ``event_time_without_date`` (a time without its date) or
-                ``series_not_found`` (HTTP 422).
-        """
-        if board.kind == "personal":
-            raise _invalid(
-                "A card on a personal board cannot be an Event.", "event_personal_board", "event"
-            )
-        if payload.ends_on is not None and (
-            payload.starts_on is None or payload.ends_on < payload.starts_on
-        ):
-            raise _invalid("The end is before the start.", "event_dates_invalid", "endsOn")
-        if (payload.start_time is not None and payload.starts_on is None) or (
-            payload.end_time is not None and payload.ends_on is None
-        ):
-            raise _invalid("A time needs its date.", "event_time_without_date", "startTime")
-        if (
-            payload.start_time is not None
-            and payload.end_time is not None
-            and payload.ends_on == payload.starts_on
-            and payload.end_time < payload.start_time
-        ):
-            raise _invalid("The end is before the start.", "event_dates_invalid", "endTime")
-        if (
-            payload.series_id is not None
-            and await self.session.get(TodoEventSeries, payload.series_id) is None
-        ):
-            raise _invalid("The series was not found.", "series_not_found", "seriesId")
 
     async def _shared_boards(self, principal: Principal) -> list[TodoBoard]:
         """The live team, free and permission boards that the principal reads."""

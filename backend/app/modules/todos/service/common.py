@@ -18,7 +18,6 @@ from app.modules.todos.models import (
     TodoBoard,
     TodoBoardEntry,
     TodoCard,
-    TodoCardEvent,
     TodoColumn,
 )
 from app.shared.errors import ConflictError, ValidationProblem
@@ -114,8 +113,6 @@ class _Facts:
     links: Mapping[uuid.UUID, tuple[CardLink, ...]] = field(default_factory=dict)
     people: Mapping[uuid.UUID, PersonRef] = field(default_factory=dict)
     resolved: Mapping[tuple[str, uuid.UUID], Resolved] = field(default_factory=dict)
-    events: Mapping[uuid.UUID, TodoCardEvent] = field(default_factory=dict)
-    series: Mapping[uuid.UUID, str] = field(default_factory=dict)
 
 
 def _uuid_of(value: object) -> uuid.UUID | None:

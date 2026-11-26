@@ -10,6 +10,7 @@ export const FEATURES = [
   'budget',
   'invoices',
   'orders',
+  'events',
   'tickets',
   'graph',
   'public',

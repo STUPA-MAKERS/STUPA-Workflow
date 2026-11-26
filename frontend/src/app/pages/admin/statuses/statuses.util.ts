@@ -16,6 +16,8 @@ export interface StatusRow {
   readonly tone: StatusTone;
   readonly phase: StatusPhase;
   readonly setsDate: StatusDate | null;
+  /** The start status of a new element; exactly one row of the kind `open` (spec 003040). */
+  readonly start: boolean;
   /** The number of elements with the stored status; 0 for a new row. */
   readonly used: number;
   /** A new row: its key comes from its name at the save. */
@@ -46,6 +48,7 @@ export function rowOf(status: StatusDef): StatusRow {
     tone: status.tone,
     phase: status.phase,
     setsDate: status.setsDate ?? null,
+    start: status.start,
     used: status.used ?? 0,
     fresh: false,
   };
@@ -63,6 +66,7 @@ export function newRow(): StatusRow {
     tone: 'neutral',
     phase: 'open',
     setsDate: null,
+    start: false,
     used: 0,
     fresh: true,
   };
@@ -130,21 +134,27 @@ export function missingPhases(rows: readonly StatusRow[]): readonly StatusPhase[
   return STATUS_PHASES.filter((phase) => !rows.some((row) => row.phase === phase));
 }
 
-/** The list breaks no rule: names, the first status open, each phase, each replacement. */
+/** The start row, when exactly one row is the start and has the kind `open`. */
+export function startRow(rows: readonly StatusRow[]): StatusRow | null {
+  const starts = rows.filter((row) => row.start);
+  return starts.length === 1 && starts[0].phase === 'open' ? starts[0] : null;
+}
+
+/** The list breaks no rule: names, one open start status, each kind, each replacement. */
 export function listValid(draft: ListDraft, stored: readonly StatusDef[], lang: string): boolean {
   const keys = new Set(rowKeys(draft.rows, lang, stored));
   return (
     draft.rows.length >= STATUS_PHASES.length &&
     draft.rows.every((row) => nameText(row.name, lang).trim() !== '') &&
-    draft.rows[0]?.phase === 'open' &&
+    startRow(draft.rows) !== null &&
     missingPhases(draft.rows).length === 0 &&
     removedInUse(stored, draft.rows).every((r) => keys.has(draft.replacements[r.key] ?? ''))
   );
 }
 
 /**
- * The body of the save. The first status is the start status of a new element, and the
- * date applies only to the list of the Bestellungen (spec 003037).
+ * The body of the save, in the order in which the statuses were added. The date applies only
+ * to the list of the Bestellungen (spec 003037).
  */
 export function bodyOf(
   kind: StatusListKind,
@@ -160,7 +170,7 @@ export function bodyOf(
       name: Object.fromEntries(Object.entries(row.name).map(([code, text]) => [code, text.trim()])),
       tone: row.tone,
       phase: row.phase,
-      start: i === 0,
+      start: row.start,
       ...(kind === 'order' && row.setsDate ? { setsDate: row.setsDate } : {}),
     })),
     replacements: Object.fromEntries(
@@ -204,15 +214,4 @@ export function elementsOf(row: StatusRow, list: ListDraft, stored: readonly Sta
   return Object.entries(list.replacements)
     .filter(([, target]) => target === row.key)
     .reduce((sum, [from]) => sum + (used.get(from) ?? 0), row.used);
-}
-
-/** Move a row one place up (-1) or down (1). */
-export function moveRow(
-  rows: readonly StatusRow[],
-  index: number,
-  by: -1 | 1,
-): readonly StatusRow[] {
-  const to = index + by;
-  if (to < 0 || to >= rows.length) return rows;
-  return rows.map((row, i) => (i === index ? rows[to] : i === to ? rows[index] : row));
 }

@@ -31,6 +31,7 @@ export const KIND_FEATURE: Readonly<Partial<Record<GraphKind, FeatureKey>>> = {
   appointment: 'calendar',
   invoice: 'invoices',
   order: 'orders',
+  event: 'events',
   expense: 'budget',
   budget: 'budget',
   ticket: 'tickets',

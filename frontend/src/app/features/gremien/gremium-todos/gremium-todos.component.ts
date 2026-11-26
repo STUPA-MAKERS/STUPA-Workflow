@@ -54,8 +54,6 @@ export function openCards(board: TodoBoard): readonly TodoLinkedCard[] {
       isDone: false,
       dueDate: c.dueDate,
       assignees: c.assignees,
-      event: c.event,
-      balance: null,
     })),
   );
 }

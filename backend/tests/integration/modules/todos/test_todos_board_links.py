@@ -112,12 +112,6 @@ async def test_due_cards_of_the_assignee_are_in_the_feed(
         mine = card("Raum buchen", dueDate="2026-11-20", assigneeIds=[str(pid)])
         card("Ohne Datum", assigneeIds=[str(pid)])
         card("Für Bea", dueDate="2026-11-21", assigneeIds=[str(oid)])
-        card(
-            "Fest",
-            dueDate="2026-11-22",
-            assigneeIds=[str(pid)],
-            event={"startsOn": "2026-11-22"},
-        )
         finished = card("Erledigt bald", dueDate="2026-11-23", assigneeIds=[str(pid)])
         _ok(client.post(f"/api/todos/cards/{finished['id']}/move", json={"columnId": done}))
 

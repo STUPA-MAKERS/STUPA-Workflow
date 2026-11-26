@@ -69,8 +69,8 @@ describe('GraphApiService', () => {
     req.flush({ nodes: [], edges: [], nextCursor: null });
   });
 
-  it('lists the thirteen kinds and the three choices of the relations', () => {
-    expect(GRAPH_KINDS).toHaveLength(13);
+  it('lists the fourteen kinds and the three choices of the relations', () => {
+    expect(GRAPH_KINDS).toHaveLength(14);
     expect(GRAPH_RELATIONS).toEqual(['all', 'links', 'builtin']);
   });
 });

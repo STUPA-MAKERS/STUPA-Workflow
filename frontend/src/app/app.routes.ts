@@ -6,6 +6,7 @@ import { featureMatch } from '@core/features/feature.guard';
 import { FeatureService } from '@core/features/feature.service';
 import { leaveUnsaved } from '@stupa-makers/ui-kit';
 import { ShellComponent } from './layout/shell.component';
+import { eventAddress } from './pages/events/event-address.guard';
 import { orderAddress } from './pages/orders/order-address.guard';
 import {
   ADMIN_AREA_PERMISSIONS,
@@ -437,6 +438,40 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'events',
+        canMatch: [featureMatch('events')],
+        data: { title: 'nav.events', wide: true },
+        canActivate: [authGuard, eventAddress],
+        loadComponent: () =>
+          import('./pages/events/events-page.component').then((m) => m.EventsPageComponent),
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            data: { none: { icon: 'mappin', heading: '', emptyHeading: '' } },
+            loadComponent: () =>
+              import('./pages/events/event-none').then((m) => m.EventNoneComponent),
+          },
+          {
+            path: 'new',
+            canDeactivate: [leaveUnsaved],
+            loadComponent: () =>
+              import('./pages/events/event-form.component').then((m) => m.EventFormComponent),
+          },
+          {
+            path: ':id/edit',
+            canDeactivate: [leaveUnsaved],
+            loadComponent: () =>
+              import('./pages/events/event-form.component').then((m) => m.EventFormComponent),
+          },
+          {
+            path: ':id',
+            loadComponent: () =>
+              import('./pages/events/event-detail.component').then((m) => m.EventDetailComponent),
+          },
+        ],
+      },
+      {
         path: 'invoices',
         canMatch: [featureMatch('invoices')],
         data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
@@ -785,11 +820,11 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'order-phases',
+            path: 'order-statuses',
             canMatch: [featureMatch('orders')],
             data: {
               title: 'admin.statuses.title.order',
-              permission: 'admin.order_phases',
+              permission: 'admin.order_statuses',
               parent: ['admin'],
               statusList: 'order',
             },
@@ -800,10 +835,10 @@ export const routes: Routes = [
               ),
           },
           {
-            path: 'event-phases',
+            path: 'event-statuses',
             data: {
               title: 'admin.statuses.title.event',
-              permission: 'admin.event_phases',
+              permission: 'admin.event_statuses',
               parent: ['admin'],
               statusList: 'event',
             },

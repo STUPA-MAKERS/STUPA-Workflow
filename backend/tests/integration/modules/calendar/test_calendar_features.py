@@ -22,7 +22,12 @@ from app.modules.meetings.models import Meeting
 from app.modules.site_config.features import FeatureSwitches
 from app.modules.site_config.models import SiteConfigVersion
 from tests.integration.modules.calendar.conftest import CalendarApi
-from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
+from tests.integration.modules.todos.conftest import (
+    add_gremium,
+    add_member,
+    add_person,
+    team_of,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -56,6 +61,7 @@ async def test_the_calendar_omits_the_entries_of_a_feature_that_is_off(
     anna, anna_id = await add_person(maker, "Anna")
     stupa, board = await add_gremium(maker, "StuPa")
     await add_member(maker, stupa, anna_id, "todo.write")
+    team = await team_of(maker, stupa)
     async with maker() as session:
         await session.execute(
             update(Gremium).where(Gremium.id == stupa).values(protocols_public=True)
@@ -75,10 +81,13 @@ async def test_the_calendar_omits_the_entries_of_a_feature_that_is_off(
         cards = "/api/todos/cards"
         card = {"boardId": str(board), "title": "Bericht Mai", "dueDate": "2031-05-08"}
         assert client.post(cards, json=card).status_code == 201
-        fest = client.post(cards, json={"boardId": str(board), "title": "Maifest"})
-        assert fest.status_code == 201
-        event = {"startsOn": "2031-05-30", "endsOn": "2031-05-30"}
-        assert client.put(f"{cards}/{fest.json()['id']}/event", json=event).status_code == 200
+        event = {
+            "teamId": str(team),
+            "title": "Maifest",
+            "startsOn": "2031-05-30",
+            "endsOn": "2031-05-30",
+        }
+        assert client.post("/api/events", json=event).status_code == 201
 
         def seen() -> tuple[list[str], list[str], list[str]]:
             return (
@@ -98,7 +107,10 @@ async def test_the_calendar_omits_the_entries_of_a_feature_that_is_off(
             assert await feed.member_meetings(session, anna.sub) == []
 
         await _switch(maker, todos=False)
-        assert seen() == (["meeting"], ["meeting"], ["meeting"])
+        assert seen() == (["event", "meeting"], ["event", "meeting"], ["meeting"])
+
+        await _switch(maker, events=False)
+        assert seen() == (["card", "meeting"], ["card", "meeting"], ["meeting"])
 
         await _switch(maker)
         assert seen() == (every, every, ["meeting"])

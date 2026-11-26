@@ -30,8 +30,8 @@ Layout of the package:
     Pure serialization into the API schemas.
 ``base``
     Access, locks, lookups, events, pings and mails that every ops class shares.
-``boards``, ``columns``, ``details``, ``cards``, ``card_parts``, ``card_events``,
-``comments``, ``reads``, ``calendar_reads``
+``boards``, ``columns``, ``details``, ``cards``, ``card_parts``, ``comments``,
+``reads``, ``calendar_reads``
     The ops classes, one concern each.
 ``service``
     The `TodoService` facade that combines them.

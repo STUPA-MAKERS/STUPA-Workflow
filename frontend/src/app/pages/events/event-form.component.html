@@ -1,0 +1,12 @@
+<app-form-screen
+  [head]="{ title: title() }"
+  [icon]="editing() ? 'edit' : 'mappin'"
+  [subtitle]="event()?.number ?? ''"
+  [form]="form()"
+  [value]="value()"
+  [errors]="errors()"
+  [submit]="{ label: 'action.save' | t, busy: saving() }"
+  (valueChange)="onValue($event)"
+  (submit)="save($event)"
+  (cancel)="close()"
+/>

@@ -4,7 +4,6 @@ import {
   elementsOf,
   keyOf,
   listValid,
-  moveRow,
   nameText,
   newRow,
   removeRow,
@@ -38,9 +37,6 @@ describe('statuses.util', () => {
       'storniert_2',
       'storniert_3',
     ]);
-    const rows = [fresh, { ...fresh, key: 'a', fresh: false }];
-    expect(moveRow(rows, 1, -1)).toEqual([rows[1], rows[0]]);
-    expect(moveRow(rows, 0, -1)).toBe(rows);
   });
 });
 
@@ -95,7 +91,7 @@ describe('the rules of a list', () => {
     expect(keyOf('x', taken)).toBe('x_100');
   });
 
-  it('refuses an empty name, an open-less start and a missing replacement', () => {
+  it('refuses an empty name, a start that is not one open row and a missing replacement', () => {
     const stored = DEFAULT_STATUS_LISTS.event.map((s) => ({ ...s, used: 1 }));
     const list = draftOf(stored);
     expect(listValid(list, stored, 'de')).toBe(true);
@@ -107,6 +103,12 @@ describe('the rules of a list', () => {
       ),
     ).toBe(false);
     expect(listValid({ ...list, rows: [...list.rows.slice(1), list.rows[0]] }, stored, 'de')).toBe(
+      true,
+    );
+    expect(
+      listValid({ ...list, rows: list.rows.map((r) => ({ ...r, start: r.key === 'cancelled' })) }, stored, 'de'),
+    ).toBe(false);
+    expect(listValid({ ...list, rows: list.rows.map((r) => ({ ...r, start: true })) }, stored, 'de')).toBe(
       false,
     );
     const fewer = {

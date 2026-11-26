@@ -20,11 +20,13 @@ import type {
   FiscalYear,
   Invoice,
 } from '../budget/budget-tree.api';
+import { EventsApiService } from '@core/api/events.service';
 import { TodosApiService } from '@core/api/todos.service';
 import { kindSpies } from '../../../testing/toast';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
-const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), links: () => of({ canLink: false, links: [] }), boards: () => of([]) };
+const EVENTS_API = { linked: () => of([]), links: () => of({ canLink: false, links: [] }), boards: () => of([]) };
+const EVENT_REFS = { refs: () => of([]) };
 
 /**
  * An `ActivatedRoute` carrying query params.
@@ -119,6 +121,7 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: Budget
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
       { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book']) },
     ],
   });
@@ -239,6 +242,7 @@ function build(
       { provide: ActivatedRoute, useValue: routeStub([]) },
       { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
       {
         provide: AuthService,
         useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'finance.export']),
@@ -1561,6 +1565,7 @@ describe('ExpensesComponent (infinite scroll)', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });
@@ -1955,6 +1960,7 @@ describe('ExpensesComponent (query-param adoption)', () => {
         { provide: ActivatedRoute, useValue: routeStub(query) },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });
@@ -2194,6 +2200,7 @@ describe('ExpensesComponent (query-param adoption)', () => {
         },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });
@@ -2249,6 +2256,7 @@ describe('ExpensesListState.refresh', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
       ],
     });
     const http = TestBed.inject(HttpTestingController);
@@ -3084,6 +3092,7 @@ describe('ExpensesComponent (list/detail)', () => {
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['invoice', 'inv-1']]) },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });
@@ -3119,6 +3128,7 @@ describe('ExpensesComponent (list/detail)', () => {
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking']]) },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view']) },
       ],
     });
@@ -3149,6 +3159,7 @@ describe('ExpensesComponent (list/detail)', () => {
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['order', 'o-1']]) },
         { provide: USE_MOCK_API, useValue: false },
         { provide: TodosApiService, useValue: EVENTS_API },
+        { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });
@@ -3284,6 +3295,7 @@ describe('ExpensesComponent (list/detail)', () => {
         { provide: ActivatedRoute, useValue: routeStub([['view', 'transfers'], ['transfer', 'tr-1']]) },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
     });

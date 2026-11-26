@@ -1,80 +1,107 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
-import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
-import { detail, link } from '../../../testing/todo-fixtures';
+import { of, throwError } from 'rxjs';
+import { EventsApiService } from '@core/api/events.service';
+import { TodosApiService } from '@core/api/todos.service';
+import { linkRow } from '../../../testing/todo-fixtures';
 import { EventLinkState } from './event-link.state';
 import { TodoLinkedRefresh } from './linked-list/todo-linked-refresh';
 
-const EVENT = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: null, seriesId: null, seriesName: null };
+const OLD = linkRow({ id: 'l-7', kind: 'event', targetId: 'ev-old', title: 'Sommerfest' });
 
-function linkedEvent(): TodoLinkedCard {
-  return {
-    id: 'ev-old',
-    boardId: 'b-9',
-    boardName: 'AStA',
-    title: 'Sommerfest',
-    columnName: 'Offen',
-    isDone: false,
-    dueDate: null,
-    assignees: [],
-    event: EVENT,
-    balance: '0.00',
-  };
-}
-
-function setup(linked: TodoLinkedCard[] = []) {
+function setup(links = [OLD], fail = false) {
   localStorage.setItem('ap.locale', 'de');
-  const api = {
-    writableEvents: jest.fn(() =>
-      of([{ id: 'ev-1', boardId: 'b-1', boardName: 'StuPa', title: 'Erstiparty', startsOn: '2026-11-20', endsOn: null }]),
+  const events = {
+    refs: jest.fn(() =>
+      fail
+        ? throwError(() => ({ status: 500 }))
+        : of([
+            { id: 'ev-1', number: 'V-1', title: 'Erstiparty', teamName: 'Kultur', startsOn: '2026-11-20', endsOn: null, startTime: null, endTime: null },
+          ]),
     ),
-    linked: jest.fn(() => of(linked)),
-    card: jest.fn(() => of(detail({ id: 'ev-old', links: [link({ id: 'l-7', kind: 'expense', targetId: 'x-1' })] }))),
-    addLink: jest.fn(() => of(detail())),
-    removeLink: jest.fn(() => of(detail())),
   };
-  TestBed.configureTestingModule({ providers: [{ provide: TodosApiService, useValue: api }] });
+  const api = {
+    links: jest.fn(() => (fail ? throwError(() => ({ status: 500 })) : of({ canLink: true, links }))),
+    link: jest.fn(() => of({ canLink: true, links: [linkRow({ id: 'l-9', kind: 'expense', targetId: 'x-1' })] })),
+    unlink: jest.fn(() => of(undefined)),
+  };
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: TodosApiService, useValue: api },
+      { provide: EventsApiService, useValue: events },
+    ],
+  });
   const state = TestBed.runInInjectionContext(() => new EventLinkState());
   const touched = jest.spyOn(TestBed.inject(TodoLinkedRefresh), 'touch');
-  return { api, state, touched };
+  return { api, events, state, touched };
 }
 
 describe('EventLinkState', () => {
-  it('lists the writable Events and links the picked one to a new booking (spec 000480)', () => {
+  afterEach(() => localStorage.clear());
+
+  /** §F/collaboration/events/003033: the picker lists the Events that the person writes. */
+  it('lists the open Events and links the picked one to a new booking', () => {
     const { api, state, touched } = setup();
     state.load(null);
     expect(state.options()).toEqual([
       { value: '', label: 'Keine Veranstaltung' },
-      { value: 'ev-1', label: 'Erstiparty · 20.11.2026 · StuPa' },
+      { value: 'ev-1', label: 'Erstiparty · 20.11.2026 · Kultur' },
     ]);
-    expect(api.linked).not.toHaveBeenCalled();
+    expect(api.links).not.toHaveBeenCalled();
     state.value.set('ev-1');
+    expect(state.changed()).toBe(true);
     state.apply('x-1').subscribe();
-    expect(api.addLink).toHaveBeenCalledWith('ev-1', 'expense', 'x-1');
-    expect(api.removeLink).not.toHaveBeenCalled();
-    expect(touched).toHaveBeenCalledWith([{ kind: 'expense', targetId: 'x-1' }]);
+    expect(api.link).toHaveBeenCalledWith({ kind: 'event', id: 'ev-1' }, { kind: 'expense', id: 'x-1' });
+    expect(api.unlink).not.toHaveBeenCalled();
+    expect(touched).toHaveBeenCalledWith([
+      { kind: 'expense', targetId: 'x-1' },
+      { kind: 'event', targetId: 'ev-1' },
+    ]);
     expect(state.changed()).toBe(false);
   });
 
   it('moves the link of an edited booking from its Event to another, and sends nothing without a change', () => {
-    const { api, state } = setup([linkedEvent()]);
+    const { api, state, touched } = setup();
     state.load('x-1');
+    expect(api.links).toHaveBeenCalledWith('expense', 'x-1');
     expect(state.value()).toBe('ev-old');
-    expect(state.options()[1]).toEqual({ value: 'ev-old', label: 'Sommerfest · AStA' });
+    expect(state.options()[1]).toEqual({ value: 'ev-old', label: 'Sommerfest' });
     state.apply('x-1').subscribe();
-    expect(api.addLink).not.toHaveBeenCalled();
+    expect(api.link).not.toHaveBeenCalled();
     state.value.set('ev-1');
     state.apply('x-1').subscribe();
-    expect(api.removeLink).toHaveBeenCalledWith('ev-old', 'l-7');
-    expect(api.addLink).toHaveBeenCalledWith('ev-1', 'expense', 'x-1');
+    expect(api.unlink).toHaveBeenCalledWith('l-7');
+    expect(api.link).toHaveBeenCalledWith({ kind: 'event', id: 'ev-1' }, { kind: 'expense', id: 'x-1' });
+    expect(touched).toHaveBeenCalledWith([
+      { kind: 'expense', targetId: 'x-1' },
+      { kind: 'event', targetId: 'ev-old' },
+      { kind: 'event', targetId: 'ev-1' },
+    ]);
   });
 
   it('removes the link when the pick goes back to none', () => {
-    const { api, state } = setup([linkedEvent()]);
+    const { api, state } = setup();
     state.load('x-1');
     state.value.set('');
     state.apply('x-1').subscribe();
-    expect(api.removeLink).toHaveBeenCalledWith('ev-old', 'l-7');
-    expect(api.addLink).not.toHaveBeenCalled();
+    expect(api.unlink).toHaveBeenCalledWith('l-7');
+    expect(api.link).not.toHaveBeenCalled();
+  });
+
+  it('keeps the current Event once in the options', () => {
+    const { state } = setup([linkRow({ id: 'l-8', kind: 'event', targetId: 'ev-1', title: null as never })]);
+    state.load('x-1');
+    expect(state.options().map((o) => o.value)).toEqual(['', 'ev-1']);
+  });
+
+  it('keeps none for a booking without a linked Event', () => {
+    const { state } = setup([linkRow()]);
+    state.load('x-2');
+    expect(state.value()).toBe('');
+  });
+
+  it('shows only "Keine Veranstaltung" when the reads fail', () => {
+    const { state } = setup([], true);
+    state.load('x-1');
+    expect(state.options()).toEqual([{ value: '', label: 'Keine Veranstaltung' }]);
   });
 });

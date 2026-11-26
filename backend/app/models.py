@@ -54,6 +54,7 @@ from app.modules.calendar.models import ExternalEntry as CalendarExternalEntry
 from app.modules.calendar.models import Invitation as CalendarInvitation
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.events.models import Event
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
@@ -115,6 +116,7 @@ from app.modules.webhooks.models import Webhook, WebhookDelivery
 
 __all__ = [
     "ApplicationOrderEvent",
+    "Event",
     "PurchaseOrder",
     "PurchaseOrderPosition",
     "ActivityVisit",

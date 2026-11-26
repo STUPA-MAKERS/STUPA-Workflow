@@ -76,6 +76,7 @@ const GROUPS: readonly WebhookEventGroup[] = [
   'meetings',
   'protocols',
   'budget',
+  'events',
   'tickets',
 ];
 

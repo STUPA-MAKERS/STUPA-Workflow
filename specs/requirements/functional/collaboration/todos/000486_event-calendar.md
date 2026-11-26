@@ -2,13 +2,10 @@
 id: "000486"
 title: An Event with a start is in the calendar
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - backend/app/modules/calendar/service.py
-  - backend/app/modules/calendar/ics.py
-  - backend/app/modules/todos/service/calendar_reads.py
+updated: 2026-11-25
+replaced_by: F/collaboration/events/003033
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

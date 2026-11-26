@@ -24,7 +24,8 @@ a move writes one row only (``lexorank.py``). ``version`` guards the content edi
 
 ``link`` connects two elements of any two kinds (specs 001400-001402): an application,
 a meeting, an agenda item, a vote, a Termin (``calendar_appointment``), a gremium, an
-invoice, a booking (``budget_expense``), a cost centre (``budget``), a ticket or a card.
+invoice, a booking (``budget_expense``), a Bestellung, an Event, a cost centre (``budget``),
+a ticket, a card or a Paperless document.
 A link has no direction. Its two ends are stored in a fixed order, ``(a_kind, a_id)``
 before ``(b_kind, b_id)`` by byte order (``Link.between``), so the unique index holds one
 row per pair. An end has no foreign key, because it points into one of eleven tables:
@@ -35,17 +36,15 @@ an ``AFTER DELETE`` trigger on each of them (``link_drop_ends``, migration
 ``due_reminded_on`` is the due date that the ``todo_due`` reminder went out for. A
 changed due date gets a new reminder.
 
-A card with a ``todo_card_event`` row is an Event (``Veranstaltung``): it has a start
-and an optional end, each a day with an optional time, a place, the expected
-participants and an optional series (``todo_event_series``). A series has a name
-that is unique in the platform and belongs to no board. The row is never deleted
-while the card exists, so an Event does not become a to-do again.
+A card holds no event data: an Event is an element of its own (``app.modules.events``,
+F/collaboration/events/003022). ``todo_event_series`` holds the series (``Reihe``) of the
+Events. A series has a name that is unique in the platform and belongs to no board.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -58,7 +57,6 @@ from sqlalchemy import (
     Integer,
     PrimaryKeyConstraint,
     Text,
-    Time,
     func,
     text,
 )
@@ -97,6 +95,7 @@ LINK_KINDS: tuple[str, ...] = (
     "invoice",
     "expense",
     "order",
+    "event",
     "budget",
     "ticket",
     "todo",
@@ -113,6 +112,7 @@ LINK_TABLES: dict[str, str] = {
     "invoice": "invoice",
     "expense": "budget_expense",
     "order": "purchase_order",
+    "event": "event",
     "budget": "budget",
     "ticket": "ticket",
     "todo": "todo_card",
@@ -286,42 +286,6 @@ class TodoEventSeries(UUIDPkMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("uq_todo_event_series_name", text("lower(name)"), unique=True),
         CheckConstraint("length(btrim(name)) BETWEEN 1 AND 200", name="name"),
-    )
-
-
-class TodoCardEvent(Base):
-    """The event data of a card; the card is then an Event."""
-
-    __tablename__ = "todo_card_event"
-
-    card_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("todo_card.id", ondelete="CASCADE"), primary_key=True
-    )
-    starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
-    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    place: Mapped[str | None] = mapped_column(Text, nullable=True)
-    participants: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    series_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("todo_event_series.id", ondelete="SET NULL"), nullable=True
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "ends_on IS NULL OR (starts_on IS NOT NULL AND ends_on >= starts_on)",
-            name="dates",
-        ),
-        CheckConstraint(
-            "(start_time IS NULL OR starts_on IS NOT NULL) "
-            "AND (end_time IS NULL OR ends_on IS NOT NULL) "
-            "AND (start_time IS NULL OR end_time IS NULL "
-            "OR ends_on > starts_on OR end_time >= start_time)",
-            name="times",
-        ),
-        CheckConstraint("participants IS NULL OR participants >= 0", name="participants"),
-        Index("ix_todo_card_event_series_id", "series_id"),
-        Index("ix_todo_card_event_starts_on", "starts_on"),
     )
 
 

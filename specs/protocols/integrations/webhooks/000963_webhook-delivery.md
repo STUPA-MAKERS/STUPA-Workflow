@@ -4,7 +4,7 @@ title: A webhook delivery is a signed JSON POST
 kind: protocol
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-24
+updated: 2026-11-25
 version: 1
 media_type: application/json
 tests:
@@ -57,7 +57,8 @@ language of the platform default. An amount is a decimal string with two places,
 `"125.00"`. A reference to a Gremium, an Antragsart, a status, a cost centre or a Bereich (`area`) is an
 object with `id` and `name`. `fromStatus` and `toStatus` of `ticket.status` are status keys, for
 example `"done"`. `kind`, `status` and `fromStatus` of a Bestellung are keys too: `order` or
-`outlay`, and `planned`, `ordered`, `delivered` or `cancelled`. `source` is `help`, `mail` or `team`.
+`outlay`, and `planned`, `ordered`, `delivered` or `cancelled`. `status` and `fromStatus` of a
+Veranstaltung are keys of the status list of the Events. `source` is `help`, `mail` or `team`.
 
 | Event | ID keys | Fields |
 | --- | --- | --- |
@@ -72,6 +73,8 @@ example `"done"`. `kind`, `status` and `fromStatus` of a Bestellung are keys too
 | `invoice.created` | `invoiceId` | `number`, `supplier`, `grossAmount`, `currency`, `issueDate`, `dueDate`, `costCentre`, `url` |
 | `order.created` | `orderId`, `applicationId` | `number`, `title`, `kind`, `status`, `supplier`, `plannedAmount`, `actualAmount`, `applicationTitle`, `url` |
 | `order.status_changed` | `orderId`, `applicationId` | the fields of `order.created`, plus `fromStatus` |
+| `event.created`, `event.updated`, `event.deleted` | `eventId` | `number`, `title`, `status`, `startsOn`, `startTime`, `endsOn`, `endTime`, `place`, `participants`, `shopUrl`, `teamName`, `url` |
+| `event.status_changed` | `eventId` | the fields of `event.created`, plus `fromStatus` |
 | `ticket.created` | `ticketId` | `number`, `title`, `area`, `url`, `kind`, `source`, `body` P, `reporterEmail` P |
 | `ticket.message` | `ticketId` | `number`, `title`, `area`, `url`, `body` P |
 | `ticket.status` | `ticketId` | `number`, `title`, `area`, `url`, `fromStatus`, `toStatus` |

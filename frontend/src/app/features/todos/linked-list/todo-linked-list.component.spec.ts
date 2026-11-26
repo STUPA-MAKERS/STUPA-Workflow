@@ -21,8 +21,6 @@ function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
     isDone: false,
     dueDate: '2026-10-17',
     assignees: [{ principalId: 'p-1', displayName: 'Mara Keller' }, { principalId: null, displayName: null }],
-    event: null,
-    balance: null,
     ...over,
   };
 }
@@ -133,15 +131,36 @@ describe('TodoLinkedListComponent', () => {
     expect(screen.getByRole('link', { name: 'Zweite' })).toBeInTheDocument();
   });
 
-  it('shows a linked Event with its dates, board, place and balance (spec 000489)', async () => {
-    const event = { startsOn: '2026-11-20', endsOn: '2026-11-21', startTime: null, endTime: null, place: 'Mensa', participants: null, seriesId: null, seriesName: null };
-    await setup(() => of(linksOf([card({ id: 'ev', title: 'Erstiparty', event, balance: '-725.40' }), card()])));
-    const rows = [...document.querySelectorAll('.tl__row')];
-    expect(rows[0]).toHaveClass('tl__row--event');
-    expect(rows[0]).toHaveTextContent('Erstiparty');
-    expect(screen.getByText('Veranstaltung · 20.11.–21.11.2026 · Studierendenparlament')).toBeInTheDocument();
-    expect(rows[0].querySelector('.tl__neg')?.textContent).toContain('−725,40');
-    expect(rows[0]).toHaveTextContent('Mensa');
+  /** §F/collaboration/events/003041: four Buchungen of an Event fold into one row. */
+  it('folds four Buchungen of an Event into one row with their number and sum', async () => {
+    const booking = (i: number, amount: string | null) =>
+      linkRow({ id: `l-b${i}`, kind: 'expense', targetId: `x-${i}`, title: `Buchung ${i}`, url: `/expenses?id=x-${i}`, detail: { amount } });
+    const rows = [
+      linkRow({ id: 'l-a', kind: 'application', targetId: 'a-1', title: 'Antrag', url: '/applications/a-1' }),
+      booking(1, '10.00'),
+      booking(2, '20.50'),
+      booking(3, null),
+      booking(4, '5.00'),
+      linkRow({ id: 'l-i', title: 'RE-1' }),
+    ];
+    const { cmp, fixture } = await setup(() => of(linksOf([], rows)), { kind: 'event', targetId: 'e-1' });
+    const keys = () => cmp.entries().map((e) => e.key);
+    expect(keys()).toEqual(['l-a', 'fold', 'l-i']);
+    const fold = screen.getByTestId('tl-fold');
+    expect(fold).toHaveTextContent('4 Buchungen');
+    expect(fold.textContent).toMatch(/35,50\s€/);
+    const button = fold.querySelector('button')!;
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    button.click();
+    fixture.detectChanges();
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(keys()).toEqual(['l-a', 'fold', 'l-b1', 'l-b2', 'l-b3', 'l-b4', 'l-i']);
+  });
+
+  it('keeps three Buchungen of an Event as rows', async () => {
+    const rows = [1, 2, 3].map((i) => linkRow({ id: `l-b${i}`, kind: 'expense', targetId: `x-${i}` }));
+    const three = await setup(() => of(linksOf([], rows)), { kind: 'event', targetId: 'e-1' });
+    expect(three.cmp.entries().map((e) => e.key)).toEqual(['l-b1', 'l-b2', 'l-b3']);
   });
 
   it('shows nothing without links', async () => {

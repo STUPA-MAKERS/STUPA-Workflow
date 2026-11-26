@@ -353,8 +353,6 @@ describe('MeetingPageComponent', () => {
             isDone: false,
             dueDate: null,
             assignees: [],
-            event: null,
-            balance: null,
           },
         ]),
       );
