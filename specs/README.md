@@ -317,7 +317,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | approved |
 | [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | approved |
 | [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | approved |
-| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | approved |
+| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | draft |
 | [F/collaboration/events/003030](requirements/functional/collaboration/events/003030_event-next-edition.md) | Folgeveranstaltung anlegen copies the plan | approved |
 | [F/collaboration/events/003031](requirements/functional/collaboration/events/003031_event-migration.md) | The migration makes an Event of each event card | approved |
 | [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | approved |
@@ -649,7 +649,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | approved |
 | [F/finance/orders/002934](requirements/functional/finance/orders/002934_orders-list-without-order.md) | The list shows the approved Anträge without a Bestellung | approved |
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | approved |
-| [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | approved |
+| [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | draft |
 | [F/finance/orders/002937](requirements/functional/finance/orders/002937_order-form-in-pane.md) | The form of a Bestellung opens in the pane of the page | approved |
 | [F/finance/orders/003013](requirements/functional/finance/orders/003013_orders-feature-switch.md) | Bestellungen have a feature switch | approved |
 | [F/finance/orders/003014](requirements/functional/finance/orders/003014_order-without-antrag.md) | A Bestellung can have no Antrag | approved |

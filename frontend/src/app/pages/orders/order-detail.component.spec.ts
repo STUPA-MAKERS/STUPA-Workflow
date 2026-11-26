@@ -140,9 +140,9 @@ describe('OrderDetailComponent', () => {
     expect(cmp.head()).toMatchObject({
       title: 'Beamer',
       kicker: 'B-7K3QX9MD',
-      status: { label: 'Geplant', kind: 'neutral' },
       back: null,
     });
+    expect(cmp.head().status).toBeUndefined();
     expect(cmp.head().meta.map((m: { label: string }) => m.label)).toEqual([
       'Auslage',
       'Rechnung bezahlt',
@@ -179,6 +179,7 @@ describe('OrderDetailComponent', () => {
     expect(api.list).not.toHaveBeenCalled();
     expect(client.getApplication).not.toHaveBeenCalled();
     expect(cmp.canManage()).toBe(false);
+    expect(cmp.head().status).toEqual({ label: 'Geplant', kind: 'neutral' });
     expect(screen.queryByTestId('od-status')).toBeNull();
     expect(cmp.actions()).toEqual([]);
     expect(cmp.covered()).toEqual([]);
@@ -223,6 +224,7 @@ describe('OrderDetailComponent', () => {
     paramMap.next(convertToParamMap({ id: 'o-2' }));
     expect(cmp.sumLine()).toBe('');
     expect(cmp.canManage()).toBe(false);
+    expect(cmp.head().status).toEqual({ label: 'Geplant', kind: 'neutral' });
     expect(cmp.linked()).toHaveLength(1);
   });
 

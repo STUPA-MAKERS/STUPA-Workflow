@@ -47,7 +47,8 @@ export interface EventFact {
 /**
  * The detail of one Event in the pane of the page "Veranstaltungen" (spec 003029).
  *
- * In this order: the head with the name, the number and the status; "Bearbeiten",
+ * In this order: the head with the name and the number, without the status chip, because
+ * the field "Status" shows it (003042); "Bearbeiten",
  * "Folgeveranstaltung anlegen" (003030) and "Löschen" in the ⋮ menu; the field "Status" as
  * a dropdown of the list `event` that saves a pick at once (003042); the fields (003023)
  * with the shop as a link that opens a new tab (003024); the totals (000479); the
@@ -106,10 +107,6 @@ export class EventDetailComponent {
     return {
       title: event.title,
       kicker: event.number,
-      status: {
-        label: this.catalog.label('event', event.status),
-        kind: this.catalog.tone('event', event.status),
-      },
       back: null,
     };
   });

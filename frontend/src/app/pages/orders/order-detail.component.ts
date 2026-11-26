@@ -76,8 +76,9 @@ const HEAD_FACTS: readonly TranslationKey[] = [
 /**
  * The detail of one Bestellung in the pane of the page "Bestellungen".
  *
- * The head holds the Bezeichnung, the number, the status and the marks of the invoice and
- * of the bookings. Below it, for a person with `order.manage`, the field "Status" is a
+ * The head holds the Bezeichnung, the number, the marks of the invoice and of the bookings,
+ * and the status chip only for a person without `order.manage`, because the field "Status"
+ * shows it to the others. Below it, for a person with `order.manage`, the field "Status" is a
  * dropdown of the status list `order` that saves a pick at once (002870), and the other
  * actions are in the ⋮ menu. The body shows the fields with the
  * planned price, the real price and their signed difference, the positions of the Antrag
@@ -183,10 +184,9 @@ export class OrderDetailComponent {
     return {
       title: order.title,
       kicker: order.number,
-      status: {
-        label: this.catalog.label('order', order.status),
-        kind: this.catalog.tone('order', order.status),
-      },
+      ...(this.canManage()
+        ? {}
+        : { status: { label: this.catalog.label('order', order.status), kind: this.catalog.tone('order', order.status) } }),
       meta: [
         ...(order.kind === 'outlay' ? [{ label: this.i18n.translate(ORDER_KIND_LABEL.outlay) }] : []),
         ...marks.map((label) => ({ label })),

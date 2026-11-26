@@ -78,7 +78,7 @@ describe('EventDetailComponent', () => {
   it('shows the head, the fields, the money, the decisions, the series and "Verknüpft" in this order', async () => {
     const { cmp, api, container } = await setup();
     expect(api.get).toHaveBeenCalledWith('e-1');
-    expect(cmp.head()).toMatchObject({ title: 'Erstiparty', kicker: 'V-7K3QX9MD', status: { label: 'Geplant', kind: 'neutral' } });
+    expect(cmp.head()).toEqual({ title: 'Erstiparty', kicker: 'V-7K3QX9MD', back: null });
     expect(screen.getByRole('heading', { name: 'Erstiparty', level: 1 })).toBeInTheDocument();
     const order = Array.from(container.querySelectorAll('[data-testid="ed-status"], [data-testid="ed-section"]')).map((el) =>
       el.getAttribute('data-testid') === 'ed-status' ? 'status' : (el.querySelector('h2, h3, h4')?.textContent?.trim() ?? el.tagName.toLowerCase()),
