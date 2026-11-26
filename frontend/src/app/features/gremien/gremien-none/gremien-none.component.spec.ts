@@ -21,12 +21,12 @@ describe('GremienNoneComponent', () => {
     await render(GremienNoneComponent, {
       providers: [{ provide: GremienStore, useValue: storeWith({ items: [gremium()] }) }],
     });
-    expect(screen.getByText('Kein Gremium geöffnet')).toBeTruthy();
+    expect(screen.getByText('Kein Team geöffnet')).toBeTruthy();
   });
 
   it('says that there is no gremium', async () => {
     await render(GremienNoneComponent, { providers: [{ provide: GremienStore, useValue: storeWith({}) }] });
-    expect(screen.getByText('Keine Gremien')).toBeTruthy();
+    expect(screen.getByText('Keine Teams')).toBeTruthy();
   });
 
   it.each([

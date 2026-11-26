@@ -4,8 +4,12 @@ title: The tab Gremien is the tab Teams
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-25
-implementation: null
+updated: 2026-11-26
+implementation:
+  - frontend/src/app/features/gremien/gremien-page/gremien.component.ts
+  - frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts
+  - frontend/src/app/features/gremien/team-sub-teams/team-sub-teams.component.ts
+  - frontend/src/app/app.routes.ts
 scope:
   - frontend/src/app/features/gremien
   - frontend/src/app/app.routes.ts
@@ -15,7 +19,8 @@ scope:
 
 The navigation tab Gremien must be named Teams and open `/teams`. The old route `/committees`
 must lead to `/teams`. The list must show the teams of the person, each sub-team under its
-parent. The page of an inherent team must show the tabs of its Gremium as today, plus the tab
+parent. Each row must show the name and the number of members of the team, and "Läuft" while a
+meeting of its Gremium runs. A row must not show a role, the parent team or a meeting date. The page of an inherent team must show the tabs of its Gremium as today, plus the tab
 Sub-Teams. The tabs Sitzungen, Beschlüsse and Anwesenheit must exist only on the page of an
 inherent team. The page of another team must show only the tabs Board, Mitglieder, Sub-Teams and
 Info.

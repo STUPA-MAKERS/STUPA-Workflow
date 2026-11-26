@@ -3,7 +3,8 @@
  * attendance matrix, the meetings of one person and a vote, plus a mock of the API that
  * answers with them.
  */
-import { of } from 'rxjs';
+import { map, type Observable, of } from 'rxjs';
+import type { Team, TeamsApiService } from '../app/core/api/teams.service';
 import type {
   GremienApiService,
   GremiumAttendance,
@@ -186,3 +187,65 @@ export function gremienApiMock(over: Partial<GremienApiMock> = {}): GremienApiMo
 
 /** The clock of the specs: Thursday, 15 October 2026. */
 export const GREMIEN_TEST_NOW = (): Date => new Date(2026, 9, 15, 12, 0, 0);
+
+/** The inherent team of a Gremium row, with the id of the Gremium, so a spec opens `/teams/g-1`. */
+export function teamOfGremium(g: GremiumOverview, over: Partial<Team> = {}): Team {
+  return {
+    id: g.id,
+    name: g.name,
+    gremiumId: g.id,
+    parentId: null,
+    parentName: null,
+    boardId: null,
+    memberCount: null,
+    isMember: g.isMember,
+    canManage: false,
+    ...over,
+  };
+}
+
+/** A free team (spec 003063). */
+export function freeTeam(over: Partial<Team> = {}): Team {
+  return {
+    id: 't-1',
+    name: 'Ersti-Woche',
+    gremiumId: null,
+    parentId: null,
+    parentName: null,
+    boardId: 'b-t1',
+    memberCount: 3,
+    isMember: true,
+    canManage: true,
+    ...over,
+  };
+}
+
+/**
+ * The team API of the tab: the list follows the overview of `gremien` (one inherent team per
+ * Gremium, same id), plus `extra` teams.
+ */
+export function teamsApiMock(
+  gremien: Pick<GremienApiMock, 'overview'>,
+  extra: readonly Team[] = [],
+): { [K in keyof TeamsApiService]: jest.Mock } {
+  return {
+    list: jest.fn(() =>
+      ((gremien.overview.getMockImplementation() ?? gremien.overview)() as Observable<
+        readonly GremiumOverview[]
+      >).pipe(
+        map((rows) => [...rows.map((g) => teamOfGremium(g)), ...extra]),
+      ),
+    ),
+    detail: jest.fn((id: string) =>
+      of({ team: extra.find((t) => t.id === id) ?? freeTeam({ id }), members: [], subTeams: [] }),
+    ),
+    create: jest.fn((name: string, parentId: string | null) =>
+      of({ team: freeTeam({ id: 't-new', name, parentId }), members: [], subTeams: [] }),
+    ),
+    patch: jest.fn(() => of({ team: freeTeam(), members: [], subTeams: [] })),
+    remove: jest.fn(() => of(undefined)),
+    setMember: jest.fn(() => of({ team: freeTeam(), members: [], subTeams: [] })),
+    removeMember: jest.fn(() => of({ team: freeTeam(), members: [], subTeams: [] })),
+  };
+}
+

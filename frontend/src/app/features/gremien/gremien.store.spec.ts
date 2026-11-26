@@ -1,13 +1,18 @@
+import { TeamsApiService } from '@core/api/teams.service';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { GremienApiService } from '@core/api/gremien.service';
-import { gremienApiMock, gremium } from '../../../testing/gremien-fixtures';
+import { gremienApiMock, gremium, teamsApiMock } from '../../../testing/gremien-fixtures';
 import { GREMIEN_NOW, GremienStore } from './gremien.store';
 
 describe('GremienStore', () => {
   function setup(api = gremienApiMock()) {
     TestBed.configureTestingModule({
-      providers: [GremienStore, { provide: GremienApiService, useValue: api }],
+      providers: [
+        GremienStore,
+        { provide: GremienApiService, useValue: api },
+        { provide: TeamsApiService, useValue: teamsApiMock(api) },
+      ],
     });
     return { store: TestBed.inject(GremienStore), api };
   }
@@ -22,6 +27,13 @@ describe('GremienStore', () => {
     expect(store.find('g-1')).toEqual(gremium());
     expect(store.find('g-x')).toBeNull();
     expect(store.find(null)).toBeNull();
+    expect(store.team('g-1')?.gremiumId).toBe('g-1');
+    expect(store.team('t-x')).toBeNull();
+    expect(store.team(null)).toBeNull();
+    expect(store.teamOfGremium('g-1')?.id).toBe('g-1');
+    expect(store.teamOfGremium('g-x')).toBeNull();
+    expect(store.teamOfGremium(null)).toBeNull();
+    expect(store.subTeams(null)).toEqual([]);
   });
 
   it('reports a failed read and counts it as loaded', () => {

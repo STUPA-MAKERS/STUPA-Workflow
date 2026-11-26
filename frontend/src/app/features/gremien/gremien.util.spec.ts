@@ -3,6 +3,7 @@ import { gremiumInfo } from '../../../testing/gremien-fixtures';
 import {
   cellStrength,
   infoEmpty,
+  teamTree,
   infoTabShown,
   infoUrlShown,
   infoUrlValid,
@@ -187,5 +188,24 @@ describe('rangeDays', () => {
     expect(infoTabShown(gremiumInfo())).toBe(false);
     expect(infoTabShown(gremiumInfo({ canEdit: true }))).toBe(true);
     expect(infoTabShown(gremiumInfo({ links: [{ label: 'W', url: 'https://w.de' }] }))).toBe(true);
+  });
+});
+
+describe('teamTree (003072)', () => {
+  const t = (id: string, parentId: string | null = null) => ({ id, parentId });
+
+  it('puts each sub-team under its parent, one level deeper', () => {
+    const tree = teamTree([t('a'), t('b'), t('a1', 'a'), t('a11', 'a1'), t('b1', 'b')]);
+    expect(tree.map((n) => [n.team.id, n.depth])).toEqual([
+      ['a', 0],
+      ['a1', 1],
+      ['a11', 2],
+      ['b', 0],
+      ['b1', 1],
+    ]);
+  });
+
+  it('starts a tree for a team whose parent is not shown', () => {
+    expect(teamTree([t('x1', 'x')]).map((n) => [n.team.id, n.depth])).toEqual([['x1', 0]]);
   });
 });

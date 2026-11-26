@@ -101,6 +101,7 @@ async def test_a_free_team_with_sub_teams_and_members(
         top_id = top["team"]["id"]
         assert top["team"]["name"] == "Ersti" and top["team"]["canManage"] is True
         assert top["team"]["boardId"] is not None
+        assert top["team"]["memberCount"] == 1
         assert top["members"] == [
             {"principalId": str(creator_id), "displayName": "Clara", "role": "manager"}
         ]

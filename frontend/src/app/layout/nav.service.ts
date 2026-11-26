@@ -132,9 +132,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   {
     key: 'gremien',
-    path: '/committees',
+    path: '/teams',
     labelKey: 'nav.gremien',
-    icon: 'landmark',
+    icon: 'network',
     /** A member sees the own gremien; `gremium.view_all` (and the admin) sees every one. */
     permissions: ['gremium.view_all'],
     inAnyCommittee: true,

@@ -58,6 +58,19 @@ describe('TodoBoardEntriesComponent', () => {
     expect(view.added).toHaveBeenCalledWith({ hit: { kind: 'person', id: 'p-2', name: 'Bert' }, role: 'edit' });
   });
 
+  /** § 003063: the members of a team show "Mitglied" and "Verwaltung"; a role outside the list shows the default. */
+  it('names the roles of the list it gets', async () => {
+    const view = await setup();
+    view.fixture.componentRef.setInput('roles', [
+      { role: 'edit', label: 'teams.role.member' },
+      { role: 'manage', label: 'teams.role.manager' },
+    ]);
+    expect(view.cmp.roleName('manage')).toBe('Verwaltung');
+    expect(view.cmp.roleName('read')).toBe('Mitglied');
+    view.fixture.componentRef.setInput('roles', [{ role: 'manage', label: 'teams.role.manager' }]);
+    expect(view.cmp.roleName('read')).toBe('Bearbeiten');
+  });
+
   it('offers no Gremien when they cannot load', async () => {
     const view = await setup(true);
     expect(view.cmp.teams()).toEqual([]);

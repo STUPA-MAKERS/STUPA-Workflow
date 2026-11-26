@@ -68,6 +68,20 @@ export class TodoBoardEntriesComponent {
   private readonly i18n = inject(I18nService);
 
   readonly entries = input.required<readonly TodoBoardEntry[]>();
+  /**
+   * The roles to pick from, in order. The members of a free team pick "Mitglied" and
+   * "Verwaltung" (spec 003063), shown on the roles `edit` and `manage`.
+   */
+  readonly roles = input<readonly { readonly role: TodoEntryRole; readonly label: TranslationKey }[]>(
+    ENTRY_ROLES,
+  );
+  /** The picker shows: the caller may add an entry. */
+  readonly editable = input(true);
+  /** The picker offers teams too; the members of a team are persons only. */
+  readonly withTeams = input(true);
+  /** The name of the list for a screen reader, and the placeholder of the picker. */
+  readonly listLabel = input<TranslationKey>('todos.entries.title');
+  readonly addLabel = input<TranslationKey>('todos.entries.add');
   /** A request runs: the controls wait. */
   readonly busy = input(false);
 
@@ -78,8 +92,10 @@ export class TodoBoardEntriesComponent {
   readonly teams = signal<readonly PickerTeam[]>([]);
   readonly taken = computed(() => this.entries().map((e) => e.targetId));
   readonly roleOptions = computed<FilterSelectOption[]>(() =>
-    ENTRY_ROLES.map((r) => ({ value: r.role, label: this.i18n.translate(r.label) })),
+    this.roles().map((r) => ({ value: r.role, label: this.i18n.translate(r.label) })),
   );
+  /** The teams that the picker offers. */
+  readonly pickerTeams = computed(() => (this.withTeams() ? this.teams() : []));
   readonly findPeople = (q: string): Observable<readonly PickerPerson[]> =>
     this.api.entryOptions(q).pipe(map((o) => o.persons));
 
@@ -91,7 +107,9 @@ export class TodoBoardEntriesComponent {
   }
 
   roleName(role: TodoEntryRole): string {
-    return this.i18n.translate(ENTRY_ROLES.find((r) => r.role === role)?.label ?? 'todos.entries.role.edit');
+    const roles = this.roles();
+    const label = (roles.find((r) => r.role === role) ?? roles.find((r) => r.role === NEW_ENTRY_ROLE))?.label;
+    return this.i18n.translate(label ?? 'todos.entries.role.edit');
   }
 
   /** The key of a row: the id, or the target for the fixed team and a new entry. */
@@ -100,7 +118,7 @@ export class TodoBoardEntriesComponent {
   }
 
   setRole(entry: TodoBoardEntry, value: string): void {
-    const role = ENTRY_ROLES.find((r) => r.role === value)?.role;
+    const role = this.roles().find((r) => r.role === value)?.role;
     if (role && role !== entry.role) this.roleChanged.emit({ entry, role });
   }
 

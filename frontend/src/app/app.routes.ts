@@ -325,8 +325,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
       },
+      // The tab Gremien is the tab Teams (spec 003072): an old link to a Gremium opens its
+      // inherent team, which the list finds by `?gremium=`.
+      { path: 'committees', pathMatch: 'full', redirectTo: 'teams' },
       {
-        path: 'committees',
+        path: 'committees/:id',
+        redirectTo: ({ params }) => `/teams?gremium=${encodeURIComponent(params['id'] ?? '')}`,
+      },
+      {
+        path: 'teams',
         data: {
           title: 'nav.gremien',
           permission: ['gremium.view_all'],
@@ -349,7 +356,7 @@ export const routes: Routes = [
             path: ':id',
             data: {
               title: 'gremien.title',
-              parent: ['committees'],
+              parent: ['teams'],
               permission: ['gremium.view_all'],
               allowCommitteeMember: true,
             },
