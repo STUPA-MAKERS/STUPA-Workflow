@@ -310,6 +310,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
+| [F/collaboration/committees/003078](requirements/functional/collaboration/committees/003078_info-edit-action.md) | The edit action of a filled Info sits under it | draft |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |

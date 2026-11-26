@@ -3702,6 +3702,7 @@
   "gremien.info.error": "Die Info konnte nicht geladen werden.",
   "gremien.info.empty": "Noch keine Info",
   "gremien.info.edit": "Info bearbeiten",
+  "gremien.info.editShort": "Bearbeiten",
   "gremien.info.editTitle": "Info bearbeiten",
   "gremien.info.links": "Links",
   "gremien.info.changedBy": "Zuletzt geändert von {name} am {date}",

@@ -3702,6 +3702,7 @@
   "gremien.info.error": "The info could not be loaded.",
   "gremien.info.empty": "No info yet",
   "gremien.info.edit": "Edit info",
+  "gremien.info.editShort": "Edit",
   "gremien.info.editTitle": "Edit info",
   "gremien.info.links": "Links",
   "gremien.info.changedBy": "Last changed by {name} on {date}",
