@@ -2,7 +2,7 @@
 id: "003036"
 title: Each status has the kind open, done or void
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
 implementation:

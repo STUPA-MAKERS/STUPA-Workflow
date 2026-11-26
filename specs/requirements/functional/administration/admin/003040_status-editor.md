@@ -2,7 +2,7 @@
 id: "003040"
 title: The pages Bestellzustände and Veranstaltungszustände edit a list without a sequence
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
 implementation:

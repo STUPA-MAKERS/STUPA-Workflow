@@ -2,7 +2,7 @@
 id: "003042"
 title: The detail of an Event changes the status in a dropdown
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
 implementation:

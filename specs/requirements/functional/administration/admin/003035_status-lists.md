@@ -2,7 +2,7 @@
 id: "003035"
 title: The statuses of an element are a list in the admin configuration
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
 implementation:

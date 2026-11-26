@@ -108,12 +108,12 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/002693](requirements/functional/administration/admin/002693_audit-log-search.md) | The Audit-Log searches on the server | approved |
 | [F/administration/admin/003017](requirements/functional/administration/admin/003017_permission-names.md) | Every global permission has a German and an English name | approved |
 | [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | approved |
-| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | draft |
-| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the kind open, done or void | draft |
+| [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | approved |
+| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the kind open, done or void | approved |
 | [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | approved |
 | [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | approved |
 | [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | approved |
-| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellzustände and Veranstaltungszustände edit a list without a sequence | draft |
+| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellzustände and Veranstaltungszustände edit a list without a sequence | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -317,14 +317,14 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | approved |
 | [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | approved |
 | [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | approved |
-| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | draft |
+| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | approved |
 | [F/collaboration/events/003030](requirements/functional/collaboration/events/003030_event-next-edition.md) | Folgeveranstaltung anlegen copies the plan | approved |
 | [F/collaboration/events/003031](requirements/functional/collaboration/events/003031_event-migration.md) | The migration makes an Event of each event card | approved |
 | [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | approved |
 | [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | approved |
 | [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
 | [F/collaboration/events/003041](requirements/functional/collaboration/events/003041_event-bookings-collapsed.md) | Many bookings of an Event fold into one row | approved |
-| [F/collaboration/events/003042](requirements/functional/collaboration/events/003042_event-status-field.md) | The detail of an Event changes the status in a dropdown | draft |
+| [F/collaboration/events/003042](requirements/functional/collaboration/events/003042_event-status-field.md) | The detail of an Event changes the status in a dropdown | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -624,7 +624,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002867](requirements/functional/finance/orders/002867_order-version.md) | A change of a Bestellung names its version | approved |
 | [F/finance/orders/002868](requirements/functional/finance/orders/002868_order-sum-warning.md) | A sum above the approved amount warns and does not block | approved |
 | [F/finance/orders/002869](requirements/functional/finance/orders/002869_order-section.md) | The Antrag lists its Bestellungen under Verknüpft | approved |
-| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | draft |
+| [F/finance/orders/002870](requirements/functional/finance/orders/002870_order-row-menu.md) | The detail of a Bestellung has its actions | approved |
 | [F/finance/orders/002871](requirements/functional/finance/orders/002871_order-attachments.md) | A Bestellung has its own attachments | approved |
 | [F/finance/orders/002872](requirements/functional/finance/orders/002872_order-api.md) | The Bestellungen have their own API | approved |
 | [F/finance/orders/002873](requirements/functional/finance/orders/002873_order-invoice.md) | A Bestellung has at most one invoice | approved |
@@ -649,7 +649,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/finance/orders/002932](requirements/functional/finance/orders/002932_position-id.md) | Each position of a Kostenaufstellung has a fixed id | approved |
 | [F/finance/orders/002934](requirements/functional/finance/orders/002934_orders-list-without-order.md) | The list shows the approved Anträge without a Bestellung | approved |
 | [F/finance/orders/002935](requirements/functional/finance/orders/002935_order-shows-antrag-comments.md) | The detail of a Bestellung shows the comments of its Antrag | approved |
-| [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | draft |
+| [F/finance/orders/002936](requirements/functional/finance/orders/002936_order-detail-pane.md) | The detail of a Bestellung shows all of it in one pane | approved |
 | [F/finance/orders/002937](requirements/functional/finance/orders/002937_order-form-in-pane.md) | The form of a Bestellung opens in the pane of the page | approved |
 | [F/finance/orders/003013](requirements/functional/finance/orders/003013_orders-feature-switch.md) | Bestellungen have a feature switch | approved |
 | [F/finance/orders/003014](requirements/functional/finance/orders/003014_order-without-antrag.md) | A Bestellung can have no Antrag | approved |
