@@ -19,8 +19,6 @@ import {
   type TodoBoardKind,
   type TodoBoardSummary,
   type TodoCardDetail,
-  type TodoEventIn,
-  type TodoEventSeries,
   type TodoLinkKind,
   type TodoLinkTarget,
   type TodoMember,
@@ -33,12 +31,9 @@ import {
   ButtonGroupComponent,
   ChipComponent,
   DatepickerComponent,
-  TimeInputComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
-  SegmentedComponent,
-  type SegmentedOption,
   SelectFieldComponent,
   type SelectFieldOption,
   type SelectOption,
@@ -54,7 +49,6 @@ import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
 /** The most characters of a card title (server rule). */
 const MAX_TITLE = 300;
 /** The value of the "Neue Reihe …" option of "Reihe". */
-const NEW_SERIES = '__new';
 
 /** A link the new card takes along; `label` is its text in the chip. */
 export interface NewTodoLink {
@@ -102,11 +96,9 @@ export interface TodoCardCopy {
     ButtonComponent,
     ButtonGroupComponent,
     DatepickerComponent,
-    TimeInputComponent,
-    DialogComponent,
+      DialogComponent,
     IconComponent,
     InputComponent,
-    SegmentedComponent,
     MarkdownImageUploadDirective,
     SelectFieldComponent,
     TodoLinkPickerComponent,
@@ -148,38 +140,6 @@ export class TodoNewDialogComponent {
   readonly members = signal<TodoMember[]>([]);
   readonly assignee = signal<Uuid>('');
   readonly due = signal('');
-  /** What the dialog creates: a to-do or an Event (spec 000488). */
-  readonly kind = signal<'todo' | 'event'>('todo');
-  readonly kindOptions = computed<SegmentedOption[]>(() => [
-    { value: 'todo', label: this.i18n.translate('todos.eventCard.kindTodo') },
-    { value: 'event', label: this.i18n.translate('todos.eventCard.name') },
-  ]);
-  readonly startsOn = signal('');
-  readonly endsOn = signal('');
-  readonly startTime = signal('');
-  readonly endTime = signal('');
-  readonly place = signal('');
-  /** The series id, `NEW_SERIES` for a new one (then `seriesName`), or '' for none. */
-  readonly seriesId = signal('');
-  readonly seriesName = signal('');
-  readonly seriesList = signal<TodoEventSeries[]>([]);
-  readonly newSeries = NEW_SERIES;
-  readonly seriesOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('todos.eventCard.noSeries') },
-    ...this.seriesList().map((s) => ({ value: s.id, label: s.name })),
-    { value: NEW_SERIES, label: this.i18n.translate('todos.eventCard.newSeries') },
-  ]);
-  /** A personal board has no Events, so the switch needs a writable shared board. */
-  readonly canEvent = computed(
-    () => !this.copy() && this.boards().some((b) => b.canWrite && b.kind !== 'personal'),
-  );
-  readonly datesError = computed(() =>
-    this.kind() === 'event' &&
-    ((this.endsOn() && (!this.startsOn() || this.endsOn() < this.startsOn())) ||
-      (this.startTime() && this.endTime() && this.endsOn() === this.startsOn() && this.endTime() < this.startTime()))
-      ? this.i18n.translate('todos.error.eventDates')
-      : '',
-  );
   readonly description = signal('');
   readonly links = signal<NewTodoLink[]>([]);
   readonly pickerOpen = signal(false);
@@ -191,7 +151,7 @@ export class TodoNewDialogComponent {
 
   readonly boardOptions = computed<SelectOption[]>(() =>
     this.boards()
-      .filter((b) => b.canWrite && (this.kind() === 'todo' || b.kind !== 'personal'))
+      .filter((b) => b.canWrite)
       .map((b) => ({ value: b.id, label: b.name })),
   );
   readonly columnOptions = computed<SelectOption[]>(() =>
@@ -219,8 +179,6 @@ export class TodoNewDialogComponent {
       !!this.title().trim() &&
       !this.titleError() &&
       !!this.selectedBoard() &&
-      !this.datesError() &&
-      !(this.kind() === 'event' && this.seriesId() === NEW_SERIES && !this.seriesName().trim()) &&
       !this.saving() &&
       !this.images()?.uploading(),
   );
@@ -243,14 +201,6 @@ export class TodoNewDialogComponent {
     this.wantAssignee = this.people()[0] ?? '';
     this.assignee.set('');
     this.due.set(copy?.dueDate ?? '');
-    this.kind.set('todo');
-    this.startsOn.set('');
-    this.endsOn.set('');
-    this.startTime.set('');
-    this.endTime.set('');
-    this.place.set('');
-    this.seriesId.set('');
-    this.seriesName.set('');
     this.description.set(copy?.descriptionMd ?? '');
     this.saving.set(false);
     this.noBoard.set(false);
@@ -319,20 +269,6 @@ export class TodoNewDialogComponent {
     this.links.update((list) => [...list, { kind: hit.kind, targetId: hit.targetId, label }]);
   }
 
-  /** The switch To-Do | Veranstaltung: an Event moves off a personal board. */
-  setKind(kind: 'todo' | 'event'): void {
-    this.kind.set(kind);
-    if (kind !== 'event') return;
-    if (!this.seriesList().length) {
-      this.api.series().subscribe({ next: (list) => this.seriesList.set(list), error: () => undefined });
-    }
-    const current = this.boards().find((b) => b.id === this.selectedBoard());
-    if (current?.kind === 'personal') {
-      const shared = this.boards().find((b) => b.canWrite && b.kind !== 'personal');
-      if (shared) this.setBoard(shared.id);
-    }
-  }
-
   unlink(link: NewTodoLink): void {
     this.links.update((list) => list.filter((l) => l !== link));
   }
@@ -344,35 +280,8 @@ export class TodoNewDialogComponent {
   save(): void {
     if (!this.canSave()) return;
     this.saving.set(true);
-    if (this.kind() === 'event' && this.seriesId() === NEW_SERIES) {
-      this.api.createSeries(this.seriesName().trim()).subscribe({
-        next: (made) => {
-          this.seriesList.update((list) => [...list, made]);
-          this.seriesId.set(made.id);
-          this.create();
-        },
-        error: (err: { error?: { code?: string } }) => {
-          this.saving.set(false);
-          this.toast.show(this.i18n.translate(this.errorKey(err?.error?.code)), 'error');
-        },
-      });
-      return;
-    }
     this.create();
   }
-
-  private event(): TodoEventIn | null {
-    if (this.kind() !== 'event') return null;
-    return {
-      startsOn: this.startsOn() || null,
-      endsOn: this.endsOn() || null,
-      startTime: this.startsOn() && this.startTime() ? `${this.startTime()}:00` : null,
-      endTime: this.endsOn() && this.endTime() ? `${this.endTime()}:00` : null,
-      place: this.place().trim() || null,
-      seriesId: this.seriesId() || null,
-    };
-  }
-
   private create(): void {
     this.api
       .createCard({
@@ -383,7 +292,6 @@ export class TodoNewDialogComponent {
         dueDate: this.due() || null,
         ...this.copied(),
         links: this.links().map((l) => ({ kind: l.kind, targetId: l.targetId })),
-        ...(this.kind() === 'event' ? { event: this.event() } : {}),
       })
       .subscribe({
         next: (card) => {
@@ -425,8 +333,6 @@ export class TodoNewDialogComponent {
     if (code === 'assignee_not_allowed') return 'todos.error.assignee';
     if (code === 'link_target_not_found') return 'todos.error.linkTarget';
     if (code === 'event_link_taken') return 'todos.error.eventLinkTaken';
-    if (code === 'event_dates_invalid') return 'todos.error.eventDates';
-    if (code === 'series_exists') return 'todos.error.seriesExists';
     return 'todos.error.create';
   }
 }

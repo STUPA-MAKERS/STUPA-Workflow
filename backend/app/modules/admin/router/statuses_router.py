@@ -1,7 +1,7 @@
-"""Admin routes of the status lists: the pages "Bestellphasen" and "Veranstaltungsphasen".
+"""Admin routes of the status lists: the pages "Bestellzustände" and "Veranstaltungszustände".
 
 Each list has its own page and permission (F/administration/admin/003035):
-``admin.order_phases`` for ``order`` and ``admin.event_phases`` for ``event``. The read of a
+``admin.order_statuses`` for ``order`` and ``admin.event_statuses`` for ``event``. The read of a
 list for each member is ``GET /api/statuses/{kind}`` in the module ``statuses``.
 """
 

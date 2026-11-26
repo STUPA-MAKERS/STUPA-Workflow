@@ -879,6 +879,7 @@ export type WebhookEventGroup =
   | 'meetings'
   | 'protocols'
   | 'budget'
+  | 'events'
   | 'tickets';
 
 /** One field of a catalog event (`GET /admin/webhooks/catalog`). */

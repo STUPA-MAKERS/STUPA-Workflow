@@ -41,6 +41,7 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   invoice: 'receipt',
   expense: 'swap',
   order: 'package',
+  event: 'cal',
   budget: 'pie',
   ticket: 'chat',
   todo: 'circleok',
@@ -57,6 +58,7 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   invoice: 'todos.linkKind.invoice',
   expense: 'todos.linkKind.expense',
   order: 'todos.linkKind.order',
+  event: 'todos.linkKind.event',
   budget: 'todos.linkKind.budget',
   ticket: 'todos.linkKind.ticket',
   todo: 'todos.linkKind.todo',
@@ -186,6 +188,13 @@ function linkFacts(
         d.orderStatus ? statusName('order', d.orderStatus) : null,
         d.counterparty,
         d.amount ? formatMoney(d.amount, locale) : null,
+      ];
+    case 'event':
+      return [
+        numberPart(d.number, title),
+        d.eventStatus ? statusName('event', d.eventStatus) : null,
+        eventDays(d.date ?? null, d.endDate ?? null, locale),
+        d.place,
       ];
     case 'budget':
       return [d.costCentre];

@@ -28,8 +28,8 @@ const SHARED_FOLDERS: Readonly<Record<string, readonly string[]>> = {
   admin: ['admin-list'],
   texts: ['branding'],
   committees: ['committees', 'gremium-roles'],
-  'order-phases': ['statuses'],
-  'event-phases': ['statuses'],
+  'order-statuses': ['statuses'],
+  'event-statuses': ['statuses'],
 };
 
 describe('ADMIN_PAGES', () => {

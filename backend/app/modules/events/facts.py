@@ -1,19 +1,18 @@
-"""Events (``Veranstaltung``): the event data of a card, its totals, decisions and series.
+"""The money, the decisions and the series of an Event, read from its links.
 
-A card with a ``todo_card_event`` row is an Event. Its links bring the money and the
-decisions:
+The links of an Event (kind ``event``) bring the money and the decisions
+(F/collaboration/events/003029):
 
 * Totals: the requested amount of the linked Anträge, the approved amount of those in an
   approved state (spec 000572), and the expenses and the income of the linked Buchungen.
-  A sub-booking whose parent is linked too counts once, through the parent. The totals
-  count every linked element, because each reader of the Event reads them (spec 000479).
+  A sub-booking whose parent is linked too counts once, through the parent (000479).
 * Decisions: the valid decision of each linked Antrag and each closed vote of a linked
   TOP or vote, the newest first. A vote that made the decision of a linked Antrag shows
-  once, as that decision (spec 000482).
+  once, as that decision (000482).
 * One Event per element: an Antrag, a Buchung or an invoice is linked to at most one
-  Event (spec 000481, 409 ``event_link_taken``).
+  Event (000481, 409 ``event_link_taken``).
 * Series: the other Events of the series that the viewer reads, the newest first, and
-  the number of the others (spec 000483).
+  the number of the others (000483).
 """
 
 from __future__ import annotations
@@ -30,20 +29,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.applications.service.service_base import _title_of
 from app.modules.budget.tree_models import BudgetExpense
+from app.modules.events.models import Event
 from app.modules.flow.models import State
 from app.modules.meetings.models import Meeting, MeetingAgendaItem
 from app.modules.todos import link_store
 from app.modules.todos.grouping import grouped
 from app.modules.todos.link_store import Edge
-from app.modules.todos.models import (
-    TodoBoard,
-    TodoCard,
-    TodoCardEvent,
-    TodoEventSeries,
-)
+from app.modules.todos.models import TodoEventSeries
 from app.modules.voting.models import Vote
 from app.shared.errors import ConflictError
 
+#: The link kind of an Event.
+KIND = "event"
 #: The link kinds that belong to at most one Event.
 ONE_EVENT_KINDS: tuple[str, ...] = ("application", "expense", "invoice")
 _ZERO = Decimal("0.00")
@@ -78,19 +75,6 @@ class Decision:
     target_id: uuid.UUID | None = None
 
 
-async def event_rows(
-    session: AsyncSession, card_ids: Iterable[uuid.UUID]
-) -> dict[uuid.UUID, TodoCardEvent]:
-    """The event rows of the cards that are Events."""
-    ids = list(card_ids)
-    if not ids:
-        return {}
-    rows = (
-        await session.scalars(select(TodoCardEvent).where(TodoCardEvent.card_id.in_(ids)))
-    ).all()
-    return {row.card_id: row for row in rows}
-
-
 async def series_names(
     session: AsyncSession, series_ids: Iterable[uuid.UUID | None]
 ) -> dict[uuid.UUID, str]:
@@ -104,15 +88,15 @@ async def series_names(
     return dict(rows.tuples().all())
 
 
-async def _links(session: AsyncSession, card_ids: Sequence[uuid.UUID], *kinds: str) -> list[Edge]:
-    return await link_store.edges(session, "todo", card_ids, kinds)
+async def _links(session: AsyncSession, event_ids: Sequence[uuid.UUID], *kinds: str) -> list[Edge]:
+    return await link_store.edges(session, KIND, event_ids, kinds)
 
 
-async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Totals]:
-    """The totals of each card, also for a card without links (all zero)."""
-    if not card_ids:
+async def totals(session: AsyncSession, event_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, Totals]:
+    """The totals of each Event, also for an Event without links (all zero)."""
+    if not event_ids:
         return {}
-    links = await _links(session, card_ids, "application", "expense")
+    links = await _links(session, event_ids, "application", "expense")
     apps_of = _id_sets(
         (link.own_id, link.target_id) for link in links if link.kind == "application"
     )
@@ -126,13 +110,13 @@ async def totals(session: AsyncSession, card_ids: Sequence[uuid.UUID]) -> dict[u
         session, frozenset(eid for ids in expenses_of.values() for eid in ids)
     )
     return {
-        card_id: _card_totals(
-            apps_of.get(card_id, frozenset()),
-            _counted(expenses_of.get(card_id, frozenset()), bookings),
+        event_id: _event_totals(
+            apps_of.get(event_id, frozenset()),
+            _counted(expenses_of.get(event_id, frozenset()), bookings),
             money,
             approved,
         )
-        for card_id in card_ids
+        for event_id in event_ids
     }
 
 
@@ -143,8 +127,8 @@ type _Booking = tuple[str, Decimal, uuid.UUID | None]
 def _id_sets(
     pairs: Iterable[tuple[uuid.UUID, uuid.UUID]],
 ) -> dict[uuid.UUID, frozenset[uuid.UUID]]:
-    """Group the target ids of the links by their card."""
-    return {card_id: frozenset(ids) for card_id, ids in grouped(pairs).items()}
+    """Group the target ids of the links by their Event."""
+    return {event_id: frozenset(ids) for event_id, ids in grouped(pairs).items()}
 
 
 async def _application_money(
@@ -208,13 +192,13 @@ def _counted(
     )
 
 
-def _card_totals(
+def _event_totals(
     app_ids: frozenset[uuid.UUID],
     booked: Iterable[tuple[str, Decimal]],
     money: _Money,
     in_approved_state: frozenset[uuid.UUID],
 ) -> Totals:
-    """The totals of one card from the money of its Anträge and its counted Buchungen.
+    """The totals of one Event from the money of its Anträge and its counted Buchungen.
 
     ``approved`` counts each Antrag in an approved state: the amount of its valid decision,
     else the requested amount (spec 000572).
@@ -236,9 +220,9 @@ def _card_totals(
     )
 
 
-async def decisions(session: AsyncSession, card_id: uuid.UUID) -> list[Decision]:
+async def decisions(session: AsyncSession, event_id: uuid.UUID) -> list[Decision]:
     """The decisions of an Event: valid decisions of Anträge, closed votes of TOPs/votes."""
-    links = await _links(session, [card_id], "application", "agenda_item", "vote")
+    links = await _links(session, [event_id], "application", "agenda_item", "vote")
     app_ids = {link.target_id for link in links if link.kind == "application"}
     item_ids = {link.target_id for link in links if link.kind == "agenda_item"}
     vote_ids = {link.target_id for link in links if link.kind == "vote"}
@@ -347,39 +331,29 @@ async def _application_titles(session: AsyncSession, ids: set[uuid.UUID]) -> dic
 
 async def editions(
     session: AsyncSession,
-    card: TodoCard,
-    series_id: uuid.UUID | None,
+    event: Event,
     readable: ColumnElement[bool],
-) -> tuple[list[tuple[TodoCard, TodoBoard, TodoCardEvent]], int]:
+) -> tuple[list[Event], int]:
     """The other Events of the series that the viewer reads, newest first, and the rest."""
-    if series_id is None:
+    if event.series_id is None:
         return [], 0
-    base = (
-        select(TodoCard, TodoBoard, TodoCardEvent)
-        .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
-        .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-        .where(TodoCardEvent.series_id == series_id, TodoCard.id != card.id)
-    )
+    base = select(Event).where(Event.series_id == event.series_id, Event.id != event.id)
     total = await session.scalar(
-        select(func.count()).select_from(base.with_only_columns(TodoCard.id).subquery())
+        select(func.count()).select_from(base.with_only_columns(Event.id).subquery())
     )
     rows = (
-        (
-            await session.execute(
-                base.where(readable).order_by(
-                    TodoCardEvent.starts_on.desc().nulls_last(), TodoCard.created_at.desc()
-                )
+        await session.scalars(
+            base.where(readable).order_by(
+                Event.starts_on.desc().nulls_last(), Event.created_at.desc()
             )
         )
-        .tuples()
-        .all()
-    )
+    ).all()
     return list(rows), max(0, int(total or 0) - len(rows))
 
 
 async def check_one_event(
     session: AsyncSession,
-    card_id: uuid.UUID,
+    event_id: uuid.UUID,
     refs: Iterable[tuple[str, uuid.UUID]],
 ) -> None:
     """Refuse a link of an Antrag, a Buchung or an invoice that another Event has.
@@ -395,13 +369,11 @@ async def check_one_event(
     }
     if not by_kind:
         return
-    cards = union_all(
-        *(link_store.linked_ids("todo", kind, ids) for kind, ids in by_kind.items())
+    events = union_all(
+        *(link_store.linked_ids(KIND, kind, ids) for kind, ids in by_kind.items())
     ).subquery()
     taken = await session.scalar(
-        select(TodoCardEvent.card_id)
-        .where(TodoCardEvent.card_id.in_(select(cards.c.own_id)), TodoCardEvent.card_id != card_id)
-        .limit(1)
+        select(Event.id).where(Event.id.in_(select(events.c.own_id)), Event.id != event_id).limit(1)
     )
     if taken is not None:
         raise ConflictError(

@@ -12,11 +12,13 @@ import { ExpenseSubBookingsState } from '../expense-sub-bookings.state';
 import { ExpenseTransfersState } from '../expense-transfers.state';
 import { ExpensesListState } from '../expenses-list.state';
 import { BookingFormComponent } from './booking-form.component';
+import { EventsApiService } from '@core/api/events.service';
 import { TodosApiService } from '@core/api/todos.service';
 import { of } from 'rxjs';
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
-const EVENTS_API = { writableEvents: () => of([]), linked: () => of([]), links: () => of({ canLink: false, links: [] }) };
+const EVENTS_API = { linked: () => of([]), links: () => of({ canLink: false, links: [] }) };
+const EVENT_REFS = { refs: () => of([]) };
 
 const TREE: BudgetTreeNode[] = [
   {
@@ -163,6 +165,7 @@ async function setup(mode: 'create' | 'edit', inputs: Record<string, unknown> = 
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
+      { provide: EventsApiService, useValue: EVENT_REFS },
     ],
   });
   const http = TestBed.inject(HttpTestingController);

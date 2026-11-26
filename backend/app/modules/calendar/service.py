@@ -115,29 +115,30 @@ async def member_meetings(db: AsyncSession, sub: str) -> list[tuple[Meeting, str
 
 
 async def readable_events(db: AsyncSession, row: PrincipalRow) -> list[CardEvent]:
-    """The Events with a start on the boards that the person reads (spec 000486).
+    """The Events with a start of the teams of the person (000486, 003033).
 
     The feed has no session, so the person's rights come from the `principal` row,
-    as at a login.
+    as at a login. No Event shows while `Veranstaltungen` is off (003032).
     """
     from app.modules.auth.rbac import resolve_principal
-    from app.modules.todos.service import TodoService
+    from app.modules.events.calendar import events_between
 
+    if not await feature_on(db, Feature.EVENTS):
+        return []
     principal = await resolve_principal(db, row, datetime.now(UTC))
-    rows = await TodoService(db).calendar_events(principal)
     return [
         CardEvent(
-            uid=str(card.id),
-            title=card.title,
+            uid=str(event.id),
+            title=event.title,
             start=cast(date, event.starts_on),
             end=event.ends_on,
             start_time=event.start_time,
             end_time=event.end_time,
-            stamp=card.created_at,
+            stamp=event.created_at,
             place=event.place,
-            board_name=board.name,
+            team_name=team,
         )
-        for card, board, event in rows
+        for event, team in await events_between(db, principal)
     ]
 
 

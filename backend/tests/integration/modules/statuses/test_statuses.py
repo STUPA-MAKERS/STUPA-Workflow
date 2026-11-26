@@ -32,9 +32,9 @@ from tests.integration.modules.orders.test_orders import (
 pytestmark = pytest.mark.integration
 
 _ADMIN = Principal(
-    sub="status-admin", roles=[], permissions={"admin.order_phases", "admin.event_phases"}
+    sub="status-admin", roles=[], permissions={"admin.order_statuses", "admin.event_statuses"}
 )
-_ORDER_ADMIN = Principal(sub="order-admin", roles=[], permissions={"admin.order_phases"})
+_ORDER_ADMIN = Principal(sub="order-admin", roles=[], permissions={"admin.order_statuses"})
 _BUYER = Principal(sub="status-buyer", roles=["member"], permissions={"order.manage"})
 _MEMBER = Principal(sub="status-member", roles=["member"], permissions=set())
 

@@ -2,12 +2,10 @@
 id: "000737"
 title: The Kalender shows an Event like a Termin
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-11
-implementation:
-  - backend/app/modules/calendar/entries.py
-  - frontend/src/app/features/calendar/calendar.util.ts
+updated: 2026-11-25
+replaced_by: F/collaboration/events/003033
 scope:
   - backend/app/modules/calendar
   - frontend/src/app/features

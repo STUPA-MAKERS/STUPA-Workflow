@@ -479,16 +479,11 @@ export class TodosComponent implements OnDestroy {
     if (!board) return new Map();
     const f = this.filter();
     const ctx = { today: this.today(), mine: this.mine(), labels: this.labelsById() };
-    const archived =
-      f.kind === 'archive' ? this.archivedEvents().filter((card) => card.boardId === board.id) : [];
-    const cards = [...board.cards, ...archived].filter((card) => matchesFilter(card, f, ctx));
+    const cards = board.cards.filter((card) => matchesFilter(card, f, ctx));
     const inColumn = (columnId: Uuid): readonly TodoCardTile[] =>
       cards.filter((c) => c.columnId === columnId);
     return new Map(board.columns.map((col) => [col.id, inColumn(col.id)]));
   });
-
-  /** The archived Events of the board, for "Veranstaltungen mit Archiv" (spec 000485). */
-  readonly archivedEvents = signal<readonly TodoCardTile[]>([]);
 
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
@@ -544,17 +539,6 @@ export class TodosComponent implements OnDestroy {
     filterChipText(
       this.i18n.translate('todos.filter.due'),
       this.filter().due ? this.i18n.translate(DUE_TEXT[this.filter().due]) : null,
-    ),
-  );
-  readonly kindOptions = computed<FilterSelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('todos.filter.kindAll') },
-    { value: 'events', label: this.i18n.translate('todos.filter.kindEvents') },
-    { value: 'archive', label: this.i18n.translate('todos.filter.kindArchive') },
-  ]);
-  readonly kindText = computed(() =>
-    filterChipText(
-      this.i18n.translate('todos.eventCard.kind'),
-      this.filter().kind ? this.kindOptions().find((o) => o.value === this.filter().kind)?.label : null,
     ),
   );
 
@@ -1016,22 +1000,7 @@ export class TodosComponent implements OnDestroy {
     this.filter.update((f) => ({ ...f, due }));
   }
 
-  setKind(value: string): void {
-    const kind = (['events', 'archive'] as const).find((k) => k === value) ?? '';
-    this.filter.update((f) => ({ ...f, kind }));
-    const board = this.board();
-    this.archivedEvents.set([]);
-    if (kind !== 'archive' || !board) return;
-    this.api.archive(board.id, '', 0, 200, true).subscribe({
-      next: (page) => {
-        if (this.filter().kind === 'archive' && this.board()?.id === board.id) this.archivedEvents.set(page.items);
-      },
-      error: () => this.archivedEvents.set([]),
-    });
-  }
-
   resetFilters(): void {
-    this.archivedEvents.set([]);
     this.search.clear();
     this.filter.set(NO_FILTER);
   }

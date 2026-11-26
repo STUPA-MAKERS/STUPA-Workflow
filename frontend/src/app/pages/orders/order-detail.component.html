@@ -8,12 +8,16 @@
   <ng-template screenBody>
     @if (order(); as current) {
      <app-section [heading]="current.title" [hideHeading]="true">
-      @if (step(); as next) {
-        <app-button-group>
-          <app-button variant="primary" [loading]="busy()" data-testid="od-step" (click)="setStatus(next.status)">
-            {{ next.label }}
-          </app-button>
-        </app-button-group>
+      @if (canManage()) {
+        <app-select
+          data-testid="od-status"
+          [label]="'orders.field.status' | t"
+          [options]="statusOptions()"
+          [clearable]="false"
+          [disabled]="busy()"
+          [(value)]="statusPick"
+          (valueChange)="pickStatus($event)"
+        />
       }
       <app-section [heading]="'orders.dialog.details' | t" [hideHeading]="true">
         <app-field-group>
@@ -104,7 +108,7 @@
   [body]="cancelBody()"
   [confirmLabel]="cancelLabel()"
   (confirm)="confirmCancel()"
-  (cancel)="cancelling.set(null)"
+  (cancel)="keepStatus()"
 />
 <app-confirm-dialog
   [open]="deleting()"

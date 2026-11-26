@@ -95,8 +95,9 @@ export function entryLink(
     case 'meeting':
       return { commands: ['/meetings', e.id] };
     case 'card':
-    case 'event':
       return { commands: ['/todos'], queryParams: { card: e.id } };
+    case 'event':
+      return { commands: ['/events'], queryParams: { id: e.id } };
     case 'appointment':
     case 'external':
       return null;

@@ -38,12 +38,12 @@ description: Backend calendar module. It serves the entries of the Kalender page
 - `models.py` — `Appointment` (`calendar_appointment`: title, `starts_on`/`ends_on`, `start_time`/`end_time` NULL = all-day, place, description, `creator_id` SET NULL, `for_all`, `sequence`), `Invitation` (exactly one of `gremium_id`/`principal_id`), `Answer` (PK appointment + principal; `accept`/`tentative`/`decline`).
 - `rules.py` — the pure rules: `Viewer`, `Targets`, `Span`, `can_read`, `is_invited`, `can_edit`, `sees_answers`, `time_changed`, `needs_mail`, `has_ended`, `forbidden_gremien`.
 - `appointments.py` — `AppointmentService` (create, update, delete, answer, `between`, `matching`, `people_search`) and the SQL forms `readable`/`mine`. A write returns `Written(out, mails)`; the router commits and sends the mails as a background task.
-- `entries.py` — `CalendarEntries.between`/`search`: the entries of the page, each kind under the rule of its own module (`MeetingRules.meeting_read_scope`, `TodoService.calendar_due_between`/`calendar_events_between`, `appointments.readable`).
+- `entries.py` — `CalendarEntries.between`/`search`: the entries of the page, each kind under the rule of its own module (`MeetingRules.meeting_read_scope`, `TodoService.calendar_due_between`, `events.calendar.events_between` (the Events of the teams of the caller, behind the feature `events`), `appointments.readable`).
 - `mails.py` — one mail per person with the `.ics` file (`build_appointment_file`), notification kind `appointment`, templates `appointment_invited`/`_changed`/`_cancelled` (`notifications/texts/calendar.py`).
 - `privacy.py` — `erase_appointments`, `appointment_export` (called by `privacy/service.py`). The account merge handles the three principal columns in `admin/principal_merge.py`.
 
 **API surface:**
-- `GET /api/calendar/entries?from&to&mine` — at most 100 days. `mine` limits the cards and Events to the assigned ones and the Termine to created or invited.
+- `GET /api/calendar/entries?from&to&mine` — at most 100 days. `mine` limits the cards to the assigned ones (an Event of a team of the caller is always `mine`) and the Termine to created or invited.
 - `GET /api/calendar/search?q` — two characters or more, every month, the nearest to today first.
 - `GET /api/calendar/people?q` — id and name of the active accounts, never an address (000738).
 - `POST /api/calendar/appointments`, `GET|PUT|DELETE /api/calendar/appointments/{id}`, `PUT …/{id}/answer`.

@@ -34,8 +34,8 @@ from tests.integration.conftest import clear_privacy_tables
 def _clear(eng: Engine) -> None:
     clear_privacy_tables(eng)
     with eng.begin() as conn:
-        conn.execute(text("DELETE FROM gremium WHERE slug LIKE 'todo-%'"))
         conn.execute(text("DELETE FROM team WHERE gremium_id IS NULL"))
+        conn.execute(text("DELETE FROM gremium WHERE slug LIKE 'todo-%'"))
 
 
 @pytest.fixture

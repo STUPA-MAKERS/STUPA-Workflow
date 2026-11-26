@@ -79,6 +79,7 @@ def empty_new_kinds(
 
     monkeypatch.setattr(LinkResolver, "_appointment_candidates", _no_ids)
     monkeypatch.setattr(LinkResolver, "_order_candidates", _no_ids)
+    monkeypatch.setattr(LinkResolver, "_event_candidates", _no_ids)
 
     monkeypatch.setattr(vote_listing, "list_votes", _none)
     monkeypatch.setattr(BudgetTreeService, "list_invoices_paged", _none)

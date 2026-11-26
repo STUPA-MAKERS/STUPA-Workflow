@@ -12,7 +12,6 @@ const FIELDS: readonly (readonly [string, string])[] = [
   ['shared/formly/types/formly-positions.type.scss', '.pf'],
   ['../../vendor/ui-kit/views/chat/src/chat-view.component.scss', '.chat__editInput'],
   ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__itemInput'],
-  ['features/todos/card-detail/todo-card-detail.component.scss', '.cd__evInput'],
   ['../../vendor/ui-kit/views/protocol/src/top-sheet-view.component.scss', '.ts__titleInput'],
   ['../../vendor/ui-kit/views/meeting/src/agenda-pane-view.component.scss', '.ap__input'],
   ['pages/admin/privacy/privacy.component.scss', '.pv__textarea'],

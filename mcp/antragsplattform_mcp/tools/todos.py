@@ -171,7 +171,7 @@ async def todo_all_boards() -> list:
 
 @group.tool
 async def todo_card_get(card_id: str) -> dict:
-    """Get one card with description, checklist, links, comments and events.
+    """Get one card with description, checklist, links, comments and its history.
 
     Each comment lists its `attachments` with `scanState`; download a clean one with
     `download_attachment`.
@@ -411,40 +411,6 @@ async def todo_checklist_remove(card_id: str, item_id: str) -> dict:
 
 
 @group.tool
-async def todo_card_event_set(card_id: str, event: S.TodoEventIn) -> dict:
-    """Set the event data of a card: dates, times, place, participants and the Reihe.
-
-    The card becomes an Event (Veranstaltung) for good; an Event never becomes a to-do
-    again (409 `event_permanent`).
-    """
-    return await api().put(f"/todos/cards/{card_id}/event", json=dump_create(event))
-
-
-@group.tool
-async def todo_card_follow_up(card_id: str) -> dict:
-    """Create the next edition of an Event ("Folgeveranstaltung anlegen")."""
-    return await api().post(f"/todos/cards/{card_id}/follow-up")
-
-
-@group.tool
-async def todo_series(q: str | None = None) -> list:
-    """List the Reihen of Events by name (at most 50)."""
-    return await api().get("/todos/series", params=params(q=q))
-
-
-@group.tool
-async def todo_series_create(name: str) -> dict:
-    """Create a Reihe for Events; the name is unique, case ignored (409 `series_exists`)."""
-    return await api().post("/todos/series", json={"name": name})
-
-
-@group.tool
-async def todo_events(q: str | None = None) -> list:
-    """List the live Events on the boards that the caller writes (the Veranstaltung picker)."""
-    return await api().get("/todos/events", params=params(q=q))
-
-
-@group.tool
 async def todo_mine() -> dict:
     """The open cards assigned to the caller, with the count due within 7 days."""
     return await api().get("/todos/mine")
@@ -478,7 +444,6 @@ async def todo_board_members(board_id: str) -> list:
 async def todo_board_archived_cards(
     board_id: str,
     q: str | None = None,
-    events: bool = False,
     limit: int | None = None,
     offset: int | None = None,
 ) -> dict:
@@ -486,11 +451,10 @@ async def todo_board_archived_cards(
 
     Args:
         q: Search text.
-        events: true lists only the Events.
     """
     return await api().get(
         f"/todos/boards/{board_id}/archive",
-        params=params(q=q, events=events or None, limit=limit, offset=offset),
+        params=params(q=q, limit=limit, offset=offset),
     )
 
 

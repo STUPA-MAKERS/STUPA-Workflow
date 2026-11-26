@@ -9,7 +9,6 @@ from sqlalchemy import delete, func, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.principal import Principal
-from app.modules.todos import events as todo_events
 from app.modules.todos import link_store
 from app.modules.todos.link_audit import audit_link
 from app.modules.todos.models import (
@@ -17,7 +16,6 @@ from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
     TodoCard,
-    TodoCardEvent,
     TodoCardLabel,
     TodoCheckItem,
     TodoColumn,
@@ -41,7 +39,6 @@ from app.modules.todos.service.ranks import (
     _place,
     _slot,
 )
-from app.modules.todos.service.rows import _event_row
 from app.shared.errors import ConflictError
 
 
@@ -51,15 +48,13 @@ class CardOps(DetailOps):
     async def create(self, payload: CardCreate, principal: Principal) -> TodoCardDetail:
         """Create a card at the end of its column (default: the first column).
 
-        ``event`` makes the card an Event (spec 000478). ``checklist`` holds the open items
-        of a duplicate (spec 000554).
+        ``checklist`` holds the open items of a duplicate (spec 000554). A card holds no
+        event data (F/collaboration/events/003022): the body refuses the field ``event``.
 
         Raises:
             NotFoundError: The board is unknown or not readable (HTTP 404).
             ValidationProblem: ``column_not_on_board``, ``assignee_not_allowed``,
-                ``label_not_on_board``, ``link_target_not_found`` or an event error of
-                ``_check_event`` (HTTP 422).
-            ConflictError: ``event_link_taken`` (HTTP 409).
+                ``label_not_on_board`` or ``link_target_not_found`` (HTTP 422).
         """
         actor = await self._actor(principal)
         board = await self._board(payload.board_id, principal, write=True)
@@ -76,9 +71,6 @@ class CardOps(DetailOps):
         for kind, target_id in links:
             if not await self.links.readable(kind, target_id, principal):
                 raise _invalid("The link target was not found.", "link_target_not_found", "links")
-        if payload.event is not None:
-            await self._check_event(board, payload.event)
-            await todo_events.check_one_event(self.session, uuid.uuid4(), links)
         live = await self._column_cards(column.id)
         now = _now()
         card = TodoCard(
@@ -116,8 +108,6 @@ class CardOps(DetailOps):
                     position=position,
                 )
             )
-        if payload.event is not None:
-            self.session.add(_event_row(card.id, payload.event))
         self._event(card, "created", actor)
         await self.session.flush()
         if column.is_done:
@@ -445,15 +435,6 @@ class CardOps(DetailOps):
             ForbiddenError: ``write`` and the caller does not write the card (HTTP 403).
         """
         return await self._card(card_id, principal, lock=True, write=write)
-
-    async def check_new_link(self, card: TodoCard, other: tuple[str, uuid.UUID]) -> None:
-        """Refuse a link that would give the Antrag, Buchung or invoice a second Event.
-
-        Raises:
-            ConflictError: ``event_link_taken`` (HTTP 409).
-        """
-        if await self.session.get(TodoCardEvent, card.id) is not None:
-            await todo_events.check_one_event(self.session, card.id, [other])
 
     def note_link(
         self,

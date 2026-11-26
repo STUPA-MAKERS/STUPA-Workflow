@@ -19,7 +19,7 @@ import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney, moneyNumber } from '@shared/format-money';
 import { LinkToDirective } from '../../../shared/link-to.directive';
-import { LINK_ICON, LINK_KIND_LABEL, type StatusName, eventDays, linkSub, linkTitle } from '../todos.util';
+import { LINK_ICON, LINK_KIND_LABEL, type StatusName, linkSub, linkTitle } from '../todos.util';
 import {
   type AvatarSize,
   AvatarStackComponent,
@@ -57,6 +57,16 @@ export interface LinkedAction {
   readonly queryParams?: Readonly<Record<string, string>>;
 }
 
+/** From this number of Buchungen on, the list of an Event folds them into one row (003041). */
+export const FOLD_AT = 4;
+
+/** One row of the list: a link, or the folded Buchungen of an Event. */
+export interface LinkedEntry {
+  readonly key: string;
+  readonly row?: LinkRow;
+  readonly fold?: { readonly count: number; readonly sum: string };
+}
+
 /** A linked card shown without its link row (a page passes `items`). */
 const cardRow = (card: TodoLinkedCard): LinkRow => ({
   id: card.id,
@@ -74,7 +84,9 @@ const cardRow = (card: TodoLinkedCard): LinkRow => ({
 /**
  * The section "Verknüpft" of an element (spec 001407): every link of the element that
  * the viewer reads (`GET /links`), of any kind. A linked Event comes first, then the
- * other links in the order of the kinds, the newest first in each kind. A card shows its
+ * other links in the order of the kinds, the newest first in each kind. In the list of an
+ * Event four or more Buchungen fold into one row with their number and their sum, and a
+ * press unfolds them (003041). A card shows its
  * board, its column, the due date and the people and opens on its board; any other
  * element opens its page, or shows "<Kind> (kein Zugriff)".
  *
@@ -208,6 +220,32 @@ export class TodoLinkedListComponent {
     const items = this.items();
     return items ? items.map(cardRow) : (this.loaded()?.links ?? []);
   });
+  /** The folded Buchungen of an Event are open (003041). */
+  readonly bookingsOpen = signal(false);
+
+  /**
+   * The rows in their order. In the list of an Event, four or more Buchungen stand as one
+   * row at the place of the first one; the open row shows them below it.
+   */
+  readonly entries = computed<readonly LinkedEntry[]>(() => {
+    const links = this.links();
+    const bookings = links.filter((row) => row.kind === 'expense');
+    const fold = this.kind() === 'event' && bookings.length >= FOLD_AT;
+    if (!fold) return links.map((row) => ({ key: row.id, row }));
+    const first = bookings[0].id;
+    const sum = bookings.reduce((total, row) => total + (moneyNumber(row.detail?.amount ?? null) ?? 0), 0);
+    const head: LinkedEntry = {
+      key: 'fold',
+      fold: { count: bookings.length, sum: formatMoney(sum.toFixed(2), this.i18n.formatLocale()) },
+    };
+    const open = this.bookingsOpen();
+    return links.flatMap((row): LinkedEntry[] => {
+      if (row.kind !== 'expense') return [{ key: row.id, row }];
+      const own: LinkedEntry[] = open ? [{ key: row.id, row }] : [];
+      return row.id === first ? [head, ...own] : own;
+    });
+  });
+
   /** The number of the newest list read; an older answer is dropped. */
   private readonly seq = signal(0);
 
@@ -294,23 +332,6 @@ export class TodoLinkedListComponent {
     return linkSub(row, this.i18n.formatLocale(), this.i18n.uiLocale(), this.t, this.statusName);
   }
 
-
-  /** "Veranstaltung · 20.11.–21.11.2026 · AStA": the server puts a linked Event first. */
-  eventSub(card: TodoLinkedCard): string {
-    const days = eventDays(card.event?.startsOn ?? null, card.event?.endsOn ?? null, this.i18n.formatLocale());
-    return days
-      ? this.t('todos.eventCard.linkedSub', { dates: days, board: card.boardName })
-      : this.t('todos.eventCard.linkedSubNoDate', { board: card.boardName });
-  }
-
-  /** The balance of an Event with its sign. */
-  money(value: string | null): string {
-    return formatMoney(value, this.i18n.formatLocale(), { signed: true });
-  }
-
-  negative(value: string | null): boolean {
-    return (moneyNumber(value) ?? 0) < 0;
-  }
 
   sub(card: TodoLinkedCard): string {
     const due = card.dueDate

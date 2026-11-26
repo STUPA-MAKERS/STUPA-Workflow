@@ -70,6 +70,7 @@ const KIND_CHIPS: readonly { readonly value: PickerKind; readonly label: Transla
   { value: 'invoice', label: 'todos.picker.invoices' },
   { value: 'expense', label: 'todos.picker.expenses' },
   { value: 'order', label: 'todos.picker.orders' },
+  { value: 'event', label: 'todos.picker.events' },
   { value: 'budget', label: 'todos.picker.budgets' },
   { value: 'ticket', label: 'todos.picker.tickets' },
   { value: 'todo', label: 'todos.picker.todos' },
@@ -88,6 +89,7 @@ const LINK_FEATURE: Partial<Record<TodoLinkKind, FeatureKey>> = {
   invoice: 'invoices',
   expense: 'budget',
   order: 'orders',
+  event: 'events',
   budget: 'budget',
   ticket: 'tickets',
   paperless: 'paperless',
@@ -101,7 +103,8 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 /**
  * "Verknüpfen" (spec 001408): search what an element can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
- * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Kostenstellen, Tickets, To-Dos), a
+ * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Bestellungen, Veranstaltungen, Kostenstellen, Tickets,
+ * To-Dos), a
  * linked target carries a check mark. A pick of a linked target takes the link off again.
  *
  * A panel that floats over the whole page and looks like the global search (spec 001977),
@@ -228,6 +231,7 @@ export class TodoLinkPickerComponent {
       { key: 'invoice', label: 'todos.picker.invoices', hits: by(['invoice']) },
       { key: 'expense', label: 'todos.picker.expenses', hits: by(['expense']) },
       { key: 'order', label: 'todos.picker.orders', hits: by(['order']) },
+      { key: 'event', label: 'todos.picker.events', hits: by(['event']) },
       { key: 'budget', label: 'todos.picker.budgets', hits: by(['budget']) },
       { key: 'ticket', label: 'todos.picker.tickets', hits: by(['ticket']) },
       { key: 'todo', label: 'todos.picker.todos', hits: by(['todo']) },

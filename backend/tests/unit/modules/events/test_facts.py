@@ -1,4 +1,4 @@
-"""Events: totals, decisions, series and the one-Event rule (specs 000479-000483)."""
+"""The facts of an Event: totals, decisions, series and the one-Event rule (000479-000483)."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from typing import Any
 import pytest
 from sqlalchemy import true
 
-from app.modules.todos import events
-from app.modules.todos.models import TodoCardEvent
+from app.modules.events import facts as events
+from app.modules.events.models import Event
 from app.shared.errors import ConflictError
-from tests.unit.modules.todos.fakes import ScriptedSession, board, card, column, link
+from tests.unit.modules.todos.fakes import ScriptedSession, link
 
 CARD = uuid.UUID(int=100)
 EMPTY = uuid.UUID(int=101)
@@ -24,16 +24,6 @@ V1, V2, V3 = (uuid.UUID(int=n) for n in (31, 32, 33))
 T1 = datetime(2026, 5, 1, tzinfo=UTC)
 T2 = datetime(2026, 6, 1, tzinfo=UTC)
 T3 = datetime(2026, 7, 1, tzinfo=UTC)
-
-
-async def test_event_rows_by_card() -> None:
-    session: Any = ScriptedSession()
-    assert await events.event_rows(session, []) == {}
-    assert session.statements == []
-    row = TodoCardEvent(card_id=CARD, series_id=None)
-    row.id = CARD  # pyright: ignore[reportAttributeAccessIssue]
-    session.put(row)
-    assert await events.event_rows(session, [CARD]) == {CARD: row}
 
 
 async def test_series_names_skip_none_and_map_ids() -> None:
@@ -235,31 +225,27 @@ async def test_decisions_vote_without_any_title() -> None:
     assert only.title == ""
 
 
+def _event(series_id: uuid.UUID | None = None) -> Event:
+    return Event(id=uuid.uuid4(), title="Fest", series_id=series_id, team_id=uuid.uuid4())
+
+
 async def test_editions_without_series() -> None:
     session: Any = ScriptedSession()
-    b = board()
-    c = card(b, column(b.id))
-    assert await events.editions(session, c, None, true()) == ([], 0)
+    assert await events.editions(session, _event(), true()) == ([], 0)
     assert session.statements == []
 
 
 async def test_editions_count_the_hidden_rest() -> None:
-    b = board()
-    col = column(b.id)
-    c = card(b, col)
-    others = [(card(b, col), b, TodoCardEvent()), (card(b, col), b, TodoCardEvent())]
-    session: Any = ScriptedSession(scalar=[5], execute=[others])
-    rows, rest = await events.editions(session, c, uuid.uuid4(), true())
+    others = [_event(), _event()]
+    session: Any = ScriptedSession(scalar=[5], scalars=[others])
+    rows, rest = await events.editions(session, _event(uuid.uuid4()), true())
     assert rows == others
     assert rest == 3
 
 
 async def test_editions_rest_never_negative() -> None:
-    b = board()
-    col = column(b.id)
-    c = card(b, col)
-    session: Any = ScriptedSession(scalar=[None], execute=[[(card(b, col), b, TodoCardEvent())]])
-    rows, rest = await events.editions(session, c, uuid.uuid4(), true())
+    session: Any = ScriptedSession(scalar=[None], scalars=[[_event()]])
+    rows, rest = await events.editions(session, _event(uuid.uuid4()), true())
     assert len(rows) == 1
     assert rest == 0
 

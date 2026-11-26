@@ -140,7 +140,7 @@
             }
             <app-select
               name="event"
-              [label]="'todos.eventCard.name' | t"
+              [label]="'events.picker.label' | t"
               [options]="s.event.options()"
               [ngModel]="s.event.value()"
               (ngModelChange)="s.event.value.set($event ?? '')"
@@ -184,7 +184,7 @@
             }
             <app-select
               name="event"
-              [label]="'todos.eventCard.name' | t"
+              [label]="'events.picker.label' | t"
               [options]="s.event.options()"
               [ngModel]="s.event.value()"
               (ngModelChange)="s.event.value.set($event ?? '')"
