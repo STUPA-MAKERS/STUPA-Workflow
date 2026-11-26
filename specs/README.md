@@ -310,7 +310,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001853](requirements/functional/collaboration/committees/001853_notify-template.md) | The members message is a mail template | approved |
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
-| [F/collaboration/committees/003078](requirements/functional/collaboration/committees/003078_info-edit-action.md) | The edit action of a filled Info sits under it | draft |
+| [F/collaboration/committees/003078](requirements/functional/collaboration/committees/003078_info-edit-action.md) | The edit action of a filled Info sits under it | approved |
 | [F/collaboration/events/003022](requirements/functional/collaboration/events/003022_event-element.md) | An Event is an element of its own | approved |
 | [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | approved |
 | [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | approved |
@@ -1083,7 +1083,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [NF/usability/controls/000931](requirements/non-functional/usability/controls/000931_back-closes-budget-dialogs.md) | The dialogs of the Haushalt close on Back | approved |
 | [NF/usability/controls/002163](requirements/non-functional/usability/controls/002163_bar-pill-at-press.md) | The pill of the navigation bar moves at the press | approved |
 | [NF/usability/controls/002164](requirements/non-functional/usability/controls/002164_ripple-in-surface.md) | The ripple is the ripple of Angular Material inside the pressed surface | approved |
-| [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | draft |
+| [NF/usability/controls/002570](requirements/non-functional/usability/controls/002570_one-icon-look-in-a-group.md) | Every icon of a button group has one size and one colour | approved |
 | [NF/usability/controls/002581](requirements/non-functional/usability/controls/002581_select-in-form-fills-row.md) | A multiple choice in a form fills its row and names its values | approved |
 | [NF/usability/controls/002582](requirements/non-functional/usability/controls/002582_webhook-needs-name.md) | The webhook dialog saves only with a name and a valid URL | approved |
 | [NF/usability/layout/000199](requirements/non-functional/usability/layout/000199_footer.md) | The footer shows only on start and public pages | approved |

@@ -2,7 +2,7 @@
 id: "003078"
 title: The edit action of a filled Info sits under it
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
 implementation:
