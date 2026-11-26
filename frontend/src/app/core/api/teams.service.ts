@@ -24,6 +24,8 @@ export interface Team {
   readonly parentName: string | null;
   /** The own board of the team. */
   readonly boardId: Uuid | null;
+  /** The active members of a free team; null for an inherent team (its Gremium counts). */
+  readonly memberCount: number | null;
   readonly isMember: boolean;
   readonly canManage: boolean;
 }

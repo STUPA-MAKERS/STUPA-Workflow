@@ -78,7 +78,7 @@ export interface GremiumRow {
  *   the groups "Meine Teams" and "Weitere Teams", each sub-team right under its parent,
  *   without a step in (spec 003075 of the kit). The row of an inherent team shows the logo of
  *   its Gremium, the number of members and "Läuft" while a meeting runs. The row of another
- *   team shows its name only. No row shows a role.
+ *   team shows its number of members too. No row shows a role.
  * - Right: the child route `/teams/:id` with the open team (`GremiumDetailComponent`).
  *   The page opens no gremium by itself (§ui-kit:000664).
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
@@ -277,13 +277,13 @@ export class GremienComponent {
 
   private toRow(team: Team, depth: number): GremiumRow {
     const item = this.store.find(team.gremiumId);
-    if (!item) {
-      return { team, item: null, depth, sub: '', live: false };
-    }
-    const count =
-      item.memberCount === 1
-        ? this.i18n.translate('gremien.list.member1')
-        : this.i18n.translate('gremien.list.members', { n: item.memberCount });
-    return { team, item, depth, sub: count, live: item.live };
+    const count = item ? item.memberCount : team.memberCount;
+    const sub =
+      count === null
+        ? ''
+        : count === 1
+          ? this.i18n.translate('gremien.list.member1')
+          : this.i18n.translate('gremien.list.members', { n: count });
+    return { team, item, depth, sub, live: item?.live ?? false };
   }
 }
