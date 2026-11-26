@@ -53,9 +53,6 @@ export class TeamSubTeamsComponent {
       data: subs.map((sub) => ({
         id: sub.id,
         title: sub.name,
-        meta: sub.isMember
-          ? [this.i18n.translate(sub.canManage ? 'teams.role.manager' : 'teams.role.member')]
-          : undefined,
         link: { commands: ['/teams', sub.id] },
       })),
     };

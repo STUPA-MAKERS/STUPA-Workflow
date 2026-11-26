@@ -143,16 +143,16 @@ describe('GremienComponent', () => {
   });
 
   /** Without gremium.view_all there is no other gremium and no chip. */
-  it('shows the own gremien with role, members and the next meeting', async () => {
+  it('shows the own gremien with their members, and Läuft for a running meeting', async () => {
     const s = await start('/teams');
     restore = s.restore;
     expect(s.cmp.split()).toBe(false);
     expect(s.router.url).toBe('/teams');
     expect(s.api.overview).toHaveBeenCalledTimes(1);
     const rows = s.cmp.mine();
-    expect(rows.map((r) => r.sub)).toEqual(['Mitglied · 31 Mitglieder', 'Vorstand · 1 Mitglied']);
-    expect(rows[0].next).toEqual({ kind: 'date', text: 'Di, 20.10.', title: 'Nächste Sitzung: 34. Sitzung' });
-    expect(rows[1].next).toEqual({ kind: 'live' });
+    expect(rows.map((r) => r.sub)).toEqual(['31 Mitglieder', '1 Mitglied']);
+    expect(rows.map((r) => r.live)).toEqual([false, true]);
+    expect(screen.queryByText('Di, 20.10.')).toBeNull();
     expect(s.cmp.others()).toEqual([]);
     expect(s.cmp.viewAll()).toBe(false);
     expect(screen.queryByText('Weitere Teams')).toBeNull();
@@ -170,9 +170,8 @@ describe('GremienComponent', () => {
     restore = s.restore;
     expect(s.cmp.others().map((r) => r.item?.id)).toEqual(['g-3']);
     expect(s.cmp.others()[0].sub).toBe('12 Mitglieder');
-    expect(s.cmp.others()[0].next).toEqual({ kind: 'none' });
+    expect(s.cmp.others()[0].live).toBe(false);
     expect(screen.getByText('Weitere Teams')).toBeTruthy();
-    expect(screen.getByText('Keine Sitzung geplant')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Teams' })).toBeInTheDocument();
     expect(s.cmp.searchPlaceholder()).toBe('3 Teams durchsuchen');
     s.cmp.setScope('mine');
@@ -251,7 +250,7 @@ describe('GremienComponent', () => {
   });
 
   describe('teams (spec 003072)', () => {
-    it('puts each sub-team right under its parent, with the own role and the parent', async () => {
+    it('puts each sub-team right under its parent, with no role and no parent text', async () => {
       const teams = [
         freeTeam({ id: 't-1', name: 'Ersti-Woche' }),
         freeTeam({ id: 't-2', name: 'Party', parentId: 't-1', parentName: 'Ersti-Woche', canManage: false }),
@@ -260,10 +259,10 @@ describe('GremienComponent', () => {
       const s = await start('/teams', { teams, items: [gremium()] });
       restore = s.restore;
       expect(s.cmp.mine().map((r) => [r.team.name, r.depth, r.sub])).toEqual([
-        ['Studierendenparlament', 0, 'Mitglied · 31 Mitglieder'],
-        ['Presse', 1, '↳ StuPa · Mitglied'],
-        ['Ersti-Woche', 0, 'Verwaltung'],
-        ['Party', 1, '↳ Ersti-Woche · Mitglied'],
+        ['Studierendenparlament', 0, '31 Mitglieder'],
+        ['Presse', 1, ''],
+        ['Ersti-Woche', 0, ''],
+        ['Party', 1, ''],
       ]);
       const party = screen.getByRole('link', { name: 'Party' }).closest('app-list-item') as HTMLElement;
       expect(party.getAttribute('aria-level')).toBe('2');

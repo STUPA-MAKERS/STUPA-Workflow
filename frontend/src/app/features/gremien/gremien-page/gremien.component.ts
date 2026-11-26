@@ -43,8 +43,7 @@ import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/ca
 import { GremienApiService } from '@core/api/gremien.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { GremienStore } from '../gremien.store';
-import { localized, teamTree } from '../gremien.util';
-import { weekdayDate } from '@shared/date-format';
+import { teamTree } from '../gremien.util';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { TeamNameDialogComponent } from '../team-name-dialog/team-name-dialog.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
@@ -67,11 +66,8 @@ export interface GremiumRow {
   /** The level under the shown parent team (spec 003072). */
   readonly depth: number;
   readonly sub: string;
-  /** `live`, a date ("Di, 20.10."), or `none`. */
-  readonly next:
-    | { readonly kind: 'live' }
-    | { readonly kind: 'date'; readonly text: string; readonly title: string }
-    | { readonly kind: 'none' };
+  /** A meeting of the Gremium runs now ("Läuft"). */
+  readonly live: boolean;
 }
 
 /**
@@ -80,9 +76,9 @@ export interface GremiumRow {
  * - Left: the title with the calendar subscription and "Team anlegen" (`team.create`), the
  *   search and, with `gremium.view_all`, the chip "Anzeigen: Meine Teams | Alle Teams". Then
  *   the groups "Meine Teams" and "Weitere Teams", each sub-team right under its parent,
- *   without a step in: its row names the parent ("↳ AStA", spec 003075 of the kit). The row of an inherent team shows the logo of its Gremium, the role and the number
- *   of members, and the next meeting ("Läuft", a date or "keine geplant"). The row of
- *   another team shows the own role in it.
+ *   without a step in (spec 003075 of the kit). The row of an inherent team shows the logo of
+ *   its Gremium, the number of members and "Läuft" while a meeting runs. The row of another
+ *   team shows its name only. No row shows a role.
  * - Right: the child route `/teams/:id` with the open team (`GremiumDetailComponent`).
  *   The page opens no gremium by itself (§ui-kit:000664).
  * - One pane at a time (narrow, phone): the list, then the gremium with a way back.
@@ -282,29 +278,12 @@ export class GremienComponent {
   private toRow(team: Team, depth: number): GremiumRow {
     const item = this.store.find(team.gremiumId);
     if (!item) {
-      const role = team.canManage ? 'teams.role.manager' : 'teams.role.member';
-      const parent = team.parentName ? this.i18n.translate('teams.subTeamOf', { name: team.parentName }) : '';
-      const sub = [parent, team.isMember ? this.i18n.translate(role) : ''].filter(Boolean).join(' · ');
-      return { team, item: null, depth, sub, next: { kind: 'none' } };
+      return { team, item: null, depth, sub: '', live: false };
     }
-    const locale = this.i18n.uiLocale();
     const count =
       item.memberCount === 1
         ? this.i18n.translate('gremien.list.member1')
         : this.i18n.translate('gremien.list.members', { n: item.memberCount });
-    const role = item.isMember ? localized(item.roleName, locale, item.roleKey ?? '') : '';
-    const sub = role ? `${role} · ${count}` : count;
-    return { team, item, depth, sub, next: this.nextOf(item) };
-  }
-
-  /** The next meeting of a row: running now, a planned date, or none. */
-  private nextOf(item: GremiumOverview): GremiumRow['next'] {
-    if (item.live) return { kind: 'live' };
-    if (!item.nextMeeting?.date) return { kind: 'none' };
-    return {
-      kind: 'date',
-      text: weekdayDate(item.nextMeeting.date, this.i18n.formatLocale(), { year: false }),
-      title: this.i18n.translate('gremien.list.nextTitle', { title: item.nextMeeting.title }),
-    };
+    return { team, item, depth, sub: count, live: item.live };
   }
 }

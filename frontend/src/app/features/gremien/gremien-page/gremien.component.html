@@ -127,18 +127,8 @@
         >
           <app-gremium-logo lead [name]="row.team.name" [logoUrl]="row.item?.logoUrl ?? null" />
           <span trail class="grl__trail">
-            @if (row.item) {
-              @switch (row.next.kind) {
-                @case ('live') {
-                  <span class="grl__live">{{ 'gremien.list.live' | t }}</span>
-                }
-                @case ('date') {
-                  <span class="grl__next num" [title]="row.next.title">{{ row.next.text }}</span>
-                }
-                @default {
-                  <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
-                }
-              }
+            @if (row.live) {
+              <span class="grl__live">{{ 'gremien.list.live' | t }}</span>
             }
             @if (!split() && !phone()) {
               <app-row-chevron />

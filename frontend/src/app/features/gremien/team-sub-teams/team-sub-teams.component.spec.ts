@@ -42,9 +42,9 @@ describe('TeamSubTeamsComponent (spec 003062)', () => {
     expect(s.cmp.rows()).toEqual(
       expect.objectContaining({
         data: [
-          expect.objectContaining({ title: 'Party', meta: ['Verwaltung'] }),
-          expect.objectContaining({ title: 'Presse', meta: undefined }),
-          expect.objectContaining({ title: 'Technik', meta: ['Mitglied'] }),
+          expect.objectContaining({ title: 'Party' }),
+          expect.objectContaining({ title: 'Presse' }),
+          expect.objectContaining({ title: 'Technik' }),
         ],
       }),
     );
