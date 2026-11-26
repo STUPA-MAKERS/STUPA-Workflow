@@ -1,4 +1,4 @@
-import { DEFAULT_STATUS_LISTS, nextStatus, provideTestStatuses } from '@core/api/statuses.service';
+import { provideTestStatuses } from '@core/api/statuses.service';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject, type Observable, Subject, of, throwError } from 'rxjs';
@@ -107,18 +107,6 @@ describe('OrderDetailComponent', () => {
     jest.useRealTimers();
   });
 
-  /** §F/administration/admin/003035: the next status of the list that is not void. */
-  it('names the status that follows in the list of the Bestellungen', () => {
-    const list = DEFAULT_STATUS_LISTS.order;
-    expect(['planned', 'ordered', 'delivered', 'cancelled', 'gone'].map((key) => nextStatus(list, key)?.key ?? null)).toEqual([
-      'ordered',
-      'delivered',
-      null,
-      null,
-      null,
-    ]);
-  });
-
   /** §F/finance/orders/002936: head, fields, positions, sum and the built-in rows of "Verknüpft". */
   it('shows the Bestellung with its difference, its positions, the sum and the linked rows', async () => {
     const first = order({
@@ -140,9 +128,9 @@ describe('OrderDetailComponent', () => {
     expect(cmp.head()).toMatchObject({
       title: 'Beamer',
       kicker: 'B-7K3QX9MD',
-      status: { label: 'Geplant', kind: 'neutral' },
       back: null,
     });
+    expect(cmp.head().status).toBeUndefined();
     expect(cmp.head().meta.map((m: { label: string }) => m.label)).toEqual([
       'Auslage',
       'Rechnung bezahlt',
@@ -179,7 +167,8 @@ describe('OrderDetailComponent', () => {
     expect(api.list).not.toHaveBeenCalled();
     expect(client.getApplication).not.toHaveBeenCalled();
     expect(cmp.canManage()).toBe(false);
-    expect(cmp.step()).toBeNull();
+    expect(cmp.head().status).toEqual({ label: 'Geplant', kind: 'neutral' });
+    expect(screen.queryByTestId('od-status')).toBeNull();
     expect(cmp.actions()).toEqual([]);
     expect(cmp.covered()).toEqual([]);
     expect(cmp.sumLine()).toBe('');
@@ -210,7 +199,7 @@ describe('OrderDetailComponent', () => {
     expect(cmp.sumLine()).toMatch(/^212,50\s€$/);
     expect(cmp.linked()[0].title).toBe('Ohne Titel');
     expect(api.bookings).not.toHaveBeenCalled();
-    expect(screen.getByTestId('od-step')).toHaveTextContent('Als „Bestellt“ markieren');
+    expect(screen.getByTestId('od-status')).toBeInTheDocument();
   });
 
   it('leaves the parts of the Antrag out when their reads fail, and hides the sum of the applicant view', async () => {
@@ -223,6 +212,7 @@ describe('OrderDetailComponent', () => {
     paramMap.next(convertToParamMap({ id: 'o-2' }));
     expect(cmp.sumLine()).toBe('');
     expect(cmp.canManage()).toBe(false);
+    expect(cmp.head().status).toEqual({ label: 'Geplant', kind: 'neutral' });
     expect(cmp.linked()).toHaveLength(1);
   });
 
@@ -263,11 +253,17 @@ describe('OrderDetailComponent', () => {
     expect(cmp.linked()).toHaveLength(3);
   });
 
-  /** §F/finance/orders/002870: the next status is the main button, the rest is in the menu. */
-  it('offers the next status as the main button and every other action in the menu', async () => {
+  /** §F/finance/orders/002870: the field "Status" holds every status, the menu the other actions. */
+  it('offers every status in the field "Status" and the other actions in the menu', async () => {
     const { cmp, keys } = await setup();
-    expect(cmp.step()).toEqual({ status: 'ordered', label: 'Als „Bestellt“ markieren' });
-    expect(keys()).toEqual(['status:delivered', 'invoiceLink', 'invoiceNew', 'booking', 'edit', 'status:cancelled', 'delete']);
+    expect(cmp.statusOptions()).toEqual([
+      { value: 'planned', label: 'Geplant' },
+      { value: 'ordered', label: 'Bestellt' },
+      { value: 'delivered', label: 'Geliefert' },
+      { value: 'cancelled', label: 'Storniert' },
+    ]);
+    expect(cmp.statusPick()).toBe('planned');
+    expect(keys()).toEqual(['invoiceLink', 'invoiceNew', 'booking', 'edit', 'delete']);
     const byKey = Object.fromEntries(cmp.actions().map((a: { key: string }) => [a.key, a]));
     expect(byKey['edit']).toMatchObject({ priority: 'head', route: { commands: ['/orders', 'o-1', 'edit'] } });
     expect(byKey['invoiceNew'].route).toEqual({ commands: ['/invoices'], query: { new: 'invoice', order: 'o-1' } });
@@ -278,16 +274,24 @@ describe('OrderDetailComponent', () => {
     cmp.onAction('invoiceNew');
   });
 
-  it('fits the menu to the status, the invoice and the rights', async () => {
+  it('fits the menu to the invoice and the rights', async () => {
     const delivered = await setup({ first: order({ status: 'delivered', invoiceId: 'i-1' }), permissions: ['order.manage'] });
-    expect(delivered.cmp.step()).toBeNull();
-    expect(delivered.keys()).toEqual(['status:planned', 'status:ordered', 'invoiceUnlink', 'edit', 'status:cancelled', 'delete']);
+    expect(delivered.keys()).toEqual(['invoiceUnlink', 'edit', 'delete']);
   });
 
-  it('offers no cancel for a cancelled Bestellung', async () => {
-    const { keys, cmp } = await setup({ first: order({ status: 'cancelled' }), permissions: ['order.manage', 'budget.view'] });
-    expect(cmp.step()).toBeNull();
-    expect(keys()).toEqual(['status:planned', 'status:ordered', 'status:delivered', 'invoiceLink', 'edit', 'delete']);
+  it('offers the invoice link for a reader of the budget', async () => {
+    const cancelled = await setup({ first: order({ status: 'cancelled' }), permissions: ['order.manage', 'budget.view'] });
+    expect(cancelled.keys()).toEqual(['invoiceLink', 'edit', 'delete']);
+  });
+
+  it('saves a pick of the field "Status" and ignores the current status', async () => {
+    const { cmp, api } = await setup();
+    cmp.pickStatus('planned');
+    expect(api.setStatus).not.toHaveBeenCalled();
+    cmp.statusPick.set('ordered');
+    cmp.pickStatus('ordered');
+    expect(api.setStatus).toHaveBeenCalledWith('o-1', 'ordered', 1);
+    expect(cmp.statusPick()).toBe('ordered');
   });
 
   /** §F/finance/orders/002931: after "Bestellt" the detail offers the marked transitions; nothing fires by itself. */
@@ -313,7 +317,7 @@ describe('OrderDetailComponent', () => {
   it('fires the offered transition on a press and says how it went', async () => {
     const { cmp, client, toast, navigate } = await setup({ first: order({ status: 'ordered', version: undefined }) });
     client.transitions.mockReturnValue(of([transition(), transition({ id: 't-2', label: 'Zur Sitzung', addsToAgenda: true }), transition({ id: 't-3', label: 'Entscheiden', allowsDecision: true })]));
-    cmp.onAction('status:delivered');
+    cmp.pickStatus('delivered');
     expect(client.transitions).toHaveBeenCalledWith('a-1', { orderStatus: 'delivered' });
     expect(cmp.offerActions().map((a: { kind?: string }) => a.kind)).toEqual([undefined, 'main', undefined, undefined]);
     cmp.onOffer('t-1');
@@ -334,7 +338,7 @@ describe('OrderDetailComponent', () => {
 
   it('asks the flow after each status, and offers nothing without an Antrag or when the flow does not answer', async () => {
     const { cmp, api, client } = await setup();
-    cmp.onAction('status:cancelled');
+    cmp.pickStatus('cancelled');
     expect(api.setStatus).toHaveBeenCalledWith('o-1', 'cancelled', 1);
     expect(client.transitions).toHaveBeenCalledWith('a-1', { orderStatus: 'cancelled' });
     client.transitions.mockReturnValue(throwError(() => ({ status: 500 })));
@@ -350,8 +354,13 @@ describe('OrderDetailComponent', () => {
   /** §F/finance/orders/002881: a cancel of a Bestellung with bookings asks first. */
   it('asks before the cancel of a Bestellung with bookings', async () => {
     const { cmp, api } = await setup({ first: order({ bookedAmount: '40.00' }) });
-    cmp.onAction('status:cancelled');
+    cmp.statusPick.set('cancelled');
+    cmp.pickStatus('cancelled');
     expect(cmp.cancelling()?.key).toBe('cancelled');
+    cmp.keepStatus();
+    expect(cmp.cancelling()).toBeNull();
+    expect(cmp.statusPick()).toBe('planned');
+    cmp.pickStatus('cancelled');
     expect(cmp.cancelTitle()).toBe('Status „Storniert“ setzen?');
     expect(cmp.cancelLabel()).toBe('Als „Storniert“ markieren');
     expect(cmp.cancelBody()).toMatch(/^Für „Beamer“ sind 40,00\s€ verbucht\. Die Buchungen bleiben bestehen\.$/);
@@ -368,8 +377,10 @@ describe('OrderDetailComponent', () => {
     cmp.setStatus('ordered');
     cmp.setStatus('ordered');
     expect(api.setStatus).toHaveBeenCalledTimes(1);
+    cmp.statusPick.set('ordered');
     slow.error({ error: null });
     expect(cmp.busy()).toBe(false);
+    expect(cmp.statusPick()).toBe('planned');
     expect(toast).toHaveBeenCalledWith('Die Bestellung konnte nicht gespeichert werden.', 'error');
     expect(api.get).toHaveBeenCalledTimes(1);
     api.setStatus.mockReturnValueOnce(conflict());

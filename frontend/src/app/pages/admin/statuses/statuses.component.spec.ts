@@ -38,7 +38,7 @@ async function setup(
 ) {
   const api = opts.api ?? makeApi();
   const kind = opts.kind ?? 'order';
-  const perms = new Set(opts.perms ?? ['admin.order_phases', 'admin.event_phases']);
+  const perms = new Set(opts.perms ?? ['admin.order_statuses', 'admin.event_statuses']);
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(AdminStatusesComponent, {
     providers: [
@@ -59,33 +59,38 @@ async function setup(
 describe('AdminStatusesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  /** § 003040: the page Bestellphasen holds the list of the Bestellungen, each as a numbered row. */
+  /** § 003040: the page Bestellzustände holds the list of the Bestellungen, rows without numbers or moves. */
   it('shows the list of its page only', async () => {
-    const { api } = await setup();
+    const { api, c, container } = await setup();
     expect(api.getStatusList).toHaveBeenCalledTimes(1);
     expect(api.getStatusList).toHaveBeenCalledWith('order');
-    expect(screen.getByRole('heading', { name: 'Bestellphasen' })).toBeInTheDocument();
-    const names = screen.getAllByLabelText(/^Name von Phase \d/) as HTMLInputElement[];
+    expect(screen.getByRole('heading', { name: 'Bestellzustände' })).toBeInTheDocument();
+    const names = screen.getAllByLabelText(/^Name/) as HTMLInputElement[];
     expect(names.map((field) => field.value)).toEqual([
       'Geplant',
       'Bestellt',
       'Geliefert',
       'Storniert',
     ]);
-    expect(screen.getByLabelText(/^Art von Phase 1/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datum von Phase 1/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/^Art/)).toHaveLength(4);
+    expect(screen.getAllByLabelText(/^Datum/)).toHaveLength(4);
+    expect(container.querySelector('.steprow__no')).toBeNull();
+    expect(container.querySelector('app-move-buttons')).toBeNull();
+    expect(c.startOptions().map((o: { label: string }) => o.label)).toEqual(['Geplant', 'Bestellt']);
+    expect(c.startValue()).toBe('0');
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
-  /** § 003040: a new phase, moved up, saves with its new position; the event page sends its list. */
-  it('adds a phase, moves it up and saves the list in the new order', async () => {
+  /** § 003040: a new status goes to the end and can be the start; the event page sends its list. */
+  it('adds a status at the end, makes it the start and saves the list', async () => {
     const { c, api, toast } = await setup({ kind: 'event' });
-    expect(screen.getByRole('heading', { name: 'Veranstaltungsphasen' })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^Datum von Phase/)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Veranstaltungszustände' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Datum/)).toBeNull();
     c.add();
     c.setName(3, 'In Planung');
-    c.move(3, -1);
-    c.move(2, -1);
+    expect(c.startOptions().map((o: { value: string }) => o.value)).toEqual(['0', '3']);
+    c.setStart('3');
+    expect(c.startValue()).toBe('3');
     expect(c.body()).not.toBeNull();
     c.save();
     expect(api.putStatusList).toHaveBeenCalledTimes(1);
@@ -93,32 +98,34 @@ describe('AdminStatusesComponent', () => {
     expect(kind).toBe('event');
     expect(body.statuses.map((s) => s.key)).toEqual([
       'planned',
-      'in_planung',
       'settled',
       'cancelled',
+      'in_planung',
     ]);
-    expect(body.statuses.map((s) => s.start)).toEqual([true, false, false, false]);
-    expect(body.statuses[1]).toEqual({
+    expect(body.statuses.map((s) => s.start)).toEqual([false, false, false, true]);
+    expect(body.statuses[3]).toEqual({
       key: 'in_planung',
       name: { de: 'In Planung' },
       tone: 'neutral',
       phase: 'open',
-      start: false,
+      start: true,
     });
     expect(body.replacements).toEqual({});
     expect(toast.success).toHaveBeenCalled();
   });
 
-  /** § 003035: the first phase is the start, so it needs the kind open; each kind once. */
+  /** § 003035: the start status needs the kind open; each kind once. */
   it('refuses a list without an open start or without a kind', async () => {
     const { c } = await setup({ kind: 'event' });
-    c.move(0, 1);
+    c.patch(0, { phase: 'done' });
     expect(c.body()).toBeNull();
-    expect(c.phaseError(0)).toBe('Die erste Phase ist der Start und braucht die Art Offen.');
-    c.move(0, 1);
+    expect(c.startValue()).toBe('');
+    expect(c.startError()).toBe('Wähle einen Startzustand der Art Offen.');
+    c.patch(0, { phase: 'open' });
+    expect(c.startError()).toBe('');
     c.remove(2);
     expect(c.body()).toBeNull();
-    expect(c.missing()).toBe('Es fehlt eine Phase der Art Verworfen.');
+    expect(c.missing()).toBe('Es fehlt ein Zustand der Art Verworfen.');
     c.discard();
     expect(c.body()).not.toBeNull();
     expect(c.form.dirty()).toBe(false);
@@ -130,7 +137,7 @@ describe('AdminStatusesComponent', () => {
     c.remove(3);
     expect(c.rows()).toHaveLength(4);
     expect(c.deleteTitle()).toBe('„Storniert“ löschen');
-    expect(c.deleteSub()).toBe('Bestellungen in dieser Phase: 3');
+    expect(c.deleteSub()).toBe('Bestellungen in diesem Zustand: 3');
     expect(c.targets().map((o: { value: string }) => o.value)).toEqual([
       'planned',
       'ordered',
@@ -147,7 +154,7 @@ describe('AdminStatusesComponent', () => {
     c.patch(3, { phase: 'void', tone: 'muted' });
     // The target takes the moved Bestellungen, so its own delete asks again and passes them on.
     c.remove(2);
-    expect(c.deleteSub()).toBe('Bestellungen in dieser Phase: 4');
+    expect(c.deleteSub()).toBe('Bestellungen in diesem Zustand: 4');
     c.replaceWith('ordered');
     c.add();
     c.setName(3, 'Fertig');
@@ -222,7 +229,7 @@ describe('AdminStatusesComponent', () => {
     expect(c.screenState()).toEqual(
       expect.objectContaining({
         state: 'error',
-        message: 'Die Phasen konnten nicht geladen werden.',
+        message: 'Die Zustände konnten nicht geladen werden.',
       }),
     );
     c.screenState().retry();
@@ -231,10 +238,10 @@ describe('AdminStatusesComponent', () => {
   });
 
   it('shows no list without the right of its page', async () => {
-    const { api } = await setup({ perms: ['admin.event_phases'] });
+    const { api } = await setup({ perms: ['admin.event_statuses'] });
     expect(api.getStatusList).not.toHaveBeenCalled();
     expect(
-      screen.getByText('Für diese Seite fehlt das Recht, Bestellphasen zu verwalten.'),
+      screen.getByText('Für diese Seite fehlt das Recht, Bestellzustände zu verwalten.'),
     ).toBeInTheDocument();
   });
 });

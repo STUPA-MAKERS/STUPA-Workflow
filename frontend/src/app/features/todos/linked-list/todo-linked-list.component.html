@@ -72,41 +72,25 @@
             </span>
           </li>
         }
-        @for (row of links(); track row.id) {
-          @if (row.card; as card) {
-            @if (card.event; as event) {
-              <li class="tl__row tl__row--event" data-testid="tl-event">
-                <app-icon class="tl__icon" name="cal" [size]="18" />
-                <span class="tl__text">
-                  <a
-                    class="tl__link"
-                    routerLink="/todos"
-                    [queryParams]="{ card: card.id }"
-                    [state]="{ cardReturn: true }"
-                    >{{ card.title }}</a
-                  >
-                  <span class="tl__sub">{{ eventSub(card) }}</span>
-                  <span class="tl__sub">
-                    @if (event.place) {
-                      {{ event.place }} ·
-                    }
-                    {{ 'todos.eventCard.balance' | t }}
-                    <span class="num" [class.tl__neg]="negative(card.balance)">{{
-                      money(card.balance)
-                    }}</span>
-                  </span>
-                </span>
-                @if (card.assignees.length) {
-                  <app-avatar-stack
-                    [size]="avatarSize()"
-                    [names]="names(card)"
-                    [principalIds]="ids(card)"
-                    [max]="3"
-                  />
-                }
-                <ng-container *ngTemplateOutlet="unlink; context: { $implicit: row }" />
-              </li>
-            } @else {
+        @for (entry of entries(); track entry.key) {
+          @if (entry.fold; as fold) {
+            <li class="tl__row" data-testid="tl-fold">
+              <app-icon class="tl__icon" name="swap" [size]="18" />
+              <span class="tl__text">
+                <button
+                  type="button"
+                  class="tl__link tl__fold"
+                  [attr.aria-expanded]="bookingsOpen()"
+                  (click)="bookingsOpen.set(!bookingsOpen())"
+                >
+                  {{ 'todos.linked.bookings' | t: { n: fold.count } }}
+                </button>
+                <span class="tl__sub num">{{ fold.sum }}</span>
+              </span>
+              <app-icon class="tl__icon" [name]="bookingsOpen() ? 'up' : 'down'" [size]="18" />
+            </li>
+          } @else if (entry.row; as row) {
+            @if (row.card; as card) {
               <li class="tl__row" [class.tl__row--done]="card.isDone">
                 <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
                 <span class="tl__text">
@@ -129,20 +113,20 @@
                 }
                 <ng-container *ngTemplateOutlet="unlink; context: { $implicit: row }" />
               </li>
+            } @else {
+              <li class="tl__row" data-testid="tl-link-row">
+                <app-icon class="tl__icon" [name]="icon(row)" [size]="18" />
+                <span class="tl__text">
+                  @if (row.url; as url) {
+                    <a class="tl__link" [appLinkTo]="url">{{ title(row) }}</a>
+                  } @else {
+                    <span class="tl__plain" [class.tl__muted]="!row.accessible">{{ title(row) }}</span>
+                  }
+                  <span class="tl__sub">{{ linkSub(row) }}</span>
+                </span>
+                <ng-container *ngTemplateOutlet="unlink; context: { $implicit: row }" />
+              </li>
             }
-          } @else {
-            <li class="tl__row" data-testid="tl-link-row">
-              <app-icon class="tl__icon" [name]="icon(row)" [size]="18" />
-              <span class="tl__text">
-                @if (row.url; as url) {
-                  <a class="tl__link" [appLinkTo]="url">{{ title(row) }}</a>
-                } @else {
-                  <span class="tl__plain" [class.tl__muted]="!row.accessible">{{ title(row) }}</span>
-                }
-                <span class="tl__sub">{{ linkSub(row) }}</span>
-              </span>
-              <ng-container *ngTemplateOutlet="unlink; context: { $implicit: row }" />
-            </li>
           }
         }
       </ul>

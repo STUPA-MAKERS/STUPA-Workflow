@@ -60,7 +60,6 @@
   "backend/app/modules/todos/boards.py": 1,
   "backend/app/modules/todos/hooks.py": 1,
   "backend/app/modules/todos/service/boards.py": 1,
-  "backend/app/modules/todos/service/card_events.py": 3,
   "backend/app/modules/todos/service/card_parts.py": 7,
   "backend/app/modules/todos/service/cards.py": 6,
   "backend/app/modules/todos/service/columns.py": 7,

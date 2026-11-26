@@ -54,6 +54,9 @@ Backend domain modules (`backend/app/modules/<module>`):
   invoices *(critical)*
 - **be-orders** — Bestellungen of an approved Antrag: purchases with planned and real price,
   status, positions, buyer, own files, right `order.manage`, the page "Bestellungen" (/orders)
+- **be-events** — Veranstaltungen as an element with a team: fields, status list `event`,
+  totals and decisions from links, series, segments, Buchung picker, export, the page
+  "Veranstaltungen" (/events)
 - **be-notifications** — mail templates (Jinja2 sandboxed), rules, prefs, arq dispatch
 - **be-webhooks** — outgoing event webhooks, SSRF guard, HMAC signature *(critical)*
 - **be-audit** — append-only sha256 hash chain, DB trigger, chain verification *(critical)*

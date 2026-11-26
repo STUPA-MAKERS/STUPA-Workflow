@@ -32,6 +32,7 @@ class Feature(StrEnum):
     BUDGET = "budget"
     INVOICES = "invoices"
     ORDERS = "orders"
+    EVENTS = "events"
     TICKETS = "tickets"
     GRAPH = "graph"
     PUBLIC = "public"
@@ -67,6 +68,7 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     budget: bool = Field(default=True)
     invoices: bool = Field(default=True)
     orders: bool = Field(default=True)
+    events: bool = Field(default=True)
     tickets: bool = Field(default=True)
     graph: bool = Field(default=True)
     public: bool = Field(default=True)

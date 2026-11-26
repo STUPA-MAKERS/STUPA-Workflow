@@ -2,13 +2,10 @@
 id: "000480"
 title: A Buchung can name its Event
 kind: functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-10
-implementation:
-  - frontend/src/app/features/todos/event-link.state.ts
-  - frontend/src/app/pages/expenses/expense-dialogs.state.ts
-  - frontend/src/app/pages/expenses/booking-form/booking-form.component.html
+updated: 2026-11-25
+replaced_by: F/collaboration/events/003033
 scope:
   - backend/app/modules/todos
   - frontend/src/app/features/todos

@@ -33,6 +33,10 @@ WebhookEventName = Literal[
     "invoice.created",
     "order.created",
     "order.status_changed",
+    "event.created",
+    "event.updated",
+    "event.status_changed",
+    "event.deleted",
     "ticket.created",
     "ticket.message",
     "ticket.status",
@@ -42,7 +46,9 @@ WebhookEventName = Literal[
 #: subscribes to it.
 TEST_EVENT = "webhook.test"
 
-EventGroup = Literal["applications", "votes", "meetings", "protocols", "budget", "tickets"]
+EventGroup = Literal[
+    "applications", "votes", "meetings", "protocols", "budget", "events", "tickets"
+]
 
 _ID = "3f6c1d2e-8a4b-4c5d-9e6f-7a8b9c0d1e2f"
 
@@ -127,6 +133,21 @@ _ORDER_FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("actualAmount", None),
     FieldSpec("applicationTitle", "Zuschuss Sommerfest"),
     FieldSpec("url", "https://example.org/orders/" + _ID),
+)
+
+_EVENT_FIELDS: tuple[FieldSpec, ...] = (
+    FieldSpec("number", "V-7K3QX9MD"),
+    FieldSpec("title", "Sommerfest"),
+    FieldSpec("status", "planned"),
+    FieldSpec("startsOn", "2026-06-20"),
+    FieldSpec("startTime", "16:00:00"),
+    FieldSpec("endsOn", "2026-06-20"),
+    FieldSpec("endTime", "23:00:00"),
+    FieldSpec("place", "Campus-Wiese"),
+    FieldSpec("participants", 400),
+    FieldSpec("shopUrl", "https://shop.example.org/sommerfest"),
+    FieldSpec("teamName", "Kultur"),
+    FieldSpec("url", "https://example.org/events?id=" + _ID),
 )
 
 _CATALOG: tuple[EventSpec, ...] = (
@@ -217,6 +238,15 @@ _CATALOG: tuple[EventSpec, ...] = (
         ("orderId", "applicationId"),
         (*_ORDER_FIELDS, FieldSpec("fromStatus", "planned")),
     ),
+    EventSpec("event.created", "events", ("eventId",), _EVENT_FIELDS),
+    EventSpec("event.updated", "events", ("eventId",), _EVENT_FIELDS),
+    EventSpec(
+        "event.status_changed",
+        "events",
+        ("eventId",),
+        (*_EVENT_FIELDS, FieldSpec("fromStatus", "planned")),
+    ),
+    EventSpec("event.deleted", "events", ("eventId",), _EVENT_FIELDS),
     EventSpec(
         "ticket.created",
         "tickets",

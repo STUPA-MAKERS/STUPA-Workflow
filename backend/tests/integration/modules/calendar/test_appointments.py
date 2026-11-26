@@ -348,18 +348,20 @@ async def test_entries_follow_the_module_rules(
             ),
             201,
         )
-        fest = _ok(client.post(cards, json={"boardId": str(board), "title": "Sommerfest"}), 201)
         _ok(
-            client.put(
-                f"{cards}/{fest['id']}/event",
+            client.post(
+                "/api/events",
                 json={
+                    "teamId": str(stupa_t),
+                    "title": "Sommerfest",
                     "startsOn": "2031-05-30",
                     "endsOn": "2031-06-01",
                     "startTime": "19:00:00",
                     "endTime": "02:00:00",
                     "place": "Hof",
                 },
-            )
+            ),
+            201,
         )
         _create(client, **TIMED, teamIds=[str(stupa_t)])
         seen = _entries(client)
@@ -367,18 +369,23 @@ async def test_entries_follow_the_module_rules(
             ("appointment", "Klausurtagung", True),
             ("meeting", "Sitzung 12", False),
             ("card", "Bericht", False),
-            ("event", "Sommerfest", False),
+            ("event", "Sommerfest", True),
         ]
         assert seen[0]["source"] == "StuPa" and seen[0]["gremiumIds"] == [str(stupa)]
         assert (seen[1]["startTime"], seen[1]["source"]) == ("18:00:00", "StuPa")
         assert (seen[3]["endsOn"], seen[3]["place"]) == ("2031-06-01", "Hof")
         assert (seen[3]["startTime"], seen[3]["endTime"]) == ("19:00:00", "02:00:00")
-        assert [e["kind"] for e in _entries(client, mine=True)] == ["appointment", "meeting"]
+        assert [e["kind"] for e in _entries(client, mine=True)] == [
+            "appointment",
+            "meeting",
+            "event",
+        ]
         api.login(bert)
         assert [e["kind"] for e in _entries(client, mine=True)] == [
             "appointment",
             "meeting",
             "card",
+            "event",
         ]
         assert [
             e["title"] for e in _ok(client.get("/api/calendar/search", params={"q": "s"}))["items"]

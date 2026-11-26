@@ -7,7 +7,7 @@ owner: frederikbeimgraben
 updated: 2026-11-09
 implementation:
   - backend/app/modules/budget/tree/view.py
-  - backend/app/modules/todos/events.py
+  - backend/app/modules/events/facts.py
   - backend/app/modules/applications/decision.py
   - backend/app/modules/flow/service.py
   - backend/migrations/versions/e4a91c27b6d3_state_outcome_flags.py

@@ -9,7 +9,6 @@ from sqlalchemy import select
 
 from app.modules.auth.people import person_refs
 from app.modules.auth.principal import Principal
-from app.modules.todos import events as todo_events
 from app.modules.todos.models import (
     Link,
     TodoBoard,
@@ -18,17 +17,14 @@ from app.modules.todos.models import (
     TodoComment,
     TodoEvent,
 )
-from app.modules.todos.schemas import TodoCardDetail, TodoCardTile, TodoEventFacts
+from app.modules.todos.schemas import TodoCardDetail, TodoCardTile
 from app.modules.todos.service.base import TodoServiceBase
-from app.modules.todos.service.common import CardLink, _Facts
+from app.modules.todos.service.common import CardLink
 from app.modules.todos.service.rows import (
     _by_card,
-    _decision_out,
     _detail_people,
     _detail_refs,
     _DetailParts,
-    _edition_out,
-    _totals_out,
 )
 from app.shared.errors import NotFoundError
 
@@ -154,9 +150,6 @@ class DetailOps(TodoServiceBase):
         files = await self.files.message_attachments(
             "todo_comment", [c.id for card in cards for c in comments.get(card.id, ())]
         )
-        gathered = await self._event_facts(
-            [card for card in cards if card.id in facts.events], facts, principal
-        )
         parts = _DetailParts(
             facts=facts,
             columns=columns,
@@ -169,37 +162,5 @@ class DetailOps(TodoServiceBase):
             persons=persons,
             me=me,
             files=files,
-            gathered=gathered,
         )
         return [parts.detail(card, board) for card, board in pairs]
-
-    async def _event_facts(
-        self, cards: Sequence[TodoCard], facts: _Facts, principal: Principal
-    ) -> dict[uuid.UUID, TodoEventFacts]:
-        """The totals, decisions and other editions of the Events among ``cards``."""
-        if not cards:
-            return {}
-        readable = (await self.access.scope(principal)).condition()
-        found = {
-            card.id: await todo_events.editions(
-                self.session, card, facts.events[card.id].series_id, readable
-            )
-            for card in cards
-        }
-        ids = [
-            *(card.id for card in cards),
-            *(other.id for rows, _hidden in found.values() for other, _b, _e in rows),
-        ]
-        sums = await todo_events.totals(self.session, list(dict.fromkeys(ids)))
-        decided = {card.id: await todo_events.decisions(self.session, card.id) for card in cards}
-        return {
-            card.id: TodoEventFacts(
-                totals=_totals_out(sums[card.id]),
-                decisions=tuple(_decision_out(d) for d in decided[card.id]),
-                editions=[
-                    _edition_out(other, board, row, sums) for other, board, row in found[card.id][0]
-                ],
-                hidden_editions=found[card.id][1],
-            )
-            for card in cards
-        }

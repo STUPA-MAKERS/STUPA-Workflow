@@ -13,8 +13,8 @@ The routes of ``/api/links`` (spec 001409) use this service. A link has no direc
   other element. Two Paperless documents do not link. A new link stores the title, the
   type and the date of the document (§F/integrations/paperless/002763-002765).
 * A link with a card end writes the card events ``linked`` and ``unlinked`` and touches
-  the board, and an Event keeps its Antrag, Buchung or invoice to itself
-  (``event_link_taken``).
+  the board.
+* An Event keeps its Antrag, Buchung or invoice to itself (000481, ``event_link_taken``).
 * Each added or removed link writes an audit entry with the grant of a token
   (§F/collaboration/links/002923, ``link_audit``).
 
@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.principal import Principal
+from app.modules.events.facts import check_one_event
 from app.modules.todos import link_store
 from app.modules.todos.link_audit import audit_link
 from app.modules.todos.link_rights import LinkRights
@@ -51,6 +52,8 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, Vali
 
 #: The kind that gives read access to its links (spec 001405).
 GRANTING_KIND = "todo"
+#: The kind of an Event (F/collaboration/events/003033).
+EVENT_KIND = "event"
 #: The kind of a Paperless document (§F/integrations/paperless/002763).
 PAPERLESS_KIND = "paperless"
 
@@ -62,7 +65,7 @@ def _invalid(msg: str, code: str, field_name: str) -> ValidationProblem:
 def _order(row: LinkRow) -> tuple[bool, int, float]:
     """A linked Event first, then by kind, then the newest first."""
     return (
-        row.card is None or row.card.event is None,
+        row.kind != EVENT_KIND,
         LINK_KINDS.index(row.kind),
         -row.created_at.timestamp(),
     )
@@ -225,8 +228,8 @@ class LinkService:
             ForbiddenError: ``link_forbidden`` (HTTP 403).
             ServiceUnavailableError: ``paperless_unavailable`` for a Paperless end while
                 Paperless does not answer (HTTP 503).
-            ConflictError: ``link_exists``, or ``event_link_taken`` when a card end is an
-                Event and another Event links the Antrag, Buchung or invoice (HTTP 409).
+            ConflictError: ``link_exists``, or ``event_link_taken`` when an end is an Event
+                and another Event links the Antrag, Buchung or invoice (HTTP 409).
         """
         if one == other:
             raise _invalid("An element cannot link itself.", "link_self", "b")
@@ -240,8 +243,9 @@ class LinkService:
         if await link_store.link_between(self.session, one, other) is not None:
             raise ConflictError("The elements are linked.", code="link_exists")
         actor = await self.todos.actor_of(principal)
-        for end, card, _board in cards:
-            await self.todos.check_new_link(card, other if end == one else one)
+        for end in (one, other):
+            if end[0] == EVENT_KIND:
+                await check_one_event(self.session, end[1], [other if end == one else one])
         link = Link.between(one, other, actor)
         self.session.add(link)
         await audit_link(self.session, AuditAction.LINK_ADD, link, principal)

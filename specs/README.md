@@ -18,7 +18,7 @@ specs/
     functional/
       administration/  accounts, admin, audit, backups, files, privacy, translations
       applications/    applications, dashboard, flow, forms
-      collaboration/   activity, committees, graph, links, notifications, search, teams, tickets, todos
+      collaboration/   activity, committees, events, graph, links, notifications, search, teams, tickets, todos
       finance/         budget, invoices, orders
       integrations/    external, mcp, mollie, paperless, pretix, ticket-mail, webhooks
       meetings/        calendar, delegations, meetings, protocols, voting
@@ -109,11 +109,11 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/administration/admin/003017](requirements/functional/administration/admin/003017_permission-names.md) | Every global permission has a German and an English name | approved |
 | [F/administration/admin/003018](requirements/functional/administration/admin/003018_roles-page-permission-names.md) | The page Rollen & Rechte shows the name of a permission with its key | approved |
 | [F/administration/admin/003035](requirements/functional/administration/admin/003035_status-lists.md) | The statuses of an element are a list in the admin configuration | approved |
-| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the phase open, done or void | approved |
+| [F/administration/admin/003036](requirements/functional/administration/admin/003036_status-phases.md) | Each status has the kind open, done or void | approved |
 | [F/administration/admin/003037](requirements/functional/administration/admin/003037_status-date.md) | A status of a Bestellung can set a date | approved |
 | [F/administration/admin/003038](requirements/functional/administration/admin/003038_status-delete.md) | A status in use is deleted only with a replacement | approved |
 | [F/administration/admin/003039](requirements/functional/administration/admin/003039_status-start-values.md) | The status lists start with the statuses of today | approved |
-| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellphasen and Veranstaltungsphasen use the editor of the plan steps | approved |
+| [F/administration/admin/003040](requirements/functional/administration/admin/003040_status-editor.md) | The pages Bestellzustände and Veranstaltungszustände edit a list without a sequence | approved |
 | [F/administration/audit/000291](requirements/functional/administration/audit/000291_record-in-tx.md) | An audit entry is written in the same transaction | approved |
 | [F/administration/audit/000292](requirements/functional/administration/audit/000292_chain-check.md) | The audit chain is checked every night | approved |
 | [F/administration/audit/000293](requirements/functional/administration/audit/000293_three-permissions.md) | Read, check and revert are separate permissions | approved |
@@ -311,6 +311,21 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/committees/001854](requirements/functional/collaboration/committees/001854_notify-checks.md) | A members message is checked and audited | approved |
 | [F/collaboration/committees/002600](requirements/functional/collaboration/committees/002600_manage-opens-gremien-page.md) | Gremium verwalten opens the Gremium on the Gremien page | approved |
 | [F/collaboration/committees/003078](requirements/functional/collaboration/committees/003078_info-edit-action.md) | The edit action of a filled Info sits under it | draft |
+| [F/collaboration/events/003022](requirements/functional/collaboration/events/003022_event-element.md) | An Event is an element of its own | approved |
+| [F/collaboration/events/003023](requirements/functional/collaboration/events/003023_event-fields.md) | An Event holds these fields | approved |
+| [F/collaboration/events/003024](requirements/functional/collaboration/events/003024_event-shop.md) | An Event has a link to its shop | approved |
+| [F/collaboration/events/003025](requirements/functional/collaboration/events/003025_event-status.md) | An Event has a status of its status list | approved |
+| [F/collaboration/events/003026](requirements/functional/collaboration/events/003026_event-rights.md) | The team of an Event gives its rights | approved |
+| [F/collaboration/events/003027](requirements/functional/collaboration/events/003027_events-page.md) | Veranstaltungen is a page of its own with a list and a detail | approved |
+| [F/collaboration/events/003028](requirements/functional/collaboration/events/003028_events-segments.md) | The page Veranstaltungen has four segments | approved |
+| [F/collaboration/events/003029](requirements/functional/collaboration/events/003029_event-detail.md) | The detail of an Event shows its money, decisions and series | approved |
+| [F/collaboration/events/003030](requirements/functional/collaboration/events/003030_event-next-edition.md) | Folgeveranstaltung anlegen copies the plan | approved |
+| [F/collaboration/events/003031](requirements/functional/collaboration/events/003031_event-migration.md) | The migration makes an Event of each event card | approved |
+| [F/collaboration/events/003032](requirements/functional/collaboration/events/003032_events-feature-switch.md) | Veranstaltungen have a feature switch | approved |
+| [F/collaboration/events/003033](requirements/functional/collaboration/events/003033_event-reach.md) | An Event is a link kind, a search source and a calendar entry | approved |
+| [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
+| [F/collaboration/events/003041](requirements/functional/collaboration/events/003041_event-bookings-collapsed.md) | Many bookings of an Event fold into one row | approved |
+| [F/collaboration/events/003042](requirements/functional/collaboration/events/003042_event-status-field.md) | The detail of an Event changes the status in a dropdown | approved |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -422,17 +437,17 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/000443](requirements/functional/collaboration/todos/000443_board-columns.md) | A board has one done column | approved |
 | [F/collaboration/todos/000444](requirements/functional/collaboration/todos/000444_boards-tab.md) | The to-do tab is Boards | approved |
 | [F/collaboration/todos/000467](requirements/functional/collaboration/todos/000467_card-version-conflict.md) | Concurrent card edits give 409 | approved |
-| [F/collaboration/todos/000478](requirements/functional/collaboration/todos/000478_event-card.md) | An Event is a card with event data | approved |
+| [F/collaboration/todos/000478](requirements/functional/collaboration/todos/000478_event-card.md) | An Event is a card with event data | replaced |
 | [F/collaboration/todos/000479](requirements/functional/collaboration/todos/000479_event-totals.md) | An Event shows the totals of its links | approved |
-| [F/collaboration/todos/000480](requirements/functional/collaboration/todos/000480_event-picker.md) | A Buchung can name its Event | approved |
+| [F/collaboration/todos/000480](requirements/functional/collaboration/todos/000480_event-picker.md) | A Buchung can name its Event | replaced |
 | [F/collaboration/todos/000481](requirements/functional/collaboration/todos/000481_one-event-per-element.md) | An Antrag or a Buchung belongs to at most one Event | approved |
 | [F/collaboration/todos/000482](requirements/functional/collaboration/todos/000482_event-decisions.md) | An Event lists its decisions | approved |
 | [F/collaboration/todos/000483](requirements/functional/collaboration/todos/000483_event-series.md) | An Event can belong to a series | approved |
-| [F/collaboration/todos/000484](requirements/functional/collaboration/todos/000484_next-edition.md) | Folgeveranstaltung anlegen copies the plan, not the facts | approved |
-| [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | approved |
-| [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | approved |
+| [F/collaboration/todos/000484](requirements/functional/collaboration/todos/000484_next-edition.md) | Folgeveranstaltung anlegen copies the plan, not the facts | replaced |
+| [F/collaboration/todos/000485](requirements/functional/collaboration/todos/000485_events-findable.md) | Archived Events stay findable | replaced |
+| [F/collaboration/todos/000486](requirements/functional/collaboration/todos/000486_event-calendar.md) | An Event with a start is in the calendar | replaced |
 | [F/collaboration/todos/000487](requirements/functional/collaboration/todos/000487_card-grants-read.md) | A card gives read access to its links | approved |
-| [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | approved |
+| [F/collaboration/todos/000488](requirements/functional/collaboration/todos/000488_to-do-becomes-event-once.md) | A to-do becomes an Event only once | replaced |
 | [F/collaboration/todos/000489](requirements/functional/collaboration/todos/000489_links-are-called-linked.md) | The cards of an element are under Verknüpft | replaced |
 | [F/collaboration/todos/000547](requirements/functional/collaboration/todos/000547_create-card-from-element.md) | A card is created from the detail of an element | approved |
 | [F/collaboration/todos/000548](requirements/functional/collaboration/todos/000548_link-card-from-element.md) | An element is linked to a card from its detail | replaced |
@@ -780,7 +795,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/calendar/000732](requirements/functional/meetings/calendar/000732_public-meetings.md) | The public calendar shows the meetings of Gremien with public protocols | approved |
 | [F/meetings/calendar/000733](requirements/functional/meetings/calendar/000733_public-ics-feed.md) | The public calendar has an ICS feed without a token | approved |
 | [F/meetings/calendar/000734](requirements/functional/meetings/calendar/000734_public-calendar-noindex.md) | The public calendar is not indexed | approved |
-| [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | approved |
+| [F/meetings/calendar/000737](requirements/functional/meetings/calendar/000737_event-as-termin.md) | The Kalender shows an Event like a Termin | replaced |
 | [F/meetings/calendar/000738](requirements/functional/meetings/calendar/000738_termin-invite-person-search.md) | The invitation search finds each active account by name | approved |
 | [F/meetings/calendar/000740](requirements/functional/meetings/calendar/000740_termin-open-answers.md) | The answer list of a Termin names the invited persons without an answer | approved |
 | [F/meetings/calendar/000973](requirements/functional/meetings/calendar/000973_rule-with-day-times.md) | A recurrence rule with times of the day gives only the first date | approved |

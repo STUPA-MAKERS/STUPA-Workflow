@@ -109,11 +109,10 @@ TYPICAL FLOWS:
 - To-do card parts: subtasks are the checklist of a card — `todo_checklist_add`,
   `todo_checklist_update(card_id, item_id, done=True)` ticks one, `todo_checklist_remove`;
   `todo_card_create` takes `checklist` too. `todo_card_assignee_add/_remove`,
-  `todo_card_label_add/_remove`, `todo_card_event_set` (an Event with its Reihe from
-  `todo_series`), `todo_card_archive`/`_restore`. Board setup (`manage`): `todo_column_*`,
-  `todo_label_*`, `todo_board_update`.
+  `todo_card_label_add/_remove`, `todo_card_archive`/`_restore`. Board setup
+  (`manage`): `todo_column_*`, `todo_label_*`, `todo_board_update`.
 - Links between any two elements (Antrag, Sitzung, TOP, Abstimmung, Termin, Gremium,
-  Rechnung, Buchung, Kostenstelle, Ticket, Karte): `link_targets` finds an end,
+  Rechnung, Buchung, Kostenstelle, Ticket, Karte, Veranstaltung): `link_targets` finds an end,
   `link_add(a, b)`, `link_list(kind, target_id)`, `link_remove(link_id)`, `link_view`
   (the other end of a card link). A link has no direction; the caller reads both ends
   and changes at least one (403 `link_forbidden`).
@@ -127,6 +126,12 @@ TYPICAL FLOWS:
   and `export_orders_xlsx`.
   Only a person creates a Bestellung, for an approved Antrag of a type with money. A
   write needs `order.manage`.
+- Veranstaltungen (Events) belong to a team, and a member of the team reads and writes
+  them: `event_list` (segment, team, series, search), `event_get`, `event_teams`,
+  `event_create`, `event_update` (needs `version`), `event_set_status`, `event_delete`,
+  `event_series`/`event_series_create` (the Reihen), `event_refs` and
+  `export_events_xlsx`. The money comes from links: `link_add` an Antrag, a Buchung or
+  an invoice to the kind `event`; each of them links at most one Event.
 - Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
   `gremium_attendance`, `get_gremium_info`/`set_gremium_info`, `get_team_info`/
   `set_team_info`; `calendar_entries`, `create_appointment` (a Termin with invitations),

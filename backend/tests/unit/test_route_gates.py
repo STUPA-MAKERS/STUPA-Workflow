@@ -38,6 +38,7 @@ from app.deps import require_any_permission, require_applicant, require_group, r
 from tests.unit.test_public_routes import _is_auth, _routes
 
 _LIVE = "MeetingService.assert_can_read"
+_EVENT_TEAM = "events.access.event_team_ids (team member, spec 003026)"
 _MEETING_WRITE = "MeetingOut.can_write (PermissionOps.can_write)"
 _MEETING_MANAGE = "PermissionOps.can_manage (policy.has_gremium_permission session.manage)"
 _MEETING_VOTES = "MeetingOut.can_manage_votes (PermissionOps.can_manage_votes)"
@@ -293,9 +294,6 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/todos/cards/{card_id}/comments"): _TODO_WRITE,
     ("PATCH", "/api/todos/cards/{card_id}/comments/{comment_id}"): _TODO_WRITE,
     ("DELETE", "/api/todos/cards/{card_id}/comments/{comment_id}"): _TODO_WRITE,
-    ("PUT", "/api/todos/cards/{card_id}/event"): _TODO_WRITE,
-    ("DELETE", "/api/todos/cards/{card_id}/event"): _TODO_WRITE,
-    ("POST", "/api/todos/cards/{card_id}/follow-up"): _TODO_WRITE,
     ("POST", "/api/todos/cards/{card_id}/labels"): _TODO_WRITE,
     ("DELETE", "/api/todos/cards/{card_id}/labels/{label_id}"): _TODO_WRITE,
     ("POST", "/api/todos/cards/{card_id}/move"): _TODO_WRITE,
@@ -313,7 +311,6 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("PATCH", "/api/todos/boards/{board_id}/entries/{entry_id}"): _TODO_CONFIGURE,
     ("DELETE", "/api/todos/boards/{board_id}/entries/{entry_id}"): _TODO_CONFIGURE,
     ("GET", "/api/todos/entry-options"): "master data: gremien and person names for the picker",
-    ("GET", "/api/todos/events"): "TodoService.writable_events (BoardAccess.can_write)",
     ("GET", "/api/links"): "LinkService.of (LinkResolver.readable per kind, spec 001407)",
     ("POST", "/api/links"): "LinkService.add (LinkRights.can_change, spec 001404)",
     ("DELETE", "/api/links/{link_id}"): "LinkService.remove (LinkRights.can_change, spec 001404)",
@@ -321,8 +318,16 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("GET", "/api/links/{link_id}/view"): "BoardAccess.can_read + LinkResolver grant (000487)",
     ("GET", "/api/todos/mine"): _TODO_SCOPE,
     ("GET", "/api/todos/mine/boards"): _TODO_SCOPE,
-    ("GET", "/api/todos/series"): "any member; names of series only (spec 000483)",
-    ("POST", "/api/todos/series"): "TodoService.create_series (writes a shared board)",
+    ("GET", "/api/events"): _EVENT_TEAM,
+    ("POST", "/api/events"): _EVENT_TEAM,
+    ("GET", "/api/events/teams"): _EVENT_TEAM,
+    ("GET", "/api/events/refs"): _EVENT_TEAM,
+    ("GET", "/api/events/series"): "any member; names of series only (spec 000483)",
+    ("POST", "/api/events/series"): "EventService.create_series (member of a team, spec 000483)",
+    ("GET", "/api/events/{event_id}"): _EVENT_TEAM,
+    ("PATCH", "/api/events/{event_id}"): _EVENT_TEAM,
+    ("DELETE", "/api/events/{event_id}"): _EVENT_TEAM,
+    ("POST", "/api/events/{event_id}/status"): _EVENT_TEAM,
     ("GET", "/api/votes"): "voting.listing.read_scope",
     ("POST", "/api/votes"): (
         "PollService.can_create (policy.has_gremium_permission vote.manage), also for "

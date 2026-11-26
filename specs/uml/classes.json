@@ -442,6 +442,27 @@
       "to": "Principal"
     },
     {
+      "column": "created_by",
+      "from": "Event",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Principal"
+    },
+    {
+      "column": "team_id",
+      "from": "Event",
+      "multiplicity": "*",
+      "onDelete": "RESTRICT",
+      "to": "Team"
+    },
+    {
+      "column": "series_id",
+      "from": "Event",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "TodoEventSeries"
+    },
+    {
       "column": "team_id",
       "from": "ExternalCalendar",
       "multiplicity": "*",
@@ -1203,20 +1224,6 @@
       "multiplicity": "*",
       "onDelete": "NO ACTION",
       "to": "TodoColumn"
-    },
-    {
-      "column": "card_id",
-      "from": "TodoCardEvent",
-      "multiplicity": "1",
-      "onDelete": "CASCADE",
-      "to": "TodoCard"
-    },
-    {
-      "column": "series_id",
-      "from": "TodoCardEvent",
-      "multiplicity": "*",
-      "onDelete": "SET NULL",
-      "to": "TodoEventSeries"
     },
     {
       "column": "card_id",
@@ -3579,6 +3586,123 @@
     {
       "attributes": [
         {
+          "name": "number",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "team_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "title",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "description_md",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "starts_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "start_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "ends_on",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "end_time",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TIME"
+        },
+        {
+          "name": "place",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "participants",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "series_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "shop_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "version",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "INTEGER"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "Event",
+      "module": "events",
+      "name": "Event",
+      "path": "backend/app/modules/events/models.py",
+      "table": "event"
+    },
+    {
+      "attributes": [
+        {
           "name": "name",
           "nullable": false,
           "primaryKey": false,
@@ -4497,6 +4621,7 @@
             "invoice",
             "expense",
             "order",
+            "event",
             "budget",
             "ticket",
             "todo",
@@ -4524,6 +4649,7 @@
             "invoice",
             "expense",
             "order",
+            "event",
             "budget",
             "ticket",
             "todo",
@@ -8108,63 +8234,6 @@
       "name": "TodoCard",
       "path": "backend/app/modules/todos/models.py",
       "table": "todo_card"
-    },
-    {
-      "attributes": [
-        {
-          "name": "card_id",
-          "nullable": false,
-          "primaryKey": true,
-          "type": "CHAR(32)"
-        },
-        {
-          "name": "starts_on",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "DATE"
-        },
-        {
-          "name": "ends_on",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "DATE"
-        },
-        {
-          "name": "start_time",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TIME"
-        },
-        {
-          "name": "end_time",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TIME"
-        },
-        {
-          "name": "place",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "TEXT"
-        },
-        {
-          "name": "participants",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "INTEGER"
-        },
-        {
-          "name": "series_id",
-          "nullable": true,
-          "primaryKey": false,
-          "type": "CHAR(32)"
-        }
-      ],
-      "id": "TodoCardEvent",
-      "module": "todos",
-      "name": "TodoCardEvent",
-      "path": "backend/app/modules/todos/models.py",
-      "table": "todo_card_event"
     },
     {
       "attributes": [

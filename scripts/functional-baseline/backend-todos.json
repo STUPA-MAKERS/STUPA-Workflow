@@ -7,7 +7,6 @@
   "backend/app/modules/todos/schemas.py": 1,
   "backend/app/modules/todos/service/base.py": 5,
   "backend/app/modules/todos/service/boards.py": 2,
-  "backend/app/modules/todos/service/card_events.py": 1,
   "backend/app/modules/todos/service/card_parts.py": 2,
   "backend/app/modules/todos/service/cards.py": 21,
   "backend/app/modules/todos/service/columns.py": 10,

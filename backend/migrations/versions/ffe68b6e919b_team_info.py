@@ -10,7 +10,7 @@ Idempotent. A fresh database already gets the table from the ``create_all`` base
 The downgrade drops the table.
 
 Revision ID: ffe68b6e919b
-Revises: 5d8c2a7e41f3
+Revises: b3e7d1c9a402
 Create Date: 2026-11-26 11:30:00
 """
 
@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "ffe68b6e919b"
-down_revision: str | None = "5d8c2a7e41f3"
+down_revision: str | None = "b3e7d1c9a402"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -39,8 +39,8 @@ export const ADMIN_AREA_PERMISSIONS = [
   'privacy.manage',
   'webhook.manage',
   'admin.calendars',
-  'admin.order_phases',
-  'admin.event_phases',
+  'admin.order_statuses',
+  'admin.event_statuses',
   'admin.features',
   'admin.paperless',
   'ticket.manage',
@@ -66,6 +66,7 @@ export type NavKey =
   | 'expenses'
   | 'invoices'
   | 'orders'
+  | 'events'
   | 'tickets'
   | 'protocols'
   | 'decisions'
@@ -168,6 +169,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, feature: 'budget', place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, feature: 'invoices', place: 'main' },
   { key: 'orders', path: '/orders', labelKey: 'nav.orders', icon: 'package', permissions: ORDER_PERMISSIONS, feature: 'orders', place: 'main' },
+  /** The Events of the teams of the person (spec 003027); the API answers each person. */
+  { key: 'events', path: '/events', labelKey: 'nav.events', icon: 'mappin', permissions: [], feature: 'events', place: 'main' },
   { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, feature: 'tickets', place: 'main' },
   /** The graph of the elements and their relations (specs 001420, 001421). */
   { key: 'graph', path: '/graph', labelKey: 'nav.graph', icon: 'shapes', permissions: ['graph.view'], feature: 'graph', place: 'main' },

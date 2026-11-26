@@ -66,6 +66,7 @@ from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, In
 from app.modules.calendar.models import Appointment as CalendarAppointment
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.events.models import Event
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.models import (
     DelegationSubstitute,
@@ -478,8 +479,12 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         session.add(card)
         await session.flush()
         order_id = uuid.uuid4()
+        team = Team(name=f"Team {tag}")
+        session.add(team)
+        await session.flush()
         session.add_all(
             [
+                Event(team_id=team.id, status="planned", title=f"Fest {tag}", created_by=old.id),
                 TodoAssignee(card_id=card.id, principal_id=old.id),
                 TodoComment(
                     card_id=card.id, author_id=old.id, body="Merken", mentions=[str(old.id)]
@@ -664,7 +669,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert after["memberships"]["removed"] == 1
     assert after["calendar"]["removed"] == 1
     assert after["tickets"] == {"rewritten": 6, "combined": 0, "removed": 0}
-    assert after["todos"] == {"rewritten": 8, "combined": 0, "removed": 0}
+    assert after["todos"] == {"rewritten": 9, "combined": 0, "removed": 0}
 
     async with maker() as session:
         for column in SUB_REFS:

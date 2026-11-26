@@ -61,19 +61,6 @@ describe('TodosApiService', () => {
     http.expectOne((r) => r.url === '/api/todos/entry-options' && r.params.get('q') === 'as').flush({ gremien: [], persons: [] });
   });
 
-  it('searches series and writable Events, with the term only when given', () => {
-    api.series().subscribe();
-    expect(http.expectOne((r) => r.url === '/api/todos/series').request.params.keys()).toEqual([]);
-    api.series('Fest').subscribe();
-    http.expectOne((r) => r.url === '/api/todos/series' && r.params.get('q') === 'Fest').flush([]);
-    api.writableEvents().subscribe();
-    expect(http.expectOne((r) => r.url === '/api/todos/events').request.params.keys()).toEqual([]);
-    api.writableEvents('Ball').subscribe();
-    http.expectOne((r) => r.url === '/api/todos/events' && r.params.get('q') === 'Ball').flush([]);
-    api.createSeries('Neu').subscribe();
-    expect(http.expectOne('/api/todos/series').request.body).toEqual({ name: 'Neu' });
-  });
-
   it('reads cards in a batch, a tile and the sheet of a link', () => {
     api.cards(['k-1', 'k-2']).subscribe();
     expect(http.expectOne((r) => r.url === '/api/todos/cards').request.params.getAll('ids')).toEqual(['k-1', 'k-2']);

@@ -112,6 +112,7 @@ from app.modules.calendar.models import Answer as CalendarAnswer
 from app.modules.calendar.models import Appointment as CalendarAppointment
 from app.modules.calendar.models import Invitation as CalendarInvitation
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.events.models import Event
 from app.modules.forms.models import FormVersion
 from app.modules.gremien.membership_sync import sync_principal_memberships
 from app.modules.gremien.models import (
@@ -246,6 +247,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", TodoEvent.actor_id),
     ("todos", Link.created_by),
     ("todos", TodoEventSeries.created_by),
+    ("todos", Event.created_by),
     ("calendar", CalendarAppointment.creator_id),
     ("budget", PurchaseOrder.buyer_id),
 )

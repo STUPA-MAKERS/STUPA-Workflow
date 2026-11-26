@@ -208,7 +208,7 @@ describe('CalendarComponent (desktop)', () => {
   });
 
   /** § 000714: a card entry opens the card, a meeting entry opens the meeting. */
-  it('opens the card of a card entry and the page of a meeting', async () => {
+  it('opens the card of a card entry, the page of a meeting and the page of an Event', async () => {
     const view = await setup();
     load(view);
     await userEvent.click(within(panel()).getByRole('button', { name: /Angebot einholen/ }));
@@ -219,7 +219,7 @@ describe('CalendarComponent (desktop)', () => {
     expect(view.router.url).toBe('/meetings/m-35');
     view.cmp.openEntry(EVENT);
     await view.fixture.whenStable();
-    expect(view.router.url).toBe('/todos?card=e-1');
+    expect(view.router.url).toBe('/events?id=e-1');
   });
 
   it('opens a Termin in the dialog and keeps its answer in the card', async () => {

@@ -7,7 +7,7 @@ sent" from ``null`` through ``model_fields_set``.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, datetime, time
+from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -33,6 +33,7 @@ TodoLinkKind = Literal[
     "invoice",
     "expense",
     "order",
+    "event",
     "budget",
     "ticket",
     "todo",
@@ -122,6 +123,7 @@ class TodoLinkDetail(FrozenCamelModel, frozen=True):
     place: str | None = None
     document_type: str | None = Field(default=None, serialization_alias="documentType")
     order_status: OrderStatus | None = Field(default=None, serialization_alias="orderStatus")
+    event_status: str | None = Field(default=None, serialization_alias="eventStatus")
 
 
 class TodoLinkOut(FrozenCamelModel, frozen=True):
@@ -180,88 +182,8 @@ class ChecklistCount(FrozenCamelModel, frozen=True):
     total: int = 0
 
 
-class TodoEventBrief(FrozenCamelModel, frozen=True):
-    """The event data of a card: start, end, place, participants and series."""
-
-    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
-    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
-    start_time: time | None = Field(default=None, serialization_alias="startTime")
-    end_time: time | None = Field(default=None, serialization_alias="endTime")
-    place: str | None = None
-    participants: int | None = None
-    series_id: UUID | None = Field(default=None, serialization_alias="seriesId")
-    series_name: str | None = Field(default=None, serialization_alias="seriesName")
-
-
-class TodoEventTotals(FrozenCamelModel, frozen=True):
-    """The money of an Event as decimal strings with two places (spec 000479)."""
-
-    requested: str = "0.00"
-    approved: str = "0.00"
-    expenses: str = "0.00"
-    income: str = "0.00"
-    balance: str = "0.00"
-
-
-class TodoEventDecision(FrozenCamelModel, frozen=True):
-    """A decision of an Event: the valid decision of an Antrag or a closed vote."""
-
-    kind: Literal["decision", "vote"]
-    target_id: UUID | None = Field(default=None, serialization_alias="targetId")
-    title: str
-    decided_at: datetime | None = Field(default=None, serialization_alias="decidedAt")
-    meeting_title: str | None = Field(default=None, serialization_alias="meetingTitle")
-    result: str | None = None
-    amount: str | None = None
-    conditions: list[str] = Field(default_factory=list)
-
-
-class TodoEventEdition(FrozenCamelModel, frozen=True):
-    """Another Event of the series that the viewer reads."""
-
-    id: UUID
-    board_id: UUID = Field(serialization_alias="boardId")
-    board_name: str = Field(serialization_alias="boardName")
-    title: str
-    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
-    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
-    start_time: time | None = Field(default=None, serialization_alias="startTime")
-    end_time: time | None = Field(default=None, serialization_alias="endTime")
-    archived: bool = False
-    totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
-
-
-class TodoEventFacts(FrozenCamelModel, frozen=True):
-    """What an Event gathers: its totals, decisions and the other Events of its series."""
-
-    totals: TodoEventTotals = Field(default_factory=TodoEventTotals)
-    decisions: tuple[TodoEventDecision, ...] = Field(default_factory=tuple)
-    editions: list[TodoEventEdition] = Field(default_factory=list)
-    hidden_editions: int = Field(default=0, serialization_alias="hiddenEditions")
-
-
-class TodoEventSeriesOut(FrozenCamelModel, frozen=True):
-    """A series of Events (``Reihe``)."""
-
-    id: UUID
-    name: str
-
-
-class TodoEventRef(FrozenCamelModel, frozen=True):
-    """An Event that the caller can write: an option of the ``Veranstaltung`` picker."""
-
-    id: UUID
-    board_id: UUID = Field(serialization_alias="boardId")
-    board_name: str = Field(serialization_alias="boardName")
-    title: str
-    starts_on: date | None = Field(default=None, serialization_alias="startsOn")
-    ends_on: date | None = Field(default=None, serialization_alias="endsOn")
-    start_time: time | None = Field(default=None, serialization_alias="startTime")
-    end_time: time | None = Field(default=None, serialization_alias="endTime")
-
-
 class TodoCardTile(FrozenCamelModel, frozen=True):
-    """A card as a tile on the board; ``event`` is set for an Event."""
+    """A card as a tile on the board."""
 
     id: UUID
     board_id: UUID = Field(serialization_alias="boardId")
@@ -276,7 +198,6 @@ class TodoCardTile(FrozenCamelModel, frozen=True):
     comment_count: int = Field(default=0, serialization_alias="commentCount")
     primary_link: TodoLinkOut | None = Field(default=None, serialization_alias="primaryLink")
     link_count: int = Field(default=0, serialization_alias="linkCount")
-    event: TodoEventBrief | None = None
     version: int = 1
     created_at: datetime = Field(serialization_alias="createdAt")
     updated_at: datetime = Field(serialization_alias="updatedAt")
@@ -373,7 +294,6 @@ class TodoCardDetail(TodoCardTile, frozen=True):
     events: tuple[TodoEventOut, ...] = Field(default_factory=tuple)
     comments: tuple[TodoCommentOut, ...] = Field(default_factory=tuple)
     archived_at: datetime | None = Field(default=None, serialization_alias="archivedAt")
-    event_facts: TodoEventFacts | None = Field(default=None, serialization_alias="eventFacts")
 
 
 class TodoMineItem(TodoCardTile, frozen=True):
@@ -436,16 +356,14 @@ class TodoLinkedCard(FrozenCamelModel, frozen=True):
     is_done: bool = Field(serialization_alias="isDone")
     due_date: date | None = Field(default=None, serialization_alias="dueDate")
     assignees: tuple[PersonRef, ...] = Field(default_factory=tuple)
-    event: TodoEventBrief | None = None
-    balance: str | None = None
 
 
 class LinkRow(FrozenCamelModel, frozen=True):
     """A link of an element as its reader sees it (``GET /api/links``, spec 001407).
 
     ``accessible`` is false when the reader cannot read the other end. ``granted`` is set
-    on the links of a card only (spec 001405). ``card`` carries the board, the column and
-    the Event of a linked card. ``removable`` tells if the reader may remove the link.
+    on the links of a card only (spec 001405). ``card`` carries the board and the column of
+    a linked card. ``removable`` tells if the reader may remove the link.
     """
 
     id: UUID
@@ -605,24 +523,6 @@ class LinkCreate(FrozenStrictCamelModel, frozen=True):
     b: LinkEndIn
 
 
-class EventIn(FrozenStrictCamelModel, frozen=True):
-    """The event data of a card (spec 000478)."""
-
-    starts_on: date | None = Field(default=None, alias="startsOn")
-    ends_on: date | None = Field(default=None, alias="endsOn")
-    start_time: time | None = Field(default=None, alias="startTime")
-    end_time: time | None = Field(default=None, alias="endTime")
-    place: str | None = Field(default=None, max_length=200)
-    participants: int | None = Field(default=None, ge=0, le=1_000_000)
-    series_id: UUID | None = Field(default=None, alias="seriesId")
-
-
-class SeriesCreate(FrozenStrictCamelModel, frozen=True):
-    """A new series."""
-
-    name: str = Field(min_length=1, max_length=200)
-
-
 class CardCreate(FrozenStrictCamelModel, frozen=True):
     """A new card."""
 
@@ -639,7 +539,6 @@ class CardCreate(FrozenStrictCamelModel, frozen=True):
     checklist: tuple[Annotated[str, Field(min_length=1, max_length=500)], ...] = Field(
         default_factory=tuple, max_length=100
     )
-    event: EventIn | None = None
 
 
 class CardPatch(FrozenStrictCamelModel, frozen=True):

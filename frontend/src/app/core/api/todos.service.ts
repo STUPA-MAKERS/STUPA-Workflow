@@ -31,6 +31,7 @@ export type TodoLinkKind =
   | 'invoice'
   | 'expense'
   | 'order'
+  | 'event'
   | 'budget'
   | 'ticket'
   | 'todo'
@@ -105,6 +106,8 @@ export interface TodoLinkDetail {
   /** The status of a Bestellung. */
   /** The key of a status of the list of the Bestellungen (spec 003035). */
   readonly orderStatus?: string | null;
+  /** The status key of an Event (`StatusCatalog`, list `event`). */
+  readonly eventStatus?: string | null;
 }
 
 export interface TodoLink {
@@ -144,87 +147,6 @@ export interface TodoLinkView {
   readonly rows: readonly TodoViewRow[];
 }
 
-/** The event data of a card: the card is an Event (`Veranstaltung`). Dates are `YYYY-MM-DD`. */
-export interface TodoEventBrief {
-  readonly startsOn: string | null;
-  readonly endsOn: string | null;
-  /** The time of the start day and of the end day (`HH:MM:SS`), or null for none. */
-  readonly startTime: string | null;
-  readonly endTime: string | null;
-  readonly place: string | null;
-  readonly participants: number | null;
-  readonly seriesId: Uuid | null;
-  readonly seriesName: string | null;
-}
-
-/** The money of an Event: decimal strings with two places; balance = income − expenses. */
-export interface TodoEventTotals {
-  readonly requested: string;
-  readonly approved: string;
-  readonly expenses: string;
-  readonly income: string;
-  readonly balance: string;
-}
-
-/** A decision of an Event: the valid decision of a linked Antrag or a closed vote. */
-export interface TodoEventDecision {
-  readonly kind: 'decision' | 'vote';
-  readonly targetId: Uuid | null;
-  readonly title: string;
-  readonly decidedAt: IsoDateTime | null;
-  readonly meetingTitle: string | null;
-  readonly result: string | null;
-  readonly amount: string | null;
-  readonly conditions: readonly string[];
-}
-
-/** Another Event of the series that the caller reads. */
-export interface TodoEventEdition {
-  readonly id: Uuid;
-  readonly boardId: Uuid;
-  readonly boardName: string;
-  readonly title: string;
-  readonly startsOn: string | null;
-  readonly endsOn: string | null;
-  readonly archived: boolean;
-  readonly totals: TodoEventTotals;
-}
-
-/** What an Event gathers: totals, decisions, the other editions of its series. */
-export interface TodoEventFacts {
-  readonly totals: TodoEventTotals;
-  readonly decisions: readonly TodoEventDecision[];
-  readonly editions: readonly TodoEventEdition[];
-  /** The other editions that the caller cannot read. */
-  readonly hiddenEditions: number;
-}
-
-/** The event data to set (`PUT /todos/cards/{id}/event`) or to create a card with. */
-export interface TodoEventIn {
-  readonly startsOn?: string | null;
-  readonly endsOn?: string | null;
-  readonly startTime?: string | null;
-  readonly endTime?: string | null;
-  readonly place?: string | null;
-  readonly participants?: number | null;
-  readonly seriesId?: Uuid | null;
-}
-
-export interface TodoEventSeries {
-  readonly id: Uuid;
-  readonly name: string;
-}
-
-/** An Event on a board that the caller writes: an option of the `Veranstaltung` picker. */
-export interface TodoEventRef {
-  readonly id: Uuid;
-  readonly boardId: Uuid;
-  readonly boardName: string;
-  readonly title: string;
-  readonly startsOn: string | null;
-  readonly endsOn: string | null;
-}
-
 export interface TodoCardTile {
   readonly id: Uuid;
   readonly boardId: Uuid;
@@ -240,8 +162,6 @@ export interface TodoCardTile {
   readonly commentCount: number;
   readonly primaryLink: TodoLink | null;
   readonly linkCount: number;
-  /** Set for an Event. */
-  readonly event: TodoEventBrief | null;
   readonly version: number;
   readonly createdAt: IsoDateTime;
   readonly updatedAt: IsoDateTime;
@@ -324,8 +244,6 @@ export interface TodoCardDetail extends TodoCardTile {
   readonly events: readonly TodoEvent[];
   readonly comments: readonly TodoComment[];
   readonly archivedAt: IsoDateTime | null;
-  /** Set for an Event. */
-  readonly eventFacts: TodoEventFacts | null;
 }
 
 export interface TodoCardCreate {
@@ -340,8 +258,6 @@ export interface TodoCardCreate {
   readonly links?: readonly { readonly kind: TodoLinkKind; readonly targetId: Uuid }[];
   /** The checklist, every item open (a duplicate, spec 000554). */
   readonly checklist?: readonly string[];
-  /** Makes the card an Event. */
-  readonly event?: TodoEventIn | null;
 }
 
 /** Content edits; `version` guards them (409 `card_version_conflict`). */
@@ -478,9 +394,6 @@ export interface TodoLinkedCard {
   readonly isDone: boolean;
   readonly dueDate: string | null;
   readonly assignees: readonly PersonRef[];
-  /** Set for an Event; then `balance` is its balance. */
-  readonly event: TodoEventBrief | null;
-  readonly balance: string | null;
 }
 
 /** The hits of the link picker and whether Paperless answered. */
@@ -677,13 +590,8 @@ export class TodosApiService {
   }
 
   /** The archived cards of a board, newest first. */
-  archive(boardId: Uuid, q = '', offset = 0, limit = 50, eventsOnly = false): Observable<Page<TodoCardTile>> {
-    const params = httpParams({
-      limit,
-      offset,
-      q: q || undefined,
-      events: eventsOnly ? 'true' : undefined,
-    });
+  archive(boardId: Uuid, q = '', offset = 0, limit = 50): Observable<Page<TodoCardTile>> {
+    const params = httpParams({ limit, offset, q: q || undefined });
     return this.http.get<Page<TodoCardTile>>(`${this.base}/todos/boards/${boardId}/archive`, {
       params,
       context: skipLoading(),
@@ -936,37 +844,10 @@ export class TodosApiService {
       );
   }
 
-  /** The readable cards that link the element: a linked Event first, then the newest. */
+  /** The readable cards that link the element, the newest first. */
   linked(kind: TodoLinkKind, targetId: Uuid): Observable<TodoLinkedCard[]> {
     return this.links(kind, targetId).pipe(
       map((out) => out.links.flatMap((row) => (row.card ? [row.card] : []))),
     );
-  }
-
-  /** Set the event data; a to-do becomes an Event for good. */
-  setEvent(cardId: Uuid, body: TodoEventIn): Observable<TodoCardDetail> {
-    return this.http.put<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/event`, body, {
-      context: skipLoading(),
-    });
-  }
-
-  /** `Folgeveranstaltung anlegen`: the next edition in the first column. */
-  followUp(cardId: Uuid): Observable<TodoCardDetail> {
-    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/follow-up`, null);
-  }
-
-  series(q = ''): Observable<TodoEventSeries[]> {
-    const params = httpParams({ q: q || undefined });
-    return this.http.get<TodoEventSeries[]>(`${this.base}/todos/series`, { params, context: skipLoading() });
-  }
-
-  createSeries(name: string): Observable<TodoEventSeries> {
-    return this.http.post<TodoEventSeries>(`${this.base}/todos/series`, { name }, { context: skipLoading() });
-  }
-
-  /** The live Events on boards that the caller writes (the `Veranstaltung` picker). */
-  writableEvents(q = ''): Observable<TodoEventRef[]> {
-    const params = httpParams({ q: q || undefined });
-    return this.http.get<TodoEventRef[]>(`${this.base}/todos/events`, { params, context: skipLoading() });
   }
 }

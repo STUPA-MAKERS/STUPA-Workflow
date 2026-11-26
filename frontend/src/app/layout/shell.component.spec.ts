@@ -305,6 +305,7 @@ describe('ShellComponent', () => {
         'Buchungen',
         'Rechnungen',
         'Bestellungen',
+        'Veranstaltungen',
         'Tickets',
         'Graph',
         'Protokolle',

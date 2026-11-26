@@ -9,7 +9,6 @@ from datetime import timedelta
 from sqlalchemy import func, select
 
 from app.modules.auth.principal import Principal
-from app.modules.todos import events as todo_events
 from app.modules.todos.access import ReadScope, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.grouping import grouped
@@ -17,7 +16,6 @@ from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
     TodoCard,
-    TodoCardEvent,
     TodoColumn,
     TodoLabel,
 )
@@ -29,7 +27,7 @@ from app.modules.todos.service.common import (
     _in_column_order,
     berlin_today,
 )
-from app.modules.todos.service.rows import _assigned_board, _event_brief, _mine_item, _tile
+from app.modules.todos.service.rows import _assigned_board, _mine_item, _tile
 from app.shared.errors import ForbiddenError
 from app.shared.search import dialect_of, trigram_rank
 
@@ -246,9 +244,6 @@ class ReadOps(TodoServiceBase):
         if not rows:
             return {}
         facts = await self._facts([card for card, _b, _c in rows], principal)
-        sums = await todo_events.totals(
-            self.session, [card.id for card, _b, _c in rows if card.id in facts.events]
-        )
         return {
             card.id: TodoLinkedCard(
                 id=card.id,
@@ -259,10 +254,6 @@ class ReadOps(TodoServiceBase):
                 is_done=col.is_done,
                 due_date=card.due_date,
                 assignees=_tile(card, facts).assignees,
-                event=_event_brief(facts.events.get(card.id), facts.series),
-                balance=(
-                    todo_events.balance_text(sums[card.id].balance) if card.id in sums else None
-                ),
             )
             for card, board, col in rows
         }
@@ -291,30 +282,3 @@ class ReadOps(TodoServiceBase):
             )
         ).all()
         return [(card, board, column) for card, board, column in rows]
-
-    async def search_events(
-        self, q: str, principal: Principal, *, limit: int
-    ) -> list[tuple[TodoCard, TodoBoard, TodoCardEvent]]:
-        """Find Events by title on the boards that the principal reads, archived ones too.
-
-        Spec 000485: the palette source ``Veranstaltungen`` finds archived Events.
-        """
-        if not token_reads(principal):
-            return []
-        scope = await self.access.scope(principal)
-        where, rank = trigram_rank(q, [TodoCard.title], dialect=dialect_of(self.session))
-        rows = (
-            (
-                await self.session.execute(
-                    select(TodoCard, TodoBoard, TodoCardEvent)
-                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                    .join(TodoCardEvent, TodoCardEvent.card_id == TodoCard.id)
-                    .where(where, scope.condition())
-                    .order_by(rank.desc(), TodoCardEvent.starts_on.desc().nulls_last(), TodoCard.id)
-                    .limit(limit)
-                )
-            )
-            .tuples()
-            .all()
-        )
-        return list(rows)

@@ -6,8 +6,8 @@ module import cheap.
 Time zones: meetings carry local times (Europe/Berlin). The builder converts a
 timed event to UTC and writes it with `Z`. This avoids the error-prone
 `VTIMEZONE` block. `zoneinfo` resolves DST per date. A meeting without a time
-becomes an all-day event (`VALUE=DATE`). An Event (a to-do card with event data) is
-always all-day: `DTEND` is the day after its end, because RFC5545 makes the end of
+becomes an all-day event (`VALUE=DATE`). An Event (a Veranstaltung) without a time is
+all-day: `DTEND` is the day after its end, because RFC5545 makes the end of
 a `VALUE=DATE` event exclusive. An Event without an end lasts one day. A due card
 (spec 000549) is an all-day event on its due date with the url of the card.
 
@@ -70,9 +70,9 @@ class MeetingEvent:
 
 @dataclass(frozen=True, slots=True)
 class CardEvent:
-    """An Event card as a calendar event (spec 000486).
+    """An Event (a Veranstaltung) as a calendar event (000486, F/collaboration/events/003033).
 
-    `uid` is the card id. `end` is the last day, or `None` for one day. The times are
+    `uid` is the id of the Event. `end` is the last day, or `None` for one day. The times are
     local naive values. An Event without a start time is an all-day event.
     """
 
@@ -82,7 +82,7 @@ class CardEvent:
     end: _date | None
     stamp: datetime
     place: str | None = None
-    board_name: str | None = None
+    team_name: str | None = None
     start_time: _time | None = None
     end_time: _time | None = None
 
@@ -239,7 +239,7 @@ def _build_event(event: MeetingEvent, *, domain: str, default_duration: timedelt
 
 
 def _build_card_event(event: CardEvent, *, domain: str) -> Event:
-    """Build one VEVENT for an Event card: timed with a start time, else all-day.
+    """Build one VEVENT for an Event: timed with a start time, else all-day.
 
     A timed Event without an end time takes `_EVENT_DURATION`.
     """
@@ -259,7 +259,7 @@ def _build_card_event(event: CardEvent, *, domain: str) -> Event:
         ("dtstamp", _as_utc(event.stamp)),
         ("summary", event.title),
         *_when(event.place, ("location", event.place)),
-        *_when(event.board_name, ("description", f"Board: {event.board_name}")),
+        *_when(event.team_name, ("description", f"Team: {event.team_name}")),
         ("dtstart", event.start if begin is None else begin),
         ("dtend", last + timedelta(days=1) if finish is None else finish),
     )

@@ -109,7 +109,7 @@ neighbors), `todo_comment`, `todo_board_create` (a free board), `todo_board_entr
 `todo_board_entry_add`, `todo_board_entry_update`, `todo_board_entry_remove`,
 `todo_board_archive`, `todo_board_restore`, `todo_board_delete`, the checklist (subtasks)
 `todo_checklist_add`, `todo_checklist_update`, `todo_checklist_remove`, the card parts
-(`todo_card_assignee_*`, `todo_card_label_*`, `todo_card_event_set`,
+(`todo_card_assignee_*`, `todo_card_label_*`,
 `todo_card_archive`, `todo_card_restore`) and the board setup (`todo_column_*`,
 `todo_label_*`, `todo_board_update`).
 Links between any two elements (spec 001409): `link_list`, `link_add`, `link_remove`,
@@ -118,6 +118,11 @@ Bestellungen of an Antrag (writes need `order.manage`): `order_list`, `order_get
 `order_create`, `order_update`, `order_set_status`, `order_delete`, `order_set_invoice`,
 `invoice_orders`, `order_attachments`, `order_attachment_upload`, `order_attachment_delete`,
 `order_list_all`, `order_pending_applications`, `order_bookings`, `export_orders_xlsx`.
+Veranstaltungen of the teams of the caller (a write needs the scope `todos:write`):
+`event_list`, `event_get`, `event_teams`, `event_create`, `event_update`,
+`event_set_status`, `event_delete`, `event_refs`, `event_series`, `event_series_create`,
+`export_events_xlsx`. The money of an Event comes from its links (`link_add` with kind
+`event`).
 Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
 `gremium_attendance`, `get_gremium_info`, `set_gremium_info`, `get_team_info`, `set_team_info`, `notify_gremium_members`,
 `calendar_entries`, `create_appointment`, `answer_appointment`.

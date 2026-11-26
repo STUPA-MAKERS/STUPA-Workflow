@@ -39,7 +39,7 @@ describe('NavService', () => {
   });
 
   it('shows a plain member only the personal areas', () => {
-    expect(keysFor(BASE)).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', ...PUBLIC]);
+    expect(keysFor(BASE)).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'events', ...PUBLIC]);
   });
 
   it('opens the budget areas with a global budget right', () => {
@@ -53,13 +53,14 @@ describe('NavService', () => {
       'expenses',
       'invoices',
       'orders',
+      'events',
       ...PUBLIC,
     ]);
   });
 
   it('opens the tickets with ticket.manage, after the Bestellungen', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', ...PUBLIC, 'admin']);
-    expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'orders') + 1);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'events', 'tickets', ...PUBLIC, 'admin']);
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'events') + 1);
   });
 
   /** §F/finance/orders/002883: "Bestellungen" needs `order.manage` or a read permission of the Haushalt. */
@@ -83,9 +84,19 @@ describe('NavService', () => {
     expect(route?.children?.map((c) => c.path)).toEqual(['', 'new', ':id/edit', ':id']);
   });
 
+  /** §F/collaboration/events/003027: the entry "Veranstaltungen" right after "Bestellungen". */
+  it('puts the Veranstaltungen after the Bestellungen, with the routes of the list, the form and the detail', () => {
+    const item = NAV_ITEMS.find((i) => i.key === 'events');
+    expect(item).toMatchObject({ path: '/events', labelKey: 'nav.events', feature: 'events', permissions: [], place: 'main' });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'events')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'orders') + 1);
+    const route = routes.flatMap((r) => [r, ...(r.children ?? [])]).find((r) => r.path === 'events');
+    expect(route?.data).toMatchObject({ title: 'nav.events' });
+    expect(route?.children?.map((c) => c.path)).toEqual(['', 'new', ':id/edit', ':id']);
+  });
+
   /** § F/collaboration/graph/001420 and 001421: the entry "Graph" needs `graph.view`. */
   it('opens the graph with graph.view, after the tickets', () => {
-    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'graph', 'protocols', 'decisions', 'publicCalendar']);
+    expect(keysFor({ ...BASE, permissions: ['graph.view'] })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'events', 'graph', 'protocols', 'decisions', 'publicCalendar']);
     const item = NAV_ITEMS.find((i) => i.key === 'graph');
     expect(item).toMatchObject({ path: '/graph', labelKey: 'nav.graph', permissions: ['graph.view'], place: 'main' });
     expect(NAV_ITEMS.findIndex((i) => i.key === 'graph')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tickets') + 1);
@@ -94,7 +105,7 @@ describe('NavService', () => {
   });
 
   it('opens the tickets to a reporter without ticket.manage', () => {
-    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'tickets', ...PUBLIC]);
+    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['activity', 'applications', 'tasks', 'todos', 'calendar', 'events', 'tickets', ...PUBLIC]);
   });
 
   it('shows the To-Dos to every session, after the tasks', () => {
@@ -205,6 +216,7 @@ describe('NavService', () => {
       ['budget', ['budget', 'expenses']],
       ['invoices', ['invoices']],
       ['orders', ['orders']],
+      ['events', ['events']],
       ['tickets', ['tickets']],
       ['graph', ['graph']],
       ['public', ['protocols', 'decisions', 'publicCalendar']],

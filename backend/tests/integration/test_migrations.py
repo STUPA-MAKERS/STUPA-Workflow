@@ -2635,3 +2635,91 @@ def test_paperless_open_antrag_jobs_dropped(alembic_cfg: Config, engine: Engine)
         ]
         conn.execute(text("DELETE FROM paperless_filing"))
     command.upgrade(alembic_cfg, "head")
+
+
+def test_event_cards_become_events(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 7c4e2a9d1b85 makes an Event of each card with event data (003031).
+
+    A card in the done column of a free board without a team entry gets the status
+    ``settled``, its series, its link, a new team with the name of the board and a link to
+    its Event. The card stays and loses its event data.
+    """
+    command.downgrade(alembic_cfg, "5d8c2a7e41f3")
+    with engine.begin() as conn:
+        creator = conn.execute(
+            text("INSERT INTO principal (sub) VALUES ('event-card') RETURNING id")
+        ).scalar_one()
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-event') RETURNING id")
+        ).scalar_one()
+        board = conn.execute(
+            text("INSERT INTO todo_board (name, kind) VALUES ('Feste', 'free') RETURNING id")
+        ).scalar_one()
+        done = conn.execute(
+            text(
+                "INSERT INTO todo_column (board_id, name, position, is_done) "
+                "VALUES (:b, 'Erledigt', 0, true) RETURNING id"
+            ),
+            {"b": board},
+        ).scalar_one()
+        card = conn.execute(
+            text(
+                "INSERT INTO todo_card (board_id, column_id, title, rank, created_by) "
+                "VALUES (:b, :c, 'Sommerfest', 'a', :p) RETURNING id"
+            ),
+            {"b": board, "c": done, "p": creator},
+        ).scalar_one()
+        series = conn.execute(
+            text("INSERT INTO todo_event_series (name) VALUES ('Feste') RETURNING id")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO todo_card_event (card_id, starts_on, place, series_id) "
+                "VALUES (:c, '2026-06-20', 'Wiese', :s)"
+            ),
+            {"c": card, "s": series},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO link (a_kind, a_id, b_kind, b_id, created_by) "
+                "VALUES ('gremium', :g, 'todo', :c, :p)"
+            ),
+            {"g": gremium, "c": card, "p": creator},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        event = conn.execute(
+            text(
+                "SELECT e.id, e.title, e.status, e.series_id, e.place, e.created_by, t.name "
+                "FROM event e JOIN team t ON t.id = e.team_id WHERE e.title = 'Sommerfest'"
+            )
+        ).one()
+        links = set(
+            conn.execute(
+                text(
+                    "SELECT a_kind, b_kind FROM link WHERE (a_kind = 'event' AND a_id = :e) "
+                    "OR (b_kind = 'event' AND b_id = :e)"
+                ),
+                {"e": event[0]},
+            ).all()
+        )
+        manager = conn.execute(
+            text(
+                "SELECT m.role FROM team_member m JOIN event e ON e.team_id = m.team_id "
+                "WHERE e.id = :e AND m.principal_id = :p"
+            ),
+            {"e": event[0], "p": creator},
+        ).scalar_one()
+        card_kept = conn.execute(
+            text("SELECT count(*) FROM todo_card WHERE id = :c"), {"c": card}
+        ).scalar_one()
+        old = conn.execute(text("SELECT to_regclass('todo_card_event')")).scalar_one()
+    assert event[1:] == ("Sommerfest", "settled", series, "Wiese", creator, "Feste")
+    assert {frozenset(tuple(pair)) for pair in links} == {
+        frozenset({"event", "gremium"}),
+        frozenset({"event", "todo"}),
+    }
+    assert manager == "manager"
+    assert card_kept == 1
+    assert old is None
