@@ -128,8 +128,9 @@ TYPICAL FLOWS:
   Only a person creates a Bestellung, for an approved Antrag of a type with money. A
   write needs `order.manage`.
 - Gremien and Kalender: `gremien_overview`, `gremium_members`, `gremium_decisions`,
-  `gremium_attendance`, `get_gremium_info`/`set_gremium_info`; `calendar_entries`,
-  `create_appointment` (a Termin with invitations), `answer_appointment`.
+  `gremium_attendance`, `get_gremium_info`/`set_gremium_info`, `get_team_info`/
+  `set_team_info`; `calendar_entries`, `create_appointment` (a Termin with invitations),
+  `answer_appointment`.
 - Votes without a meeting: `create_gremium_vote` (a poll, or `kind: "circular"` for an
   Umlaufverfahren), `list_votes`.
 - Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →

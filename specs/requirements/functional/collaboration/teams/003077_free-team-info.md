@@ -2,10 +2,15 @@
 id: "003077"
 title: A free team has an Info tab
 kind: functional
-status: draft
+status: approved
 owner: frederikbeimgraben
 updated: 2026-11-26
-implementation: null
+implementation:
+  - backend/app/modules/team_pages/info.py
+  - backend/app/modules/team_pages/router.py
+  - frontend/src/app/features/gremien/gremium-detail/gremium-detail.component.ts
+  - frontend/src/app/features/gremien/gremium-info-dialog/gremium-info-dialog.component.ts
+  - mcp/antragsplattform_mcp/tools/committees.py
 scope:
   - backend/app/modules/team_pages
   - frontend/src/app/features/gremien

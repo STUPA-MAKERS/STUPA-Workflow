@@ -418,3 +418,31 @@ async def set_team_member(
 async def remove_team_member(team_id: str, principal_id: str) -> dict:
     """Remove a person from a team; the last manager stays (409 `last_manager`)."""
     return await api().delete(f"/teams/{team_id}/members/{principal_id}")
+
+
+@group.tool
+async def get_team_info(team_id: str) -> dict:
+    """Read the Info tab of a free team: the Markdown text, the links, `version`, `canEdit`.
+
+    A member or a manager reads it; the team of a Gremium gives 404 (use `get_gremium_info`).
+    """
+    return await api().get(f"/teams/{team_id}/info")
+
+
+@group.tool
+async def set_team_info(
+    team_id: str, body_md: str, links: list[S.GremiumInfoLink], version: int
+) -> dict:
+    """Save the text and the links of the Info tab of a free team together.
+
+    Requires a manager of the team. `version` is the version read with `get_team_info`;
+    another version gives 409 `team_info_version_conflict`.
+    """
+    return await api().put(
+        f"/teams/{team_id}/info",
+        json={
+            "bodyMd": body_md,
+            "links": [link.model_dump() for link in links],
+            "version": version,
+        },
+    )

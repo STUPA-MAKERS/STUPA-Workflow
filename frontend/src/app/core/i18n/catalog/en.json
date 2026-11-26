@@ -2495,6 +2495,7 @@
   "admin.audit.action.backup_import": "Backup imported",
   "admin.audit.action.backup_restore": "Backup restored",
   "admin.audit.action.gremium_info_update": "Info of a committee changed",
+  "admin.audit.action.team_info_update": "Info of a team changed",
   "admin.audit.action.gremium_notify": "Message to the members of a committee",
   "admin.audit.openTarget": "Open target",
   "admin.audit.detail.action": "Action",

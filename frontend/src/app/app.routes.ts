@@ -335,8 +335,8 @@ export const routes: Routes = [
         path: 'teams',
         data: {
           title: 'nav.gremien',
-          permission: ['gremium.view_all'],
-          allowCommitteeMember: true,
+          permission: ['gremium.view_all', 'team.create'],
+          allowTeamMember: true,
           wide: true,
         },
         canActivateChild: [authGuard],
@@ -345,7 +345,7 @@ export const routes: Routes = [
         children: [
           {
             path: '',
-            data: { permission: ['gremium.view_all'], allowCommitteeMember: true },
+            data: { permission: ['gremium.view_all', 'team.create'], allowTeamMember: true },
             loadComponent: () =>
               import('./features/gremien/gremien-none/gremien-none.component').then(
                 (m) => m.GremienNoneComponent,
@@ -356,8 +356,8 @@ export const routes: Routes = [
             data: {
               title: 'gremien.title',
               parent: ['teams'],
-              permission: ['gremium.view_all'],
-              allowCommitteeMember: true,
+              permission: ['gremium.view_all', 'team.create'],
+              allowTeamMember: true,
             },
             loadComponent: () =>
               import('./features/gremien/gremium-detail/gremium-detail.component').then(

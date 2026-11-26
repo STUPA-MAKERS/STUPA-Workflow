@@ -47,4 +47,14 @@ describe('TeamsApiService', () => {
     api.removeMember('t-1', 'p-1').subscribe();
     http.expectOne({ method: 'DELETE', url: '/api/teams/t-1/members/p-1' }).flush({});
   });
+
+  it('reads and saves the Info of a team (spec 003077)', () => {
+    api.info('t-1').subscribe();
+    const read = http.expectOne({ method: 'GET', url: '/api/teams/t-1/info' });
+    expect(read.request.context.get(SKIP_LOADING)).toBe(true);
+    read.flush({});
+    const body = { bodyMd: 'Hallo', links: [], version: 1 };
+    api.saveInfo('t-1', body).subscribe();
+    expect(http.expectOne({ method: 'PUT', url: '/api/teams/t-1/info' }).request.body).toEqual(body);
+  });
 });

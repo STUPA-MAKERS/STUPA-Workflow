@@ -73,7 +73,7 @@ export const GREMIUM_TABS = [
 ] as const;
 export type GremiumTab = (typeof GREMIUM_TABS)[number];
 /** The sub-tabs of a team without a Gremium (spec 003072), in their order. */
-export const FREE_TEAM_TABS: readonly GremiumTab[] = ['todos', 'members', 'subTeams'];
+export const FREE_TEAM_TABS: readonly GremiumTab[] = ['info', 'todos', 'members', 'subTeams'];
 
 /**
  * One team (`/teams/:id`, spec 003072): the detail sheet beside the list. The page of an
@@ -197,19 +197,22 @@ export class GremiumDetailComponent {
     if (!t || t.gremiumId) return this.gremiumBoardId();
     return this.features.isOn('todos') && (t.isMember || t.canManage) ? t.boardId : null;
   });
+  /** The free team whose Info the person reads: its members and its managers (spec 003077). */
+  private readonly infoTeamId = computed<Uuid | null>(() => {
+    const t = this.team();
+    return t && !t.gremiumId && (t.isMember || t.canManage) ? t.id : null;
+  });
   /** A new read of the Info: after a load error and after a 409 of the editor. */
   private readonly infoReads = signal(0);
   /** The Info as loaded: `undefined` while it loads, `null` after a load error. */
   private readonly loadedInfo = toSignal(
-    toObservable(computed(() => ({ id: this.id(), read: this.infoReads() }))).pipe(
-      switchMap(({ id }) =>
-        id
-          ? this.gremienApi.info(id).pipe(
-              catchError(() => of(null)),
-              startWith(undefined),
-            )
-          : of(null),
-      ),
+    toObservable(
+      computed(() => ({ id: this.id(), team: this.infoTeamId(), read: this.infoReads() })),
+    ).pipe(
+      switchMap(({ id, team }) => {
+        const read = id ? this.gremienApi.info(id) : team ? this.teamsApi.info(team) : null;
+        return read ? read.pipe(catchError(() => of(null)), startWith(undefined)) : of(null);
+      }),
     ),
     { initialValue: undefined },
   );
@@ -231,7 +234,13 @@ export class GremiumDetailComponent {
   /** The widths of the tab labels in the skeleton: Info, Sitzungen, Mitglieder, Anwesenheit, Beschlüsse. */
   protected readonly skelTabs = ['2rem', '4rem', '4.5rem', '5.5rem', '4.5rem'] as const;
   readonly shownTabs = computed<readonly GremiumTab[]>(() => {
-    if (this.free()) return FREE_TEAM_TABS.filter((t) => t !== 'todos' || this.features.isOn('todos'));
+    if (this.free()) {
+      const on = (t: GremiumTab): boolean =>
+        t === 'info'
+          ? this.infoTeamId() !== null && infoTabShown(this.info())
+          : t !== 'todos' || this.features.isOn('todos');
+      return FREE_TEAM_TABS.filter(on);
+    }
     const on: Record<GremiumTab, boolean> = {
       info: infoTabShown(this.info()),
       meetings: this.features.isOn('meetings'),

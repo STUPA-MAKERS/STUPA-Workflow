@@ -246,6 +246,8 @@ export function teamsApiMock(
     remove: jest.fn(() => of(undefined)),
     setMember: jest.fn(() => of({ team: freeTeam(), members: [], subTeams: [] })),
     removeMember: jest.fn(() => of({ team: freeTeam(), members: [], subTeams: [] })),
+    info: jest.fn(() => of(gremiumInfo())),
+    saveInfo: jest.fn(() => of(gremiumInfo({ version: 1, canEdit: true }))),
   };
 }
 

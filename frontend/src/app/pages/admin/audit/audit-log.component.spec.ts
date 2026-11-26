@@ -125,6 +125,7 @@ async function setup(opts: SetupOpts = {}) {
 const BACKEND_AUDIT_ACTIONS = [
   'login',
   'status_change',
+  'team_info_update',
   'vote_cast',
   'config_change',
   'config_activation',

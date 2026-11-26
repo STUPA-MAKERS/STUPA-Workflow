@@ -2495,6 +2495,7 @@
   "admin.audit.action.backup_import": "Backup importiert",
   "admin.audit.action.backup_restore": "Backup wiederhergestellt",
   "admin.audit.action.gremium_info_update": "Info eines Gremiums geändert",
+  "admin.audit.action.team_info_update": "Info eines Teams geändert",
   "admin.audit.action.gremium_notify": "Nachricht an die Mitglieder eines Gremiums",
   "admin.audit.openTarget": "Ziel öffnen",
   "admin.audit.detail.action": "Aktion",

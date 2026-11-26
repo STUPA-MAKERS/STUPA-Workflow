@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { GremienApiService, type GremiumInfo, type GremiumInfoLink } from '@core/api/gremien.service';
+import { TeamsApiService } from '@core/api/teams.service';
 import { problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -49,7 +50,7 @@ export interface InfoLinkErrors {
 
 type InfoMode = 'write' | 'preview';
 
-const CONFLICT = 'gremium_info_version_conflict';
+const CONFLICTS: readonly string[] = ['gremium_info_version_conflict', 'team_info_version_conflict'];
 
 /** The row is blank: no label and no URL. The save leaves it out. */
 export function linkBlank(link: InfoLinkDraft): boolean {
@@ -111,11 +112,14 @@ export function draftLinks(drafts: readonly InfoLinkDraft[]): readonly GremiumIn
 })
 export class GremiumInfoDialogComponent {
   private readonly api = inject(GremienApiService);
+  private readonly teamsApi = inject(TeamsApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
   readonly open = input(false);
   readonly gremiumId = input.required<string>();
+  /** A free team (003077): the save goes to the team, not to a Gremium. */
+  readonly teamId = input<string | null>(null);
   readonly gremiumName = input('');
   readonly info = input.required<GremiumInfo>();
   readonly closed = output<void>();
@@ -202,7 +206,9 @@ export class GremiumInfoDialogComponent {
     this.saving.set(true);
     this.conflict.set(false);
     const body = { bodyMd: this.body(), links: draftLinks(this.links()), version: this.info().version };
-    this.api.saveInfo(this.gremiumId(), body).subscribe({
+    const team = this.teamId();
+    const save = team ? this.teamsApi.saveInfo(team, body) : this.api.saveInfo(this.gremiumId(), body);
+    save.subscribe({
       next: (info) => {
         this.saving.set(false);
         this.toast.show(this.i18n.translate('gremien.info.saved'), 'success');
@@ -211,7 +217,7 @@ export class GremiumInfoDialogComponent {
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        if (problemCode(err) === CONFLICT) {
+        if (CONFLICTS.includes(problemCode(err) ?? '')) {
           this.conflict.set(true);
           this.stale.emit();
           return;

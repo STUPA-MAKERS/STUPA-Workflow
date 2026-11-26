@@ -108,6 +108,16 @@
     <ng-template #page let-id let-g="g">
       @if (visited().has(id) && free()) {
         @switch (id) {
+          @case ('info') {
+            <app-gremium-info
+              [gremiumId]="team()!.id"
+              [teamId]="team()!.id"
+              [gremiumName]="team()!.name"
+              [info]="info()"
+              (changed)="onInfoChanged($event)"
+              (reload)="reloadInfo()"
+            />
+          }
           @case ('members') {
             <app-team-members [teamId]="team()!.id" [canManage]="canManageTeam()" (changed)="onTeamChanged()" />
           }

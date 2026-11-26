@@ -10,7 +10,7 @@ import { GremienApiService, type GremiumOverview } from '@core/api/gremien.servi
 import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
-import { freeTeam, gremienApiMock, gremium, teamsApiMock } from '../../../../testing/gremien-fixtures';
+import { freeTeam, gremienApiMock, gremium, gremiumInfo, teamsApiMock } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import type { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -436,6 +436,38 @@ describe('GremiumDetailComponent', () => {
       expect(sheet.queryByRole('button', { name: 'Sitzungen abonnieren' })).toBeNull();
       expect(d.menu()[0].items.map((i) => i.id)).toEqual(['board', 'rename', 'delete']);
       expect(await runAxe(s.harness.fixture.nativeElement)).toHaveNoViolations();
+    });
+
+    it('shows the Info tab of a free team to a manager, first, and loads it by the team (spec 003077)', async () => {
+      const s = await start('/teams/t-1', { teams: [team] });
+      restore = s.restore;
+      s.teamsApi.info.mockReturnValue(of(gremiumInfo({ canEdit: true })));
+      s.detail().reloadInfo();
+      await s.settle();
+      const d = s.detail();
+      expect(s.teamsApi.info).toHaveBeenCalledWith('t-1');
+      expect(s.api.info).not.toHaveBeenCalled();
+      expect(d.tabs().map((t) => t.label)).toEqual(['Info', 'To-Dos', 'Mitglieder', 'Sub-Teams']);
+      expect(d.tab()).toBe('info');
+      expect(s.harness.fixture.nativeElement.querySelector('app-gremium-info')).toBeTruthy();
+    });
+
+    it('shows a filled Info to a member and hides an empty one', async () => {
+      const s = await start('/teams/t-1', { teams: [team] });
+      restore = s.restore;
+      expect(s.detail().tabs().map((t) => t.label)).toEqual(['To-Dos', 'Mitglieder', 'Sub-Teams']);
+      s.teamsApi.info.mockReturnValue(of(gremiumInfo({ bodyMd: 'Hallo', version: 2 })));
+      s.detail().reloadInfo();
+      await s.settle();
+      expect(s.detail().tabs()[0].label).toBe('Info');
+    });
+
+    it('reads no Info for a person outside the team', async () => {
+      const outside = freeTeam({ id: 't-1', isMember: false, canManage: false });
+      const s = await start('/teams/t-1', { teams: [outside] });
+      restore = s.restore;
+      expect(s.teamsApi.info).not.toHaveBeenCalled();
+      expect(s.detail().shownTabs()).not.toContain('info');
     });
 
     it('shows no board and no manage items to a person outside the team', async () => {

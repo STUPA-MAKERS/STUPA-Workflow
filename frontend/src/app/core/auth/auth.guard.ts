@@ -57,6 +57,9 @@ export const authGuard: CanActivateFn = (route, state) => {
         if (allowCommittee && auth.gremien().length > 0) {
           return true;
         }
+        if (route.data['allowTeamMember'] === true && auth.inAnyTeam()) {
+          return true;
+        }
         if (
           route.data['allowScopedBudgetView'] === true &&
           auth.hasScopedBudgetView()
