@@ -3,7 +3,6 @@ import type { I18nMap } from '@core/api/models';
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   HostListener,
   computed,
   effect,
@@ -33,7 +32,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  ScrollFadeDirective,
   type SelectOption,
   SkeletonComponent,
   StatusTextComponent,
@@ -97,6 +95,9 @@ import {
   StateInspectorViewComponent,
   TransitionInspectorViewComponent,
   TransitionListsViewComponent,
+  FlowCanvasViewComponent,
+  type FlowCanvasNode,
+  type FlowCanvasTool,
 } from '@stupa-makers/ui-kit/views/flow-editor';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { injectPanePage } from '../pane-page';
@@ -171,7 +172,7 @@ const MIN_FIT_SCALE = 0.75;
     StatusTextComponent,
     NoteComponent,
     RowMenuComponent,
-    ScrollFadeDirective,
+    FlowCanvasViewComponent,
   ],
   host: {
     '[class.fe-pane]': 'wide()',
@@ -188,11 +189,13 @@ export class FlowEditorComponent {
   private readonly i18n = inject(I18nService);
   private readonly opts = inject(FlowEditorOptionsService);
 
-  protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
+  /** The canvas view of the kit: the SVG, its box and the inspector sheet. */
+  private readonly canvasView = viewChild(FlowCanvasViewComponent);
+  protected readonly canvas = computed(() => this.canvasView()?.svg());
   /** The inspector. Wide, it scrolls inside itself. */
-  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+  private readonly panel = computed(() => this.canvasView()?.sheet());
   /** The box around the canvas. Its size sets the scale of the fitted view. */
-  private readonly canvasWrap = viewChild<ElementRef<HTMLElement>>('canvasWrap');
+  private readonly canvasWrap = computed(() => this.canvasView()?.box());
 
   /** Wide viewport: the canvas and the inspector fill the window side by side. */
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -487,14 +490,6 @@ export class FlowEditorComponent {
     this.pan(side);
   }
 
-  protected readonly panSides: readonly PanSide[] = ['left', 'right', 'up', 'down'];
-  protected readonly panLabel: Record<PanSide, TranslationKey> = {
-    left: 'admin.flow.panLeft',
-    right: 'admin.flow.panRight',
-    up: 'admin.flow.panUp',
-    down: 'admin.flow.panDown',
-  };
-
   /** The meta of the header: the active version, once known. */
   protected readonly versionMeta = computed(() => {
     const v = this.currentVersion();
@@ -612,6 +607,48 @@ export class FlowEditorComponent {
 
   protected label(s: StateDef): string {
     return stateDisplayLabel(s);
+  }
+
+  /** The states as the kit canvas draws them: the kind label is resolved here. */
+  protected readonly canvasNodes = computed<readonly FlowCanvasNode[]>(() =>
+    this.nodes().map((n) => ({
+      ...n,
+      kindLabel: n.kind === 'normal' ? '' : this.kindLabel(n.kind),
+      dots: n.dots.map((d) => ({ id: d.id, branch: d.branch, guarded: !!d.label, cy: d.cy, label: d.label })),
+    })),
+  );
+
+  /** A button of the toolbar of the canvas. */
+  protected onTool(tool: FlowCanvasTool): void {
+    switch (tool) {
+      case 'addState':
+        this.addState();
+        break;
+      case 'undo':
+        this.undo();
+        break;
+      case 'redo':
+        this.redo();
+        break;
+      case 'group':
+        this.createGroupFromSelection();
+        break;
+      case 'zoomIn':
+        this.zoomIn();
+        break;
+      case 'zoomOut':
+        this.zoomOut();
+        break;
+      case 'resetView':
+        this.resetView();
+        break;
+    }
+  }
+
+  /** A press on a connector dot starts a new transition with the guard or branch of the dot. */
+  protected onDotPointerDown(event: PointerEvent, key: string, dotId: string): void {
+    const dot = this.nodes().find((n) => n.key === key)?.dots.find((d) => d.id === dotId);
+    this.onConnectPointerDown(event, key, dot?.branch ?? null, dot?.guard ?? null);
   }
 
   protected kindLabel(k: string): string {
