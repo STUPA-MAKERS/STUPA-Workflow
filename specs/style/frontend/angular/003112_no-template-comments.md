@@ -16,11 +16,12 @@ scope:
 
 # A template has no comments
 
-A component template must not contain an HTML comment. The reason for a part of a template
-belongs in the spec that the part implements.
+A component template must not contain an HTML comment. A directive to a tool, for example
+`<!-- eslint-disable-next-line ... -->`, is the one exception. The reason for a part of a
+template belongs in the spec that the part implements.
 
 Reason: A comment in a template repeats the markup in prose and goes out of date when the
 markup changes, while the spec stays the one place of the rule.
 
 Test: `frontend/src/app/core/templates/template-style.spec.ts`: no `.html` file below
-`src/app` contains `<!--`.
+`src/app` contains a comment other than an `eslint-` directive.
