@@ -14,7 +14,6 @@
       (input)="search.set($any($event.target).value)"
       (keydown.enter)="search.flush()"
     />
-    <!-- The close button of the global search: the key "Esc", on a phone a × (spec 001977). -->
     <button
       type="button"
       class="lp__close"
@@ -86,7 +85,6 @@
   </div>
 </ng-template>
 
-<!-- A note in the results: the failed search, or Paperless that does not answer (002766). -->
 <ng-template #note let-text let-error="error">
   <p [class]="error ? 'lp__note lp__note--error' : 'lp__note'">{{ text | t }}</p>
 </ng-template>

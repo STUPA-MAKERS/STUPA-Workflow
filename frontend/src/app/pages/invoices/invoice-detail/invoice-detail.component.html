@@ -13,8 +13,6 @@
         ><app-icon name="file" /></app-button>
       }
       @if (canManage()) {
-        <!-- On a phone the edit button shows its text; elsewhere it is an icon button with a tooltip.
-             It stands right in the group of the sheet bar, so it joins the shape of the group (001350). -->
         @if (phone()) {
           <app-button variant="tonal" (click)="edit.emit()">
             <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
@@ -47,7 +45,6 @@
         <span class="fd__part"><span class="mono fd__amount">{{ money(i.grossAmount) }}</span></span>
       </span>
     </p>
-    <!-- "Buchung anlegen" stands in the head of the section "Buchungen" and in the head menu (§ui-kit:000671, 001292). -->
     @if (canManage() && i.status === 'open') {
       <div class="fd__actions">
         <app-button-group [main]="true">

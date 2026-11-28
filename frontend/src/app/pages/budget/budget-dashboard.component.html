@@ -5,7 +5,6 @@
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-load-error face [message]="'budget.error' | t" (retry)="load()" />
 } @else if (showSkeleton()) {
-  <!-- The skeleton uses the containers of the page, so nothing moves when the figures arrive. -->
   <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
     <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
     @if (wide()) {
@@ -80,7 +79,6 @@
             </div>
           }
         </dl>
-        <!-- The two columns of the loaded page: the distribution and the use per child. -->
         <div class="bd__cols">
           <app-section class="bd__sec" size="lg" [heading]="'budget.dash.distribution' | t">
             <span sectionAction class="skel-box bd__skChip"></span>

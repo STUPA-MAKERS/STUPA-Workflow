@@ -1143,6 +1143,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [S/frontend/angular/000398](style/frontend/angular/000398_mock-dev-only.md) | The mock API runs only in dev builds | approved |
 | [S/frontend/angular/000526](style/frontend/angular/000526_use-shared-parts.md) | A view uses the shared components | approved |
 | [S/frontend/angular/000639](style/frontend/angular/000639_admin-folder-is-route.md) | The folder of an admin page has the name of its route | approved |
+| [S/frontend/angular/003112](style/frontend/angular/003112_no-template-comments.md) | A template has no comments | draft |
+| [S/frontend/angular/003113](style/frontend/angular/003113_switch-for-many-cases.md) | A choice of three or more cases is a switch | draft |
+| [S/frontend/angular/003114](style/frontend/angular/003114_shared-markup-is-a-component.md) | Markup that two templates repeat is one component | draft |
 | [S/frontend/functional/000091](style/frontend/functional/000091_signal-update.md) | A signal update returns a new value | approved |
 | [S/frontend/functional/000438](style/frontend/functional/000438_eslint-functional.md) | eslint-plugin-functional warns on mutation | approved |
 | [S/shared/agents/000175](style/shared/agents/000175_prod-data.md) | Production data changes only on request | approved |

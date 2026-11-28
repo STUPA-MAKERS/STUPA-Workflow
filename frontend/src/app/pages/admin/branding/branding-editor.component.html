@@ -4,7 +4,6 @@
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
   >
     <app-breadcrumbs crumbs />
-    <!-- §ui-kit:000672: the language of the texts stands at the end of the page head. -->
     <div actions class="br__headTools">
       @if (draft() && dirty()) {
         <app-button variant="text" [disabled]="saving()" (click)="discard()">{{ 'action.discard' | t }}</app-button>
@@ -20,7 +19,6 @@
     [errorText]="(section === 'texts' ? 'admin.texts.loadFailed' : 'admin.brand.loadFailed') | t"
     (retry)="loadConfig()"
   >
-    <!-- The skeleton has the sections and fields of the loaded page (§ui-kit:000893). -->
     <ng-template #loading>
       <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
       <div class="br__cols skel-in" aria-hidden="true">
@@ -147,7 +145,6 @@
             </div>
 
             <div class="br__col">
-              <!-- § 001093: the description of the link preview, the page head and the manifest. -->
               <app-section class="br__sec" [level]="2" [heading]="'admin.brand.preview.group' | t">
                 <label class="br__area" data-testid="description">
                   <span class="br__areaLabel">{{ withLang('admin.brand.preview.description' | t) }}</span>

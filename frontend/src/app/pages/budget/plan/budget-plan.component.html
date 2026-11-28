@@ -2,7 +2,6 @@
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-load-error face [message]="'budget.plan.loadError' | t" (retry)="retry()" />
 } @else if (loading()) {
-  <!-- The skeleton uses the containers of the page, so nothing moves when the plan arrives. -->
   <div class="bd skel-in" [class.bd--wide]="wide()" aria-busy="true">
     <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
     @if (wide()) {
@@ -248,7 +247,6 @@
   </div>
 </ng-template>
 
-<!-- The skeleton of a plan: its steps, its three figures and the tables of both sides. -->
 <ng-template #planSkeleton>
   <div class="bp__skSteps">
     @for (w of skeletonSteps; track $index) {

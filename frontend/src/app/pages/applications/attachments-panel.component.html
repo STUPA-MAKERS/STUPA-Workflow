@@ -60,7 +60,6 @@
     <ul class="rowgroup att__list">
       @for (att of attachments(); track att.id) {
         @let st = scan(att.scanState);
-        <!-- A long press toggles the row like its checkbox (000211, 001810). -->
         <li
           class="att__row"
           appLongPress
@@ -88,7 +87,6 @@
           </div>
           <div class="att__actions">
             <app-button-group>
-              <!-- A file that the viewer shows opens there; its bar holds the download (001080). -->
               @if (canPreview(att)) {
                 <app-button
                   variant="text"
