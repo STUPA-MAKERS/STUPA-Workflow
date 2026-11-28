@@ -236,11 +236,14 @@ async def delete_meeting(meeting_id: str) -> dict:
 
 @group.tool
 async def get_attendance(meeting_id: str) -> dict:
-    """Get the attendance list of a meeting: present, excused or absent per member.
+    """Get the attendance list of a meeting: present, excused or absent per person.
 
-    `status` null means "open" (nothing recorded). `source` is `self` (the member
-    reported it) or `lead` (the meeting lead set it). `note` is the reason of an
-    excuse. Only the member and the meeting lead see it; it is null for all others.
+    The list holds the members and each delegate with the voting right in the meeting.
+    `represents` names the members a delegate represents, and `isMember` is false for a
+    delegate from outside or from the pool. A pool substitute on a seat without a
+    record reads `present`. `status` null means "open" (nothing recorded). `source` is
+    `self` (the person reported it) or `lead` (the meeting lead set it). `note` is the
+    reason of an excuse. Only the member and the meeting lead see it; it is null for all others.
     """
     return await api().get(f"/meetings/{meeting_id}/attendance")
 
@@ -252,7 +255,7 @@ async def set_attendance(
     status: Literal["present", "excused", "absent"],
     note: str | None = None,
 ) -> dict:
-    """Set the attendance of a member for a meeting as the meeting lead.
+    """Set the attendance of a member or of a delegate for a meeting as the meeting lead.
 
     Requires write access to the meeting: session.manage or protocol.write in its
     gremium, the assigned minute-taker, or admin. Rules:
@@ -1070,7 +1073,7 @@ async def set_agenda_item_done(meeting_id: str, item_id: str, done: bool) -> lis
 async def set_own_attendance(
     meeting_id: str, status: Literal["present", "excused"], note: str | None = None
 ) -> list:
-    """Report the own attendance for a planned or live meeting (Gremium members only).
+    """Report the own attendance for a planned or live meeting (members and delegates).
 
     `note` (the reason) only with `excused`. 409 `attendance_set_by_lead` when the
     meeting lead set the record, 409 `delegation_active` for `present` while the caller

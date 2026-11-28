@@ -9,9 +9,11 @@ from datetime import time as _time
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.documents.service import anlage_reference
 from app.modules.gremien.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.media.models import MarkdownDocument
@@ -225,7 +227,9 @@ class DocumentOps(ProtocolServiceBase):
         """Resolve the protocol keepers and the attendance groups for the header.
 
         A list entry holds the display name of the principal, or the sub as a
-        fallback. The excused members are their own group. `public=True`
+        fallback. A delegate names the represented members: "Lea Kurz (für Max
+        Muster)" (§F/meetings/protocols/003153). The excused members are their own
+        group. `public=True`
         redacts the person-related header metadata for the mailed variant. The full
         attendance lists and the names of the protocol keepers must never go
         external. The method then emits the counters only, as the data lines
@@ -237,17 +241,10 @@ class DocumentOps(ProtocolServiceBase):
         """
         if meeting is None:
             return HeaderMeta()
-        rows = (
-            await self.session.execute(
-                select(MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub)
-                .join(PrincipalRow, PrincipalRow.id == MeetingAttendance.principal_id)
-                .where(MeetingAttendance.meeting_id == meeting.id)
-                .order_by(PrincipalRow.display_name)
-            )
-        ).all()
-        present = [name or sub for status, name, sub in rows if status == "present"]
-        excused = [name or sub for status, name, sub in rows if status == "excused"]
-        absent = [name or sub for status, name, sub in rows if status == "absent"]
+        rows = await self._attendance_lines(meeting.id)
+        present = [line for status, line in rows if status == "present"]
+        excused = [line for status, line in rows if status == "excused"]
+        absent = [line for status, line in rows if status == "absent"]
         present_count = await meeting_present(self.session, meeting)
         from app.modules.livevote.guests import GuestService
 
@@ -281,6 +278,58 @@ class DocumentOps(ProtocolServiceBase):
             present_count=present_count,
             datalines=guest_lines,
         )
+
+    async def _attendance_lines(self, meeting_id: UUID) -> list[tuple[str, str]]:
+        """Return the status and the list entry of each person with an attendance.
+
+        A person with a record has one, and so has a pool substitute on a seat without a
+        record (§F/meetings/delegations/003152). A delegate names the represented members
+        (§F/meetings/protocols/003153). The entries and the represented members are in
+        the order of the names.
+        """
+        records = (
+            await self.session.execute(
+                select(MeetingAttendance.status, PrincipalRow.display_name, PrincipalRow.sub)
+                .join(PrincipalRow, PrincipalRow.id == MeetingAttendance.principal_id)
+                .where(MeetingAttendance.meeting_id == meeting_id)
+            )
+        ).all()
+        delegate, delegator = aliased(PrincipalRow), aliased(PrincipalRow)
+        delegations = (
+            await self.session.execute(
+                select(
+                    delegate.sub,
+                    delegate.display_name,
+                    delegator.display_name,
+                    delegator.sub,
+                    MeetingDelegation.via_pool,
+                )
+                .join(delegate, delegate.id == MeetingDelegation.delegate_principal_id)
+                .join(delegator, delegator.id == MeetingDelegation.delegator_principal_id)
+                .where(
+                    MeetingDelegation.meeting_id == meeting_id,
+                    MeetingDelegation.delegate_voting.is_(True),
+                )
+            )
+        ).all()
+        behalf = {
+            sub: sorted(
+                (name or other for d_sub, _, name, other, _ in delegations if d_sub == sub),
+                key=str.casefold,
+            )
+            for sub in {d_sub for d_sub, _, _, _, _ in delegations}
+        }
+        recorded = {sub: (status, name or sub) for status, name, sub in records}
+        seats = {
+            sub: ("present", name or sub)
+            for sub, name, _, _, pool in delegations
+            if pool and sub not in recorded
+        }
+        lines = [
+            (status, f"{name} (für {', '.join(behalf[sub])})" if sub in behalf else name)
+            for sub, (status, name) in (recorded | seats).items()
+        ]
+        return sorted(lines, key=lambda line: line[1].casefold())
 
     async def _legacy_protokollant(self, meeting: Meeting) -> str | None:
         """Return the name of `meeting.protokollant_id` for a meeting without periods."""

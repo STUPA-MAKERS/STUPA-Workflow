@@ -1355,12 +1355,17 @@ interface MockAttendance {
   readonly canKeepProtocol: boolean;
   /** The member has an own vote (`vote.cast`) and can be substituted. */
   readonly canVote: boolean;
+  /** The members whose voting right a delegate holds (§ 003150). */
+  readonly represents?: readonly { readonly principalId: string; readonly displayName: string | null }[];
+  /** False for a delegate who is no member. */
+  readonly isMember?: boolean;
 }
 
 /**
  * The roster of the mock Gremium. The demo user is in it with the id of the principal.
  * Vera Vertretung has a delegation for the live meeting, so "present" gives 409. Olga Offen
- * is a member without a vote, so the lead cannot enter a substitute for her.
+ * is a member without a vote, so the lead cannot enter a substitute for her. Sven
+ * Stellvertreter represents Vera Vertretung; Lea Kurz is no member and represents Fritz Fehlend.
  */
 let MOCK_ATTENDANCE: readonly MockAttendance[] = [
   { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true, canVote: true },
@@ -1369,9 +1374,10 @@ let MOCK_ATTENDANCE: readonly MockAttendance[] = [
   { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
-  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
+  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true, represents: [{ principalId: 'p-6', displayName: 'Vera Vertretung' }] },
   { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
   { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false, canVote: false },
+  { principalId: 'p-10', displayName: 'Lea Kurz', email: 'lea@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false, canVote: false, isMember: false, represents: [{ principalId: 'p-8', displayName: 'Fritz Fehlend' }] },
 ];
 
 interface MockAgendaItem {
@@ -2061,7 +2067,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     if (/\/committees\/[^/]+\/meeting-members$/.test(p)) {
       return ok(
-        MOCK_ATTENDANCE.map((a) => ({
+        MOCK_ATTENDANCE.filter((a) => a.isMember !== false).map((a) => ({
           principalId: a.principalId,
           displayName: a.displayName,
           email: a.email,

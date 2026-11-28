@@ -1,21 +1,26 @@
 """Attendance service for a meeting.
 
 The roster of a meeting holds the members of the Gremium, plus each principal
-with an attendance record for the meeting (see `app.modules.meetings.roster`). A
-closed meeting thus keeps its attendance, also when the OIDC sync removed a
-membership later. A change of the attendance needs a membership. Each pair of meeting and member
-has exactly one record. The unique constraint drives the upsert.
+with an attendance record for the meeting, plus each delegate with the voting right
+in the meeting (see `app.modules.meetings.roster`). A closed meeting thus keeps its
+attendance, also when the OIDC sync removed a membership later. A change of the
+attendance needs a membership or a delegation with the voting right in the meeting
+(§F/meetings/delegations/003150). Each pair of meeting and person has exactly one
+record. The unique constraint drives the upsert.
 
 The rules:
 
-- A member reports the own attendance (`source='self'`) as `present` or
-  `excused` only, while the meeting is `planned` or `live`.
-- The meeting lead (`canWrite`) sets the attendance of any member
-  (`source='lead'`), `absent` included. A record that the lead set wins: the
+- A member or a delegate reports the own attendance (`source='self'`) as `present`
+  or `excused` only, while the meeting is `planned` or `live`.
+- The meeting lead (`canWrite`) sets the attendance of any member and of any
+  delegate (`source='lead'`), `absent` included. A record that the lead set wins: the
   member cannot change it any more (409 `attendance_set_by_lead`) until the lead
   resets it to "open" with a delete of the record.
 - A check-in (`present`) of a member frees a seat that a pool substitute took
   for the member (`delegations.pool_seat`).
+- A pool substitute on a seat without a record reads `present`, because a seat
+  needs the live meeting. A ballot of a delegate marks the delegate present
+  (§F/meetings/delegations/003152).
 - Nobody can set a member `present` while another delegation of that member for
   the meeting exists (409 `delegation_active`): not the lead, and not the member
   with the own report. The delegation must be revoked first. The delegator can
@@ -63,13 +68,19 @@ from app.modules.meetings.models import (
     MeetingSettings,
 )
 from app.modules.meetings.periods import kept_late_excuse_days
-from app.modules.meetings.present import present_count
+from app.modules.meetings.present import (
+    Delegates,
+    delegate_status,
+    meeting_delegates,
+    present_count,
+)
 from app.modules.meetings.protocol_models import Protocol
 from app.modules.meetings.roster import meeting_roster_filter
 from app.modules.meetings.schemas import (
     AttendanceOut,
     AttendanceStatus,
     MeetingMemberOut,
+    RepresentedOut,
     SelfAttendanceStatus,
 )
 from app.settings import get_settings
@@ -123,6 +134,9 @@ def _open_window(
     return until if now <= until else None
 
 
+_NO_DELEGATES = Delegates(represents={}, seat_holders=frozenset())
+
+
 def _attendance_out(
     member: PrincipalRow,
     rec: MeetingAttendance | None,
@@ -131,19 +145,28 @@ def _attendance_out(
     is_self: bool,
     can_write: bool,
     late_until: datetime | None = None,
+    represents: list[RepresentedOut] | None = None,
+    status: str | None = None,
+    is_member: bool = True,
 ) -> AttendanceOut:
-    """Build one roster row; the note goes only to the member and to the lead."""
+    """Build one roster row; the note goes only to the member and to the lead.
+
+    ``status`` is the status of the row: the record, or ``present`` for a pool seat
+    without a record.
+    """
     return AttendanceOut(
         lateExcuseUntil=late_until,
         principalId=member.id,
         displayName=member.display_name,
         email=member.email,
-        status=rec.status if rec else None,  # type: ignore[arg-type]
+        status=status,  # type: ignore[arg-type]
         source=rec.source if rec else None,  # type: ignore[arg-type]
         note=rec.note if rec and (is_self or can_write) else None,
         isSelf=is_self,
         canKeepProtocol=KEEPER_PERMISSION in held,
         canVote=VOTE_PERMISSION in held,
+        represents=represents or [],
+        isMember=is_member,
     )
 
 
@@ -221,7 +244,9 @@ class AttendanceService:
 
         The list holds the members of the Gremium, plus each principal with a
         record for the meeting, so a former member who attended stays in the
-        list. A member without
+        list, plus each delegate with the voting right in the meeting. A delegate
+        names the members it represents (`represents`), and a pool substitute on
+        a seat without a record reads `present`. A member without
         a record gets `status` and `source` as `None`. The `note` goes only to
         the member and to the meeting lead (`can_write`). `canKeepProtocol` marks
         the members who can keep the minutes now, for the keeper picker and
@@ -251,7 +276,13 @@ class AttendanceService:
             .all()
         )
         by_principal = {r.principal_id: r for r in records}
+        statuses = {r.principal_id: r.status for r in records}
         perms = await member_permissions(self.session, meeting.gremium_id)
+        member_ids = await self._member_ids(meeting.gremium_id)
+        delegates = (await meeting_delegates(self.session, [meeting_id])).get(
+            meeting_id, _NO_DELEGATES
+        )
+        names = await self._names(delegates, members)
         until = late_excuse_until(meeting, await self._late_excuse_days(meeting))
         now = datetime.now(UTC)
         return [
@@ -264,9 +295,74 @@ class AttendanceService:
                 late_until=_open_window(
                     by_principal.get(m.id), until, now, is_self=m.sub == requester_sub
                 ),
+                represents=sorted(
+                    (
+                        RepresentedOut(principalId=pid, displayName=names.get(pid))
+                        for pid in delegates.represents.get(m.id, ())
+                    ),
+                    key=lambda r: (r.display_name or "").casefold(),
+                ),
+                status=delegate_status(delegates, statuses, m.id),
+                is_member=m.id in member_ids,
             )
             for m in members
         ]
+
+    async def _member_ids(self, gremium_id: UUID) -> set[UUID]:
+        """Return the ids of the current members of the Gremium."""
+        return set(
+            (
+                await self.session.execute(
+                    select(GremiumMembership.principal_id).where(
+                        GremiumMembership.gremium_id == gremium_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    async def _names(
+        self, delegates: Delegates, roster: list[PrincipalRow]
+    ) -> dict[UUID, str | None]:
+        """Return the display name of each represented member.
+
+        A represented member is in the roster as a rule; a former member is read.
+        """
+        wanted = {pid for ids in delegates.represents.values() for pid in ids}
+        known = {m.id: m.display_name for m in roster if m.id in wanted}
+        missing = wanted - known.keys()
+        if not missing:
+            return known
+        rows = await self.session.execute(
+            select(PrincipalRow.id, PrincipalRow.display_name).where(PrincipalRow.id.in_(missing))
+        )
+        return known | dict(rows.all())
+
+    async def _is_delegate(self, meeting_id: UUID, principal_id: UUID) -> bool:
+        """Return True when the principal holds a delegation with the voting right here."""
+        found = (
+            await self.session.execute(
+                select(MeetingDelegation.id).where(
+                    MeetingDelegation.meeting_id == meeting_id,
+                    MeetingDelegation.delegate_principal_id == principal_id,
+                    MeetingDelegation.delegate_voting.is_(True),
+                )
+            )
+        ).first()
+        return found is not None
+
+    async def _attendee(self, meeting: Meeting, sub: str) -> PrincipalRow | None:
+        """Return the principal of ``sub`` when it is a member or a delegate of the meeting."""
+        member = next(
+            (m for m in await self._current_members(meeting.gremium_id) if m.sub == sub), None
+        )
+        if member is not None:
+            return member
+        person = await self.session.scalar(select(PrincipalRow).where(PrincipalRow.sub == sub))
+        if person is None or not await self._is_delegate(meeting.id, person.id):
+            return None
+        return person
 
     async def _late_excuse_days(self, meeting: Meeting) -> int:
         """Return the late-excuse period of the meeting, in days (spec 000942).
@@ -469,14 +565,15 @@ class AttendanceService:
         replace_note: bool = False,
         can_write: bool = False,
     ) -> list[AttendanceOut]:
-        """Report the own attendance of the requester.
+        """Report the own attendance of the requester, a member or a delegate.
 
         `present` is refused while the member has a delegation for the meeting,
         as for the lead. Else the member counts as present but stays
         blocked from the vote.
 
         Raises:
-            ForbiddenError: The requester is not a current member of the Gremium.
+            ForbiddenError: The requester is neither a current member of the Gremium
+                nor a delegate with the voting right in the meeting.
             ConflictError: The meeting is closed, the meeting lead set the record
                 (code `attendance_set_by_lead`), the status is `present` while
                 a delegation of the member exists (code `delegation_active`),
@@ -484,12 +581,9 @@ class AttendanceService:
         """
         meeting = await self._meeting(meeting_id, for_write=True)
         self._ensure_not_closed(meeting)
-        member = next(
-            (m for m in await self._current_members(meeting.gremium_id) if m.sub == requester_sub),
-            None,
-        )
+        member = await self._attendee(meeting, requester_sub)
         if member is None:
-            raise ForbiddenError("only committee members can mark their attendance")
+            raise ForbiddenError("only committee members and delegates can mark their attendance")
         existing = await self._record(meeting_id, member.id)
         if existing is not None and existing.source == "lead":
             raise ConflictError(
@@ -511,14 +605,15 @@ class AttendanceService:
         return await self.roster(meeting_id, requester_sub, can_write=can_write)
 
     async def mark_present_on_cast(self, meeting_id: UUID, voter_sub: str) -> None:
-        """Mark a member present who casts the own ballot in a meeting vote.
+        """Mark a member or a delegate present who casts a ballot in a meeting vote.
 
-        A ballot shows that the member takes part, so the record becomes `present`,
+        A ballot shows that the person takes part, so the record becomes `present`,
         also over an `absent` or `excused` record of the lead. The source stays as it
-        was, so a lead record stays locked against the self report. A caller who is
-        not a current member (an external substitute) has no attendance and gets
-        none, and so does a member with a delegation for the meeting (present
-        and delegated exclude each other). The method does not commit: the ballot
+        was, so a lead record stays locked against the self report. A delegate who
+        casts for the represented members counts as present too
+        (§F/meetings/delegations/003152). A caller who is neither a current member nor
+        a delegate gets no attendance, and so does a member with a delegation for the
+        meeting (present and delegated exclude each other). The method does not commit: the ballot
         commits it, and a refused ballot rolls it back. It does not lock the meeting
         row, because the caller holds the vote row and the lock order is meeting row
         first.
@@ -526,10 +621,7 @@ class AttendanceService:
         meeting = await self._meeting(meeting_id)
         if meeting.status == "closed":
             return
-        member = next(
-            (m for m in await self._current_members(meeting.gremium_id) if m.sub == voter_sub),
-            None,
-        )
+        member = await self._attendee(meeting, voter_sub)
         if member is None:
             return
         existing = await self._record(meeting_id, member.id)
@@ -588,7 +680,7 @@ class AttendanceService:
         note: str | None = None,
         replace_note: bool = False,
     ) -> list[AttendanceOut]:
-        """Set the attendance of a member as the meeting lead.
+        """Set the attendance of a member or of a delegate as the meeting lead.
 
         The router checks `canWrite` before the call. The change writes
         `attendance_set` with the status before and after it.
@@ -599,8 +691,9 @@ class AttendanceService:
         votes of the meeting are over and the substitutions belong to its record.
 
         Raises:
-            NotFoundError: The principal is not a current member of the Gremium, and
-                the meeting is not closed or holds no record of the principal.
+            NotFoundError: The principal is neither a current member of the Gremium
+                nor a delegate with the voting right in the meeting, and the meeting is
+                not closed or holds no record of the principal.
             ConflictError: The protocol of the closed meeting is final (code
                 `protocol_final`), the status is `present` while a
                 delegation of the member exists (code `delegation_active`), or
@@ -610,9 +703,11 @@ class AttendanceService:
         await self._ensure_lead_open(meeting)
         closed = meeting.status == "closed"
         members = await self._current_members(meeting.gremium_id)
-        is_member = any(m.id == principal_id for m in members)
+        is_member = any(m.id == principal_id for m in members) or await self._is_delegate(
+            meeting_id, principal_id
+        )
         if not is_member and not closed:
-            raise NotFoundError("principal is not a current member of this committee")
+            raise NotFoundError("principal is neither a member nor a delegate of this meeting")
         if (
             not closed
             and status == "present"

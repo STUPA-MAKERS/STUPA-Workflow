@@ -316,8 +316,10 @@ async def test_cast_nonvoting_delegation_does_not_block_member(marks: mock.Async
     marks.assert_awaited_once_with(vote.meeting_id, _voter().sub)
 
 
-async def test_cast_exercising_delegated_vote_is_audited() -> None:
+async def test_cast_exercising_delegated_vote_is_audited(marks: mock.AsyncMock) -> None:
     """A delegated ballot runs under the sub of the delegator and is audited.
+
+    The ballot marks the delegate present (§F/meetings/delegations/003152).
 
     The external substitute is not in eligible_group, but receives a vote delegation of
     the meeting. The ballot with as_delegation=True writes a DELEGATION_USE audit entry.
@@ -339,6 +341,7 @@ async def test_cast_exercising_delegated_vote_is_audited() -> None:
     assert (out.status, out.ballots) == ("cast", 1)
     assert db.committed == 1
     assert any(type(a).__name__ == "AuditEntry" for a in db.added)
+    marks.assert_awaited_once()
 
 
 async def test_cast_own_ballot_counts_for_each_represented_member(
@@ -377,7 +380,7 @@ async def test_cast_as_delegation_with_an_open_own_ballot_409() -> None:
     assert db.committed == 0
 
 
-async def test_cast_as_delegation_after_the_own_ballot() -> None:
+async def test_cast_as_delegation_after_the_own_ballot(marks: mock.AsyncMock) -> None:
     """A delegation that came after the own ballot still gets its ballot."""
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
@@ -463,7 +466,7 @@ async def test_cast_as_delegation_without_incoming_403() -> None:
 
 
 async def test_cast_pool_seat_claims_and_runs_under_the_member(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, marks: mock.AsyncMock
 ) -> None:
     """A pool substitute without a delegation claims a seat for the represented ballot.
 

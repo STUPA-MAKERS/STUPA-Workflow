@@ -26,18 +26,50 @@ async def test_a_person_counts_one_time_and_only_with_a_voting_right() -> None:
     """§F/meetings/meetings/000946: 2 present voters and 1 seat of another person.
 
     The fake session returns, in order: the present members with the permissions of
-    their role, and the holders of a pool seat. Rita holds no `vote.cast`. Ben is a
-    present voter and holds a seat, so the seat adds nobody.
+    their role, the delegations with the voting right, and the attendance records. Rita
+    holds no `vote.cast`. Ben is a present voter and holds a seat, so the seat adds
+    nobody. Sam holds a seat without a record, so Sam is present.
     """
     mid, other = uuid4(), uuid4()
-    anna, ben, rita, sam = uuid4(), uuid4(), uuid4(), uuid4()
+    anna, ben, rita, sam, cem, dora = (uuid4() for _ in range(6))
     db: Any = fake_session(
         result((mid, anna, ["vote.cast"]), (mid, ben, ["vote.cast"]), (mid, rita, None)),
-        result((mid, sam), (mid, ben), (other, sam)),
+        result((mid, sam, cem, True), (mid, ben, dora, True), (other, sam, cem, True)),
+        result((mid, anna, "present"), (mid, ben, "present"), (mid, rita, "present")),
     )
     counts = await present_counts(db, [mid, other])
     assert counts == {mid: Present(members=2, seats=1), other: Present(members=0, seats=1)}
     assert counts[mid].total == 3
+
+
+@pytest.mark.real_present
+async def test_a_present_delegate_counts_one_time() -> None:
+    """§F/meetings/delegations/003151: each present delegate counts once.
+
+    Lea is no member and holds two delegations: she counts one time. Ole is an absent
+    delegate and does not count. Ben is a present member and a delegate: he counts as a
+    member only. Pia holds a pool seat, but the lead set her excused, so the record wins
+    (§F/meetings/delegations/003152).
+    """
+    mid = uuid4()
+    ben, lea, ole, pia, cem, dora, eva, finn, gil = (uuid4() for _ in range(9))
+    db: Any = fake_session(
+        result((mid, ben, ["vote.cast"])),
+        result(
+            (mid, lea, cem, False),
+            (mid, lea, dora, False),
+            (mid, ole, eva, False),
+            (mid, ben, finn, False),
+            (mid, pia, gil, True),
+        ),
+        result(
+            (mid, ben, "present"),
+            (mid, lea, "present"),
+            (mid, ole, "absent"),
+            (mid, pia, "excused"),
+        ),
+    )
+    assert await present_counts(db, [mid]) == {mid: Present(members=1, seats=1)}
 
 
 @pytest.mark.real_present

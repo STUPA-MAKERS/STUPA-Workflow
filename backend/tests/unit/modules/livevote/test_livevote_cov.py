@@ -2350,13 +2350,13 @@ async def test_set_for_corrects_a_former_member_of_a_closed_meeting(
     """Correct the record of a former member after the close, without a delegation check.
 
     The fake session returns, in order: the meeting, the current members (not the
-    person) and the record of the person. The recount and the roster have their own
-    tests.
+    person), no delegation of the person and the record of the person. The recount and
+    the roster have their own tests.
     """
     meeting = _meeting(status="closed")
     former = _member(sub="former")
     existing = SimpleNamespace(principal_id=former.id, status="absent", source="self", note=None)
-    sess = _QueueSession(executes=[res(meeting), res(_member()), res(existing)])
+    sess = _QueueSession(executes=[res(meeting), res(_member()), res(), res(existing)])
 
     async def _no_seat(*_a: object, **_kw: object) -> bool:
         raise AssertionError("a correction after the close frees no pool seat")
@@ -2374,9 +2374,9 @@ async def test_set_for_corrects_a_former_member_of_a_closed_meeting(
 
 
 async def test_set_for_unknown_person_of_a_closed_meeting_not_found() -> None:
-    """Answer 404 for a person without membership and without a record."""
+    """Answer 404 for a person without membership, delegation and record."""
     meeting = _meeting(status="closed")
-    sess = _QueueSession(executes=[res(meeting), res(_member()), res()])
+    sess = _QueueSession(executes=[res(meeting), res(_member()), res(), res()])
     svc = AttendanceService(sess)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
         await svc.set_for(meeting.id, uuid4(), "absent", "lead-sub")
