@@ -14,13 +14,14 @@
         <app-section data-testid="ed-section" [heading]="'events.dialog.details' | t" [hideHeading]="true">
           <app-field-group>
             @for (fact of facts(); track fact.label) {
-              <app-field-row data-testid="ed-fact" [label]="fact.label">
-                @if (fact.href) {
-                  <a data-testid="ed-shop" [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
-                } @else {
-                  {{ fact.value }}
-                }
-              </app-field-row>
+              @if (fact.beside; as beside) {
+                <app-field-pair data-testid="ed-pair">
+                  <ng-container *ngTemplateOutlet="row; context: { $implicit: fact }" />
+                  <ng-container *ngTemplateOutlet="row; context: { $implicit: beside }" />
+                </app-field-pair>
+              } @else {
+                <ng-container *ngTemplateOutlet="row; context: { $implicit: fact }" />
+              }
             }
             @if (current.descriptionMd) {
               <app-field-row data-testid="ed-description" [label]="'events.field.description' | t">
@@ -87,6 +88,16 @@
     }
   </ng-template>
 </app-detail-screen>
+
+<ng-template #row let-fact>
+  <app-field-row data-testid="ed-fact" [label]="fact.label">
+    @if (fact.href) {
+      <a data-testid="ed-shop" [href]="fact.href" target="_blank" rel="noopener noreferrer">{{ fact.value }}</a>
+    } @else {
+      {{ fact.value }}
+    }
+  </app-field-row>
+</ng-template>
 
 <app-confirm-dialog
   [open]="deleting()"

@@ -1,10 +1,10 @@
 ---
 id: "001067"
-title: Free boards show in the board picker after the boards of the Gremien
+title: Free boards show in the board picker after the team boards
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-16
+updated: 2026-11-28
 tests:
   - "frontend/src/app/pages/todos/board-picker/todo-board-picker.component.spec.ts:TodoBoardPickerComponent"
 implementation:
@@ -17,13 +17,14 @@ scope:
   - frontend/src/app/features/todos
 ---
 
-# Free boards show in the board picker after the boards of the Gremien
+# Free boards show in the board picker after the team boards
 
 The board picker of the Boards tab must show the free boards that the person reads in their own
-group `Weitere Boards` (`More boards`) after the boards of the Gremien, sorted by name. The
+group `Weitere Boards` (`More boards`) after the team boards (group `Teams`, 003130), sorted by
+name. The
 meta-board `Alle` and `Meine To-Dos` must include the free boards. The route of a free board must
 be `/todos/<boardId>` like every other board. The group heading must not show a count.
 
 Reason: A free board must be found where every other board is found.
 
-Test: A frontend test shows a free board in its group after the Gremium boards.
+Test: A frontend test shows a free board in its group after the team boards.

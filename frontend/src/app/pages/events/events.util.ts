@@ -3,6 +3,7 @@ import { EVENT_SEGMENTS } from '@core/api/events.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ListQuery } from '@stupa-makers/ui-kit';
 import type { FormValue } from '@stupa-makers/ui-kit/screens';
+import { dayMonthYear } from '@shared/date-format';
 import { eventDays } from '../../features/todos/todos.util';
 
 /** The label of each segment of the page (spec 003028). */
@@ -26,6 +27,13 @@ const orNull = (value: unknown): string | null => text(value) ?? null;
 
 /** `19:00:00` → `19:00`. */
 export const shortTime = (value: string | null): string | null => (value ? value.slice(0, 5) : null);
+
+/** "12.03.2027, 18:00": one day of an Event and, when set, its time. */
+export function eventMoment(day: string, time: string | null, locale: string): string {
+  const date = dayMonthYear(day, locale);
+  const short = shortTime(time);
+  return short ? `${date}, ${short}` : date;
+}
 
 /** The filter of the API from the query of the screen. */
 export function eventQuery(query: ListQuery): EventQuery {
