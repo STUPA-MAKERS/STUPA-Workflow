@@ -4,7 +4,7 @@ title: A meeting shows one count of present members
 kind: functional
 status: approved
 owner: frederikbeimgraben
-updated: 2026-11-15
+updated: 2026-11-28
 tests:
   - backend/tests/integration/modules/delegations/test_one_present_count.py:test_the_head_the_vote_and_the_protocol_show_one_count
   - backend/tests/integration/modules/delegations/test_one_present_count.py:test_the_close_fixes_the_count
@@ -25,8 +25,8 @@ scope:
 
 The head of a meeting, its attendance list, its votes and its protocol must show the same
 count of present members. This count must be the count of the quorum (000900): each eligible
-member with the attendance status `present` and each pool seat (000113). A person must count
-one time only. A member without a voting right, a former member and a guest must not count.
+member with the attendance status `present` and each present delegate (003151), a pool seat
+(000113) included. A person must count one time only. A member without a voting right, a former member and a guest must not count.
 The close of a meeting must fix this count and the number of the members with a voting right.
 A closed meeting must show the fixed values.
 

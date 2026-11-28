@@ -76,7 +76,8 @@ class VoteCastOps(VoteAccessOps):
         session and external substitutes reach this point. Each represented ballot
         audits the use of the delegation. A member who casts the own ballot in a meeting
         takes part in the meeting, which frees a pool seat of the member
-        (``release_pool_seat_of``).
+        (``release_pool_seat_of``). The own or a represented ballot in a meeting marks
+        the caster present (§F/meetings/delegations/003152).
 
         A pool substitute without a voting delegation claims a free seat with the
         represented cast (``claim_pool_seat``). The claim stores a delegation, so the
@@ -135,10 +136,11 @@ class VoteCastOps(VoteAccessOps):
                 target_id=str(vote.id),
                 data={"eligibleGroup": vote.eligible_group},
             )
-        if vote.meeting_id is not None and own is not None:
+        if vote.meeting_id is not None and (own is not None or written):
             from app.modules.meetings.attendance_service import AttendanceService
 
-            await release_pool_seat_of(self.session, vote.meeting_id, principal.sub)
+            if own is not None:
+                await release_pool_seat_of(self.session, vote.meeting_id, principal.sub)
             await AttendanceService(self.session).mark_present_on_cast(
                 vote.meeting_id, principal.sub
             )

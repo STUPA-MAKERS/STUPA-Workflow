@@ -42,8 +42,15 @@ AttendanceStatus = Literal["present", "excused", "absent"]
 SelfAttendanceStatus = Literal["present", "excused"]
 
 
+class RepresentedOut(FrozenCamelModel, frozen=True):
+    """A member whose voting right a delegate holds in the meeting."""
+
+    principal_id: UUID = Field(alias="principalId")
+    display_name: str | None = Field(default=None, alias="displayName")
+
+
 class AttendanceOut(FrozenCamelModel, frozen=True):
-    """Attendance of a Gremium member for a meeting."""
+    """Attendance of a Gremium member or of a delegate for a meeting."""
 
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
@@ -66,6 +73,13 @@ class AttendanceOut(FrozenCamelModel, frozen=True):
     #: (``lateExcuseDays`` after the close). Only the own row of a closed meeting
     #: carries it, and only while the window is open.
     late_excuse_until: _datetime | None = Field(default=None, alias="lateExcuseUntil")
+    #: The members whose voting right this person holds in the meeting (a delegate), in
+    #: the order of their names. Empty for a person who represents nobody
+    #: (§F/meetings/delegations/003150).
+    represents: list[RepresentedOut] = Field(default_factory=list)
+    #: False when the person is no member of the Gremium now: a delegate from outside or
+    #: from the pool, or a former member with a record.
+    is_member: bool = Field(default=True, alias="isMember")
 
 
 class MeetingMemberOut(FrozenCamelModel, frozen=True):

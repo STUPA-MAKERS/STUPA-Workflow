@@ -6,8 +6,10 @@ group. A past meeting must still show the people who attended it.
 The roster of a meeting therefore holds:
 
 - each principal with a membership in the Gremium,
-- and each principal who has an attendance record for the meeting, also without
-  a membership. A recorded attendance never disappears from the roster.
+- each principal who has an attendance record for the meeting, also without
+  a membership. A recorded attendance never disappears from the roster,
+- and each delegate who holds a delegation with the voting right in the meeting, also
+  without a membership (§F/meetings/delegations/003150).
 
 A membership has no term, so the roster does not depend on the time of the
 meeting.
@@ -23,6 +25,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import ColumnElement, or_, select
 
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.gremien.models import GremiumMembership
 from app.modules.meetings.models import Meeting, MeetingAttendance
 
@@ -47,8 +50,9 @@ def roster_filter(gremium_id: UUID, *, meeting_id: UUID | None = None) -> Column
     """Return the WHERE clause on `principal.id` that selects the roster.
 
     Each member of the Gremium counts. With `meeting_id`, each principal with an
-    attendance record for the meeting counts too. The clause uses two `IN`
-    subqueries, so a single query gives each principal once.
+    attendance record for the meeting and each delegate with the voting right in it
+    count too. The clause uses `IN` subqueries, so a single query gives each principal
+    once.
     """
     members = select(GremiumMembership.principal_id).where(
         GremiumMembership.gremium_id == gremium_id
@@ -62,11 +66,17 @@ def roster_filter(gremium_id: UUID, *, meeting_id: UUID | None = None) -> Column
                     MeetingAttendance.meeting_id == meeting_id
                 )
             ),
+            PrincipalRow.id.in_(
+                select(MeetingDelegation.delegate_principal_id).where(
+                    MeetingDelegation.meeting_id == meeting_id,
+                    MeetingDelegation.delegate_voting.is_(True),
+                )
+            ),
         )
     )
     return or_(PrincipalRow.id.in_(members), *recorded)
 
 
 def meeting_roster_filter(meeting: Meeting) -> ColumnElement[bool]:
-    """Return the roster clause of one meeting: members and recorded principals."""
+    """Return the roster clause of one meeting: members, recorded principals, delegates."""
     return roster_filter(meeting.gremium_id, meeting_id=meeting.id)

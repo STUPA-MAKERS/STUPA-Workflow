@@ -459,6 +459,16 @@ export interface Attendance {
    * while the window is open (§ 000922).
    */
   readonly lateExcuseUntil?: string | null;
+  /** The members whose voting right this person holds in the meeting (§ 003150). */
+  readonly represents?: readonly AttendancePerson[];
+  /** False for a person who is no member of the Gremium now: a delegate or a former member. */
+  readonly isMember?: boolean;
+}
+
+/** A person named in a row of the attendance list. */
+export interface AttendancePerson {
+  readonly principalId: Uuid;
+  readonly displayName: string | null;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */

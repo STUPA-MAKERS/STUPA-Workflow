@@ -823,6 +823,9 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/delegations/002692](requirements/functional/meetings/delegations/002692_substitutes-page-per-gremium.md) | The Stellvertretungen of a Gremium have their own page | approved |
 | [F/meetings/delegations/002900](requirements/functional/meetings/delegations/002900_delegation-carries-the-vote.md) | A delegation always transfers the voting right | approved |
 | [F/meetings/delegations/002901](requirements/functional/meetings/delegations/002901_planned-delegations-get-the-vote.md) | Delegations of planned meetings get the voting right | approved |
+| [F/meetings/delegations/003150](requirements/functional/meetings/delegations/003150_delegates-in-attendance-list.md) | The attendance list of a meeting shows the delegates | draft |
+| [F/meetings/delegations/003151](requirements/functional/meetings/delegations/003151_present-delegate-counts.md) | A present delegate counts as present | draft |
+| [F/meetings/delegations/003152](requirements/functional/meetings/delegations/003152_delegate-present-by-seat-or-ballot.md) | A pool seat or a ballot marks a delegate present | draft |
 | [F/meetings/meetings/000092](requirements/functional/meetings/meetings/000092_open-window.md) | A meeting opens in a configured window | approved |
 | [F/meetings/meetings/000093](requirements/functional/meetings/meetings/000093_state-order.md) | Meeting states move only forward | approved |
 | [F/meetings/meetings/000094](requirements/functional/meetings/meetings/000094_close-with-open-vote.md) | A meeting with an open vote does not close | approved |
@@ -930,6 +933,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/meetings/protocols/002781](requirements/functional/meetings/protocols/002781_selection-bar-formats.md) | The format bar holds the inline formats | approved |
 | [F/meetings/protocols/002782](requirements/functional/meetings/protocols/002782_selection-bar-place.md) | The format bar shows below the selection | approved |
 | [F/meetings/protocols/003007](requirements/functional/meetings/protocols/003007_protocol-signature-lines.md) | The signature lines of the protocol PDF are a setting of the Gremium | approved |
+| [F/meetings/protocols/003153](requirements/functional/meetings/protocols/003153_protocol-names-delegates.md) | The protocol names a delegate with the represented members | draft |
 | [F/meetings/voting/000024](requirements/functional/meetings/voting/000024_every-vote-is-secret.md) | Every vote is secret | approved |
 | [F/meetings/voting/000025](requirements/functional/meetings/voting/000025_ballot-does-not-change.md) | A cast ballot does not change | approved |
 | [F/meetings/voting/000026](requirements/functional/meetings/voting/000026_tie-rejects-motion.md) | A tie rejects a motion | approved |

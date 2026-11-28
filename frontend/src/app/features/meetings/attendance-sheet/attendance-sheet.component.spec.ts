@@ -292,8 +292,8 @@ describe('AttendanceSheetComponent', () => {
     expect(present).toHaveAttribute('aria-disabled', 'true');
     expect(present).toHaveAttribute('title', 'Erst die Vertretung widerrufen.');
     expect(within(sheet()).getByText('Grund: Prüfung · vertreten durch Sven Stellvertreter · mit Stimmrecht')).toBeInTheDocument();
-    const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
-    expect(within(section).getByText('Vertretungen', { selector: 'h3' })).toBeInTheDocument();
+    const section = within(sheet()).getByRole('region', { name: 'Stimmübertragungen' });
+    expect(within(section).getByText('Stimmübertragungen', { selector: 'h3' })).toBeInTheDocument();
     expect(within(section).getByText('Vera Vertretung → Sven Stellvertreter')).toBeInTheDocument();
     await userEvent.click(within(section).getByRole('button', { name: 'Widerrufen' }));
     const del = http.expectOne('/api/delegations/d-1');
@@ -372,7 +372,7 @@ describe('AttendanceSheetComponent', () => {
     http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/delegations')).flush([own]);
     fixture.detectChanges();
     expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(within(within(sheet()).getByRole('region', { name: 'Vertretungen' })).getByRole('button', { name: 'Widerrufen' }));
+    await userEvent.click(within(within(sheet()).getByRole('region', { name: 'Stimmübertragungen' })).getByRole('button', { name: 'Widerrufen' }));
     http.expectOne('/api/delegations/d-own').flush(null);
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
     http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush({ ...context, myDelegation: null });
@@ -387,7 +387,7 @@ describe('AttendanceSheetComponent', () => {
     fixture.detectChanges();
     expect(within(sheet()).getByRole('alert')).toHaveTextContent('Vertretung aktiv');
     expect(within(sheet()).queryByRole('button', { name: 'Vertretung widerrufen' })).toBeNull();
-    expect(within(sheet()).queryByRole('region', { name: 'Vertretungen' })).toBeNull();
+    expect(within(sheet()).queryByRole('region', { name: 'Stimmübertragungen' })).toBeNull();
   });
 
   it('reports a failed revoke', async () => {
@@ -463,14 +463,14 @@ describe('AttendanceSheetComponent', () => {
     fixture.detectChanges();
     http.expectOne((r) => r.url.endsWith('/delegations')).flush(null, { status: 500, statusText: 'x' });
     fixture.detectChanges();
-    expect(within(sheet()).queryByRole('region', { name: 'Vertretungen' })).toBeNull();
+    expect(within(sheet()).queryByRole('region', { name: 'Stimmübertragungen' })).toBeNull();
     fixture.componentRef.setInput('conflictId', null);
     fixture.detectChanges();
     http
       .expectOne((r) => r.url.endsWith('/delegations'))
       .flush([delegation({ meetingId: 'other' })]);
     fixture.detectChanges();
-    expect(within(sheet()).queryByRole('region', { name: 'Vertretungen' })).toBeNull();
+    expect(within(sheet()).queryByRole('region', { name: 'Stimmübertragungen' })).toBeNull();
   });
 
   it('starts no second revoke while one runs', async () => {
@@ -506,6 +506,47 @@ describe('AttendanceSheetComponent', () => {
     fixture.componentInstance.open.set(true);
     fixture.detectChanges();
     expect(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' })).toHaveValue('');
+  });
+
+  /** Spec 003150: the delegates in the attendance list. */
+  describe('The delegates', () => {
+    const LEA: Attendance = {
+      principalId: 'pr-20',
+      displayName: 'Lea Kurz',
+      email: null,
+      status: null,
+      source: null,
+      note: null,
+      isSelf: false,
+      canVote: false,
+      isMember: false,
+      represents: [
+        { principalId: 'pr-4', displayName: 'Vera Vertretung' },
+        { principalId: 'pr-5', displayName: 'Fritz Fehlend' },
+      ],
+    };
+
+    it('lists a delegate who is no member below the members, with the represented members', async () => {
+      const { statusChange } = await setup({ attendance: [...ROSTER, LEA] });
+      const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
+      expect(within(section).getAllByRole('radiogroup')).toHaveLength(1);
+      expect(within(section).getByText('vertritt Vera Vertretung, Fritz Fehlend')).toBeInTheDocument();
+      await userEvent.click(within(row('Lea Kurz')).getByRole('radio', { name: 'Anwesend' }));
+      expect(statusChange).toHaveBeenLastCalledWith({ member: expect.objectContaining({ principalId: 'pr-20' }), status: 'present' });
+    });
+
+    it('keeps a delegate who is a member in the member rows, and lets a delegate report the own row', async () => {
+      const mika = { ...ROSTER[1], represents: [{ principalId: 'pr-4', displayName: 'Vera Vertretung' }] };
+      const own = { ...LEA, isSelf: true };
+      const { statusChange } = await setup({
+        meeting: meeting({ canControl: false }),
+        attendance: [ROSTER[0], mika, own],
+      });
+      expect(within(sheet()).getByText(/^vertritt Vera Vertretung($| ·)/, { selector: '.as__sub' })).toBeInTheDocument();
+      const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
+      await userEvent.click(within(section).getByRole('radio', { name: 'Anwesend' }));
+      expect(statusChange).toHaveBeenLastCalledWith({ member: expect.objectContaining({ principalId: 'pr-20' }), status: 'present' });
+    });
   });
 
   describe('The lead enters a substitute from the pool', () => {

@@ -54,13 +54,15 @@ class FakeSession:
     async def execute(self, _stmt: Any) -> FakeResult:
         """Pop the next result of the ordered queue.
 
-        The header metadata path reads the attendance, and that query has no entry in
-        the queue. It gets an empty result, so that it does not take the result of
-        another query. The header also reads the keeper periods. That query returns
-        ``keeper_rows``, which a test sets when it needs them, and never takes a result
-        of the queue.
+        The header metadata path reads the attendance and the delegations, and these
+        queries have no entry in the queue. They get an empty result, so that they do not
+        take the result of another query. The header also reads the keeper periods. That
+        query returns ``keeper_rows``, which a test sets when it needs them, and never
+        takes a result of the queue.
         """
         if "meeting_attendance" in str(_stmt).lower():
+            return FakeResult()
+        if "meeting_delegation" in str(_stmt).lower():
             return FakeResult()
         if "protocol_keeper_period" in str(_stmt).lower():
             return FakeResult(self.keeper_rows)

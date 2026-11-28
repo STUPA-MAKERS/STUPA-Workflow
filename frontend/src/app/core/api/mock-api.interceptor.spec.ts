@@ -1360,7 +1360,7 @@ describe('mockApiInterceptor', () => {
 
     it('GET …/attendance → roster', async () => {
       const roster = await get<unknown[]>('/api/meetings/m1/attendance');
-      expect(roster.length).toBe(9);
+      expect(roster.length).toBe(10);
     });
 
     it('GET …/agenda/assignable → filtered list (both seeded applications are taken)', async () => {
@@ -2221,7 +2221,7 @@ describe('mockApiInterceptor', () => {
         expect(other.status).toBe('final');
         expect(other.pdfUrl).toBeTruthy();
         const roster = await get<unknown[]>(`/api/meetings/${draft}/attendance`);
-        expect(roster.length).toBe(9);
+        expect(roster.length).toBe(10);
       });
     });
 
