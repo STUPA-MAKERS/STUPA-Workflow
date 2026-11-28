@@ -6,7 +6,7 @@ status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
 tests:
-  - "frontend/src/app/core/templates/template-style.spec.ts:no comments"
+  - "frontend/src/app/core/templates/template-style.spec.ts:templates"
 implementation:
   - frontend/src/app
 scope:
