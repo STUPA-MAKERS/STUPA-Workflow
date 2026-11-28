@@ -1357,6 +1357,8 @@ describe('group serialize/deserialize round-trip', () => {
     it('loads, changes, orders and saves the rules', async () => {
       const d = { ...draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]), rules: [rule] };
       const { c, v, fixture, createFormVersion } = await setup(d);
+      v.page.set('rules');
+      fixture.detectChanges();
       expect(screen.getByText('Regel 1')).toBeInTheDocument();
       expect(c.rules()[0].logic).toBe(JSON.stringify(rule.logic));
       v.addRule();
@@ -1432,6 +1434,7 @@ describe('group serialize/deserialize round-trip', () => {
         draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
         { type: { ...TYPE, signatureRows: rows } },
       );
+      v.page.set('form');
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toContain('Unterschriftenzeilen');
       v.moveSignatureRow(0, 1);
@@ -1450,5 +1453,24 @@ describe('group serialize/deserialize round-trip', () => {
         ],
       });
     });
+  });
+});
+
+describe('adminFormOutline', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('opens the rules card from the outline and returns to the questions with a group (spec 003132)', async () => {
+    const rule = { logic: { '==': [1, 1] }, message: { de: 'Hinweis', en: 'Note' }, severity: 'warn' as const };
+    const d = { ...draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]), rules: [rule] };
+    const { v, fixture } = await setup(d);
+    expect(screen.queryByText('Regel 1')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Regeln' }));
+    fixture.detectChanges();
+    expect(v.page()).toBe('rules');
+    expect(screen.getByText('Regel 1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abschnitt 1' }));
+    fixture.detectChanges();
+    expect(v.page()).toBe('questions');
+    expect(screen.queryByText('Regel 1')).not.toBeInTheDocument();
   });
 });

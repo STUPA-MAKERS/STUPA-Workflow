@@ -5,6 +5,8 @@ kind: non-functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/forms/form-editor.component.spec.ts:adminFormOutline"
 implementation:
   - frontend/vendor/ui-kit/views/form-editor
 scope:
