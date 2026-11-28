@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/site_config/features.py
+  - backend/app/feature_routes.py
+  - frontend/src/app/core/features/feature.service.ts
 scope:
   - backend/app/
   - frontend/src/app/

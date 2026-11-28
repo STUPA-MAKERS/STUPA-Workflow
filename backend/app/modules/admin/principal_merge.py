@@ -134,6 +134,7 @@ from app.modules.notifications.models import NotificationPreference
 from app.modules.notifications.push_models import PushPreference, PushSubscription
 from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
+from app.modules.pretix.models import PretixEventLink
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.teams.models import TeamInfo, TeamMember
@@ -248,6 +249,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("todos", Link.created_by),
     ("todos", TodoEventSeries.created_by),
     ("todos", Event.created_by),
+    ("todos", PretixEventLink.created_by),
     ("calendar", CalendarAppointment.creator_id),
     ("budget", PurchaseOrder.buyer_id),
 )

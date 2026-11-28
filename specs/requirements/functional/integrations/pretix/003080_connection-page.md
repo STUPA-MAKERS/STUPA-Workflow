@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/pretix/connection.py
+  - backend/app/modules/event_sales/router.py
+  - frontend/src/app/pages/admin/pretix
 scope:
   - backend/app/
   - frontend/src/app/

@@ -763,6 +763,22 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'pretix',
+            canMatch: [featureMatch('pretix')],
+            data: { title: 'admin.pretix.title', permission: ['admin.pretix'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/pretix/pretix.component').then((m) => m.PretixComponent),
+          },
+          {
+            path: 'mollie',
+            canMatch: [featureMatch('mollie')],
+            data: { title: 'admin.mollie.title', permission: ['admin.mollie'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/mollie/mollie.component').then((m) => m.MollieComponent),
+          },
+          {
             path: 'help-tickets',
             data: { title: 'admin.helpTickets.title', permission: ['admin.site', 'ticket.manage'], parent: ['admin'] },
             canActivate: [authGuard],

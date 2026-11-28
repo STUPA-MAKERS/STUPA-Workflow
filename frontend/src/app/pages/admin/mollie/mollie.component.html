@@ -1,0 +1,44 @@
+<app-settings-screen
+  [head]="{ title: 'admin.mollie.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [notice]="notice()"
+  [save]="{ dirty: dirty(), busy: saving() }"
+  (action)="act($event.key)"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenGroup="connection">
+    <app-input
+      type="password"
+      name="token"
+      autocomplete="new-password"
+      [label]="(tokenSet() ? 'admin.mollie.tokenNew' : 'admin.mollie.token') | t"
+      [ngModel]="draft().token"
+      (ngModelChange)="patch({ token: $event })"
+    />
+  </ng-template>
+
+  <ng-template screenGroup="budgets">
+    <app-cost-centre-select
+      [label]="'admin.mollie.feeBudget' | t"
+      [allLabel]="'admin.mollie.noBudget' | t"
+      [emptyLabel]="'admin.mollie.treeEmpty' | t"
+      [unknownLabel]="'admin.mollie.budgetUnknown' | t"
+      [nodes]="tree()"
+      [leavesOnly]="true"
+      [value]="draft().feeBudgetId"
+      (picked)="patch({ feeBudgetId: $event })"
+    />
+    <app-cost-centre-select
+      [label]="'admin.mollie.unassignedBudget' | t"
+      [allLabel]="'admin.mollie.noBudget' | t"
+      [emptyLabel]="'admin.mollie.treeEmpty' | t"
+      [unknownLabel]="'admin.mollie.budgetUnknown' | t"
+      [nodes]="tree()"
+      [leavesOnly]="true"
+      [value]="draft().unassignedBudgetId"
+      (picked)="patch({ unassignedBudgetId: $event })"
+    />
+  </ng-template>
+</app-settings-screen>

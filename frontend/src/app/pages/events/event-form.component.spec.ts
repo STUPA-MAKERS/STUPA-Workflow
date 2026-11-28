@@ -3,6 +3,11 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { render } from '@testing-library/angular';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { type EventOption, EventsApiService } from '@core/api/events.service';
+import { MOCK_EVENT_SALES, MOCK_PRETIX_EVENTS } from '@core/api/mock-sales';
+import { SalesApiService } from '@core/api/sales.service';
+import { AuthService } from '@core/auth/auth.service';
+import { BudgetTreeApi } from '../budget/budget-tree.api';
+import { node } from '../budget/plan/budget-plan.fixtures';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { eventDetail } from '../../../testing/event-fixtures';
 import { EventFormComponent } from './event-form.component';
@@ -13,6 +18,9 @@ interface Options {
   readonly id?: string | null;
   readonly from?: string | null;
   readonly teams?: readonly EventOption[] | null;
+  /** The pretix events of the picker; without them the picker is off. */
+  readonly pretix?: boolean;
+  readonly perms?: readonly string[];
 }
 
 async function setup(options: Options = {}) {
@@ -26,6 +34,14 @@ async function setup(options: Options = {}) {
     create: jest.fn(() => of(eventDetail({ id: 'e-9' }))),
     update: jest.fn(() => of(first)),
   };
+  const sales = {
+    pretixEvents: jest.fn(() => (options.pretix ? of(MOCK_PRETIX_EVENTS) : throwError(() => ({ status: 404 })))),
+    eventSales: jest.fn(() => of(MOCK_EVENT_SALES)),
+    link: jest.fn(() => of({})),
+    unlink: jest.fn(() => of(undefined)),
+    setIncomeBudget: jest.fn(() => of({})),
+  };
+  const perms = new Set(options.perms ?? ['budget.book']);
   const paramMap = new BehaviorSubject(convertToParamMap(options.id ? { id: options.id } : {}));
   const query = convertToParamMap(options.from ? { from: options.from } : {});
   const view = await render(EventFormComponent, {
@@ -33,6 +49,9 @@ async function setup(options: Options = {}) {
       provideTestStatuses(),
       provideRouter([]),
       { provide: EventsApiService, useValue: api },
+      { provide: SalesApiService, useValue: sales },
+      { provide: BudgetTreeApi, useValue: { tree: () => of([node({ id: 'inc', name: 'Einnahmen' })]) } },
+      { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
       { provide: ActivatedRoute, useValue: { paramMap, snapshot: { queryParamMap: query } } },
     ],
   });
@@ -45,7 +64,7 @@ async function setup(options: Options = {}) {
   injector.get(EventsRefresh).changed.subscribe(touched);
   const fields = (): { key: string; visible?: boolean; required?: boolean; options?: { value: string }[] }[] =>
     cmp.form().sections[0].fields;
-  return { ...view, cmp, api, toast, navigate, touched, fields, paramMap };
+  return { ...view, cmp, api, sales, toast, navigate, touched, fields, paramMap };
 }
 
 describe('EventFormComponent', () => {
@@ -69,6 +88,8 @@ describe('EventFormComponent', () => {
       'seriesId',
       'seriesName',
       'shopUrl',
+      'pretixSlug',
+      'incomeBudgetId',
       'descriptionMd',
     ]);
     expect(fields()[2].options?.map((o) => o.value)).toEqual(['planned', 'settled', 'cancelled']);
@@ -180,5 +201,68 @@ describe('EventFormComponent', () => {
     cmp.saving.set(true);
     cmp.save(cmp.value());
     expect(api.create).not.toHaveBeenCalled();
+  });
+
+  /** §F/integrations/pretix/003083, 003086: the picker and the income cost centre. */
+  describe('pretix', () => {
+    const field = (fields: () => { key: string; visible?: boolean }[], key: string) => fields().find((f) => f.key === key);
+
+    it('hides both fields while the pretix events cannot be read', async () => {
+      const { fields, cmp, sales } = await setup();
+      expect(field(fields, 'pretixSlug')?.visible).toBe(false);
+      expect(field(fields, 'incomeBudgetId')?.visible).toBe(false);
+      cmp.save({ ...cmp.value(), title: 'X', pretixSlug: 'a' });
+      expect(sales.link).not.toHaveBeenCalled();
+    });
+
+    it('offers the free events and asks for the cost centre once one is picked', async () => {
+      const { fields, cmp } = await setup({ pretix: true });
+      const picker = field(fields, 'pretixSlug') as { visible?: boolean; options?: { value: string; label: string }[] };
+      expect(picker.visible).toBe(true);
+      expect(picker.options?.map((o) => o.value)).toEqual(['', 'semesterparty-ws26']);
+      expect(picker.options?.[1].label).toMatch(/^Semesterparty WS 26\/27 · /);
+      expect(field(fields, 'incomeBudgetId')?.visible).toBe(false);
+      cmp.onValue({ ...cmp.value(), pretixSlug: 'semesterparty-ws26' });
+      expect(field(fields, 'incomeBudgetId')?.visible).toBe(true);
+    });
+
+    it('keeps the cost centre away without budget.book', async () => {
+      const { fields, cmp } = await setup({ pretix: true, perms: [] });
+      cmp.onValue({ ...cmp.value(), pretixSlug: 'semesterparty-ws26' });
+      expect(field(fields, 'incomeBudgetId')?.visible).toBe(false);
+    });
+
+    it('links a new Event and sets its cost centre after the save', async () => {
+      const { cmp, sales, navigate } = await setup({ pretix: true });
+      cmp.save({ ...cmp.value(), title: 'Party', pretixSlug: 'semesterparty-ws26', incomeBudgetId: 'inc' });
+      expect(sales.link).toHaveBeenCalledWith('e-9', 'semesterparty-ws26');
+      expect(sales.setIncomeBudget).toHaveBeenCalledWith('e-9', 'inc');
+      expect(navigate).toHaveBeenCalledWith(['/events', 'e-9'], expect.anything());
+    });
+
+    it('fills the saved link of an Event and removes it', async () => {
+      const { cmp, sales } = await setup({ id: 'e-1', pretix: true });
+      expect(cmp.value()).toMatchObject({ pretixSlug: 'semesterparty-ws26', incomeBudgetId: '' });
+      cmp.save({ ...cmp.value(), pretixSlug: '' });
+      expect(sales.unlink).toHaveBeenCalledWith('e-1');
+    });
+
+    it.each([
+      ['pretix_event_taken', 'Diese Pretix-Veranstaltung gehört schon zu einer anderen Veranstaltung.'],
+      ['other', 'Die Pretix-Veranstaltung konnte nicht verknüpft werden.'],
+    ])('says why the link failed (%s) and still opens the saved Event', async (code, text) => {
+      const { cmp, sales, toast, navigate } = await setup({ pretix: true });
+      sales.link.mockReturnValueOnce(throwError(() => ({ error: { code } })));
+      cmp.save({ ...cmp.value(), title: 'Party', pretixSlug: 'semesterparty-ws26' });
+      expect(toast).toHaveBeenCalledWith(text, 'error');
+      expect(navigate).toHaveBeenCalledWith(['/events', 'e-9'], expect.anything());
+    });
+
+    it('keeps the form when the link of an Event cannot be read', async () => {
+      const { cmp, sales, paramMap } = await setup({ pretix: true });
+      sales.eventSales.mockReturnValueOnce(throwError(() => ({ status: 500 })));
+      paramMap.next(convertToParamMap({ id: 'e-1' }));
+      expect(cmp.value()).toMatchObject({ pretixSlug: '', incomeBudgetId: '' });
+    });
   });
 });

@@ -61,3 +61,29 @@ MCP `mcp/antragsplattform_mcp/tools/events.py`.
 `tests/integration/modules/todos/test_todos_events.py` (rights, totals, series,
 segments, search, calendar, export, webhooks) and `test_migrations.py::
 test_event_cards_become_events`.
+
+## pretix and Mollie (`event_sales`, `pretix`, `mollie`)
+
+Specs `specs/requirements/functional/integrations/pretix/003080-003091`,
+`mollie/003092-003104`, `mcp/003102` and `non-functional/security/network/003100-003101`.
+
+- `app/modules/pretix/` — `client.py` (GET only, allowlist `PRETIX_HOST_ALLOWLIST`, no
+  redirect, an `Order` without personal values), `rules.py` (pure: `sales_of`,
+  `candidates`), `connection.py` (one row, sealed token, switches `show_sales` and
+  `book_income`), `models.py` (`pretix_settings`, `pretix_event_link`, `pretix_booking`).
+- `app/modules/mollie/` — `client.py` (GET only, `api.mollie.com` only, money values only),
+  `connection.py`, `models.py` (payments, refunds/chargebacks, settlements, bookings).
+- `app/modules/event_sales/` (top layer) — `sync.run` holds the advisory lock
+  (409 `sync_running`); `pretix_sync`, `mollie_sync` read and book; `booking.book` makes
+  each booking in a savepoint with the author `Pretix`/`Mollie` and returns the cause
+  code of a failure; the fees of a settlement get one sub-booking per Event plus the rest;
+  `router.py` has `/admin/pretix`, `/admin/mollie`, `/pretix/events`, `/pretix/links/{id}`,
+  `/events/{id}/sales(/refresh)` and `/sales-sync`. Every route that links or calls pretix
+  or Mollie refuses an agent token (`refuse_agent_token`). Tests override
+  `get_factories` with `tests/_support/sales_fakes.py`.
+- Worker `worker/event_sales.py`: pretix every 15 minutes, Mollie hourly.
+- Frontend: `pages/events/event-sales.component.ts` (section "Verkauf"),
+  `event-pretix-link.ts` (the two form fields), `shared/sales-sync.ts` ("Daten abrufen"),
+  `pages/admin/pretix`, `pages/admin/mollie`, `pages/admin/sales-admin.ts`.
+- Trap: a Mollie payment of a pretix event that no Event links yet is booked on the
+  Kostenstelle without an Event (003103); a later link books the pretix order too.

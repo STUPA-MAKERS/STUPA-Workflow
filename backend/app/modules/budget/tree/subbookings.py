@@ -54,13 +54,15 @@ class SubBookingOps(ExpenseOps):
         return parent
 
     async def create_sub_booking(
-        self, parent_id: UUID, payload: SubBookingCreate, *, actor: str
+        self, parent_id: UUID, payload: SubBookingCreate, *, actor: str, commit: bool = True
     ) -> ExpenseOut:
         """Create a sub-booking under a parent booking.
 
         The child inherits the cost center, the fiscal year and the kind from
         its parent. It carries its own amount, description and metadata. After
-        the create the parent amount equals the sum of its children.
+        the create the parent amount equals the sum of its children. With
+        ``commit=False`` the caller bundles the parent and its children in one
+        transaction.
         """
         parent = await self._subbooking_parent_or_error(parent_id)
         await self._require_open_fiscal_year(parent.fiscal_year_id)
@@ -90,7 +92,8 @@ class SubBookingOps(ExpenseOps):
             target_id=str(child.id),
             data={"parentExpenseId": str(parent_id), "amount": str(child.amount)},
         )
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
         path_key = (await self._get_node(parent.budget_id)).path_key
         names = await self._actor_names({actor})
         return self._expense_out(child, path_key, actor_name=names.get(actor))

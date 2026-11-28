@@ -69,6 +69,13 @@ from app.modules.meetings.models import (
     ProtocolKeeperPeriod,
 )
 from app.modules.meetings.protocol_models import Protocol, ProtocolVoteRef
+from app.modules.mollie.models import (
+    MollieBooking,
+    MollieMove,
+    MolliePayment,
+    MollieSettings,
+    MollieSettlement,
+)
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -86,6 +93,7 @@ from app.modules.paperless.models import (
     PaperlessFiling,
     PaperlessSettings,
 )
+from app.modules.pretix.models import PretixBooking, PretixEventLink, PretixSettings
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.site_config.models import SiteConfigVersion
 from app.modules.statuses.models import StatusDef
@@ -176,6 +184,14 @@ __all__ = [
     "PaperlessDocument",
     "PaperlessFiling",
     "PaperlessSettings",
+    "MollieBooking",
+    "MollieMove",
+    "MolliePayment",
+    "MollieSettings",
+    "MollieSettlement",
+    "PretixBooking",
+    "PretixEventLink",
+    "PretixSettings",
     "Principal",
     "Backup",
     "CalendarAnswer",

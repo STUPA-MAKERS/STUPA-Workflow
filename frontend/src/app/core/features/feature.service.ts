@@ -16,6 +16,8 @@ export const FEATURES = [
   'public',
   'push',
   'paperless',
+  'pretix',
+  'mollie',
 ] as const;
 
 /** The key of a feature with a switch. */
@@ -31,6 +33,8 @@ export type FeatureStates = Readonly<Partial<Record<FeatureKey, boolean>>>;
 export const FEATURE_REQUIRES: Readonly<Partial<Record<FeatureKey, readonly FeatureKey[]>>> = {
   invoices: ['budget'],
   orders: ['budget'],
+  pretix: ['events'],
+  mollie: ['events'],
 };
 
 /**

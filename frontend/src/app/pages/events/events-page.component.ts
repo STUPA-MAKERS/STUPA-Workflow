@@ -22,6 +22,7 @@ import {
   downloadBlob,
 } from '@stupa-makers/ui-kit';
 import { ListDetailScreenComponent } from '@stupa-makers/ui-kit/screens';
+import { SalesSyncAction } from '@shared/sales-sync';
 import { SEGMENT_LABEL, eventQuery, eventWhen, isSegment } from './events.util';
 import { EventsRefresh } from './events-refresh';
 
@@ -52,6 +53,7 @@ export class EventsPageComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly statuses = inject(StatusCatalog);
+  private readonly sync = inject(SalesSyncAction);
 
   private readonly teams = signal<readonly EventOption[]>([]);
   private readonly series = signal<readonly EventOption[]>([]);
@@ -109,6 +111,17 @@ export class EventsPageComponent {
           } as const,
         ]
       : []),
+    ...(this.canCreate() && this.sync.available()
+      ? [
+          {
+            key: 'fetch',
+            label: this.i18n.translate('sales.sync.action'),
+            icon: 'reload',
+            priority: 'menu',
+            disabled: this.sync.running(),
+          } as const,
+        ]
+      : []),
   ]);
 
   protected readonly rows = computed<LoadState<readonly ListRow[]>>(() => {
@@ -135,6 +148,7 @@ export class EventsPageComponent {
       .subscribe(() => this.load());
     this.api.teams().subscribe({ next: (list) => this.teams.set(list), error: () => undefined });
     this.api.series().subscribe({ next: (list) => this.series.set(list), error: () => undefined });
+    this.sync.load();
   }
 
   protected onQuery(query: ListQuery): void {
@@ -145,11 +159,17 @@ export class EventsPageComponent {
   }
 
   protected onAction(key: string): void {
-    if (key !== 'export') return;
-    this.api.exportXlsx({ ...this.filter(), segment: this.segment() }).subscribe({
-      next: (blob) => downloadBlob(blob, 'veranstaltungen.xlsx'),
-      error: () => this.toast.show(this.i18n.translate('events.page.exportError'), 'error'),
-    });
+    switch (key) {
+      case 'export':
+        this.api.exportXlsx({ ...this.filter(), segment: this.segment() }).subscribe({
+          next: (blob) => downloadBlob(blob, 'veranstaltungen.xlsx'),
+          error: () => this.toast.show(this.i18n.translate('events.page.exportError'), 'error'),
+        });
+        return;
+      case 'fetch':
+        this.sync.run('events', () => this.load());
+        return;
+    }
   }
 
   /** Read the next rows of the segment. */

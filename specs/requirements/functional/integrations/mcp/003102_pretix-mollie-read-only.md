@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - mcp/antragsplattform_mcp/tools/events.py
+  - backend/app/modules/event_sales/router.py
 scope:
   - backend/app/
   - frontend/src/app/

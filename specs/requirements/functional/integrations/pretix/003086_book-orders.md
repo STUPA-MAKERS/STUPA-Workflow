@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/pretix/rules.py
+  - backend/app/modules/event_sales/pretix_sync.py
+  - backend/app/modules/event_sales/booking.py
 scope:
   - backend/app/
   - frontend/src/app/

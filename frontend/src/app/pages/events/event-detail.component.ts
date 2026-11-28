@@ -34,6 +34,7 @@ import { DetailScreenComponent, ScreenBodyDirective } from '@stupa-makers/ui-kit
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { eventDays } from '../../features/todos/todos.util';
 import { pageItemTitle } from '../../layout/page-title.service';
+import { EventSalesComponent } from './event-sales.component';
 import { eventWhen } from './events.util';
 import { EventsRefresh } from './events-refresh';
 
@@ -64,6 +65,7 @@ export interface EventFact {
     TranslatePipe,
     ConfirmDialogComponent,
     DetailScreenComponent,
+    EventSalesComponent,
     FieldGroupComponent,
     FieldRowComponent,
     IconComponent,

@@ -55,8 +55,17 @@ async def event_list(
 
 @group.tool
 async def event_get(event_id: str) -> dict:
-    """Return one Event with its totals, its decisions and the other editions of its series."""
-    return await api().get(f"/events/{event_id}")
+    """Return one Event with its totals, its decisions and the other editions of its series.
+
+    `sales` holds the section "Verkauf": the linked pretix event (`link`), the sales per
+    product with the sums and the free places (`pretix`) and the Mollie money (`mollie`),
+    each `null` while its integration is off. A token reads these sums only; the link to
+    pretix and every call to pretix or Mollie need a person in the browser.
+    """
+    client = api()
+    event = await client.get(f"/events/{event_id}")
+    sales = await client.get(f"/events/{event_id}/sales")
+    return {**event, "sales": sales}
 
 
 @group.tool

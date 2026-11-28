@@ -1,5 +1,5 @@
 import { node, TOP } from '../plan/budget-plan.fixtures';
-import { NAME_MAX, activeOnly, costCentreError, findNode, keyProblem, pickable, usedIn, withDescendants, withoutIncome } from './cost-centre.util';
+import { NAME_MAX, activeOnly, costCentreError, costCentreOptions, findNode, keyProblem, pickable, usedIn, withDescendants, withoutIncome } from './cost-centre.util';
 
 describe('CostCentreUtil', () => {
   it('names the message of a problem code, else the fallback', () => {
@@ -75,5 +75,14 @@ describe('CostCentreUtil', () => {
       node({ id: 'b', active: false }),
     ];
     expect(activeOnly(forest).flatMap(withDescendants).map((n) => n.id)).toEqual(['a', 'a2']);
+  });
+
+  it('makes the options of a tree select from the active cost centres', () => {
+    const forest = [
+      node({ id: 'a', children: [node({ id: 'a1', parentId: 'a' }), node({ id: 'a2', parentId: 'a', active: false })] }),
+    ];
+    expect(costCentreOptions(forest)).toEqual([
+      { value: 'a', label: 'A Node a', children: [{ value: 'a1', label: 'A1 Node a1' }] },
+    ]);
   });
 });

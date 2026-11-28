@@ -143,6 +143,17 @@ class AuditAction(StrEnum):
             (§F/integrations/paperless/002528). The target is the stored PDF
             (``markdown_document``). ``data`` holds the Sitzung and the number of the
             Paperless document.
+        PRETIX_CONNECTION: A change of the pretix connection or of its switches
+            (§F/integrations/pretix/003080, 003090). ``data`` holds the address, the
+            organizer, the switches and whether the token changed, never the token.
+        PRETIX_LINK: A person linked an Event to a pretix event, or changed its field
+            `Einnahmen-Kostenstelle` (§F/integrations/pretix/003090). The target is the
+            Event. ``data`` holds the slug of the pretix event and the cost centre.
+        PRETIX_UNLINK: A person removed the link of an Event to its pretix event. The
+            target is the Event. ``data`` holds the slug.
+        MOLLIE_CONNECTION: A change of the Mollie connection or of its fields
+            (§F/integrations/mollie/003092). ``data`` holds the cost centres and whether
+            the token changed, never the token.
         TICKET_MAILBOX: A create, a change or a delete of the Postfach of a Bereich
             (§F/integrations/ticket-mail/002743). The target is the Bereich
             (``ticket_area``). ``data`` holds the operation and the names of the changed
@@ -311,6 +322,10 @@ class AuditAction(StrEnum):
     PAPERLESS_CONNECTION = "paperless_connection"
     PAPERLESS_FILED = "paperless_filed"
     PAPERLESS_INSERTED = "paperless_inserted"
+    PRETIX_CONNECTION = "pretix_connection"
+    PRETIX_LINK = "pretix_link"
+    PRETIX_UNLINK = "pretix_unlink"
+    MOLLIE_CONNECTION = "mollie_connection"
     TICKET_MAILBOX = "ticket_mailbox"
     ORDER_CREATE = "order_create"
     ORDER_UPDATE = "order_update"

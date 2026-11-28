@@ -29,8 +29,8 @@ def test_worker_settings_registers_tasks() -> None:
     The cron jobs are the nightly budget rollup, the deadline scan every minute, the hourly
     task reminders, the daily DSGVO retention, the nightly backup, the hourly draft purge,
     the nightly audit-chain check, the hourly heal of the public protocols, the daily ticket
-    anonymization, the daily to-do archive, the hourly draft reminders and the Paperless
-    filing every minute.
+    anonymization, the daily to-do archive, the hourly draft reminders, the Paperless
+    filing every minute, the pretix read every 15 minutes and the hourly Mollie read.
     """
     assert ping in WorkerSettings.functions
     assert refresh_budget_stats in WorkerSettings.functions
@@ -38,7 +38,7 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    assert len(WorkerSettings.cron_jobs) == 16
+    assert len(WorkerSettings.cron_jobs) == 18
     from worker.ticket_mail import fetch_ticket_mails, send_ticket_mails
 
     assert fetch_ticket_mails in WorkerSettings.functions
@@ -49,6 +49,10 @@ def test_worker_settings_registers_tasks() -> None:
 
     assert process_paperless_filings in WorkerSettings.functions
     assert any(job.coroutine is process_paperless_filings for job in WorkerSettings.cron_jobs)
+    from worker.event_sales import read_mollie_money, read_pretix_sales
+
+    assert read_pretix_sales in WorkerSettings.functions
+    assert any(job.coroutine is read_mollie_money for job in WorkerSettings.cron_jobs)
     from worker.drafts import process_draft_reminders
 
     assert process_draft_reminders in WorkerSettings.functions

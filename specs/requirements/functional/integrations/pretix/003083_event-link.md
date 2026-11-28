@@ -5,7 +5,11 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/event_sales/links.py
+  - backend/app/modules/event_sales/router.py
+  - frontend/src/app/pages/events/event-form.component.ts
+  - frontend/src/app/pages/events/event-pretix-link.ts
 scope:
   - backend/app/
   - frontend/src/app/

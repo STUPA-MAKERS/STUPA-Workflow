@@ -97,6 +97,7 @@ import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
+import { SalesSyncAction } from '@shared/sales-sync';
 import { isRefreshItem, refreshMenuSection, reloadLikePull } from '@shared/ui/pull-refresh/refresh-menu';
 import { RowChevronComponent } from '../../shared/ui/row-chevron/row-chevron.component';
 
@@ -397,7 +398,11 @@ export class ExpensesComponent implements OnDestroy {
     ];
   });
 
-  /** The page actions in the ⋮ menu of the header: the transfer and the export (spec 001812).
+  /** The action "Daten abrufen" of pretix and Mollie (spec 003104). */
+  private readonly sync = inject(SalesSyncAction);
+
+  /** The page actions in the ⋮ menu of the header: the transfer, the export (spec 001812)
+   *  and "Daten abrufen" while pretix or Mollie is configured (spec 003104).
    *  On a phone the sort and "Mehrere auswählen" join them; a wider screen has a button for
    *  each (spec 001811). */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
@@ -418,9 +423,15 @@ export class ExpensesComponent implements OnDestroy {
       label: this.i18n.translate('expenses.exportAction'),
       icon: 'download',
     };
+    const fetchItem: RowMenuItem = {
+      id: 'fetch',
+      label: this.i18n.translate('sales.sync.action'),
+      icon: 'reload',
+    };
     const items: RowMenuItem[] = [
       ...(manage ? [transfer] : []),
       ...(this.canExport() && bookings ? [exportItem] : []),
+      ...(manage && bookings && this.sync.available() ? [fetchItem] : []),
     ];
     if (!this.phone()) return items.length ? [{ items }] : [];
     return [
@@ -436,6 +447,7 @@ export class ExpensesComponent implements OnDestroy {
     if (item.id === 'transfer') this.openTransfer();
     else if (item.id === 'select') this.startSelecting();
     else if (item.id === 'export') this.onExport();
+    else if (item.id === 'fetch') this.sync.run('bookings', () => this.refreshList());
     else if (item.id.includes(':')) {
       const [field, order] = item.id.split(':') as [ExpenseSortField, 'asc' | 'desc'];
       this.list.sortField.set(field);
@@ -557,6 +569,7 @@ export class ExpensesComponent implements OnDestroy {
    * refresh can move the open booking out of the filter; it then loads by its id.
    */
   constructor() {
+    if (this.canManage()) this.sync.load();
     prefetchDetails({
       items: this.items,
       key: (e) => e.id,

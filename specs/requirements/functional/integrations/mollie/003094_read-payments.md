@@ -5,7 +5,10 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/mollie/client.py
+  - backend/app/modules/event_sales/mollie_sync.py
+  - backend/worker/event_sales.py
 scope:
   - backend/app/
   - frontend/src/app/
