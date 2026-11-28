@@ -1356,7 +1356,7 @@ interface MockAttendance {
   /** The member has an own vote (`vote.cast`) and can be substituted. */
   readonly canVote: boolean;
   /** The members whose voting right a delegate holds (§ 003150). */
-  readonly represents?: readonly { principalId: string; displayName: string | null }[];
+  readonly represents?: readonly { readonly principalId: string; readonly displayName: string | null }[];
   /** False for a delegate who is no member. */
   readonly isMember?: boolean;
 }

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -72,7 +73,7 @@ async def _world(maker: async_sessionmaker[AsyncSession], *, pool: bool = False)
     return w
 
 
-def _row(rows: list[dict[str, object]], pid: uuid.UUID) -> dict[str, object]:
+def _row(rows: list[dict[str, Any]], pid: uuid.UUID) -> dict[str, Any]:
     return next(r for r in rows if r["principalId"] == str(pid))
 
 

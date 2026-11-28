@@ -111,17 +111,21 @@ async def meeting_delegates(
             .order_by(MeetingDelegation.created_at, MeetingDelegation.id)
         )
     ).all()
-    found: dict[UUID, Delegates] = {}
-    for meeting_id in dict.fromkeys(mid for mid, _, _, _ in rows):
-        mine = [(d, r, pool) for mid, d, r, pool in rows if mid == meeting_id]
-        found[meeting_id] = Delegates(
-            represents={
-                d: tuple(r for d2, r, _ in mine if d2 == d)
-                for d in dict.fromkeys(d for d, _, _ in mine)
-            },
-            seat_holders=frozenset(d for d, _, pool in mine if pool),
-        )
-    return found
+    return {
+        meeting_id: _delegates_of([(d, r, pool) for mid, d, r, pool in rows if mid == meeting_id])
+        for meeting_id in dict.fromkeys(mid for mid, _, _, _ in rows)
+    }
+
+
+def _delegates_of(mine: Sequence[tuple[UUID, UUID, bool]]) -> Delegates:
+    """Build the delegates of one meeting from its (delegate, delegator, via_pool) rows."""
+    return Delegates(
+        represents={
+            d: tuple(r for d2, r, _ in mine if d2 == d)
+            for d in dict.fromkeys(d for d, _, _ in mine)
+        },
+        seat_holders=frozenset(d for d, _, pool in mine if pool),
+    )
 
 
 async def _statuses(
@@ -137,10 +141,10 @@ async def _statuses(
             ).where(MeetingAttendance.meeting_id.in_(meeting_ids))
         )
     ).all()
-    found: dict[UUID, dict[UUID, str]] = {}
-    for mid, pid, status in rows:
-        found.setdefault(mid, {})[pid] = status
-    return found
+    return {
+        meeting_id: {pid: status for mid, pid, status in rows if mid == meeting_id}
+        for meeting_id in {mid for mid, _, _ in rows}
+    }
 
 
 def delegate_status(

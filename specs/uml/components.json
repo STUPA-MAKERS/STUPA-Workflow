@@ -1146,7 +1146,7 @@
       "to": "budget"
     },
     {
-      "count": 5,
+      "count": 6,
       "from": "meetings",
       "to": "delegations"
     },
@@ -1439,6 +1439,11 @@
       "count": 2,
       "from": "protocol",
       "to": "budget"
+    },
+    {
+      "count": 1,
+      "from": "protocol",
+      "to": "delegations"
     },
     {
       "count": 2,

@@ -332,14 +332,12 @@ class AttendanceService:
         wanted = {pid for ids in delegates.represents.values() for pid in ids}
         known = {m.id: m.display_name for m in roster if m.id in wanted}
         missing = wanted - known.keys()
-        if missing:
-            rows = await self.session.execute(
-                select(PrincipalRow.id, PrincipalRow.display_name).where(
-                    PrincipalRow.id.in_(missing)
-                )
-            )
-            known.update(dict(rows.all()))
-        return known
+        if not missing:
+            return known
+        rows = await self.session.execute(
+            select(PrincipalRow.id, PrincipalRow.display_name).where(PrincipalRow.id.in_(missing))
+        )
+        return known | dict(rows.all())
 
     async def _is_delegate(self, meeting_id: UUID, principal_id: UUID) -> bool:
         """Return True when the principal holds a delegation with the voting right here."""

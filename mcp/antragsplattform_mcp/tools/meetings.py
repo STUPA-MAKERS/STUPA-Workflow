@@ -241,9 +241,9 @@ async def get_attendance(meeting_id: str) -> dict:
     The list holds the members and each delegate with the voting right in the meeting.
     `represents` names the members a delegate represents, and `isMember` is false for a
     delegate from outside or from the pool. A pool substitute on a seat without a
-    record reads `present`. `status` null means "open" (nothing recorded). `source` is `self` (the member
-    reported it) or `lead` (the meeting lead set it). `note` is the reason of an
-    excuse. Only the member and the meeting lead see it; it is null for all others.
+    record reads `present`. `status` null means "open" (nothing recorded). `source` is
+    `self` (the person reported it) or `lead` (the meeting lead set it). `note` is the
+    reason of an excuse. Only the member and the meeting lead see it; it is null for all others.
     """
     return await api().get(f"/meetings/{meeting_id}/attendance")
 

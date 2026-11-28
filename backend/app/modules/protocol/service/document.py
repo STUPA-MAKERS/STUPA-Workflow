@@ -312,18 +312,22 @@ class DocumentOps(ProtocolServiceBase):
                 )
             )
         ).all()
-        behalf: dict[str, list[str]] = {}
-        for sub, _, name, other_sub, _ in delegations:
-            behalf.setdefault(sub, []).append(name or other_sub)
-        people = {sub: (status, name or sub) for status, name, sub in records}
-        for sub, name, _, _, pool in delegations:
-            if pool and sub not in people:
-                people[sub] = ("present", name or sub)
+        behalf = {
+            sub: sorted(
+                (name or other for d_sub, _, name, other, _ in delegations if d_sub == sub),
+                key=str.casefold,
+            )
+            for sub in {d_sub for d_sub, _, _, _, _ in delegations}
+        }
+        recorded = {sub: (status, name or sub) for status, name, sub in records}
+        seats = {
+            sub: ("present", name or sub)
+            for sub, name, _, _, pool in delegations
+            if pool and sub not in recorded
+        }
         lines = [
-            (status, f"{name} (für {', '.join(sorted(behalf[sub], key=str.casefold))})")
-            if sub in behalf
-            else (status, name)
-            for sub, (status, name) in people.items()
+            (status, f"{name} (für {', '.join(behalf[sub])})" if sub in behalf else name)
+            for sub, (status, name) in (recorded | seats).items()
         ]
         return sorted(lines, key=lambda line: line[1].casefold())
 
