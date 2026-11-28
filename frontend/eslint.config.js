@@ -32,7 +32,7 @@ module.exports = tseslint.config(
     extends: [eslint.configs.recommended, ...tseslint.configs.recommended],
     plugins: { '@angular-eslint': angular },
     languageOptions: {
-      parserOptions: { project: ['tsconfig.app.json', 'tsconfig.spec.json'] },
+      parserOptions: { project: ['tsconfig.app.json', 'tsconfig.spec.json', 'tsconfig.worker.json'] },
     },
     rules: {
       '@angular-eslint/directive-selector': [

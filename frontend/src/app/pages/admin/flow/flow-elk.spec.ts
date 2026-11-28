@@ -7,6 +7,7 @@ import {
   bundleLabel,
   bundles,
   elkGraph,
+  flowOrder,
   layoutLevel,
   readLayout,
   roundedPath,
@@ -182,6 +183,77 @@ describe('flow-elk', () => {
     for (const i of [0, 1, 2, 3, 4, 5]) expect(r.routes.get(i)!.d).toMatch(/^M /);
     expect(r.routes.get(2)!.label!.text).toBe('3 Übergänge');
     expect(r.routes.get(3)!.label).toBeNull();
+  });
+
+  /** The keys sort the end first: "abgelehnt" < "entwurf" < "pruefung". */
+  const FLOW: LayoutInput = {
+    boxes: [
+      { id: 'abgelehnt', w: 150, h: 52, ports: [], role: 'end' },
+      { id: 'entwurf', w: 150, h: 52, ports: [{ id: 'out', y: 26, label: '' }], role: 'start' },
+      { id: 'pruefung', w: 150, h: 52, ports: [{ id: 'out', y: 26, label: '' }] },
+    ],
+    links: [link(0, 'pruefung', 'abgelehnt'), link(1, 'entwurf', 'pruefung'), link(2, 'pruefung', 'entwurf')],
+  };
+
+  it('orders the boxes from the initial state to the terminal states, not by key (§ F/applications/flow/003134)', () => {
+    const o = flowOrder(FLOW);
+    expect(o.boxes.map((b) => b.id)).toEqual(['entwurf', 'pruefung', 'abgelehnt']);
+    expect(o.links.map((l) => l.index)).toEqual([1, 2, 0]);
+    const g = elkGraph(FLOW, many);
+    const layer = (id: string): string | undefined =>
+      g.children!.find((c) => c.id === id)!.layoutOptions!['elk.layered.layering.layerConstraint'];
+    expect([layer('entwurf'), layer('pruefung'), layer('abgelehnt')]).toEqual(['FIRST', undefined, 'LAST']);
+  });
+
+  it('keeps a terminal state with an outgoing line out of the last layer, and walks unreached boxes in their order', () => {
+    const input: LayoutInput = {
+      boxes: [
+        { id: 'z', w: 10, h: 10, ports: [] },
+        { id: 'end', w: 10, h: 10, ports: [], role: 'end' },
+        { id: 'y', w: 10, h: 10, ports: [] },
+      ],
+      links: [link(0, 'end', 'y')],
+    };
+    expect(flowOrder(input).boxes.map((b) => b.id)).toEqual(['z', 'y', 'end']);
+    const g = elkGraph(input, many);
+    expect(g.children!.find((c) => c.id === 'end')!.layoutOptions!['elk.layered.layering.layerConstraint']).toBeUndefined();
+  });
+
+  it('lays out the flow with the initial state left of the terminal state', async () => {
+    const r = await layoutLevel(FLOW, many);
+    expect(r.pos.get('entwurf')!.x).toBeLessThan(r.pos.get('pruefung')!.x);
+    expect(r.pos.get('pruefung')!.x).toBeLessThan(r.pos.get('abgelehnt')!.x);
+  });
+
+  it('runs the layout in a web worker where one exists (§ NF/performance/rendering/003135)', async () => {
+    const posted: unknown[] = [];
+    const g = globalThis as unknown as { Worker?: unknown };
+    g.Worker = class {};
+    jest.resetModules();
+    jest.doMock('./flow-elk-worker', () => ({
+      spawnElkWorker: () => {
+        const w = {
+          onmessage: null as ((e: { data: unknown }) => void) | null,
+          postMessage: (msg: { id: number; cmd: string; graph?: ElkNode }) => {
+            posted.push(msg);
+            const data = msg.cmd === 'layout' ? { id: msg.id, data: msg.graph } : { id: msg.id, data: [] };
+            setTimeout(() => w.onmessage?.({ data }), 0);
+          },
+          terminate: () => undefined,
+        };
+        return w;
+      },
+    }));
+    try {
+      const mod = await import('./flow-elk');
+      mod.warmLayouter();
+      const r = await mod.layoutLevel(FLOW, many);
+      expect(posted.some((m) => (m as { cmd: string }).cmd === 'layout')).toBe(true);
+      expect(r.pos.has('entwurf')).toBe(true);
+    } finally {
+      delete g.Worker;
+      jest.dontMock('./flow-elk-worker');
+    }
   });
 
   it('provides layoutLevel as the default layouter', () => {

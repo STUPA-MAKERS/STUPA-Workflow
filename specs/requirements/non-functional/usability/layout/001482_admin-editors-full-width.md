@@ -2,11 +2,10 @@
 id: "001482"
 title: The form editor and the flow editor open without the list
 kind: non-functional
-status: approved
+status: replaced
 owner: frederikbeimgraben
-updated: 2026-11-19
-implementation:
-  - frontend/src/app/app.routes.ts
+updated: 2026-11-28
+replaced_by: NF/usability/layout/003130
 scope:
   - frontend/src/app/pages/admin/forms
   - frontend/src/app/pages/admin/flow

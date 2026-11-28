@@ -175,7 +175,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(screen.queryByText('Der Flow hat keine Status.')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
-    expect(document.querySelector('.fe__canvas--loading')).not.toBeNull();
+    expect(document.querySelector('.fc__canvas--loading')).not.toBeNull();
   });
 
   /** A deployment with no flow yet is a real finding, and the admin has to see it. */
@@ -234,12 +234,86 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
+  it('opens the inspector as a sheet for a selection and closes it with Escape (§ NF/usability/layout/003131)', async () => {
+    const { container, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.selection.set(null);
+    fixture.detectChanges();
+    const panel = (): HTMLElement => container.querySelector('.fc__panel') as HTMLElement;
+    expect(panel().hidden).toBe(true);
+    c.selection.set({ kind: 'state', key: 'a' });
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(true);
+    c.toggleVersions();
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(panel().hidden).toBe(true);
+    const handled = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    c.selection.set({ kind: 'state', key: 'a' });
+    handled.preventDefault();
+    document.dispatchEvent(handled);
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+  });
+
+  it('shows the inspector of an open group until the reader closes it', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.currentGroupId.set('g1');
+    expect(c.sheetOpen()).toBe(true);
+    c.closeSheet();
+    expect(c.sheetOpen()).toBe(false);
+    c.navigateTo('g1');
+    expect(c.sheetOpen()).toBe(true);
+  });
+
+  it('pans a selected state into view beside the sheet, and leaves a visible one alone (§ F/applications/flow/003137)', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.canvasSize.set({ w: 800, h: 400 });
+    c.view.set({ x: 0, y: 0, w: 800, h: 400 });
+    c.nodes = () => [
+      { key: 'a', x: 50, y: 50, w: 100, h: 50 },
+      { key: 'b', x: 700, y: 100, w: 100, h: 50 },
+    ];
+    c.edges = () => [{ index: 0, mx: 1000, my: 900 }];
+    c.reveal({ kind: 'state', key: 'a' });
+    expect(c.view()).toEqual({ x: 0, y: 0, w: 800, h: 400 });
+    c.reveal({ kind: 'state', key: 'b' });
+    expect(c.view().x).toBe(700 + 100 + 24 - (800 - 380 - 16));
+    expect(c.view().y).toBe(0);
+    c.reveal({ kind: 'transition', index: 0 });
+    expect(c.view().y).toBe(900 + 16 + 24 - 400);
+    c.reveal({ kind: 'state', key: 'none' });
+    c.canvasSize.set({ w: 0, h: 0 });
+    c.reveal({ kind: 'state', key: 'a' });
+  });
+
+  it('starts the layouter before the flow answers (§ NF/performance/loading/003136)', async () => {
+    const layouter = jest.fn(() => new Promise<LevelLayout>(() => undefined));
+    const elk = await import('./flow-elk');
+    const warm = jest.spyOn(elk, 'warmLayouter').mockImplementation(() => undefined);
+    const flow = new Subject<FlowGraph | null>();
+    await setup({ layouter, getGlobalFlow: jest.fn(() => flow) });
+    expect(warm).toHaveBeenCalled();
+    warm.mockRestore();
+  });
+
   it('renders one canvas node per state', async () => {
     const { container, fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     buildValid(fixture.componentInstance as any);
     fixture.detectChanges();
-    expect(container.querySelectorAll('.fe__node-text')).toHaveLength(2);
+    expect(container.querySelectorAll('.fc__node-text')).toHaveLength(2);
   });
 
   /** The guard editor renders in the pane below the graph. */
@@ -518,7 +592,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const getGlobalFlow = jest.fn(() => throwError(() => new Error('boom')));
     await setup({ getGlobalFlow });
     expect(loadErrorToast()).toBeTruthy();
-    expect(document.querySelector('.fe__canvasSkel')).toBeNull();
+    expect(document.querySelector('app-skeleton')).toBeNull();
     retryLoadError();
     expect(getGlobalFlow).toHaveBeenCalledTimes(2);
   });
@@ -2908,14 +2982,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     /** The legend explains the dot and the dashed line. */
     it('tags terminal states, names the kind above a state and marks an automatic edge', async () => {
       const { container } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
-      const tags = [...container.querySelectorAll('.fe__node-tag')].map((t) => t.textContent?.trim());
+      const tags = [...container.querySelectorAll('.fc__node-tag')].map((t) => t.textContent?.trim());
       expect(tags).toEqual(['Endzustand', 'Endzustand']);
-      expect(container.querySelector('.fe__node-kind')?.textContent?.trim()).toBe('Abstimmung (Gremium)');
-      expect(container.querySelectorAll('.fe__node-initial-dot')).toHaveLength(1);
-      expect(container.querySelectorAll('.fe__edge--auto')).toHaveLength(1);
-      expect(container.querySelectorAll('.fe__bolt')).toHaveLength(1);
-      expect(screen.getByText('Initial', { selector: '.fe__legendItem' })).toBeInTheDocument();
-      expect(screen.getByText('Automatisch', { selector: '.fe__legendItem' })).toBeInTheDocument();
+      expect(container.querySelector('.fc__node-kind')?.textContent?.trim()).toBe('Abstimmung (Gremium)');
+      expect(container.querySelectorAll('.fc__node-initial-dot')).toHaveLength(1);
+      expect(container.querySelectorAll('.fc__edge--auto')).toHaveLength(1);
+      expect(container.querySelectorAll('.fc__bolt')).toHaveLength(1);
+      expect(screen.getByText('Initial', { selector: '.fc__legendItem' })).toBeInTheDocument();
+      expect(screen.getByText('Automatisch', { selector: '.fc__legendItem' })).toBeInTheDocument();
     });
 
     /** A second start state and a vote without its gremium give two findings. */
@@ -2996,7 +3070,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       const c = fixture.componentInstance as any;
       const b = c.contentBounds();
       const tongue = (side: string): HTMLButtonElement =>
-        fixture.nativeElement.querySelector(`.fe__tongue[data-side="${side}"]`);
+        fixture.nativeElement.querySelector(`.fc__tongue[data-side="${side}"]`);
       fixture.detectChanges();
       for (const side of ['left', 'right', 'up', 'down']) expect(tongue(side).disabled).toBe(true);
       c.canvasSize.set({ w: b.w + 400, h: b.h + 200 });
@@ -3013,7 +3087,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(tongue('left').disabled).toBe(true);
       expect(tongue('left').getAttribute('aria-hidden')).toBe('true');
       expect(tongue('right').disabled).toBe(false);
-      expect(tongue('right')).toHaveClass('fe__tongue--on');
+      expect(tongue('right')).toHaveClass('fc__tongue--on');
       expect(tongue('right')).toHaveAccessibleName('Nach rechts verschieben');
 
       c.pan('down');
@@ -3244,7 +3318,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     it('hides the canvas until the first layout answers', async () => {
       const { c, fixture } = await laidOut(jest.fn(() => new Promise<LevelLayout>(() => undefined)));
       expect(c.layoutPending()).toBe(true);
-      expect(fixture.nativeElement.querySelector('.fe__canvas')).toHaveClass('fe__canvas--loading');
+      expect(fixture.nativeElement.querySelector('.fc__canvas')).toHaveClass('fc__canvas--loading');
     });
 
     /**
@@ -3269,11 +3343,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
         edges: c.edges().filter((e: { dim: boolean }) => e.dim).map((e: { index: number }) => e.index),
       });
       expect(dim()).toEqual({ nodes: [], edges: [] });
-      fixture.nativeElement.querySelector('.fe__node-g').dispatchEvent(new Event('pointerenter'));
+      fixture.nativeElement.querySelector('.fc__node-g').dispatchEvent(new Event('pointerenter'));
       expect(c.hoverKey()).toBe('a');
       expect(dim()).toEqual({ nodes: ['c'], edges: [1] });
       expect(c.edges().map((e: { index: number }) => e.index)).toEqual([1, 0]);
-      fixture.nativeElement.querySelector('.fe__node-g').dispatchEvent(new Event('pointerleave'));
+      fixture.nativeElement.querySelector('.fc__node-g').dispatchEvent(new Event('pointerleave'));
       expect(c.hoverKey()).toBeNull();
       c.selection.set({ kind: 'state', key: 'c' });
       expect(dim()).toEqual({ nodes: ['a'], edges: [0] });

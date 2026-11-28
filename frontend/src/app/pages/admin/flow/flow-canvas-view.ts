@@ -377,6 +377,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
           w: n.w,
           h: n.h,
           ports: n.dots.map((d) => ({ id: d.id, y: d.cy, label: d.label })),
+          ...(n.s.isInitial ? { role: 'start' as const } : n.s.isTerminal ? { role: 'end' as const } : {}),
         })),
         ...groupShapes().map((b) => ({
           id: groupBox(b.g.id),

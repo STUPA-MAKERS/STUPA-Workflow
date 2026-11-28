@@ -538,32 +538,6 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
-        path: 'admin/forms/:id',
-        data: {
-          title: 'admin.forms.edit',
-          permission: 'form.configure',
-          parent: ['admin', 'admin/forms'],
-          wide: true,
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
-      },
-      {
-        path: 'admin/flow',
-        data: {
-          title: 'admin.flow.title',
-          permission: ['flow.configure', 'admin.types'],
-          parent: ['admin'],
-          wide: true,
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/flow/flow-editor.component').then(
-            (m) => m.FlowEditorComponent,
-          ),
-      },
-      {
         path: 'admin',
         data: { wide: true, frame: 'admin' },
         canActivate: [authGuard],
@@ -629,6 +603,28 @@ export const routes: Routes = [
               import('./pages/admin/mail-templates/mail-templates.component').then(
                 (m) => m.MailTemplatesComponent,
               ),
+          },
+          {
+            path: 'forms/:id',
+            data: {
+              title: 'admin.forms.edit',
+              permission: 'form.configure',
+              parent: ['admin', 'admin/forms'],
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
+          },
+          {
+            path: 'flow',
+            data: {
+              title: 'admin.flow.title',
+              permission: ['flow.configure', 'admin.types'],
+              parent: ['admin'],
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/flow/flow-editor.component').then((m) => m.FlowEditorComponent),
           },
           {
             path: 'forms',

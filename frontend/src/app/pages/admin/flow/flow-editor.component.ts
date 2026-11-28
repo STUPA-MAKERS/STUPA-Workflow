@@ -3,7 +3,6 @@ import type { I18nMap } from '@core/api/models';
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   HostListener,
   computed,
   effect,
@@ -16,7 +15,6 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   ButtonGroupComponent,
@@ -33,7 +31,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  ScrollFadeDirective,
   type SelectOption,
   SkeletonComponent,
   StatusTextComponent,
@@ -63,7 +60,7 @@ import {
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
-import { FLOW_LAYOUTER, type LevelLayout } from './flow-elk';
+import { FLOW_LAYOUTER, type LevelLayout, warmLayouter } from './flow-elk';
 import { FlowEditorOptionsService } from './flow-editor-options.service';
 import {
   type GuardGroup,
@@ -97,6 +94,9 @@ import {
   StateInspectorViewComponent,
   TransitionInspectorViewComponent,
   TransitionListsViewComponent,
+  FlowCanvasViewComponent,
+  type FlowCanvasNode,
+  type FlowCanvasTool,
 } from '@stupa-makers/ui-kit/views/flow-editor';
 import { LoadStateComponent, loadStateOf } from '@shared/ui/load-state/load-state.component';
 import { injectPanePage } from '../pane-page';
@@ -112,6 +112,16 @@ const EDGE_SLACK = 1;
 
 /** A side of the canvas, and the direction its scroll tongue pans to. */
 export type PanSide = 'left' | 'right' | 'up' | 'down';
+
+/** The width in px of the inspector sheet before it is measured (23.75rem). */
+const SHEET_W = 380;
+/** The gap in px between the inspector sheet and the edge of the canvas. */
+const SHEET_GAP = 16;
+/** The room in px that a revealed item keeps from the edge of the visible canvas. */
+const REVEAL_PAD = 24;
+/** The box around the label of a transition that a selection reveals, in world units. */
+const EDGE_REVEAL_W = 120;
+const EDGE_REVEAL_H = 32;
 
 /** The smallest scale of the start view: below it the labels are too small to read. */
 const MIN_FIT_SCALE = 0.75;
@@ -161,9 +171,13 @@ const MIN_FIT_SCALE = 0.75;
     StatusTextComponent,
     NoteComponent,
     RowMenuComponent,
-    ScrollFadeDirective,
+    FlowCanvasViewComponent,
   ],
-  host: { '[class.fe-pane]': 'wide()', '[class.pane-page]': 'wide()' },
+  host: {
+    '[class.fe-pane]': 'wide()',
+    '[class.pane-page]': 'wide()',
+    '(document:keydown.escape)': 'onEscape($event)',
+  },
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -174,11 +188,13 @@ export class FlowEditorComponent {
   private readonly i18n = inject(I18nService);
   private readonly opts = inject(FlowEditorOptionsService);
 
-  protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
+  /** The canvas view of the kit: the SVG, its box and the inspector sheet. */
+  private readonly canvasView = viewChild(FlowCanvasViewComponent);
+  protected readonly canvas = computed(() => this.canvasView()?.svg());
   /** The inspector. Wide, it scrolls inside itself. */
-  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+  private readonly panel = computed(() => this.canvasView()?.sheet());
   /** The box around the canvas. Its size sets the scale of the fitted view. */
-  private readonly canvasWrap = viewChild<ElementRef<HTMLElement>>('canvasWrap');
+  private readonly canvasWrap = computed(() => this.canvasView()?.box());
 
   /** Wide viewport: the canvas and the inspector fill the window side by side. */
   protected readonly wide = mediaQuery(MEDIA.wide);
@@ -306,12 +322,19 @@ export class FlowEditorComponent {
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopHold());
     injectPanePage(this.wide);
+    if (this.layouter) warmLayouter();
     this.loadFlow();
 
     observeElementSize(
       () => this.canvasWrap()?.nativeElement,
       ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
     );
+
+    effect(() => {
+      const sel = this.selection();
+      this.levelLayout();
+      if (sel) untracked(() => this.reveal(sel));
+    });
 
     effect(() => {
       if (!this.loaded()) return;
@@ -466,14 +489,6 @@ export class FlowEditorComponent {
     this.pan(side);
   }
 
-  protected readonly panSides: readonly PanSide[] = ['left', 'right', 'up', 'down'];
-  protected readonly panLabel: Record<PanSide, TranslationKey> = {
-    left: 'admin.flow.panLeft',
-    right: 'admin.flow.panRight',
-    up: 'admin.flow.panUp',
-    down: 'admin.flow.panDown',
-  };
-
   /** The meta of the header: the active version, once known. */
   protected readonly versionMeta = computed(() => {
     const v = this.currentVersion();
@@ -507,6 +522,67 @@ export class FlowEditorComponent {
     this.showVersions.update((v) => !v);
   }
 
+  /** The reader closed the inspector of the open group; opening a group shows it again. */
+  private readonly groupSheetClosed = signal(false);
+
+  /**
+   * The inspector sheet over the canvas (spec 003131): open for a selection, for the open group
+   * and for "Versionen", closed otherwise.
+   */
+  protected readonly sheetOpen = computed(
+    () =>
+      this.showVersions() ||
+      this.selection() !== null ||
+      (this.currentGroupId() !== null && !this.groupSheetClosed()),
+  );
+
+  /**
+   * Pan the canvas until the selected state or transition is fully visible beside the inspector
+   * sheet (spec 003137). The zoom stays, and a fully visible item does not move the view. On the
+   * phone the sheet covers the bottom, so only the width of the canvas counts there.
+   */
+  private reveal(sel: NonNullable<Selection>): void {
+    const item = this.selectionBounds(sel);
+    const { w, h } = this.canvasSize();
+    if (!item || !w || !h) return;
+    const v = this.view() ?? this.fitBounds();
+    const scale = Math.min(w / v.w, h / v.h);
+    const vw = w / scale;
+    const vh = h / scale;
+    const x0 = v.x - (vw - v.w) / 2;
+    const y0 = v.y - (vh - v.h) / 2;
+    const sheet = this.phone() ? 0 : (this.panel()?.nativeElement.offsetWidth || SHEET_W) + SHEET_GAP;
+    const pad = REVEAL_PAD / scale;
+    const right = x0 + vw - sheet / scale;
+    const shift = (lo: number, hi: number, a: number, b: number): number =>
+      a - pad < lo ? a - pad - lo : b + pad > hi ? Math.min(b + pad - hi, a - pad - lo) : 0;
+    const dx = shift(x0, right, item.x, item.x + item.w);
+    const dy = shift(y0, y0 + vh, item.y, item.y + item.h);
+    if (dx || dy) this.view.set({ ...v, x: v.x + dx, y: v.y + dy });
+  }
+
+  /** The box of a selected state, or of the label of a selected transition, in world units. */
+  private selectionBounds(sel: NonNullable<Selection>): ViewRect | null {
+    if (sel.kind === 'state') {
+      const n = this.nodes().find((x) => x.key === sel.key);
+      return n ? { x: n.x, y: n.y, w: n.w, h: n.h } : null;
+    }
+    const e = this.edges().find((x) => x.index === sel.index);
+    return e ? { x: e.mx - EDGE_REVEAL_W / 2, y: e.my - EDGE_REVEAL_H / 2, w: EDGE_REVEAL_W, h: EDGE_REVEAL_H } : null;
+  }
+
+  /** Escape closes the sheet, unless a control inside it used the key (an open dropdown). */
+  protected onEscape(event: Event): void {
+    if (!event.defaultPrevented) this.closeSheet();
+  }
+
+  /** Close the inspector sheet: the close button and Escape. */
+  protected closeSheet(): void {
+    this.showVersions.set(false);
+    this.selection.set(null);
+    this.groupSheetClosed.set(true);
+  }
+
   protected readonly selectedState = computed<StateDef | undefined>(() => {
     const sel = this.selection();
     return sel?.kind === 'state' ? this.graph().states.find((s) => s.key === sel.key) : undefined;
@@ -530,6 +606,48 @@ export class FlowEditorComponent {
 
   protected label(s: StateDef): string {
     return stateDisplayLabel(s);
+  }
+
+  /** The states as the kit canvas draws them: the kind label is resolved here. */
+  protected readonly canvasNodes = computed<readonly FlowCanvasNode[]>(() =>
+    this.nodes().map((n) => ({
+      ...n,
+      kindLabel: n.kind === 'normal' ? '' : this.kindLabel(n.kind),
+      dots: n.dots.map((d) => ({ id: d.id, branch: d.branch, guarded: !!d.label, cy: d.cy, label: d.label })),
+    })),
+  );
+
+  /** A button of the toolbar of the canvas. */
+  protected onTool(tool: FlowCanvasTool): void {
+    switch (tool) {
+      case 'addState':
+        this.addState();
+        break;
+      case 'undo':
+        this.undo();
+        break;
+      case 'redo':
+        this.redo();
+        break;
+      case 'group':
+        this.createGroupFromSelection();
+        break;
+      case 'zoomIn':
+        this.zoomIn();
+        break;
+      case 'zoomOut':
+        this.zoomOut();
+        break;
+      case 'resetView':
+        this.resetView();
+        break;
+    }
+  }
+
+  /** A press on a connector dot starts a new transition with the guard or branch of the dot. */
+  protected onDotPointerDown(event: PointerEvent, key: string, dotId: string): void {
+    const dot = this.nodes().find((n) => n.key === key)?.dots.find((d) => d.id === dotId);
+    this.onConnectPointerDown(event, key, dot?.branch ?? null, dot?.guard ?? null);
   }
 
   protected kindLabel(k: string): string {
@@ -866,6 +984,7 @@ export class FlowEditorComponent {
 
   protected navigateTo(id: string | null): void {
     this.currentGroupId.set(id);
+    this.groupSheetClosed.set(false);
     this.selection.set(null);
     this.multiSel.set(new Set());
     this.multiSelGroups.set(new Set());
