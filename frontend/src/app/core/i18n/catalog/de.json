@@ -4362,7 +4362,7 @@
   "todos.board.pick": "Board wählen",
   "todos.board.chip": "Board: {name}",
   "todos.board.personal": "Persönlich",
-  "todos.board.gremien": "Gremien",
+  "todos.board.teams": "Teams",
   "todos.board.team": "Team",
   "todos.board.onlyYou": "nur du",
   "todos.board.teamSub": "für ticket.manage",

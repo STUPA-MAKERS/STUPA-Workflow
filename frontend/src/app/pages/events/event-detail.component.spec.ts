@@ -90,6 +90,23 @@ describe('EventDetailComponent', () => {
     expect(screen.getByTestId('ed-description')).toHaveTextContent('Party im');
   });
 
+  /** §F/collaboration/events/003132: "Beginn" and "Ende" as two fields in one row. */
+  it('shows the start and the end side by side', async () => {
+    const { cmp } = await setup();
+    const pair = screen.getByTestId('ed-pair');
+    const rows = Array.from(pair.querySelectorAll('[data-testid="ed-fact"]')).map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
+    expect(rows).toEqual(['Beginn 20.11.2026, 19:00', 'Ende 21.11.2026, 02:00']);
+    expect(screen.getAllByTestId('ed-pair')).toHaveLength(1);
+    const day = (patch: Partial<EventDetail>) => cmp.dates({ ...FULL, ...patch }, 'de-DE');
+    expect(day({ endsOn: null, endTime: '22:00:00' })).toEqual({
+      label: 'Beginn',
+      value: '20.11.2026, 19:00',
+      beside: { label: 'Ende', value: '20.11.2026, 22:00' },
+    });
+    expect(day({ startTime: null, endsOn: null, endTime: null })).toEqual({ label: 'Beginn', value: '20.11.2026' });
+    expect(day({ startsOn: null })).toBeNull();
+  });
+
   /** §F/collaboration/events/003024: the shop opens in a new tab. */
   it('shows the shop as a link that opens a new tab', async () => {
     await setup();

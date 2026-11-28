@@ -326,6 +326,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/events/003034](requirements/functional/collaboration/events/003034_events-export-webhooks.md) | Veranstaltungen have an export and webhook events | approved |
 | [F/collaboration/events/003041](requirements/functional/collaboration/events/003041_event-bookings-collapsed.md) | Many bookings of an Event fold into one row | approved |
 | [F/collaboration/events/003042](requirements/functional/collaboration/events/003042_event-status-field.md) | The detail of an Event changes the status in a dropdown | approved |
+| [F/collaboration/events/003132](requirements/functional/collaboration/events/003132_event-start-end-pair.md) | The detail of an Event shows the start and the end side by side | draft |
 | [F/collaboration/graph/001420](requirements/functional/collaboration/graph/001420_graph-page.md) | The page Graph shows the elements of a person and their relations | approved |
 | [F/collaboration/graph/001421](requirements/functional/collaboration/graph/001421_graph-permission.md) | The graph needs its own permission | approved |
 | [F/collaboration/graph/001422](requirements/functional/collaboration/graph/001422_graph-read-rules.md) | The graph shows only what the person reads | approved |
@@ -467,7 +468,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001064](requirements/functional/collaboration/todos/001064_free-board-manage.md) | Members with Verwalten and admins manage a free board | approved |
 | [F/collaboration/todos/001065](requirements/functional/collaboration/todos/001065_free-board-assignees.md) | Assignees of a free board are its members who edit | approved |
 | [F/collaboration/todos/001066](requirements/functional/collaboration/todos/001066_free-board-global-keys.md) | todo.all and todo.read_all reach free boards | approved |
-| [F/collaboration/todos/001067](requirements/functional/collaboration/todos/001067_free-boards-in-picker.md) | Free boards show in the board picker after the boards of the Gremien | approved |
+| [F/collaboration/todos/001067](requirements/functional/collaboration/todos/001067_free-boards-in-picker.md) | Free boards show in the board picker after the team boards | approved |
 | [F/collaboration/todos/001068](requirements/functional/collaboration/todos/001068_free-board-archive.md) | A manager archives a free board and only an admin deletes it | approved |
 | [F/collaboration/todos/001069](requirements/functional/collaboration/todos/001069_free-board-agenda.md) | A card of a free board goes on the agenda of each of its Gremien | approved |
 | [F/collaboration/todos/001070](requirements/functional/collaboration/todos/001070_gremium-tab-own-board.md) | The To-Dos tab of a Gremium shows only the board of the Gremium | approved |
@@ -478,6 +479,7 @@ files, for example `requirements/functional/meetings/voting/000024_every-vote-is
 | [F/collaboration/todos/001076](requirements/functional/collaboration/todos/001076_free-board-api.md) | Free boards are created and managed through the API and MCP | approved |
 | [F/collaboration/todos/001077](requirements/functional/collaboration/todos/001077_gremium-board-entries.md) | A board of a Gremium takes more Gremien and persons | approved |
 | [F/collaboration/todos/001078](requirements/functional/collaboration/todos/001078_board-rights.md) | Board rights depend on the board kind and its entries | approved |
+| [F/collaboration/todos/003130](requirements/functional/collaboration/todos/003130_team-boards-group.md) | The board picker calls the group of the team boards Teams | draft |
 | [F/finance/budget/000138](requirements/functional/finance/budget/000138_cost-centre-picker.md) | The cost centre pickers are fixed | approved |
 | [F/finance/budget/000139](requirements/functional/finance/budget/000139_close-fiscal-year.md) | A fiscal year closes and reopens | approved |
 | [F/finance/budget/000140](requirements/functional/finance/budget/000140_default-fiscal-year.md) | The default fiscal year holds today | approved |

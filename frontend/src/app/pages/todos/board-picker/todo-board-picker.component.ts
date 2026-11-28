@@ -44,7 +44,7 @@ interface PickerSection {
 /**
  * The board chip of the to-dos page ("Board: Studierendenparlament") and its
  * list: Persönlich (with the meta-board "Alle" under "Meine To-Dos" when `allId` is set),
- * Gremien, Weitere Boards (the free boards, spec 001067) and Team, without counts. Below
+ * Teams (spec 003130), Weitere Boards (the free boards, spec 001067) and Team, without counts. Below
  * them the actions "Neues Board" (with `canCreate`, spec 001061) and "Archivierte Boards"
  * (with `hasArchived`, spec 001068). Desktop: a list under the chip; Escape and a click
  * outside close it. Phone: the bottom sheet.
@@ -98,7 +98,7 @@ export class TodoBoardPickerComponent {
     const of = (kind: TodoBoardKind) => this.boards().filter((b) => b.kind === kind);
     const all: PickerSection[] = [
       { kind: 'personal', label: 'todos.board.personal', boards: of('personal') },
-      { kind: 'team', label: 'todos.board.gremien', boards: of('team') },
+      { kind: 'team', label: 'todos.board.teams', boards: of('team') },
       { kind: 'free', label: 'todos.board.free', boards: of('free') },
       { kind: 'permission', label: 'todos.board.team', boards: of('permission') },
     ];

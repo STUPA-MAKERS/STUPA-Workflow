@@ -20,6 +20,7 @@ describe('TodoBoardPickerComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.restoreAllMocks());
 
+  /** § 003130: the team boards under "Teams" with the icon of the tab Teams. */
   it('names the current board and lists the boards in sections', async () => {
     const { flush } = await setup();
     const chip = screen.getByRole('button', { name: 'Board: Studierendenparlament' });
@@ -29,7 +30,8 @@ describe('TodoBoardPickerComponent', () => {
     expect(chip).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('group', { name: 'Board wählen' })).toBeInTheDocument();
     expect(screen.getByText('Persönlich')).toBeInTheDocument();
-    expect(screen.getByText('Gremien')).toBeInTheDocument();
+    expect(screen.getByText('Teams')).toBeInTheDocument();
+    expect(screen.queryByText('Gremien')).toBeNull();
     expect(screen.getByText('Team')).toBeInTheDocument();
     expect(screen.getByText('nur du')).toBeInTheDocument();
     expect(screen.getByText('für ticket.manage')).toBeInTheDocument();
@@ -38,10 +40,11 @@ describe('TodoBoardPickerComponent', () => {
     expect(current).toHaveAttribute('aria-current', 'true');
     expect(document.activeElement).toBe(current);
     expect(BOARD_ICON.permission).toBe('ticket');
+    expect(BOARD_ICON.team).toBe('network');
   });
 
-  /** § 001067, 001061, 001068: the free boards after the Gremien, the actions with their rights. */
-  it('lists the free boards after the Gremium boards and offers "Neues Board" with the right', async () => {
+  /** § 001067, 001061, 001068: the free boards after the team boards, the actions with their rights. */
+  it('lists the free boards after the team boards and offers "Neues Board" with the right', async () => {
     const free = { ...BOARDS[1], id: 'b-free', name: 'Ersti-Woche', kind: 'free' as const, gremiumId: null };
     const { cmp, flush, fixture } = await setup({ boards: [...BOARDS, free] });
     const create = jest.fn();
@@ -51,7 +54,7 @@ describe('TodoBoardPickerComponent', () => {
     fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
     await flush();
     const caps = Array.from(document.querySelectorAll('.bp__cap')).map((c) => c.textContent?.trim());
-    expect(caps.indexOf('Weitere Boards')).toBe(caps.indexOf('Gremien') + 1);
+    expect(caps.indexOf('Weitere Boards')).toBe(caps.indexOf('Teams') + 1);
     expect(screen.getByRole('button', { name: /Ersti-Woche/ })).toBeInTheDocument();
     expect(screen.queryByTestId('bp-create')).toBeNull();
     expect(screen.queryByTestId('bp-archived')).toBeNull();
@@ -154,7 +157,7 @@ describe('TodoBoardPickerComponent', () => {
   it('asks for a board without a current one and is short when compact', async () => {
     const none = await setup({ current: 'nope', boards: [BOARDS[0]] });
     expect(screen.getByRole('button', { name: 'Board wählen' })).toBeInTheDocument();
-    expect(none.cmp.chipIcon()).toBe('landmark');
+    expect(none.cmp.chipIcon()).toBe('network');
     fireEvent.click(screen.getByRole('button', { name: 'Board wählen' }));
     await none.flush();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Meine To-Dos/ }));

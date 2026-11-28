@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -19,6 +20,7 @@ import {
   type Action,
   ConfirmDialogComponent,
   FieldGroupComponent,
+  FieldPairComponent,
   FieldRowComponent,
   IconComponent,
   ListItemComponent,
@@ -34,14 +36,18 @@ import { DetailScreenComponent, ScreenBodyDirective } from '@stupa-makers/ui-kit
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { eventDays } from '../../features/todos/todos.util';
 import { pageItemTitle } from '../../layout/page-title.service';
-import { eventWhen } from './events.util';
+import { eventMoment } from './events.util';
 import { EventsRefresh } from './events-refresh';
 
-/** One field of the detail. `href` makes the value a link to another site. */
+/**
+ * One field of the detail. `href` makes the value a link to another site. `beside` is a
+ * second field in the same row (the end beside the start, spec 003132).
+ */
 export interface EventFact {
   readonly label: string;
   readonly value: string;
   readonly href?: string;
+  readonly beside?: EventFact;
 }
 
 /**
@@ -51,8 +57,8 @@ export interface EventFact {
  * the field "Status" shows it (003042); "Bearbeiten",
  * "Folgeveranstaltung anlegen" (003030) and "Löschen" in the ⋮ menu; the field "Status" as
  * a dropdown of the list `event` that saves a pick at once (003042); the fields (003023)
- * with the shop as a link that opens a new tab (003024); the totals (000479); the
- * decisions (000482); the other Events of the series and how many of them the person does
+ * with "Beginn" and "Ende" side by side (003132) and the shop as a link that opens a new
+ * tab (003024); the totals (000479); the decisions (000482); the other Events of the series and how many of them the person does
  * not read (000483); the list "Verknüpft". Only a member of the team reads an Event, so
  * every person who sees the detail may change it (003026).
  */
@@ -65,7 +71,9 @@ export interface EventFact {
     ConfirmDialogComponent,
     DetailScreenComponent,
     FieldGroupComponent,
+    FieldPairComponent,
     FieldRowComponent,
+    NgTemplateOutlet,
     IconComponent,
     ListItemComponent,
     MarkdownViewComponent,
@@ -148,9 +156,7 @@ export class EventDetailComponent {
     const locale = this.i18n.formatLocale();
     const facts: (EventFact | null)[] = [
       e.teamName ? { label: this.t('events.field.team'), value: e.teamName } : null,
-      e.startsOn
-        ? { label: this.t('events.field.startsOn'), value: eventWhen(e, locale) ?? '' }
-        : null,
+      this.dates(e, locale),
       e.place ? { label: this.t('events.field.place'), value: e.place } : null,
       e.participants !== null
         ? { label: this.t('events.field.participants'), value: String(e.participants) }
@@ -160,6 +166,18 @@ export class EventDetailComponent {
     ];
     return facts.filter((f): f is EventFact => f !== null);
   });
+
+  /**
+   * "Beginn" with "Ende" beside it (003132). The end takes the day of the start when it has
+   * only a time; without a day and a time of the end, "Beginn" stands alone.
+   */
+  private dates(e: EventDetail, locale: string): EventFact | null {
+    if (!e.startsOn) return null;
+    const start = { label: this.t('events.field.startsOn'), value: eventMoment(e.startsOn, e.startTime, locale) };
+    const endDay = e.endsOn ?? (e.endTime ? e.startsOn : null);
+    if (!endDay) return start;
+    return { ...start, beside: { label: this.t('events.field.endsOn'), value: eventMoment(endDay, e.endTime, locale) } };
+  }
 
   /** Requested, approved, expenses, income and the signed balance (000479). */
   protected readonly totals = computed(() => {
