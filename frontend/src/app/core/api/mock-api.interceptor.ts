@@ -9,6 +9,7 @@ import { inject, isDevMode } from '@angular/core';
 import { type Observable, from, of, throwError } from 'rxjs';
 import { delay, mergeMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
+import { mockSalesBody } from './mock-sales';
 import type { Delegation } from './delegations.service';
 import type { MediaImage } from '@shared/markdown/media-api.service';
 import type {
@@ -140,6 +141,9 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.order_statuses',
     'admin.event_statuses',
     'admin.paperless',
+    'admin.pretix',
+    'admin.mollie',
+    'pretix.use',
     'admin.features',
     'admin.ticket_mail',
     'paperless.use',
@@ -1823,6 +1827,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     const body = mockNewUserGet(p);
     if (body !== undefined) return ok(body);
   }
+
+  const sales = mockSalesBody(req.method, p);
+  if (sales !== undefined) return ok(sales);
 
   const substitutes = mockSubstitutes(req, p);
   if (substitutes) return substitutes;

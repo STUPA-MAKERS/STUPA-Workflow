@@ -5,7 +5,9 @@ kind: functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/event_sales/sales.py
+  - frontend/src/app/pages/events/event-sales.component.ts
 scope:
   - backend/app/
   - frontend/src/app/

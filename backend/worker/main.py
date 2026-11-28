@@ -35,6 +35,7 @@ from worker.cd_builtin import on_startup as cd_builtin_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
 from worker.drafts import process_draft_reminders
+from worker.event_sales import read_mollie_money, read_pretix_sales
 from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
@@ -163,7 +164,9 @@ class WorkerSettings:
     so they appear without a new switch of the gremium flag. The backup at 04:00 runs
     after retention, so the archive holds the anonymized state rather than PII that
     retention is about to drop. The audit-chain check at 04:30 does not depend on the
-    backup and runs also when backups are off or failed.
+    backup and runs also when backups are off or failed. The pretix sales run every 15
+    minutes and the Mollie data every hour (§F/integrations/pretix/003085,
+    §F/integrations/mollie/003094), off the full minute of the other jobs.
     """
 
     functions = [
@@ -193,6 +196,8 @@ class WorkerSettings:
         process_paperless_filings,
         fetch_ticket_mails,
         send_ticket_mails,
+        read_pretix_sales,
+        read_mollie_money,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -209,6 +214,8 @@ class WorkerSettings:
         cron(process_draft_reminders, minute=15),
         cron(purge_draft_attachments, minute=20),
         cron(heal_public_protocols, minute=40),
+        cron(read_pretix_sales, minute={2, 17, 32, 47}, second=20),
+        cron(read_mollie_money, minute=25, second=20),
         cron(scheduled_backup, hour=4, minute=0),
         cron(
             process_audit_verification,

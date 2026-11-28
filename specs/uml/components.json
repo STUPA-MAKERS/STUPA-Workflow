@@ -178,6 +178,11 @@
     {
       "count": 1,
       "from": "admin",
+      "to": "pretix"
+    },
+    {
+      "count": 1,
+      "from": "admin",
       "to": "privacy"
     },
     {
@@ -731,6 +736,56 @@
       "to": "voting"
     },
     {
+      "count": 2,
+      "from": "event_sales",
+      "to": "audit"
+    },
+    {
+      "count": 2,
+      "from": "event_sales",
+      "to": "auth"
+    },
+    {
+      "count": 4,
+      "from": "event_sales",
+      "to": "budget"
+    },
+    {
+      "count": 3,
+      "from": "event_sales",
+      "to": "events"
+    },
+    {
+      "count": 8,
+      "from": "event_sales",
+      "to": "mollie"
+    },
+    {
+      "count": 20,
+      "from": "event_sales",
+      "to": "pretix"
+    },
+    {
+      "count": 6,
+      "from": "event_sales",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "event_sales",
+      "to": "site_config"
+    },
+    {
+      "count": 1,
+      "from": "event_sales",
+      "to": "statuses"
+    },
+    {
+      "count": 1,
+      "from": "event_sales",
+      "to": "todos"
+    },
+    {
       "count": 3,
       "from": "events",
       "to": "applications"
@@ -1177,6 +1232,16 @@
     },
     {
       "count": 2,
+      "from": "mollie",
+      "to": "audit"
+    },
+    {
+      "count": 3,
+      "from": "mollie",
+      "to": "shared"
+    },
+    {
+      "count": 2,
       "from": "notifications",
       "to": "audit"
     },
@@ -1333,6 +1398,16 @@
     {
       "count": 1,
       "from": "pdf",
+      "to": "shared"
+    },
+    {
+      "count": 2,
+      "from": "pretix",
+      "to": "audit"
+    },
+    {
+      "count": 6,
+      "from": "pretix",
       "to": "shared"
     },
     {
@@ -2000,6 +2075,12 @@
       "path": "backend/app/modules/documents"
     },
     {
+      "id": "event_sales",
+      "layer": 1,
+      "name": "event_sales",
+      "path": "backend/app/modules/event_sales"
+    },
+    {
       "id": "events",
       "layer": 2,
       "name": "events",
@@ -2060,6 +2141,12 @@
       "path": "backend/app/modules/meetings"
     },
     {
+      "id": "mollie",
+      "layer": 5,
+      "name": "mollie",
+      "path": "backend/app/modules/mollie"
+    },
+    {
       "id": "notifications",
       "layer": 5,
       "name": "notifications",
@@ -2088,6 +2175,12 @@
       "layer": 6,
       "name": "pdf",
       "path": "backend/app/modules/pdf"
+    },
+    {
+      "id": "pretix",
+      "layer": 5,
+      "name": "pretix",
+      "path": "backend/app/modules/pretix"
     },
     {
       "id": "privacy",

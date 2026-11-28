@@ -322,6 +322,13 @@ OBJECT_CHECK_ROUTES: Final[dict[tuple[str, str], str]] = {
     ("POST", "/api/events"): _EVENT_TEAM,
     ("GET", "/api/events/teams"): _EVENT_TEAM,
     ("GET", "/api/events/refs"): _EVENT_TEAM,
+    ("GET", "/api/events/{event_id}/sales"): _EVENT_TEAM,
+    ("POST", "/api/events/{event_id}/sales/refresh"): _EVENT_TEAM,
+    ("GET", "/api/sales-sync"): "self: tells which integrations are on, no object (spec 003104)",
+    ("POST", "/api/sales-sync"): (
+        "event_sales.router.run_sync (budget.book for the page bookings, a team of an Event "
+        "for the page events, spec 003104)"
+    ),
     ("GET", "/api/events/series"): "any member; names of series only (spec 000483)",
     ("POST", "/api/events/series"): "EventService.create_series (member of a team, spec 000483)",
     ("GET", "/api/events/{event_id}"): _EVENT_TEAM,

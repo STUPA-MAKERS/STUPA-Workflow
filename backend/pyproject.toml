@@ -117,11 +117,11 @@ type = "layers"
 containers = ["app.modules"]
 exhaustive = true
 layers = [
-    "admin : search : graph : activity : privacy : backup : config_revision : audit_log : account : gremien_overview : attachments : push_actions : paperless_filing : team_pages",
+    "admin : search : graph : activity : privacy : backup : config_revision : audit_log : account : gremien_overview : attachments : push_actions : paperless_filing : team_pages : event_sales",
     "protocol : livevote : todos : tickets : calendar : events",
     "documents : orders",
     "voting : budget : applications : flow : meetings : delegations",
-    "forms : application_types : notifications : webhooks : files : media : translations : avatars : paperless : statuses : teams",
+    "forms : application_types : notifications : webhooks : files : media : translations : avatars : paperless : statuses : teams : pretix : mollie",
     "gremien : site_config : audit : auth : antiabuse : pdf",
 ]
 
@@ -194,6 +194,10 @@ markers = [
 
 [tool.coverage.run]
 branch = true
+# SQLAlchemy runs each async database call in a greenlet. Without greenlet tracing, coverage
+# loses the lines that follow such a call, so a route counts as untested after its first
+# query although an integration test runs it on Postgres.
+concurrency = ["greenlet", "thread"]
 source = ["app", "worker"]
 omit = ["tests/*"]
 

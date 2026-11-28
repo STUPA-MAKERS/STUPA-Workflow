@@ -1,4 +1,5 @@
 import { provideTestStatuses } from '@core/api/statuses.service';
+import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { render } from '@testing-library/angular';
 import { Subject, of, throwError } from 'rxjs';
@@ -8,6 +9,7 @@ import { type ListQuery, type ListRow, type LoadState, ToastService } from '@stu
 import { eventItem } from '../../../testing/event-fixtures';
 import { EVENTS_PAGE_SIZE, EventsPageComponent } from './events-page.component';
 import { EventsRefresh } from './events-refresh';
+import { SalesSyncAction } from '@shared/sales-sync';
 
 const PAGE: EventPage = {
   items: [
@@ -29,6 +31,8 @@ interface Options {
   readonly permissions?: readonly string[];
   readonly teams?: readonly EventOption[] | null;
   readonly series?: readonly EventOption[] | null;
+  /** The action "Daten abrufen" is on (spec 003104). */
+  readonly sync?: boolean;
 }
 
 async function setup(options: Options = {}) {
@@ -41,12 +45,14 @@ async function setup(options: Options = {}) {
     series: jest.fn(() => (options.series === null ? fail() : of(options.series ?? [{ id: 's-1', name: 'Erstiparty' }]))),
     exportXlsx: jest.fn(() => of(new Blob(['x']))),
   };
+  const sync = { available: signal(!!options.sync), running: signal(false), load: jest.fn(), run: jest.fn() };
   const view = await render(EventsPageComponent, {
     providers: [
       provideTestStatuses(),
       provideRouter([]),
       { provide: EventsApiService, useValue: api },
       { provide: AuthService, useValue: { can: (p: string) => permissions.includes(p) } },
+      { provide: SalesSyncAction, useValue: sync },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,7 +60,7 @@ async function setup(options: Options = {}) {
   const toast = view.fixture.debugElement.injector.get(ToastService);
   const refresh = view.fixture.debugElement.injector.get(EventsRefresh);
   const rows = (): LoadState<readonly ListRow[]> => cmp.rows();
-  return { ...view, cmp, api, toast, refresh, rows };
+  return { ...view, cmp, api, toast, refresh, rows, sync };
 }
 
 describe('EventsPageComponent', () => {
@@ -173,6 +179,19 @@ describe('EventsPageComponent', () => {
     api.exportXlsx.mockReturnValueOnce(throwError(() => ({ status: 500 })));
     cmp.onAction('export');
     expect(show).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.', 'error');
+  });
+
+  /** §F/integrations/mollie/003104: "Daten abrufen" for a member of a team while an integration is on. */
+  it('offers "Daten abrufen" and reads the list again after the run', async () => {
+    const { cmp, sync, api } = await setup({ sync: true });
+    expect(sync.load).toHaveBeenCalled();
+    expect(cmp.actions().map((a: { key: string }) => a.key)).toContain('fetch');
+    cmp.onQuery(query());
+    const before = api.page.mock.calls.length;
+    sync.run.mockImplementationOnce((_page: string, done: () => void) => done());
+    cmp.onAction('fetch');
+    expect(sync.run).toHaveBeenCalledWith('events', expect.any(Function));
+    expect(api.page.mock.calls.length).toBeGreaterThan(before);
   });
 
   it('reads the list again when the pane changed an Event', async () => {

@@ -1,4 +1,5 @@
 import type { TranslationKey } from '@core/i18n/translations';
+import type { TreeOption } from '@stupa-makers/ui-kit';
 import type { BudgetTreeNode } from '../budget-tree.api';
 
 /** The messages of the problem codes of a Kostenstelle write. */
@@ -99,4 +100,13 @@ export function pickable(
     const fy = yearsOf(top).find((id) => !!id && !!top.plannedIn?.includes(id));
     return fy ? { ...top, children: members(top.children, fy) } : top;
   });
+}
+
+/** The active cost centres as the options of a tree select: "KEY Name", with the nodes below. */
+export function costCentreOptions(forest: readonly BudgetTreeNode[]): readonly TreeOption[] {
+  return activeOnly(forest).map((n) => ({
+    value: n.id,
+    label: `${n.pathKey} ${n.name}`,
+    ...(n.children.length ? { children: costCentreOptions(n.children) } : {}),
+  }));
 }

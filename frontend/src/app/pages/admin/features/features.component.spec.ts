@@ -26,6 +26,8 @@ const ALL_ON: FeatureSwitches = {
   public: true,
   push: true,
   paperless: true,
+  pretix: true,
+  mollie: true,
 };
 
 function makeApi(initial: FeatureSwitches = ALL_ON) {

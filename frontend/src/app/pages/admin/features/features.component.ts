@@ -36,6 +36,8 @@ export const FEATURE_LABELS: Readonly<Record<FeatureKey, TranslationKey>> = {
   public: 'admin.features.public',
   push: 'admin.features.push',
   paperless: 'admin.features.paperless',
+  pretix: 'admin.features.pretix',
+  mollie: 'admin.features.mollie',
 };
 
 /** One place that still needs a feature, from the 409 `feature_in_use` of the save. */
@@ -68,6 +70,8 @@ const ALL_ON: FeatureSwitches = {
   public: true,
   push: true,
   paperless: true,
+  pretix: true,
+  mollie: true,
 };
 
 /** The features that are on: the own switch and each needed feature is on. */

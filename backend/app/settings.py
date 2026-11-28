@@ -188,6 +188,12 @@ class Settings(BaseSettings):
         internal network, so the SSRF guard does not apply and this list is the whole
         guard: an empty list allows no address.
 
+    Pretix:
+        `pretix_host_allowlist` names the hosts that the address of the pretix connection
+        can have (§NF/security/network/003100). pretix can run in the internal network,
+        so this list is the whole guard: an empty list allows no address. The Mollie
+        client calls only `api.mollie.com` and needs no list.
+
     Ticket mail:
         `ticket_mail_host_allowlist` names the hosts that the IMAP host and the SMTP host
         of a Postfach can have (§NF/security/network/002744). An admin sets the hosts of
@@ -404,6 +410,7 @@ class Settings(BaseSettings):
     )
 
     paperless_host_allowlist: CsvList = []
+    pretix_host_allowlist: CsvList = []
     ticket_mail_host_allowlist: CsvList = []
 
     secrets_key: str | None = None
@@ -414,6 +421,7 @@ class Settings(BaseSettings):
         "secrets_key_old",
         "webhook_host_allowlist",
         "paperless_host_allowlist",
+        "pretix_host_allowlist",
         "ticket_mail_host_allowlist",
         mode="before",
     )

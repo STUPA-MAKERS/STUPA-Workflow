@@ -736,6 +736,27 @@
       "to": "Principal"
     },
     {
+      "column": "expense_id",
+      "from": "MollieBooking",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetExpense"
+    },
+    {
+      "column": "fee_budget_id",
+      "from": "MollieSettings",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Budget"
+    },
+    {
+      "column": "unassigned_budget_id",
+      "from": "MollieSettings",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Budget"
+    },
+    {
       "column": "principal_id",
       "from": "NotificationPreference",
       "multiplicity": "*",
@@ -754,6 +775,34 @@
       "from": "OAuthToken",
       "multiplicity": "*",
       "onDelete": "CASCADE",
+      "to": "Principal"
+    },
+    {
+      "column": "expense_id",
+      "from": "PretixBooking",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "BudgetExpense"
+    },
+    {
+      "column": "income_budget_id",
+      "from": "PretixEventLink",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
+      "to": "Budget"
+    },
+    {
+      "column": "event_id",
+      "from": "PretixEventLink",
+      "multiplicity": "1",
+      "onDelete": "CASCADE",
+      "to": "Event"
+    },
+    {
+      "column": "created_by",
+      "from": "PretixEventLink",
+      "multiplicity": "*",
+      "onDelete": "SET NULL",
       "to": "Principal"
     },
     {
@@ -5527,6 +5576,287 @@
     {
       "attributes": [
         {
+          "name": "source",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "payment",
+            "refund",
+            "chargeback",
+            "settlement"
+          ]
+        },
+        {
+          "name": "source_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "booked",
+            "failed"
+          ]
+        },
+        {
+          "name": "expense_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "MollieBooking",
+      "module": "mollie",
+      "name": "MollieBooking",
+      "path": "backend/app/modules/mollie/models.py",
+      "table": "mollie_booking"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "kind",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "refund",
+            "chargeback"
+          ]
+        },
+        {
+          "name": "payment_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "settlement_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "MollieMove",
+      "module": "mollie",
+      "name": "MollieMove",
+      "path": "backend/app/modules/mollie/models.py",
+      "table": "mollie_move"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "fee",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "created",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "paid_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "settlement_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "organizer",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "event_slug",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "MolliePayment",
+      "module": "mollie",
+      "name": "MolliePayment",
+      "path": "backend/app/modules/mollie/models.py",
+      "table": "mollie_payment"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "organization",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "fee_budget_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "unassigned_budget_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "read_ok_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "read_error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        }
+      ],
+      "id": "MollieSettings",
+      "module": "mollie",
+      "name": "MollieSettings",
+      "path": "backend/app/modules/mollie/models.py",
+      "table": "mollie_settings"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "TEXT"
+        },
+        {
+          "name": "reference",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "settled_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "amount",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        },
+        {
+          "name": "fees",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "NUMERIC(12, 2)"
+        }
+      ],
+      "id": "MollieSettlement",
+      "module": "mollie",
+      "name": "MollieSettlement",
+      "path": "backend/app/modules/mollie/models.py",
+      "table": "mollie_settlement"
+    },
+    {
+      "attributes": [
+        {
           "name": "principal_id",
           "nullable": false,
           "primaryKey": true,
@@ -6069,6 +6399,197 @@
       "name": "PdfAsset",
       "path": "backend/app/modules/site_config/models.py",
       "table": "pdf_asset"
+    },
+    {
+      "attributes": [
+        {
+          "name": "slug",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "source",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "order",
+            "refund"
+          ]
+        },
+        {
+          "name": "source_key",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "state",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT",
+          "values": [
+            "booked",
+            "failed"
+          ]
+        },
+        {
+          "name": "expense_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "error",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "updated_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PretixBooking",
+      "module": "pretix",
+      "name": "PretixBooking",
+      "path": "backend/app/modules/pretix/models.py",
+      "table": "pretix_booking"
+    },
+    {
+      "attributes": [
+        {
+          "name": "event_id",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "slug",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "name",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "date_from",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATE"
+        },
+        {
+          "name": "income_budget_id",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "sales",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "JSONB"
+        },
+        {
+          "name": "sales_ok_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "refreshed_at",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_by",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "CHAR(32)"
+        },
+        {
+          "name": "created_at",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "DATETIME"
+        }
+      ],
+      "id": "PretixEventLink",
+      "module": "pretix",
+      "name": "PretixEventLink",
+      "path": "backend/app/modules/pretix/models.py",
+      "table": "pretix_event_link"
+    },
+    {
+      "attributes": [
+        {
+          "name": "id",
+          "nullable": false,
+          "primaryKey": true,
+          "type": "INTEGER"
+        },
+        {
+          "name": "base_url",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "organizer",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "token",
+          "nullable": true,
+          "primaryKey": false,
+          "type": "TEXT"
+        },
+        {
+          "name": "show_sales",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "book_income",
+          "nullable": false,
+          "primaryKey": false,
+          "type": "BOOLEAN"
+        }
+      ],
+      "id": "PretixSettings",
+      "module": "pretix",
+      "name": "PretixSettings",
+      "path": "backend/app/modules/pretix/models.py",
+      "table": "pretix_settings"
     },
     {
       "attributes": [

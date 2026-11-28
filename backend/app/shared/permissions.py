@@ -131,6 +131,14 @@ Keys that need a note:
   call and the password of a mail account, so the key is separate from `admin.site`
   (§F/integrations/ticket-mail/002721). No OAuth scope carries it, so an agent token never
   changes a Postfach.
+- `admin.pretix`: set the connection to pretix and its switches on the page /admin/pretix
+  (§F/integrations/pretix/003080). The holder gives the server an address to call and a
+  token, so the key is separate from `admin.site`. No OAuth scope carries it.
+- `admin.mollie`: set the Mollie token and the cost centres of its bookings on the page
+  /admin/mollie (§F/integrations/mollie/003092). No OAuth scope carries it.
+- `pretix.use`: link an Event that the holder writes to a pretix event
+  (§F/integrations/pretix/003091). A link acts with the token of the platform in pretix,
+  so no seeded role but the admin holds it and no OAuth scope carries it (003102).
 - `paperless.use`: open the filed document of an element in Paperless and insert a
   document from Paperless. The holder reads what the account of the platform reads in
   Paperless, so no seeded role but the admin holds it and no OAuth scope carries it.
@@ -201,6 +209,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.order_statuses",
     "admin.event_statuses",
     "paperless.use",
+    "admin.pretix",
+    "admin.mollie",
+    "pretix.use",
 )
 
 

@@ -2,6 +2,7 @@ import { FileOpenService } from '@shared/viewer/file-open.service';
 import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting, type TestRequest } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
@@ -23,6 +24,10 @@ import type {
 import { EventsApiService } from '@core/api/events.service';
 import { TodosApiService } from '@core/api/todos.service';
 import { kindSpies } from '../../../testing/toast';
+import { SalesSyncAction } from '@shared/sales-sync';
+
+/** The action "Daten abrufen" (spec 003104): off unless a test turns it on. */
+const SYNC = { available: signal(false), running: signal(false), load: jest.fn(), run: jest.fn() };
 
 /** The Events of the `Veranstaltung` picker: none, and no linked Event. */
 const EVENTS_API = { linked: () => of([]), links: () => of({ canLink: false, links: [] }), boards: () => of([]) };
@@ -119,6 +124,7 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: Budget
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
+      { provide: SalesSyncAction, useValue: SYNC },
       { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
       { provide: EventsApiService, useValue: EVENT_REFS },
@@ -238,6 +244,7 @@ function build(
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      { provide: SalesSyncAction, useValue: SYNC },
       provideRouter([]),
       { provide: ActivatedRoute, useValue: routeStub([]) },
       { provide: USE_MOCK_API, useValue: false },
@@ -1563,6 +1570,7 @@ describe('ExpensesComponent (infinite scroll)', () => {
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
       { provide: EventsApiService, useValue: EVENT_REFS },
@@ -1956,6 +1964,7 @@ describe('ExpensesComponent (query-param adoption)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: routeStub(query) },
         { provide: USE_MOCK_API, useValue: false },
@@ -2193,6 +2202,7 @@ describe('ExpensesComponent (query-param adoption)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         {
           provide: ActivatedRoute,
@@ -2254,6 +2264,7 @@ describe('ExpensesListState.refresh', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         { provide: USE_MOCK_API, useValue: false },
       { provide: TodosApiService, useValue: EVENTS_API },
       { provide: EventsApiService, useValue: EVENT_REFS },
@@ -2898,6 +2909,23 @@ describe('ExpensesComponent (list/detail)', () => {
     cmp.onHeaderMenu({ id: 'other', label: '' });
   });
 
+  /** §F/integrations/mollie/003104: "Daten abrufen" while an integration is on. */
+  it('offers "Daten abrufen" while an integration is on and refreshes after the run', () => {
+    SYNC.available.set(true);
+    try {
+      const { cmp } = build();
+      expect(SYNC.load).toHaveBeenCalled();
+      expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toContain('fetch');
+      const refresh = jest.spyOn(cmp, 'refreshList').mockImplementation(() => undefined);
+      SYNC.run.mockImplementationOnce((_page: string, done: () => void) => done());
+      cmp.onHeaderMenu({ id: 'fetch', label: '' });
+      expect(SYNC.run).toHaveBeenCalledWith('bookings', expect.any(Function));
+      expect(refresh).toHaveBeenCalled();
+    } finally {
+      SYNC.available.set(false);
+    }
+  });
+
   /** "Zur Liste" with a form open closes the form. */
   it('names each form for the sheet of a phone', () => {
     const { cmp } = build({ expenses: page([EXPENSE]) });
@@ -3088,6 +3116,7 @@ describe('ExpensesComponent (list/detail)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['invoice', 'inv-1']]) },
         { provide: USE_MOCK_API, useValue: false },
@@ -3124,6 +3153,7 @@ describe('ExpensesComponent (list/detail)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking']]) },
         { provide: USE_MOCK_API, useValue: false },
@@ -3155,6 +3185,7 @@ describe('ExpensesComponent (list/detail)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['order', 'o-1']]) },
         { provide: USE_MOCK_API, useValue: false },
@@ -3291,6 +3322,7 @@ describe('ExpensesComponent (list/detail)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: SalesSyncAction, useValue: SYNC },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: routeStub([['view', 'transfers'], ['transfer', 'tr-1']]) },
         { provide: USE_MOCK_API, useValue: false },

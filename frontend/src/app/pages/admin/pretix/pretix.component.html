@@ -1,0 +1,39 @@
+<app-settings-screen
+  [head]="{ title: 'admin.pretix.title' | t }"
+  [groups]="groups()"
+  [state]="screenState()"
+  [notice]="notice()"
+  [save]="{ dirty: dirty(), busy: saving(), disabled: !!urlError() || !!tokenError() }"
+  (change)="set($event.key, $event.value)"
+  (action)="act($event.key)"
+  (save)="save()"
+  (discard)="discard()"
+>
+  <ng-template screenGroup="connection">
+    <app-input
+      type="url"
+      name="baseUrl"
+      autocomplete="off"
+      [label]="'admin.pretix.url' | t"
+      [error]="urlError()"
+      [ngModel]="draft().baseUrl"
+      (ngModelChange)="patch({ baseUrl: $event })"
+    />
+    <app-input
+      name="organizer"
+      autocomplete="off"
+      [label]="'admin.pretix.organizer' | t"
+      [ngModel]="draft().organizer"
+      (ngModelChange)="patch({ organizer: $event })"
+    />
+    <app-input
+      type="password"
+      name="token"
+      autocomplete="new-password"
+      [label]="(tokenSet() ? 'admin.pretix.tokenNew' : 'admin.pretix.token') | t"
+      [error]="tokenError()"
+      [ngModel]="draft().token"
+      (ngModelChange)="patch({ token: $event })"
+    />
+  </ng-template>
+</app-settings-screen>

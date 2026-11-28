@@ -101,6 +101,8 @@ export const AXE_ROUTES: readonly AxeRoute[] = [
   fixed('admin/webhooks'),
   fixed('admin/help-tickets'),
   fixed('admin/paperless'),
+  fixed('admin/pretix'),
+  fixed('admin/mollie'),
   fixed('admin/features'),
   fixed('admin/oauth-grants'),
   fixed('admin/audit'),

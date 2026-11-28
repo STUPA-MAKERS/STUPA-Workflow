@@ -5,7 +5,9 @@ kind: non-functional
 status: approved
 owner: frederikbeimgraben
 updated: 2026-11-25
-implementation: null
+implementation:
+  - backend/app/modules/pretix/connection.py
+  - backend/app/modules/mollie/connection.py
 scope:
   - backend/app/
   - frontend/src/app/

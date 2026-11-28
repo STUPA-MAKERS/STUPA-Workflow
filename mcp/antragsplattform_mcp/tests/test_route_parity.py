@@ -58,6 +58,23 @@ EXCLUDED: frozenset[tuple[str, str]] = frozenset(
         ("GET", "/paperless/search"),
         ("POST", "/meetings/{}/documents/paperless"),
         ("POST", "/tickets/{}/files/{}/paperless"),
+        # pretix and Mollie: no OAuth scope carries `admin.pretix`, `admin.mollie` or
+        # `pretix.use`, and a token never calls pretix or Mollie (§ 003102).
+        ("GET", "/admin/pretix"),
+        ("PUT", "/admin/pretix"),
+        ("POST", "/admin/pretix/test"),
+        ("GET", "/admin/pretix/failed-bookings"),
+        ("GET", "/admin/mollie"),
+        ("PUT", "/admin/mollie"),
+        ("POST", "/admin/mollie/test"),
+        ("GET", "/admin/mollie/failed-bookings"),
+        ("GET", "/pretix/events"),
+        ("PUT", "/pretix/links/{}"),
+        ("DELETE", "/pretix/links/{}"),
+        ("PUT", "/pretix/links/{}/income-budget"),
+        ("POST", "/events/{}/sales/refresh"),
+        ("GET", "/sales-sync"),
+        ("POST", "/sales-sync"),
         # Ticket mail: no OAuth scope carries `admin.ticket_mail`.
         ("GET", "/admin/ticket-mailboxes"),
         ("POST", "/admin/ticket-areas/{}/mailbox"),

@@ -43,6 +43,8 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.event_statuses',
   'admin.features',
   'admin.paperless',
+  'admin.pretix',
+  'admin.mollie',
   'ticket.manage',
   'audit.read',
   'backup.manage',

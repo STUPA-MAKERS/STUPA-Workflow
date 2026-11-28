@@ -38,15 +38,21 @@ class Feature(StrEnum):
     PUBLIC = "public"
     PUSH = "push"
     PAPERLESS = "paperless"
+    PRETIX = "pretix"
+    MOLLIE = "mollie"
 
 
 #: The features a feature needs (§F/administration/admin/000760). A feature is off while
 #: one of them is off. An invoice books on a Kostenstelle, so `Rechnungen` needs `Budget`.
 #: A Bestellung belongs to an Antrag of a type with money and its bookings name a
 #: Kostenstelle, so `Bestellungen` needs `Budget` too (§F/finance/orders/003013).
+#: pretix and Mollie exist only for the Events (§F/integrations/pretix/003081,
+#: §F/integrations/mollie/003093), so both need `Veranstaltungen`.
 REQUIRES: Mapping[Feature, frozenset[Feature]] = {
     Feature.INVOICES: frozenset({Feature.BUDGET}),
     Feature.ORDERS: frozenset({Feature.BUDGET}),
+    Feature.PRETIX: frozenset({Feature.EVENTS}),
+    Feature.MOLLIE: frozenset({Feature.EVENTS}),
 }
 
 ALL_FEATURES: frozenset[Feature] = frozenset(Feature)
@@ -74,6 +80,8 @@ class FeatureSwitches(FrozenStrictCamelModel, frozen=True):
     public: bool = Field(default=True)
     push: bool = Field(default=True)
     paperless: bool = Field(default=True)
+    pretix: bool = Field(default=True)
+    mollie: bool = Field(default=True)
 
     def is_set(self, feature: Feature) -> bool:
         """Return the stored switch of ``feature``."""

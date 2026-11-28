@@ -1,0 +1,30 @@
+@if (sales(); as current) {
+  <app-section data-testid="es-section" [heading]="'sales.title' | t" [meta]="readAt()">
+    @if (current.refreshable) {
+      <app-button-group ngProjectAs="[sectionAction]">
+        <app-button
+          data-testid="es-refresh"
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'sales.refresh.action' | t"
+          [disabled]="refreshing()"
+          (click)="refresh()"
+        >
+          <app-icon name="reload" />
+        </app-button>
+      </app-button-group>
+    }
+    <app-field-group>
+      @for (row of linkRows(); track row.label) {
+        <app-field-row data-testid="es-link" [label]="row.label" [value]="row.value" />
+      }
+      @for (row of pretixRows(); track $index) {
+        <app-field-row data-testid="es-pretix" [label]="row.label" [value]="row.value" />
+      }
+      @for (row of mollieRows(); track $index) {
+        <app-field-row data-testid="es-mollie" [label]="row.label" [value]="row.value" />
+      }
+    </app-field-group>
+  </app-section>
+}

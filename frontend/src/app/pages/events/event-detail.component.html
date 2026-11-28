@@ -36,6 +36,7 @@
             }
           </app-field-group>
         </app-section>
+        <app-event-sales [eventId]="current.id" />
         @if (current.decisions.length) {
           <app-section data-testid="ed-section" [heading]="'events.decisions.title' | t">
             <app-field-group role="list">
