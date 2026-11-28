@@ -194,6 +194,10 @@ markers = [
 
 [tool.coverage.run]
 branch = true
+# SQLAlchemy runs each async database call in a greenlet. Without greenlet tracing, coverage
+# loses the lines that follow such a call, so a route counts as untested after its first
+# query although an integration test runs it on Postgres.
+concurrency = ["greenlet", "thread"]
 source = ["app", "worker"]
 omit = ["tests/*"]
 
