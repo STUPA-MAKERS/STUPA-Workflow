@@ -86,6 +86,7 @@ from app.modules.meetings.protocol_models import Protocol
 from app.modules.notifications.models import NotificationPreference
 from app.modules.orders.models import PurchaseOrder
 from app.modules.paperless.models import PaperlessFiling
+from app.modules.pretix.models import PretixEventLink
 from app.modules.privacy.models import ErasureRequest
 from app.modules.site_config.models import PdfAsset, SiteConfigVersion
 from app.modules.teams.models import Team, TeamInfo
@@ -482,9 +483,20 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         team = Team(name=f"Team {tag}")
         session.add(team)
         await session.flush()
+        event_id = uuid.uuid4()
+        session.add(
+            Event(
+                id=event_id,
+                team_id=team.id,
+                status="planned",
+                title=f"Fest {tag}",
+                created_by=old.id,
+            )
+        )
+        await session.flush()
         session.add_all(
             [
-                Event(team_id=team.id, status="planned", title=f"Fest {tag}", created_by=old.id),
+                PretixEventLink(event_id=event_id, slug=f"fest-{tag}", created_by=old.id),
                 TodoAssignee(card_id=card.id, principal_id=old.id),
                 TodoComment(
                     card_id=card.id, author_id=old.id, body="Merken", mentions=[str(old.id)]
@@ -669,7 +681,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert after["memberships"]["removed"] == 1
     assert after["calendar"]["removed"] == 1
     assert after["tickets"] == {"rewritten": 6, "combined": 0, "removed": 0}
-    assert after["todos"] == {"rewritten": 9, "combined": 0, "removed": 0}
+    assert after["todos"] == {"rewritten": 10, "combined": 0, "removed": 0}
 
     async with maker() as session:
         for column in SUB_REFS:

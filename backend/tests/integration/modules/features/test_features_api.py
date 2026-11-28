@@ -83,6 +83,9 @@ ROUTES: dict[Feature, tuple[tuple[str, str], ...]] = {
         ("GET", "/api/admin/paperless"),
         ("POST", f"/api/meetings/{uuid.uuid4()}/documents/paperless"),
     ),
+    #: §F/integrations/pretix/003081 and §F/integrations/mollie/003093.
+    Feature.PRETIX: (("GET", "/api/pretix/events"), ("GET", "/api/admin/pretix")),
+    Feature.MOLLIE: (("GET", "/api/admin/mollie"), ("GET", "/api/admin/mollie/failed-bookings")),
     #: Each public page also needs the feature of its records, so these routes close with
     #: `Sitzungen` and with `Kalender` too (§F/administration/admin/000756).
     Feature.PUBLIC: (
@@ -98,6 +101,7 @@ CLOSED_WITH: dict[Feature, int] = {
     Feature.BUDGET: len(ROUTES[Feature.INVOICES]) + len(ROUTES[Feature.ORDERS]),
     Feature.MEETINGS: 3,
     Feature.CALENDAR: 1,
+    Feature.EVENTS: len(ROUTES[Feature.PRETIX]) + len(ROUTES[Feature.MOLLIE]),
 }
 
 
