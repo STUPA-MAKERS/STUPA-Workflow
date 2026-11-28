@@ -5,7 +5,7 @@ kind: non-functional
 status: replaced
 owner: frederikbeimgraben
 updated: 2026-11-28
-replaced_by: NF/usability/layout/003120
+replaced_by: NF/usability/layout/003130
 scope:
   - frontend/src/app/pages/admin/forms
   - frontend/src/app/pages/admin/flow

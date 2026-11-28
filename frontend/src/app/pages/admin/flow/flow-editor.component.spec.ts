@@ -234,6 +234,80 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
+  it('opens the inspector as a sheet for a selection and closes it with Escape (§ NF/usability/layout/003131)', async () => {
+    const { container, fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.selection.set(null);
+    fixture.detectChanges();
+    const panel = (): HTMLElement => container.querySelector('.fe__panel') as HTMLElement;
+    expect(panel().hidden).toBe(true);
+    c.selection.set({ kind: 'state', key: 'a' });
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(true);
+    c.toggleVersions();
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(panel().hidden).toBe(true);
+    const handled = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    c.selection.set({ kind: 'state', key: 'a' });
+    handled.preventDefault();
+    document.dispatchEvent(handled);
+    fixture.detectChanges();
+    expect(panel().hidden).toBe(false);
+  });
+
+  it('shows the inspector of an open group until the reader closes it', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.currentGroupId.set('g1');
+    expect(c.sheetOpen()).toBe(true);
+    c.closeSheet();
+    expect(c.sheetOpen()).toBe(false);
+    c.navigateTo('g1');
+    expect(c.sheetOpen()).toBe(true);
+  });
+
+  it('pans a selected state into view beside the sheet, and leaves a visible one alone (§ F/applications/flow/003137)', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.canvasSize.set({ w: 800, h: 400 });
+    c.view.set({ x: 0, y: 0, w: 800, h: 400 });
+    c.nodes = () => [
+      { key: 'a', x: 50, y: 50, w: 100, h: 50 },
+      { key: 'b', x: 700, y: 100, w: 100, h: 50 },
+    ];
+    c.edges = () => [{ index: 0, mx: 1000, my: 900 }];
+    c.reveal({ kind: 'state', key: 'a' });
+    expect(c.view()).toEqual({ x: 0, y: 0, w: 800, h: 400 });
+    c.reveal({ kind: 'state', key: 'b' });
+    expect(c.view().x).toBe(700 + 100 + 24 - (800 - 380 - 16));
+    expect(c.view().y).toBe(0);
+    c.reveal({ kind: 'transition', index: 0 });
+    expect(c.view().y).toBe(900 + 16 + 24 - 400);
+    c.reveal({ kind: 'state', key: 'none' });
+    c.canvasSize.set({ w: 0, h: 0 });
+    c.reveal({ kind: 'state', key: 'a' });
+  });
+
+  it('starts the layouter before the flow answers (§ NF/performance/loading/003136)', async () => {
+    const layouter = jest.fn(() => new Promise<LevelLayout>(() => undefined));
+    const elk = await import('./flow-elk');
+    const warm = jest.spyOn(elk, 'warmLayouter').mockImplementation(() => undefined);
+    const flow = new Subject<FlowGraph | null>();
+    await setup({ layouter, getGlobalFlow: jest.fn(() => flow) });
+    expect(warm).toHaveBeenCalled();
+    warm.mockRestore();
+  });
+
   it('renders one canvas node per state', async () => {
     const { container, fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

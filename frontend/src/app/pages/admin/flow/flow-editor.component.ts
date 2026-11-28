@@ -63,7 +63,7 @@ import {
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
-import { FLOW_LAYOUTER, type LevelLayout } from './flow-elk';
+import { FLOW_LAYOUTER, type LevelLayout, warmLayouter } from './flow-elk';
 import { FlowEditorOptionsService } from './flow-editor-options.service';
 import {
   type GuardGroup,
@@ -112,6 +112,16 @@ const EDGE_SLACK = 1;
 
 /** A side of the canvas, and the direction its scroll tongue pans to. */
 export type PanSide = 'left' | 'right' | 'up' | 'down';
+
+/** The width in px of the inspector sheet before it is measured (23.75rem). */
+const SHEET_W = 380;
+/** The gap in px between the inspector sheet and the edge of the canvas. */
+const SHEET_GAP = 16;
+/** The room in px that a revealed item keeps from the edge of the visible canvas. */
+const REVEAL_PAD = 24;
+/** The box around the label of a transition that a selection reveals, in world units. */
+const EDGE_REVEAL_W = 120;
+const EDGE_REVEAL_H = 32;
 
 /** The smallest scale of the start view: below it the labels are too small to read. */
 const MIN_FIT_SCALE = 0.75;
@@ -163,7 +173,11 @@ const MIN_FIT_SCALE = 0.75;
     RowMenuComponent,
     ScrollFadeDirective,
   ],
-  host: { '[class.fe-pane]': 'wide()', '[class.pane-page]': 'wide()' },
+  host: {
+    '[class.fe-pane]': 'wide()',
+    '[class.pane-page]': 'wide()',
+    '(document:keydown.escape)': 'onEscape($event)',
+  },
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -306,12 +320,19 @@ export class FlowEditorComponent {
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stopHold());
     injectPanePage(this.wide);
+    if (this.layouter) warmLayouter();
     this.loadFlow();
 
     observeElementSize(
       () => this.canvasWrap()?.nativeElement,
       ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
     );
+
+    effect(() => {
+      const sel = this.selection();
+      this.levelLayout();
+      if (sel) untracked(() => this.reveal(sel));
+    });
 
     effect(() => {
       if (!this.loaded()) return;
@@ -505,6 +526,67 @@ export class FlowEditorComponent {
   /** Show the version history in the inspector, or go back to the selection. */
   protected toggleVersions(): void {
     this.showVersions.update((v) => !v);
+  }
+
+  /** The reader closed the inspector of the open group; opening a group shows it again. */
+  private readonly groupSheetClosed = signal(false);
+
+  /**
+   * The inspector sheet over the canvas (spec 003131): open for a selection, for the open group
+   * and for "Versionen", closed otherwise.
+   */
+  protected readonly sheetOpen = computed(
+    () =>
+      this.showVersions() ||
+      this.selection() !== null ||
+      (this.currentGroupId() !== null && !this.groupSheetClosed()),
+  );
+
+  /**
+   * Pan the canvas until the selected state or transition is fully visible beside the inspector
+   * sheet (spec 003137). The zoom stays, and a fully visible item does not move the view. On the
+   * phone the sheet covers the bottom, so only the width of the canvas counts there.
+   */
+  private reveal(sel: NonNullable<Selection>): void {
+    const item = this.selectionBounds(sel);
+    const { w, h } = this.canvasSize();
+    if (!item || !w || !h) return;
+    const v = this.view() ?? this.fitBounds();
+    const scale = Math.min(w / v.w, h / v.h);
+    const vw = w / scale;
+    const vh = h / scale;
+    const x0 = v.x - (vw - v.w) / 2;
+    const y0 = v.y - (vh - v.h) / 2;
+    const sheet = this.phone() ? 0 : (this.panel()?.nativeElement.offsetWidth || SHEET_W) + SHEET_GAP;
+    const pad = REVEAL_PAD / scale;
+    const right = x0 + vw - sheet / scale;
+    const shift = (lo: number, hi: number, a: number, b: number): number =>
+      a - pad < lo ? a - pad - lo : b + pad > hi ? Math.min(b + pad - hi, a - pad - lo) : 0;
+    const dx = shift(x0, right, item.x, item.x + item.w);
+    const dy = shift(y0, y0 + vh, item.y, item.y + item.h);
+    if (dx || dy) this.view.set({ ...v, x: v.x + dx, y: v.y + dy });
+  }
+
+  /** The box of a selected state, or of the label of a selected transition, in world units. */
+  private selectionBounds(sel: NonNullable<Selection>): ViewRect | null {
+    if (sel.kind === 'state') {
+      const n = this.nodes().find((x) => x.key === sel.key);
+      return n ? { x: n.x, y: n.y, w: n.w, h: n.h } : null;
+    }
+    const e = this.edges().find((x) => x.index === sel.index);
+    return e ? { x: e.mx - EDGE_REVEAL_W / 2, y: e.my - EDGE_REVEAL_H / 2, w: EDGE_REVEAL_W, h: EDGE_REVEAL_H } : null;
+  }
+
+  /** Escape closes the sheet, unless a control inside it used the key (an open dropdown). */
+  protected onEscape(event: Event): void {
+    if (!event.defaultPrevented) this.closeSheet();
+  }
+
+  /** Close the inspector sheet: the close button and Escape. */
+  protected closeSheet(): void {
+    this.showVersions.set(false);
+    this.selection.set(null);
+    this.groupSheetClosed.set(true);
   }
 
   protected readonly selectedState = computed<StateDef | undefined>(() => {
@@ -866,6 +948,7 @@ export class FlowEditorComponent {
 
   protected navigateTo(id: string | null): void {
     this.currentGroupId.set(id);
+    this.groupSheetClosed.set(false);
     this.selection.set(null);
     this.multiSel.set(new Set());
     this.multiSelGroups.set(new Set());

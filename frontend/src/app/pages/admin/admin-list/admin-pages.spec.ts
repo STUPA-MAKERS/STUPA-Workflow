@@ -5,8 +5,8 @@ import { routes } from '../../../app.routes';
 import { ADMIN_PAGES } from './admin-pages';
 
 /**
- * The paths below `/admin` in `app.routes.ts`: the children of the list page and the two
- * editors beside it (spec 001482).
+ * The paths below `/admin` in `app.routes.ts`: the children of the list page and any page
+ * beside it.
  */
 function adminChildPaths(): readonly string[] {
   const shell = routes.find((r) => r.children?.some((c) => c.path === 'admin'));
@@ -31,6 +31,17 @@ const SHARED_FOLDERS: Readonly<Record<string, readonly string[]>> = {
   'order-statuses': ['statuses'],
   'event-statuses': ['statuses'],
 };
+
+describe('adminEditors', () => {
+  it('opens the form editor and the flow editor in the pane of the list page (§ NF/usability/layout/003130)', () => {
+    const shell = routes.find((r) => r.children?.some((c) => c.path === 'admin'));
+    const siblings = shell?.children ?? routes;
+    const admin = siblings.find((r) => r.path === 'admin');
+    const children = (admin?.children ?? []).map((c) => c.path);
+    expect(children).toEqual(expect.arrayContaining(['forms/:id', 'flow']));
+    expect(siblings.map((r) => r.path).filter((p) => p?.startsWith('admin/'))).toEqual([]);
+  });
+});
 
 describe('ADMIN_PAGES', () => {
   it('links every entry to a route below /admin, so no menu entry opens an empty page', () => {

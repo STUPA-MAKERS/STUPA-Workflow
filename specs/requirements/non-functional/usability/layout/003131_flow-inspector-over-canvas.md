@@ -1,10 +1,12 @@
 ---
-id: "003121"
+id: "003131"
 title: The flow inspector opens over the canvas
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/flow/flow-editor.component.spec.ts:FlowEditorComponent.sheetOpen"
 implementation:
   - frontend/src/app/pages/admin/flow/flow-editor.component.html
 scope:

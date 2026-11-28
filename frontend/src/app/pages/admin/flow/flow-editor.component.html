@@ -252,7 +252,12 @@
       </div>
     </section>
 
-    <aside #panel class="fe__panel" appScrollFade="y" [attr.aria-label]="'admin.flow.inspector' | t">
+    <aside #panel class="fe__panel" appScrollFade="y" [hidden]="!sheetOpen()" [attr.aria-label]="'admin.flow.inspector' | t">
+      <div class="fe__panelHead">
+        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'action.close' | t" [title]="'action.close' | t" (click)="closeSheet()">
+          <app-icon name="x" />
+        </app-button>
+      </div>
       <div class="fe__versions" [class.fe__hidden]="!showVersions()">
         <app-button-group>
           <app-button class="fe__back" variant="text" size="sm" (click)="showVersions.set(false)">
@@ -265,6 +270,10 @@
           (restored)="reloadFlow()"
           (current)="currentVersion.set($event)"
         />
+        <details class="fe__json">
+          <summary>{{ 'admin.common.json' | t }}</summary>
+          <pre data-testid="flow-json">{{ json() }}</pre>
+        </details>
       </div>
 
       @if (!showVersions()) {
@@ -340,14 +349,7 @@
             (colorChange)="setGroupColor(grp.id, $event)"
             (dissolve)="dissolveCurrentGroup()"
           />
-        } @else {
-          <app-empty-state plain icon="flow" fill [heading]="'admin.flow.selectHint' | t" />
         }
-
-        <details class="fe__json">
-          <summary>{{ 'admin.common.json' | t }}</summary>
-          <pre data-testid="flow-json">{{ json() }}</pre>
-        </details>
       }
     </aside>
   </div>

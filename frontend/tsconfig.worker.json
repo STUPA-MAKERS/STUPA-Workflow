@@ -1,0 +1,10 @@
+/* TypeScript config for the web workers of the app (the flow layout, spec 003125). */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/worker",
+    "lib": ["es2022", "webworker"],
+    "types": []
+  },
+  "include": ["src/**/*.worker.ts"]
+}

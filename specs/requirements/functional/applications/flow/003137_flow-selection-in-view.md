@@ -1,10 +1,12 @@
 ---
-id: "003127"
+id: "003137"
 title: A selected item of the flow moves into view
 kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/flow/flow-editor.component.spec.ts:FlowEditorComponent.reveal"
 implementation:
   - frontend/src/app/pages/admin/flow/flow-canvas-interaction.ts
 scope:

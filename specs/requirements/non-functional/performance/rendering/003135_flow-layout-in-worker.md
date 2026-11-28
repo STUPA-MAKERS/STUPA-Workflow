@@ -1,10 +1,12 @@
 ---
-id: "003125"
+id: "003135"
 title: The flow layout runs in a web worker
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/flow/flow-elk.spec.ts:warmLayouter"
 implementation:
   - frontend/src/app/pages/admin/flow/flow-elk.ts
 scope:

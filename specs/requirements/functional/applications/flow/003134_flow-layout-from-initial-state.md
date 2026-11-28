@@ -1,10 +1,12 @@
 ---
-id: "003124"
+id: "003134"
 title: The flow layout runs from the initial state to the terminal states
 kind: functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/flow/flow-elk.spec.ts:flowOrder"
 implementation:
   - frontend/src/app/pages/admin/flow/flow-elk.ts
 scope:

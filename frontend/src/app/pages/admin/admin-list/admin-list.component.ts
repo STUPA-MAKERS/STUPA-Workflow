@@ -79,8 +79,8 @@ function parentOf(root: ActivatedRouteSnapshot): string | null {
  *   open page then scrolls inside a round frame 24px inside the sheet (`.adl__body`, spec
  *   000193), and a new page starts at its top.
  *
- * The form editor and the flow editor are not children of this page: they take the full
- * width (001482).
+ * The form editor and the flow editor are children of this page like every other admin page
+ * (spec 003130): they open in the pane and follow its width.
  *
  * The area comes from the route data (`frame: 'admin' | 'account'`, `FRAME_MODES`); Konto
  * has no search.

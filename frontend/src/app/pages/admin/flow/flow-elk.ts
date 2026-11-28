@@ -15,9 +15,14 @@
  *   never covers a box or another label.
  * - Proxies (the ends outside an open group) sit in the first layer (sources) or in the
  *   last layer (targets).
+ * - The flow runs from the initial state to the terminal states (spec 003134): the boxes go to
+ *   ELK in the order of their distance from the initial state along the transitions
+ *   (`flowOrder`), the initial state is in the first layer, and a terminal state without an
+ *   outgoing line is in the last layer. The keys of the states do not change the layout.
  *
- * The module is pure except for `layoutLevel`, which loads elkjs on first use, so the
- * library is in its own chunk and only the flow editor loads it.
+ * The module is pure except for `warmLayouter` and `layoutLevel`. They start a web worker that
+ * runs elkjs (`flow-elk.worker.ts`), so a layout never blocks the page and the library is in
+ * its own chunk that only the flow editor loads.
  */
 import { InjectionToken } from '@angular/core';
 import type { ElkExtendedEdge, ElkNode, ElkPoint } from 'elkjs/lib/elk-api';
@@ -40,6 +45,8 @@ export interface LayoutBox {
   readonly ports: readonly LayoutPort[];
   /** A proxy of an outside source goes first, of an outside target last. */
   readonly layer?: 'first' | 'last';
+  /** The initial state starts the flow, a terminal state ends it (spec 003134). */
+  readonly role?: 'start' | 'end';
 }
 
 /** One visible transition: from a port of a box to the west side of a box. */
@@ -162,8 +169,50 @@ const ROOT_OPTIONS: Record<string, string> = {
   'elk.padding': '[top=50,left=40,bottom=40,right=40]',
 };
 
+/**
+ * The boxes and links in the order of the flow: a breadth-first walk from the starts (the
+ * proxies of outside sources and the initial state) along the links, then the boxes that the
+ * walk does not reach in their own order, and the ends last. The links follow the order of their
+ * source and then of their target. ELK breaks cycles and ties by this order.
+ */
+export function flowOrder(input: LayoutInput): LayoutInput {
+  const ends = new Set(input.boxes.filter((b) => b.role === 'end' || b.layer === 'last').map((b) => b.id));
+  const starts = input.boxes.filter((b) => b.layer === 'first' || b.role === 'start').map((b) => b.id);
+  const next = new Map<string, readonly string[]>(
+    input.boxes.map((b) => [b.id, input.links.filter((l) => l.src === b.id).map((l) => l.dst)]),
+  );
+  const walk = (queue: readonly string[], seen: ReadonlySet<string>): readonly string[] => {
+    if (queue.length === 0) return [];
+    const [head, ...rest] = queue;
+    const fresh = (next.get(head) ?? []).filter((d) => !seen.has(d) && !rest.includes(d));
+    return [head, ...walk([...rest, ...fresh], new Set([...seen, ...fresh]))];
+  };
+  const reached = walk(starts, new Set(starts));
+  const seq = [...reached, ...input.boxes.map((b) => b.id).filter((id) => !reached.includes(id))];
+  const ordered = [...seq.filter((id) => !ends.has(id)), ...seq.filter((id) => ends.has(id))];
+  const rank = new Map(ordered.map((id, i) => [id, i]));
+  const at = (id: string): number => rank.get(id) ?? Number.MAX_SAFE_INTEGER;
+  return {
+    boxes: [...input.boxes].sort((a, b) => at(a.id) - at(b.id)),
+    links: [...input.links].sort((a, b) => at(a.src) - at(b.src) || at(a.dst) - at(b.dst) || a.index - b.index),
+  };
+}
+
+/** The layer of a box: proxies by their side, the initial state first, a terminal state last. */
+function layerOf(b: LayoutBox, links: readonly LayoutLink[]): 'FIRST' | 'LAST' | null {
+  if (b.layer) return b.layer === 'first' ? 'FIRST' : 'LAST';
+  if (b.role === 'start') return 'FIRST';
+  if (b.role === 'end' && !links.some((l) => l.src === b.id)) return 'LAST';
+  return null;
+}
+
 /** The ELK graph of a level. Exported for the tests. */
-export function elkGraph(input: LayoutInput, many: (n: number) => string): ElkNode {
+export function elkGraph(raw: LayoutInput, many: (n: number) => string): ElkNode {
+  const input = flowOrder(raw);
+  const layered = (b: LayoutBox): Record<string, string> => {
+    const layer = layerOf(b, input.links);
+    return layer ? { 'elk.layered.layering.layerConstraint': layer } : {};
+  };
   const children: ElkNode[] = input.boxes.map((b) => ({
     id: b.id,
     width: b.w,
@@ -172,7 +221,7 @@ export function elkGraph(input: LayoutInput, many: (n: number) => string): ElkNo
       'elk.portConstraints': 'FIXED_POS',
       'elk.portLabels.placement': 'OUTSIDE',
       'elk.nodeSize.constraints': 'PORT_LABELS',
-      ...(b.layer ? { 'elk.layered.layering.layerConstraint': b.layer === 'first' ? 'FIRST' : 'LAST' } : {}),
+      ...layered(b),
     },
     ports: [
       { id: `${b.id}::in`, x: -1, y: b.h / 2 - 1, width: 2, height: 2, layoutOptions: { 'elk.port.side': 'WEST' } },
@@ -241,13 +290,42 @@ export function readLayout(input: LayoutInput, out: ElkNode, many: (n: number) =
   return { pos, routes };
 }
 
-type ElkLayouter = { layout(graph: ElkNode): Promise<ElkNode> };
-let elk: Promise<ElkLayouter> | null = null;
+/** Lays out one ELK graph. */
+type ElkEngine = (graph: ElkNode) => Promise<ElkNode>;
 
-/** Lay out one level. Loads elkjs on the first call. */
+let engine: Promise<ElkEngine> | null = null;
+
+/** The engine on a web worker: `elk-api` talks to the ELK worker script (`flow-elk.worker.ts`). */
+async function workerEngine(): Promise<ElkEngine> {
+  const [api, host] = await Promise.all([import('elkjs/lib/elk-api.js'), import('./flow-elk-worker')]);
+  const elk = new api.default({ workerFactory: () => host.spawnElkWorker() });
+  return (graph) => elk.layout(graph);
+}
+
+/** The engine on the main thread, where no web worker exists (jsdom). */
+async function threadEngine(): Promise<ElkEngine> {
+  const m = await import('elkjs/lib/elk.bundled.js');
+  const elk = new m.default();
+  return (graph) => elk.layout(graph);
+}
+
+/**
+ * Start the layout engine: the web worker of `flow-elk.worker.ts` (spec 003135), or ELK on the
+ * main thread where no worker exists. The flow editor calls it before it reads the flow, so the
+ * two loads run at the same time (spec 003136). A second call does nothing.
+ */
+export function warmLayouter(): void {
+  engine ??=
+    typeof Worker === 'undefined'
+      ? threadEngine()
+      : workerEngine();
+}
+
+/** Lay out one level. Starts the engine on the first call. */
 export async function layoutLevel(input: LayoutInput, many: (n: number) => string): Promise<LevelLayout> {
-  elk ??= import('elkjs/lib/elk.bundled.js').then((m) => new m.default());
-  const out = await (await elk).layout(elkGraph(input, many));
+  warmLayouter();
+  const run = await (engine as Promise<ElkEngine>);
+  const out = await run(elkGraph(input, many));
   return readLayout(input, out, many);
 }
 

@@ -1,10 +1,12 @@
 ---
-id: "003120"
+id: "003130"
 title: The form editor and the flow editor open in the detail pane
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/admin-list/admin-pages.spec.ts:adminEditors"
 implementation:
   - frontend/src/app/app.routes.ts
 scope:

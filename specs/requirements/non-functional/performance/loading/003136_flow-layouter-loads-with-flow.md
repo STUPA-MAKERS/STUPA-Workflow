@@ -1,10 +1,12 @@
 ---
-id: "003126"
+id: "003136"
 title: The flow editor loads the layouter while it reads the flow
 kind: non-functional
 status: draft
 owner: frederikbeimgraben
 updated: 2026-11-28
+tests:
+  - "frontend/src/app/pages/admin/flow/flow-editor.component.spec.ts:FlowEditorComponent.warmLayouter"
 implementation:
   - frontend/src/app/pages/admin/flow/flow-editor.component.ts
 scope:
