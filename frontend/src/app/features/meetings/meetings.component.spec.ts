@@ -382,11 +382,11 @@ describe('MeetingsComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Sitzung schließen?' })).toBeNull(),
     );
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren' }));
     http.expectNone('/api/protocols/p-1');
     const ask = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
     expect(within(ask).queryByRole('switch')).toBeNull();
-    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren' }));
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
@@ -408,6 +408,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/protocol').flush({
       ...PROTOCOL,
       status: 'final',
+      isSent: true,
       pdfUrl: '/api/protocols/p-1/pdf',
       publicPdfUrl: '/api/protocols/p-1/pdf/public',
     });
@@ -430,6 +431,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/protocol').flush({
       ...PROTOCOL,
       status: 'final',
+      isSent: true,
       pdfUrl: '/api/protocols/p-1/pdf',
     });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -595,10 +597,10 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
 
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Finalisieren & senden' }),
+      await screen.findByRole('button', { name: 'Finalisieren' }),
     );
     const ask = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
-    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(within(ask).getByRole('button', { name: 'Finalisieren' }));
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
@@ -616,17 +618,17 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren' }));
     http.expectNone('/api/protocols/p-1/finalize');
     const dialog = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
     expect(dialog).toHaveTextContent('Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.');
     await userEvent.click(within(dialog).getAllByRole('button', { name: 'Abbrechen' })[0]);
     http.expectNone('/api/protocols/p-1');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren' }));
     const again = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
     await userEvent.click(within(again).getByRole('switch', { name: /Nicht veröffentlichen/ }));
-    await userEvent.click(within(again).getByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(within(again).getByRole('button', { name: 'Finalisieren' }));
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.body).toEqual({ publicWithheld: true });

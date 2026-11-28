@@ -2346,9 +2346,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         ...MOCK_PROTOCOL,
         status: 'final',
         pdfUrl: 'https://files.example/s/protokoll-12-06.pdf',
-        sentAt: '2026-06-12T19:30:00Z',
+        isSent: false,
       };
       return ok(MOCK_PROTOCOL);
+    }
+    if (/\/protocols\/[^/]+\/send$/.test(p)) {
+      MOCK_PROTOCOL = { ...MOCK_PROTOCOL, sentAt: '2026-06-12T19:30:00Z', isSent: true };
+      return ok({ recipients: 12, protocol: MOCK_PROTOCOL });
     }
     if (/\/protocols\/[^/]+\/votes$/.test(p)) return ok(MOCK_PROTOCOL);
     if (/\/votes\/[^/]+\/draw-lot$/.test(p)) {

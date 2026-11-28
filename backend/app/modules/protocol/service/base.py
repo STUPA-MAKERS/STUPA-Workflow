@@ -22,6 +22,7 @@ from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient
 from app.modules.protocol.approval import approval_fields
 from app.modules.protocol.schemas import ProtocolOut
+from app.modules.protocol.service.common import is_sent
 from app.modules.voting.models import Vote
 from app.settings import Settings, get_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -106,6 +107,7 @@ class ProtocolServiceBase:
             pdfUrl=self._pdf_path(protocol),
             publicPdfUrl=self._public_pdf_path(protocol),
             sentAt=protocol.sent_at,
+            isSent=is_sent(protocol),
             publicWithheld=bool(getattr(protocol, "public_withheld", False)),
             gremiumProtocolsPublic=bool(getattr(gremium, "protocols_public", False)),
             draftSentAt=getattr(protocol, "draft_sent_at", None),
@@ -193,8 +195,8 @@ class ProtocolServiceBase:
         """Return the addresses that get the mail of the final protocol.
 
         The list is empty without a mail queue and for a Gremium without a recipient.
-        The finalization then sets no `sent_at`, so the page does not say that the
-        protocol was sent.
+        The send then refuses (spec 003019), so the page never says that the protocol
+        was sent.
         """
         if self.mail_queue is None:
             return []

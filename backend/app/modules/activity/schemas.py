@@ -49,6 +49,7 @@ ChangeKind = Literal[
     "protocol.finalized",
     "protocol.approved",
     "protocol.reopened",
+    "protocol.sent",
 ]
 
 

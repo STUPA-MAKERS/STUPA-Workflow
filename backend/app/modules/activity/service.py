@@ -7,8 +7,8 @@ already keeps:
 - To-do cards: ``todo_event`` and ``todo_comment``.
 - Tickets: ``ticket_event`` and ``ticket_note``.
 - Meetings: the ``audit_entry`` rows ``meeting_update`` of the meeting and
-  ``protocol_finalize``, ``protocol_approval`` and ``protocol_reopen`` of its protocol,
-  because a meeting keeps no history of its own.
+  ``protocol_finalize``, ``protocol_send``, ``protocol_approval`` and ``protocol_reopen``
+  of its protocol, because a meeting keeps no history of its own.
 
 Each source limits its rows in SQL to the items of the person (spec 001271). The service
 then asks the read rule of the module for each item on the page, with the same scope as
@@ -135,6 +135,7 @@ PROTOCOL_CHANGES: Final[Mapping[str, ChangeKind]] = {
     AuditAction.PROTOCOL_FINALIZE.value: "protocol.finalized",
     AuditAction.PROTOCOL_APPROVAL.value: "protocol.approved",
     AuditAction.PROTOCOL_REOPEN.value: "protocol.reopened",
+    AuditAction.PROTOCOL_SEND.value: "protocol.sent",
 }
 
 

@@ -72,15 +72,15 @@ export function meetingStatus(status: MeetingStatus): StatusView {
 
 /**
  * The state of the protocol of a closed meeting, for the status of the meeting head
- * (spec 001304). A draft waits for the finalization, and a final protocol without a
- * mail waits for a send by hand (§ 000997), so both take `warn`.
+ * (spec 001304). A draft waits for the finalization, and a final protocol that did
+ * not go out since its last finalization waits for the send (§ 003019), so both take `warn`.
  */
 export function protocolStatus(
-  protocol: Pick<Protocol, 'status' | 'isFinal' | 'sentAt' | 'approvedAt'>,
+  protocol: Pick<Protocol, 'status' | 'isFinal' | 'isSent' | 'approvedAt'>,
 ): StatusView {
   if (protocol.isFinal) {
     if (protocol.approvedAt) return { kind: 'accent', key: 'meetings.protocolStatus.approved' };
-    return protocol.sentAt
+    return protocol.isSent
       ? { kind: 'accent', key: 'meetings.protocolStatus.final' }
       : { kind: 'warn', key: 'meetings.protocolStatus.finalUnsent' };
   }

@@ -102,6 +102,9 @@ class AuditAction(StrEnum):
         PROTOCOL_DRAFT_MAIL: The draft of a protocol sent to the members of the
             Gremium. ``data`` carries the meeting, the gremium and the number of
             recipients, never an address.
+        PROTOCOL_SEND: A final protocol sent to its mailing list (spec 003019).
+            ``data`` carries the meeting, the gremium and the number of recipients,
+            never an address.
         PROTOCOL_APPROVAL: A final protocol marked as approved, or the mark removed.
             ``data`` carries the meeting, the gremium and the approving meeting
             (``approvedMeetingId``, null for a removed mark).
@@ -243,6 +246,7 @@ class AuditAction(StrEnum):
     PROTOCOL_FINALIZE = "protocol_finalize"
     PROTOCOL_PUBLICATION = "protocol_publication"
     PROTOCOL_DRAFT_MAIL = "protocol_draft_mail"
+    PROTOCOL_SEND = "protocol_send"
     PROTOCOL_APPROVAL = "protocol_approval"
     PROTOCOL_REOPEN = "protocol_reopen"
     PROTOKOLLANT_HANDOVER = "protokollant_handover"

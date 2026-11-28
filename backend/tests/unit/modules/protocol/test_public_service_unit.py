@@ -24,7 +24,7 @@ from app.modules.protocol.service import (
 )
 from app.settings import get_settings
 from app.shared.errors import BadRequestError, ServiceUnavailableError
-from tests._support.protocol_fakes import FakeSession, FakeStorage, result
+from tests._support.protocol_fakes import FakeMailQueue, FakeSession, FakeStorage, result
 
 NOW = datetime(2026, 10, 7, 12, 0, tzinfo=UTC)
 PID = uuid4()
@@ -140,14 +140,15 @@ async def test_assemble_titles_application_items_by_their_application(
 async def test_finalize_public_gremium_renders_public_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A public gremium gets the public version, and the mail keeps the internal PDF.
+    """A public gremium gets the public version, and the send mails the internal PDF.
 
-    The mail keeps the internal PDF, because the protocol has no non-public TOP.
+    The send mails the internal PDF, because the protocol has no non-public TOP. The
+    finalization itself mails nothing (spec 003019).
     """
     proto = _protocol(status="rendering")
     gremium = SimpleNamespace(id=GID, protocols_public=True)
-    session = FakeSession(store={GID: gremium}, results=[result(proto)])
-    svc = _service(session, storage=FakeStorage())
+    session = FakeSession(store={GID: gremium}, results=[result(proto), result(proto)])
+    svc = _service(session, storage=FakeStorage(), mail_queue=FakeMailQueue())
     mailed: list[bytes | None] = []
 
     async def _has_non_public(_mid: UUID) -> bool:
@@ -173,8 +174,19 @@ async def test_finalize_public_gremium_renders_public_version(
     monkeypatch.setattr(svc, "_has_non_public", _has_non_public)
     monkeypatch.setattr(svc, "_build_document", _build)
     monkeypatch.setattr(svc, "_render_pdf", _render)
+
+    async def _recipients(_protocol: Protocol) -> list[str]:
+        return ["a@x.de"]
+
+    async def _record(_session: Any, **_kw: Any) -> None:
+        return None
+
     monkeypatch.setattr(svc, "_send", _send)
+    monkeypatch.setattr(svc, "_mail_recipients", _recipients)
+    monkeypatch.setattr("app.modules.protocol.service.finalize.audit_record", _record)
     out = await svc.finalize(PID, now=NOW)
+    assert mailed == []
+    await svc.send(PID, now=NOW, actor="lead")
 
     assert out.status == "final"
     assert out.gremium_protocols_public is True

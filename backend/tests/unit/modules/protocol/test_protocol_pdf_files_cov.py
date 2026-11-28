@@ -258,10 +258,7 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     assert len(typst.calls) == 2
     keys = {k for k, _len, _ct in storage.puts}
     assert keys == {protocol_storage_key(PID), protocol_public_storage_key(PID)}
-    assert len(mail.sent) == 1
-    assert [a.filename for a in mail.sent[0].attachments] == [
-        "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
-    ]
+    assert mail.sent == []
 
 
 async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
@@ -298,7 +295,7 @@ async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert proto.pdf_storage_key is None and proto.public_pdf_storage_key is None
-    assert len(mail.sent) == 1 and mail.sent[0].attachments == ()
+    assert mail.sent == []
 
 
 async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
@@ -607,27 +604,12 @@ async def test_finalize_storage_error_during_render_503() -> None:
 async def test_send_subject_and_body_include_gremium_and_date() -> None:
     """The subject and the body carry the Gremium, the meeting and the date.
 
-    The body names the PDF attachment ("liegt als PDF bei"). The fake session serves the
-    items (empty), the members and the mail list. The scalars are the guest count,
-    ``has_non_public`` (false), the member count and the gremium name for ``_send``.
-    ``_meeting`` sets protokollant_id to None, so no protokollant scalar is read.
+    The body names the PDF attachment ("liegt als PDF bei").
     """
-    proto = _protocol()
-    meeting = _meeting()
+    proto = _protocol(status="final")
     mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: meeting, GID: _gremium()},
-        results=[
-            result(proto), result(),
-            result(),
-            result("a@x.de"),
-            result(),
-        ],
-    )
-    session.scalar_results = [0, 0, 5, "StuPa"]
-    await _service(
-        session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
-    ).finalize(PID, now=NOW)
+    session = FakeSession(store={MID: _meeting(), GID: _gremium()})
+    await _service(session, mail_queue=mail)._send(proto, b"%PDF", ["a@x.de"], at=NOW)
     msg = mail.sent[0]
     assert "StuPa" in msg.subject
     assert "12.06.2026" in msg.subject
@@ -640,27 +622,13 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
 async def test_send_without_gremium_name_and_meeting() -> None:
     """No Gremium name and no meeting give a lean subject and body without a PDF hint.
 
-    The store holds no meeting, so the meeting is None, the body is the empty Markdown
-    fallback, and no protokollant scalar is read. The scalars are ``has_non_public``
-    (0), the member count and a gremium name of None. Without storage there is no PDF,
-    so the intro drops the hint and no file travels. The subject names neither Gremium
-    nor date.
+    Without a PDF the intro drops the hint and no file travels. The subject names
+    neither Gremium nor date.
     """
-    proto = _protocol()
+    proto = _protocol(status="final")
     mail = FakeMailQueue()
-    session = FakeSession(
-        store={GID: _gremium(name=None)},
-        results=[
-            result(proto),
-            result(),
-            result("a@x.de"),
-            result(),
-        ],
-    )
-    session.scalar_results = [0, 5, None]
-    await _service(
-        session, storage=None, typst=FakeTypst(), mail_queue=mail
-    ).finalize(PID, now=NOW)
+    session = FakeSession(store={GID: _gremium(name=None)})
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], at=NOW)
     msg = mail.sent[0]
     assert msg.subject == "Sitzungsprotokoll"
     assert "liegt als PDF bei" not in msg.text

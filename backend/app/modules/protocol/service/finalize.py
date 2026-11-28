@@ -1,4 +1,4 @@
-"""The finalization of a protocol: start, blackout check, render, store and mail."""
+"""The finalization of a protocol (start, blackout check, render, store) and its send."""
 
 from __future__ import annotations
 
@@ -27,11 +27,11 @@ from app.modules.protocol.webhook_fields import emit_protocol_finalized
 from app.modules.site_config.features import Feature, feature_on
 from app.settings import get_settings
 from app.shared.blackout import has_open_marker
-from app.shared.errors import ConflictError, ValidationProblem
+from app.shared.errors import ConflictError, ServiceUnavailableError, ValidationProblem
 
 
 class FinalizeOps(RenderOps):
-    """Finalize and send a protocol."""
+    """Finalize a protocol, and send a final one."""
 
     async def start_finalize(
         self, protocol_id: UUID, *, actor: str, public_withheld: bool | None = None
@@ -117,24 +117,26 @@ class FinalizeOps(RenderOps):
         )
 
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
-        """Render the Markdown into a PDF, store it and mail it to MAIL_LIST(gremium).
+        """Render the Markdown into a PDF, store it and set the protocol to `final`.
+
+        The finalization sends no mail (spec 003019): `send` mails the stored PDF.
 
         The method runs in the worker (`render_protocol`, status `rendering`). Without
         Redis it runs synchronously as a fallback, and the status is still `draft`. It
         sets the status to `final`. The method is idempotent. An already final
-        protocol comes back unchanged, with no second render and no double send.
+        protocol comes back unchanged, with no second render.
 
         The typst render runs BEFORE the commit. A permanent render error (4xx) or a
         short typst outage (5xx) rolls the session back, and the protocol stays draft.
-        The storage `put` and the mail enqueue run only AFTER a successful commit,
-        because a failed commit would otherwise leave an orphaned MinIO object and an
-        enqueued send job for a row that never became `final`.
+        The storage `put` runs only AFTER a successful commit, because a failed commit
+        would otherwise leave an orphaned MinIO object for a row that never became
+        `final`.
 
         The method renders two PDFs when the meeting has a non-public item or the
         gremium publishes its protocols: the full internal PDF and the redacted public
-        PDF. With a non-public item or a blackout mark (000691) only the public variant
-        is mailed, so neither a non-public item nor a marked name reaches the list. A
-        gremium that publishes its protocols always gets the public variant, for the
+        PDF. With a non-public item or a blackout mark (000691) the send mails only the
+        public variant, so neither a non-public item nor a marked name reaches the list.
+        A gremium that publishes its protocols always gets the public variant, for the
         public page.
         """
         protocol = await self._get(protocol_id)
@@ -144,19 +146,66 @@ class FinalizeOps(RenderOps):
         mail_public = await self._mails_public(protocol)
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         await attach_plans(self.session, self.storage, self.typst, protocol.meeting_id, now.date())
-        uploads, mail_pdf = (
+        uploads, _ = (
             await self._render_both(protocol, mail_public=mail_public)
             if mail_public or bool(getattr(gremium, "protocols_public", False))
             else await self._render_internal(protocol)
         )
-        recipients = await self._mail_recipients(protocol)
-        _mark_final(protocol, now, sent=bool(recipients))
+        _mark_final(protocol, now)
         await emit_protocol_finalized(self.session, protocol)
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
-        await self._send(protocol, mail_pdf, recipients, at=now)
         return await self._to_out(protocol)
+
+    async def send(
+        self, protocol_id: UUID, *, now: datetime, actor: str
+    ) -> tuple[int, ProtocolOut]:
+        """Mail the stored PDF of a final protocol to MAIL_LIST(gremium) (spec 003019).
+
+        The mail carries the public variant when the meeting has a non-public item or
+        a blackout mark (000691), else the internal one. The send sets `sent_at` and
+        writes `protocol_send` with the number of recipients. A repeat is allowed: its
+        idempotency key holds the time of the send. The caller commits.
+
+        Returns:
+            The number of addresses and the protocol after the send.
+
+        Raises:
+            ConflictError: The protocol is not final (`protocol_not_final`), or the
+                Gremium has no recipient (`protocol_no_recipients`).
+            ServiceUnavailableError: No mail queue is configured (503).
+        """
+        protocol = await self._get(protocol_id, for_update=True)
+        if protocol.status != "final":
+            raise ConflictError("Only a final protocol can be sent.", code="protocol_not_final")
+        if self.mail_queue is None:
+            raise ServiceUnavailableError("The protocol cannot be sent now.")
+        recipients = await self._mail_recipients(protocol)
+        if not recipients:
+            raise ConflictError(
+                "The Gremium has no recipient for the protocol.", code="protocol_no_recipients"
+            )
+        key = protocol.pdf_storage_key
+        if protocol.public_pdf_storage_key is not None and await self._mails_public(protocol):
+            key = protocol.public_pdf_storage_key
+        pdf = await self._stored_pdf(key) if key is not None else None
+        await self._send(protocol, pdf, recipients, at=now)
+        protocol.sent_at = now
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.PROTOCOL_SEND,
+            target_type="protocol",
+            target_id=str(protocol_id),
+            data={
+                "meetingId": str(protocol.meeting_id),
+                "gremiumId": str(protocol.gremium_id),
+                "recipients": len(recipients),
+            },
+        )
+        await self.session.flush()
+        return len(recipients), await self._to_out(protocol)
 
     async def _mails_public(self, protocol: Protocol) -> bool:
         """Return True if only the public PDF may go to the mailing list.
@@ -189,11 +238,10 @@ class FinalizeOps(RenderOps):
     ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
 
-        `to` holds the recipients that the finalization already read. Without it the
-        method reads them itself.
+        `to` holds the recipients that the send already read. Without it the method
+        reads them itself.
 
-        The key holds the time of the finalization, so a protocol that went back to
-        draft sends again on its next finalization (spec 000983).
+        The key holds the time of the send, so each send goes out (spec 003019).
 
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout.

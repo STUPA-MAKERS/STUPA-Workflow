@@ -5,7 +5,8 @@ import { ProtocolBarViewComponent } from '@stupa-makers/ui-kit/views/protocol';
 import { meeting, protocol } from '../../../../testing/meeting-fixtures';
 
 const closed = (over: Partial<Meeting> = {}) => meeting({ status: 'closed', ...over });
-const final = (over: Partial<Protocol> = {}) => protocol({ status: 'final', isFinal: true, isLocked: true, ...over });
+const final = (over: Partial<Protocol> = {}) =>
+  protocol({ status: 'final', isFinal: true, isLocked: true, isSent: true, ...over });
 
 /**
  * The kit view of the bar (S/framework/views/002273) on the meeting page (`hasSession`), or
@@ -14,6 +15,7 @@ const final = (over: Partial<Protocol> = {}) => protocol({ status: 'final', isFi
 async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact?: boolean } = {}) {
   const finalize = jest.fn();
   const sendDraft = jest.fn();
+  const send = jest.fn();
   const reopen = jest.fn();
   const approve = jest.fn();
   const publish = jest.fn();
@@ -21,7 +23,7 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
   const pdfOpen = jest.fn();
   const view = await render(ProtocolBarViewComponent, {
     inputs: { meeting: m, protocol: p, compact: opts.compact ?? false, hasSession: opts.session !== false },
-    on: { finalize, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen },
+    on: { finalize, send, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen },
   });
   const labels = () => view.fixture.componentInstance.menuItems().map((i) => i.label);
   const select = async (label: string) => {
@@ -37,41 +39,41 @@ async function setup(m: Meeting, p: Protocol, opts: { session?: boolean; compact
     pdfOpen.mock.calls
       .filter(([o]) => (o as { event: unknown }).event === null)
       .map(([o]) => (o as { file: { url: string } }).file.url);
-  return { ...view, finalize, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen, labels, select, opened };
+  return { ...view, finalize, send, sendDraft, reopen, approve, publish, approvalRequest, pdfOpen, labels, select, opened };
 }
 
 /** §ui-kit:001304: the protocol part of the meeting head. */
 describe('ProtocolBarViewComponent', () => {
   it('offers the finalize of a draft to a holder of the right as the one head action', async () => {
     const { finalize, labels } = await setup(closed(), protocol());
-    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren' }));
     expect(finalize).toHaveBeenCalled();
     expect(screen.getAllByRole('button')).toHaveLength(1);
-    expect(labels()).not.toContain('Finalisieren & senden');
+    expect(labels()).not.toContain('Finalisieren');
     expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('offers no finalize while the meeting is live', async () => {
     const { labels } = await setup(meeting(), protocol());
-    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
     expect(labels()).toEqual([]);
   });
 
   it('shows the finalize disabled with the missing right to a writer, and nothing to a reader', async () => {
     const { fixture } = await setup(closed({ canFinalize: false }), protocol());
-    const button = screen.getByRole('button', { name: 'Finalisieren & senden' });
+    const button = screen.getByRole('button', { name: 'Finalisieren' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', expect.stringContaining('Gremien-Recht „Protokoll finalisieren & senden“'));
     fixture.componentRef.setInput('meeting', closed({ canFinalize: false, canWrite: false }));
     fixture.detectChanges();
-    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
   });
 
   it('puts the head action first in the menu on a phone', async () => {
     const { fixture, finalize, labels, select } = await setup(closed(), protocol(), { compact: true });
-    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
-    expect(labels()[0]).toBe('Finalisieren & senden');
-    await select('Finalisieren & senden');
+    expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
+    expect(labels()[0]).toBe('Finalisieren');
+    await select('Finalisieren');
     expect(finalize).toHaveBeenCalled();
     fixture.componentRef.setInput('protocol', final({ pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
@@ -95,7 +97,7 @@ describe('ProtocolBarViewComponent', () => {
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('target', '_blank');
     expect(labels()).toContain('PDF öffentlich');
     expect(labels()).not.toContain('PDF intern');
-    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
     fixture.componentRef.setInput('protocol', final({ pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
@@ -109,6 +111,42 @@ describe('ProtocolBarViewComponent', () => {
     fixture.componentRef.setInput('meeting', meeting());
     fixture.detectChanges();
     expect(labels()).toEqual([]);
+  });
+
+  /** STUPA-Workflow:003019 (sendFinal): finalize and send are two actions. */
+  describe('send of a final protocol', () => {
+    it('offers "Senden" in the head until the protocol went out, then the PDF', async () => {
+      const { fixture, send, labels } = await setup(closed(), final({ pdfUrl: '/p.pdf', isSent: false }));
+      expect(screen.queryByRole('link', { name: 'PDF' })).toBeNull();
+      expect(labels()).toContain('PDF');
+      expect(labels()).not.toContain('Protokoll senden');
+      await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+      const confirm = screen.getByRole('dialog', { name: 'Protokoll senden?' });
+      expect(confirm).toHaveTextContent('Verteiler erhalten das finale Protokoll');
+      await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
+      expect(send).toHaveBeenCalledTimes(1);
+      fixture.componentRef.setInput('protocol', final({ pdfUrl: '/p.pdf', sentAt: '2026-10-16T08:00:00Z' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
+      expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
+    });
+
+    it('sends again from the menu and names the date of the last send', async () => {
+      const { send, select } = await setup(closed(), final({ pdfUrl: '/p.pdf', sentAt: '2026-10-16T08:00:00Z' }));
+      await select('Protokoll senden');
+      const confirm = screen.getByRole('dialog', { name: 'Protokoll senden?' });
+      expect(confirm).toHaveTextContent('16. Oktober 2026');
+      await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts "Protokoll senden" first on a phone, and offers no send without the right', async () => {
+      const { fixture, labels } = await setup(closed(), final({ pdfUrl: '/p.pdf', isSent: false }), { compact: true });
+      expect(labels().slice(0, 2)).toEqual(['Protokoll senden', 'PDF']);
+      fixture.componentRef.setInput('meeting', closed({ canFinalize: false }));
+      fixture.detectChanges();
+      expect(labels()).not.toContain('Protokoll senden');
+    });
   });
 
   describe('draft mail and approval', () => {

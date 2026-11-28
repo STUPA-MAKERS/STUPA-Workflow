@@ -115,6 +115,7 @@ import type {
   Protocol,
   PublicSiteConfig,
   ProtocolOutWire,
+  ProtocolSendOutWire,
   ProtocolVotesBody,
   SignedUrl,
   SignedUrlOutWire,
@@ -1540,7 +1541,18 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST.
+  /**
+   * POST /protocols/{id}/send — mail the stored PDF of a final protocol to the members and
+   * the mailing list. Needs the right to finalize; 409 `protocol_not_final` or
+   * `protocol_no_recipients` (§ 003019).
+   */
+  sendProtocol(protocolId: Uuid): Observable<{ recipients: number; protocol: Protocol }> {
+    return this.http
+      .post<ProtocolSendOutWire>(`${this.base}/protocols/${protocolId}/send`, {})
+      .pipe(map(({ recipients, protocol }) => ({ recipients, protocol: mapProtocol(protocol) })));
+  }
+
+  /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO, without a mail (§ 003019).
    *  `publicWithheld` keeps the protocol of a public gremium off the public page. */
   finalizeProtocol(
     protocolId: Uuid,

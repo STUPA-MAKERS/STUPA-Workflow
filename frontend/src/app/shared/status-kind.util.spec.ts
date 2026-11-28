@@ -164,12 +164,12 @@ describe('status kinds', () => {
 
   /** §ui-kit:001304 (protocolStatus) */
   describe('protocolStatus', () => {
-    const p = { status: 'draft' as const, isFinal: false, sentAt: null, approvedAt: null };
+    const p = { status: 'draft' as const, isFinal: false, isSent: false, approvedAt: null };
     it.each([
       [p, 'warn', 'Protokoll-Entwurf'],
       [{ ...p, status: 'rendering' as const }, 'neutral', 'Protokoll wird erstellt'],
-      [{ ...p, status: 'final' as const, isFinal: true, sentAt: '2026-10-16T08:00:00Z' }, 'accent', 'Protokoll final'],
-      [{ ...p, status: 'final' as const, isFinal: true }, 'warn', 'Protokoll final, nicht versandt (keine Empfänger)'],
+      [{ ...p, status: 'final' as const, isFinal: true, isSent: true }, 'accent', 'Protokoll final'],
+      [{ ...p, status: 'final' as const, isFinal: true }, 'warn', 'Protokoll final, nicht versandt'],
       [{ ...p, status: 'final' as const, isFinal: true, approvedAt: '2026-10-29T18:00:00Z' }, 'accent', 'Protokoll genehmigt'],
     ])('%o → %s %s', (protocol, kind, label) => {
       const view = protocolStatus(protocol);

@@ -45,7 +45,8 @@ export type ActivityChange =
   | 'meeting.updated'
   | 'protocol.finalized'
   | 'protocol.approved'
-  | 'protocol.reopened';
+  | 'protocol.reopened'
+  | 'protocol.sent';
 
 export interface ActivityActor {
   readonly kind: ActivityActorKind;

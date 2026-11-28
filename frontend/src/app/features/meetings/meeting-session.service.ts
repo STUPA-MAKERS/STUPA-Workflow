@@ -57,6 +57,7 @@ const PROTOCOL_REFUSALS: Readonly<Record<string, TranslationKey>> = {
   protocol_not_final: 'meetings.toast.protocolNotFinal',
   invalid_approval_meeting: 'meetings.toast.approvalMeetingInvalid',
   protocol_approved: 'meetings.toast.protocolApprovedLocked',
+  protocol_no_recipients: 'meetings.toast.protocolNoRecipient',
 };
 
 @Injectable()
@@ -623,6 +624,33 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.approvalSaving.set(false);
+        this.protocolRefused(err);
+      },
+    });
+  }
+
+  /** The send of the final protocol is on its way to the server. */
+  readonly finalSending = signal(false);
+
+  /** "Protokoll senden": the PDF of the final protocol goes to the mailing list (§ 003019). */
+  sendProtocol(): void {
+    const proto = this.protocol();
+    if (!proto || this.finalSending()) return;
+    this.finalSending.set(true);
+    this.api.sendProtocol(proto.id).subscribe({
+      next: ({ recipients, protocol }) => {
+        this.finalSending.set(false);
+        this.protocol.set(protocol);
+        this.toast.show(
+          this.i18n.translate(
+            recipients === 1 ? 'meetings.toast.protocolSent1' : 'meetings.toast.protocolSent',
+            { n: recipients },
+          ),
+          'success',
+        );
+      },
+      error: (err: unknown) => {
+        this.finalSending.set(false);
         this.protocolRefused(err);
       },
     });

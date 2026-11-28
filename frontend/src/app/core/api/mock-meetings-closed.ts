@@ -148,6 +148,7 @@ function closedMeeting(
     pdfUrl: final ? 'https://files.example/s/protokoll-intern.pdf' : null,
     publicPdfUrl: final ? 'https://files.example/s/protokoll-oeffentlich.pdf' : null,
     sentAt: final ? at(days + 1, 9, 30) : null,
+    isSent: final,
   };
   return { meeting, agenda, protocol };
 }
@@ -176,7 +177,7 @@ export function closedMeetingGet(id: string, path: string): unknown {
 
 /**
  * A write to a closed demo meeting: the text of an item (while the protocol is a
- * draft), the protocol PATCH and the finalize. Anything else gives `undefined`.
+ * draft), the protocol PATCH, the finalize (without a mail) and the send. Anything else gives `undefined`.
  */
 export function closedMeetingWrite(id: string, method: string, path: string, body: unknown): unknown {
   const c = CLOSED[id];
@@ -198,9 +199,13 @@ export function closedMeetingWrite(id: string, method: string, path: string, bod
       publicPdfUrl: c.agenda.some((a) => a.nonPublic)
         ? 'https://files.example/s/protokoll-oeffentlich.pdf'
         : null,
-      sentAt: new Date().toISOString(),
+      isSent: false,
     };
     return { ...putClosed(id, { ...c, protocol }).protocol };
+  }
+  if (method === 'POST' && path.endsWith('/send')) {
+    const protocol: ProtocolOutWire = { ...c.protocol, sentAt: new Date().toISOString(), isSent: true };
+    return { recipients: 12, protocol: { ...putClosed(id, { ...c, protocol }).protocol } };
   }
   return undefined;
 }
