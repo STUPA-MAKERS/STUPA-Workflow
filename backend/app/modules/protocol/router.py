@@ -46,6 +46,7 @@ from app.modules.protocol.schemas import (
     ProtocolFinalizeBody,
     ProtocolOut,
     ProtocolPatch,
+    ProtocolSendOut,
     ProtocolVotesBody,
 )
 from app.modules.protocol.service import ProtocolService
@@ -269,7 +270,8 @@ async def finalize_protocol(
     protocol from the public protocols page.
 
     The call does not block, because the typst render runs in the arq worker.
-    The worker sets `final` and sends the mail. A permanent failure falls back
+    The worker sets `final`. It sends no mail: `POST /protocols/{id}/send` does
+    (spec 003019). A permanent failure falls back
     to `draft`, and a new call starts again. Without Redis the request renders
     synchronously as a fallback, so a protocol never stays stuck in `rendering`.
 
@@ -297,6 +299,28 @@ async def finalize_protocol(
             out.meeting_id, principal
         )
     return out
+
+
+@router.post(
+    "/protocols/{protocol_id}/send",
+    response_model=ProtocolSendOut,
+    responses=_errors(401, 403, 404, 409, 503),
+)
+async def send_protocol(
+    protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
+) -> ProtocolSendOut:
+    """Mail the stored PDF of a final protocol to its mailing list (spec 003019).
+
+    The caller needs ``protocol.finalize`` in the Gremium. A protocol that is not final
+    answers 409 ``protocol_not_final``, a Gremium without a recipient 409
+    ``protocol_no_recipients``, and a platform without a mail queue 503. A repeat sends
+    again. The send sets ``sentAt`` and writes ``protocol_send`` with the number of
+    recipients.
+    """
+    await service.authorize_finalize(protocol_id, principal)
+    sent, out = await service.send(protocol_id, now=datetime.now(UTC), actor=principal.sub)
+    await service.session.commit()
+    return ProtocolSendOut(recipients=sent, protocol=out)
 
 
 @router.post(

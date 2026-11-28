@@ -75,15 +75,26 @@ class HeaderMeta:
     datalines: Sequence[str] = field(default_factory=list)
 
 
-def _mark_final(protocol: Protocol, now: datetime, *, sent: bool) -> None:
-    """Set a protocol to final at `now`, with the mark of the mail only when one goes out.
+def _mark_final(protocol: Protocol, now: datetime) -> None:
+    """Set a protocol to final at `now`. The finalization sends no mail (spec 003019).
 
-    A protocol that went back to draft keeps the mark of its first mail, because that
-    mail is out and the draft must stay (spec 000983).
+    `sent_at` keeps the time of an earlier send, because that mail is out and a draft
+    that went out must stay (spec 000983). The protocol counts as sent only when
+    `sent_at` is at or after `finalized_at` (`is_sent`).
     """
     protocol.status = "final"
     protocol.finalized_at = now
-    protocol.sent_at = now if sent else protocol.sent_at
+
+
+def _mark_sent(protocol: Protocol, now: datetime) -> None:
+    """Mark the final protocol as sent at `now`, after its mail went to the queue (003019)."""
+    protocol.sent_at = now
+
+
+def is_sent(protocol: Protocol) -> bool:
+    """Return True when the final protocol went out after its last finalization (003019)."""
+    sent, final = protocol.sent_at, protocol.finalized_at
+    return protocol.status == "final" and sent is not None and (final is None or sent >= final)
 
 
 def _upload(key: str, pdf: bytes | None) -> tuple[tuple[str, bytes], ...]:

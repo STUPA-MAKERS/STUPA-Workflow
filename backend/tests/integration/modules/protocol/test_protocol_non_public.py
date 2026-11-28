@@ -283,9 +283,9 @@ async def test_has_non_public_false_without_secret_top(session: AsyncSession) ->
 
 
 async def test_finalize_dual_render(session: AsyncSession) -> None:
-    """The finalization mails only the redacted public PDF.
+    """The send mails only the redacted public PDF; the finalization mails nothing.
 
-    The extra recipient makes the service enqueue the mail. The non-public title, the
+    The extra recipient makes the send enqueue the mail (spec 003019). The non-public title, the
     attendance names and the minute taker stay in the internal PDF and are absent from
     the public PDF. Exactly one mail goes out, and its attachment is the public variant,
     never the internal PDF.
@@ -337,6 +337,8 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     assert _ABSENT_NAME.encode() not in public_bytes
     assert _PROTOKOLLANT_NAME.encode() not in public_bytes
 
+    assert mail_queue.sent == []
+    await svc.send(protocol.id, now=datetime.now(UTC), actor="test")
     assert len(mail_queue.sent) == 1
     msg = mail_queue.sent[0]
     assert len(msg.attachments) == 1

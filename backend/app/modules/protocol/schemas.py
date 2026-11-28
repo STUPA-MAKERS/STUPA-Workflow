@@ -67,6 +67,8 @@ class ProtocolOut(FrozenCamelModel, frozen=True):
     #: Redacted public variant, set only when an agenda item is non-public.
     public_pdf_url: str | None = Field(default=None, alias="publicPdfUrl")
     sent_at: datetime | None = Field(default=None, alias="sentAt")
+    #: The final protocol went out after its last finalization (spec 003019).
+    is_sent: bool = Field(default=False, alias="isSent")
     #: The protocol is held back from the public protocols page.
     public_withheld: bool = Field(default=False, alias="publicWithheld")
     #: The gremium publishes its final protocols. The editor then shows the notice
@@ -95,6 +97,13 @@ class ProtocolDraftMailOut(FrozenCamelModel, frozen=True):
     recipients: int
     #: The stored time of the last send; null when no address got the draft yet.
     draft_sent_at: datetime | None = Field(default=None, alias="draftSentAt")
+
+
+class ProtocolSendOut(FrozenCamelModel, frozen=True):
+    """`POST /protocols/{id}/send`: the number of addresses and the protocol after the send."""
+
+    recipients: int
+    protocol: ProtocolOut
 
 
 class KnownNameOut(FrozenCamelModel, frozen=True):

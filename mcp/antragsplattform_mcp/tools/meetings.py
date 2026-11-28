@@ -607,12 +607,12 @@ async def finalize_protocol(protocol_id: str, public_withheld: bool | None = Non
     Only after the meeting is CLOSED (409 `meeting_not_closed` before), and only
     once: a protocol that is rendering or final gives 409 `protocol_not_draft`.
 
-    The call is ASYNC. It returns `status: "rendering"` while a worker renders the PDF
-    and mails it to the Gremium. Re-fetch with `get_or_create_protocol(meeting_id)`
-    until `status` is `final`. A fall back to `draft` means the render failed. Fix the
-    content and finalize again. Requires the write access to the meeting AND the
-    gremium permission protocol.finalize in its gremium (or admin). The start goes
-    into the audit log (`protocol_finalize`).
+    The call is ASYNC. It returns `status: "rendering"` while a worker renders the PDF.
+    It sends NO mail: call `send_protocol` once the protocol is final. Re-fetch with
+    `get_or_create_protocol(meeting_id)` until `status` is `final`. A fall back to
+    `draft` means the render failed. Fix the content and finalize again. Requires the
+    write access to the meeting AND the gremium permission protocol.finalize in its
+    gremium (or admin). The start goes into the audit log (`protocol_finalize`).
 
     In a Gremium that publishes its protocols, the final protocol appears on the
     public protocols page (public TOPs only, attendance as counts). Pass
@@ -640,6 +640,19 @@ async def send_protocol_draft(protocol_id: str) -> dict:
 
 
 @group.tool
+async def send_protocol(protocol_id: str) -> dict:
+    """Mail the PDF of a final protocol to the members and the mailing list of the Gremium.
+
+    Requires the gremium permission protocol.finalize. A protocol that is not final gives
+    409 `protocol_not_final`, a Gremium without a recipient 409 `protocol_no_recipients`.
+    A repeat sends the mail again, so ask the user before you call it, and check
+    `isSent`/`sentAt` of the protocol first. Returns `recipients` (the number of
+    addresses) and the `protocol`. The send goes into the audit log (`protocol_send`).
+    """
+    return await api().post(f"/protocols/{protocol_id}/send")
+
+
+@group.tool
 async def set_protocol_approval(protocol_id: str, approved_in_meeting_id: str | None) -> dict:
     """Mark a final protocol as approved, or remove the mark.
 
@@ -662,8 +675,8 @@ async def reopen_protocol(protocol_id: str) -> dict:
     Requires the gremium permission protocol.finalize. A protocol that is not final
     gives 409 `protocol_not_final`, and one with an approval mark 409
     `protocol_approved`: remove the mark first. The public pages no longer show the
-    protocol until it is final again, and the next finalize sends the PDF to the mailing
-    list again, so ask the user before you call this. The change goes into the audit log
+    protocol until it is final again. The next finalize sends nothing; `send_protocol`
+    mails the corrected PDF. Ask the user before you call this. The change goes into the audit log
     (`protocol_reopen`).
     """
     return await api().post(f"/protocols/{protocol_id}/reopen")

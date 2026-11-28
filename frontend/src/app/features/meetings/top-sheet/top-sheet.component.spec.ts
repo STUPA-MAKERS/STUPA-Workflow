@@ -439,7 +439,7 @@ describe('TopSheetComponent', () => {
     expect(container.querySelector('.ts__foot')).toBeNull();
     expect(container.querySelector('app-protocol-bar')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
   });
 
   /** The protocol area has no foot: the save state sits in the bar. */

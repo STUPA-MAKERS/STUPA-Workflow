@@ -157,7 +157,7 @@ async def test_public_free_text_blacks_out_the_name(session: AsyncSession) -> No
 
 
 async def test_finalize_with_a_mark_mails_the_public_pdf(session: AsyncSession) -> None:
-    """§000691: a mark renders both PDFs and mails only the public one."""
+    """§000691: a mark renders both PDFs, and the send mails only the public one."""
     protocol = await _seed(session)
     storage = _FakeStorage()
     mail_queue = _FakeMailQueue()
@@ -175,6 +175,8 @@ async def test_finalize_with_a_mark_mails_the_public_pdf(session: AsyncSession) 
     assert refreshed.pdf_storage_key is not None
     assert _NAME.encode() in storage.blobs[refreshed.pdf_storage_key]
     assert _NAME.encode() not in storage.blobs[refreshed.public_pdf_storage_key]
+    assert mail_queue.sent == []
+    await svc.send(protocol.id, now=datetime.now(UTC), actor="test")
     assert len(mail_queue.sent) == 1
     attachments = mail_queue.sent[0].attachments or []
     assert attachments

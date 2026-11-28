@@ -171,6 +171,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'protocol_finalize',
   'protocol_publication',
   'protocol_draft_mail',
+  'protocol_send',
   'protocol_approval',
   'protocol_reopen',
   'protokollant_handover',

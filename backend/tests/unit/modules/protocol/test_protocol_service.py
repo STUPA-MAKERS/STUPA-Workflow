@@ -276,15 +276,8 @@ async def test_embed_votes_on_final_conflict() -> None:
         await _service(session).embed_votes(PID, [VID])
 
 
-async def test_finalize_renders_stores_and_mails() -> None:
-    """The finalization renders, stores and mails the protocol.
-
-    The fake session serves the empty agenda, the members (the base of the union) and an
-    empty mail list. The PDF travels as an attachment, because a link to the API needs a
-    login and a meeting right, which the recipients do not have. The mail links the
-    meeting page, which holds the protocol, and names no public version for a Gremium
-    that does not publish its protocols.
-    """
+async def test_finalize_renders_and_stores_without_a_mail() -> None:
+    """§F/meetings/protocols/003019: the finalization renders and stores, and sends nothing."""
     proto = _protocol()
     storage = FakeStorage()
     typst = FakeTypst(pdf=b"%PDF-1.4 ok")
@@ -298,42 +291,23 @@ async def test_finalize_renders_stores_and_mails() -> None:
     )
 
     assert out.status == "final"
-    assert out.sent_at == NOW
+    assert out.sent_at is None and out.is_sent is False
     assert proto.finalized_at == NOW
     assert proto.pdf_storage_key == protocol_storage_key(PID)
     assert storage.puts and storage.puts[0][2] == "application/pdf"
     assert typst.calls and typst.calls[0][1] == "protocol-stupa"
     assert out.pdf_url is not None
-    assert len(mail.sent) == 1
-    assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    assert [a.filename for a in mail.sent[0].attachments] == [
-        "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
-    ]
-    assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
-    assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
-    assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
-    assert "/protocols/" not in mail.sent[0].text
-
-
-async def test_finalize_without_a_recipient_marks_no_send() -> None:
-    """A Gremium without a recipient: the protocol is final, and it does not count as sent.
-
-    The fake session serves the empty agenda and finds no member and no extra address.
-    """
-    proto = _protocol()
-    mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result(proto), result(), result(), result(), result()],
-    )
-    out = await _service(
-        session, storage=FakeStorage(), typst=FakeTypst(pdf=b"%PDF-1.4 ok"), mail_queue=mail
-    ).finalize(PID, now=NOW)
-
-    assert out.status == "final"
-    assert proto.finalized_at == NOW
-    assert out.sent_at is None
     assert mail.sent == []
+
+
+async def test_send_without_a_recipient_marks_no_send(_no_audit: list[dict[str, Any]]) -> None:
+    """A Gremium without a recipient: the send answers 409, and the protocol is not sent."""
+    proto = _protocol(status="final", finalized_at=NOW)
+    with pytest.raises(ConflictError) as err:
+        await _send(proto, ())
+    assert err.value.code == "protocol_no_recipients"
+    assert proto.sent_at is None
+    assert _no_audit == []
 
 
 async def test_protocol_mail_links_the_public_version_when_public() -> None:
@@ -348,9 +322,8 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: gremium},
-        results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None, at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
 
     assert len(mail.sent) == 1
     text = mail.sent[0].text
@@ -358,17 +331,16 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
     assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in text
 
 
-async def test_a_second_finalization_sends_again() -> None:
-    """§F/meetings/protocols/000983: the key of the mail holds the time of the finalization."""
+async def test_a_second_send_goes_out_again() -> None:
+    """§F/meetings/protocols/003019: the key of the mail holds the time of the send."""
     proto = _protocol(status="final")
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result("a@x.de"), result(), result("a@x.de"), result()],
     )
     svc = _service(session, mail_queue=mail)
-    await svc._send(proto, None, at=NOW)
-    await svc._send(proto, None, at=NOW + timedelta(days=1))
+    await svc._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
+    await svc._send(proto, None, ["a@x.de"], queue=mail, at=NOW + timedelta(days=1))
     first, second = (m.idempotency_key for m in mail.sent)
     assert first != second
 
@@ -381,9 +353,8 @@ async def test_protocol_mail_hides_a_withheld_public_version() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: gremium},
-        results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None, at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
 
     assert "/protocols/" not in mail.sent[0].text
 
@@ -406,14 +377,10 @@ async def test_the_design_never_decides_the_document_shape() -> None:
     assert typst.calls[0][1] == "protocol-stupa"
 
 
-async def test_finalize_uploads_and_mails_only_after_commit() -> None:
-    """The storage put and the mail enqueue run after the commit.
+async def test_finalize_uploads_only_after_commit() -> None:
+    """The storage put runs after the commit, and the finalization queues no mail.
 
-    The fakes count the commit and record the put and the enqueue only after it. The
-    test checks the committed end state. The PDF is in the storage, the mail is queued
-    and the commit ran.
-
-    Exactly one put (single render) and one mail run, both on the post-commit path.
+    Exactly one put (single render) runs, on the post-commit path.
     """
     proto = _protocol()
     storage = FakeStorage()
@@ -426,7 +393,7 @@ async def test_finalize_uploads_and_mails_only_after_commit() -> None:
     await _service(session, storage=storage, typst=typst, mail_queue=mail).finalize(PID, now=NOW)
     assert session.committed == 1
     assert [p[0] for p in storage.puts] == [protocol_storage_key(PID)]
-    assert len(mail.sent) == 1
+    assert mail.sent == []
 
 
 async def test_finalize_storage_error_after_commit_raises_503() -> None:
@@ -454,20 +421,17 @@ async def test_finalize_storage_error_after_commit_raises_503() -> None:
     assert proto.status == "final"
 
 
-async def test_finalize_without_storage_degrades_but_mails() -> None:
-    """Without storage the render is skipped, and the mail goes out without a PDF."""
+async def test_finalize_without_storage_degrades(_no_audit: list[dict[str, Any]]) -> None:
+    """Without storage the render is skipped, and the send mails without a PDF."""
     proto = _protocol()
     typst = FakeTypst()
-    mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium()},
-        results=[result(proto), result(), result("a@x.de"), result()],
-    )
-    out = await _service(session, storage=None, typst=typst, mail_queue=mail).finalize(PID, now=NOW)
+    session = FakeSession(store={MID: _meeting(), GID: _gremium()}, results=[result(proto)])
+    out = await _service(session, storage=None, typst=typst).finalize(PID, now=NOW)
     assert out.status == "final"
     assert out.pdf_url is None
     assert proto.pdf_storage_key is None
     assert typst.calls == []
+    _count, _out, mail = await _send(proto, ("a@x.de",))
     assert len(mail.sent) == 1 and mail.sent[0].attachments == ()
 
 
@@ -511,28 +475,14 @@ async def test_finalize_no_recipients_skips_mail() -> None:
     assert mail.sent == []
 
 
-async def test_finalize_members_receive_without_extra_recipients() -> None:
+async def test_send_members_receive_without_extra_recipients(
+    _no_audit: list[dict[str, Any]],
+) -> None:
     """A Gremium without extra recipients still sends to the Gremium members.
 
     The members are always the base of the recipient union.
-
-    The fake session serves ``_get``, no agenda items and two members.
     """
-    proto = _protocol()
-    mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium()},
-        results=[
-            result(proto),
-            result(),
-            result(),
-            result("a@x.de", "b@x.de"),
-        ],
-    )
-    out = await _service(
-        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
-    ).finalize(PID, now=NOW)
-    assert out.status == "final"
+    _count, _out, mail = await _send(_protocol(status="final"), ("a@x.de", "b@x.de"))
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
 
@@ -547,16 +497,9 @@ async def test_finalize_without_mail_queue_skips_send() -> None:
     assert out.pdf_url is not None
 
 
-async def test_finalize_deduplicates_the_extra_recipients() -> None:
-    proto = _protocol()
-    mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium(recipients=["a@x", "b@x", "b@x", "c@x"])},
-        results=[result(proto), result(), result()],
-    )
-    await _service(session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail).finalize(
-        PID, now=NOW
-    )
+async def test_send_deduplicates_the_extra_recipients(_no_audit: list[dict[str, Any]]) -> None:
+    gremium = _gremium(recipients=["a@x", "b@x", "b@x", "c@x"])
+    _count, _out, mail = await _send(_protocol(status="final"), (), gremium=gremium)
     assert mail.sent[0].to == ("a@x", "b@x", "c@x")
 
 
@@ -692,28 +635,16 @@ async def test_finalize_from_rendering_completes() -> None:
     assert out.status == "final"
 
 
-async def test_finalize_recipients_union_members_plus_maillist() -> None:
+async def test_send_recipients_union_members_plus_maillist(
+    _no_audit: list[dict[str, Any]],
+) -> None:
     """The extra recipients of the Gremium extend the member list.
 
     The result is a deduplicated union. The extra addresses never replace the members.
-
-    The fake session serves ``_get``, no agenda items and the members. The extra
-    recipients repeat a member address.
+    The extra recipients repeat a member address.
     """
-    proto = _protocol()
-    mail = FakeMailQueue()
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium(recipients=["extra@y.de", "member@x.de"])},
-        results=[
-            result(proto),
-            result(),
-            result(),
-            result("member@x.de"),
-        ],
-    )
-    await _service(session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail).finalize(
-        PID, now=NOW
-    )
+    gremium = _gremium(recipients=["extra@y.de", "member@x.de"])
+    _count, _out, mail = await _send(_protocol(status="final"), ("member@x.de",), gremium=gremium)
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("member@x.de", "extra@y.de")
 
@@ -764,3 +695,115 @@ async def test_delete_protocol_unknown_404() -> None:
     session = FakeSession(results=[result()])
     with pytest.raises(NotFoundError):
         await _service(session).delete_protocol(PID, actor="p1")
+
+
+async def _send(
+    proto: Protocol,
+    members: tuple[str, ...],
+    *,
+    storage: FakeStorage | None = None,
+    mail: FakeMailQueue | None = None,
+    gremium: SimpleNamespace | None = None,
+) -> tuple[int, Any, FakeMailQueue]:
+    """Send a final protocol through a fake session: `_get`, the members, the preferences."""
+    queue = mail if mail is not None else FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: gremium or _gremium("stupa")},
+        results=[result(proto), result(*members), result()],
+    )
+    count, out = await _service(session, storage=storage, mail_queue=queue).send(
+        PID, now=NOW + timedelta(hours=1), actor="lead"
+    )
+    return count, out, queue
+
+
+@pytest.fixture
+def _no_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record the audit entries of the send instead of writing them."""
+    calls: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    monkeypatch.setattr("app.modules.protocol.service.finalize.audit_record", _record)
+    return calls
+
+
+async def test_send_mails_the_stored_pdf(_no_audit: list[dict[str, Any]]) -> None:
+    """§F/meetings/protocols/003019: the send mails the stored PDF and marks the protocol sent.
+
+    The PDF travels as an attachment, because a link to the API needs a login and a
+    meeting right, which the recipients do not have. The mail links the meeting page,
+    which holds the protocol, and names no public version for a Gremium that does not
+    publish its protocols.
+    """
+    key = protocol_storage_key(PID)
+    storage = FakeStorage()
+    storage.blobs[key] = b"%PDF-1.4 ok"
+    proto = _protocol(status="final", finalized_at=NOW, pdf_storage_key=key)
+    count, out, mail = await _send(proto, ("a@x.de", "b@x.de"), storage=storage)
+
+    assert count == 2
+    assert out.is_sent is True and proto.sent_at == NOW + timedelta(hours=1)
+    assert len(mail.sent) == 1
+    assert mail.sent[0].to == ("a@x.de", "b@x.de")
+    assert [a.filename for a in mail.sent[0].attachments] == [
+        "Protokoll_StuPa-Sitzung_2026-06-12.pdf"
+    ]
+    assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
+    assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
+    assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
+    assert "/protocols/" not in mail.sent[0].text
+    [entry] = _no_audit
+    assert entry["action"].value == "protocol_send"
+    assert entry["data"] == {"meetingId": str(MID), "gremiumId": str(GID), "recipients": 2}
+
+
+async def test_send_of_a_draft_is_refused(_no_audit: list[dict[str, Any]]) -> None:
+    """Only a final protocol goes out (409 ``protocol_not_final``)."""
+    with pytest.raises(ConflictError) as err:
+        await _send(_protocol(), ("a@x.de",))
+    assert err.value.code == "protocol_not_final"
+    assert _no_audit == []
+
+
+async def test_send_without_mail_queue_is_unavailable() -> None:
+    """Without a mail queue nothing can go out (503)."""
+    session = FakeSession(results=[result(_protocol(status="final"))])
+    with pytest.raises(ServiceUnavailableError):
+        await _service(session, mail_queue=None).send(PID, now=NOW, actor="lead")
+
+
+async def test_send_mails_the_public_pdf_of_a_non_public_meeting(
+    _no_audit: list[dict[str, Any]],
+) -> None:
+    """A non-public item or a blackout mark sends the public variant (000691)."""
+    from app.modules.protocol.service import protocol_public_storage_key
+
+    storage = FakeStorage()
+    storage.blobs[protocol_storage_key(PID)] = b"%PDF internal"
+    storage.blobs[protocol_public_storage_key(PID)] = b"%PDF public"
+    proto = _protocol(
+        status="final",
+        finalized_at=NOW,
+        pdf_storage_key=protocol_storage_key(PID),
+        public_pdf_storage_key=protocol_public_storage_key(PID),
+    )
+    queue = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(proto), result("a@x.de"), result()],
+    )
+    session.scalar_results = [1]
+    await _service(session, storage=storage, mail_queue=queue).send(PID, now=NOW, actor="lead")
+    assert queue.sent[0].attachments[0].content == b"%PDF public"
+
+
+def test_a_send_before_the_last_finalization_does_not_count() -> None:
+    """A protocol finalized again after "Zurück in Entwurf" counts as not sent (003019)."""
+    from app.modules.protocol.service.common import is_sent
+
+    assert is_sent(_protocol(status="final", finalized_at=NOW, sent_at=NOW))
+    assert not is_sent(_protocol(status="final", finalized_at=NOW, sent_at=NOW - timedelta(days=1)))
+    assert not is_sent(_protocol(status="draft", finalized_at=NOW, sent_at=NOW))
+    assert not is_sent(_protocol(status="final", finalized_at=NOW))

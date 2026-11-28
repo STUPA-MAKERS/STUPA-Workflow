@@ -2037,6 +2037,12 @@ export interface MeetingOutWire {
   readonly opensAt?: IsoDateTime | null;
 }
 
+/** `POST /protocols/{id}/send`: the number of addresses and the protocol after the send. */
+export interface ProtocolSendOutWire {
+  readonly recipients: number;
+  readonly protocol: ProtocolOutWire;
+}
+
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
 export interface ProtocolOutWire {
   readonly id: Uuid;
@@ -2049,6 +2055,8 @@ export interface ProtocolOutWire {
   /** Redacted public variant. It exists only if an agenda item is non-public. */
   readonly publicPdfUrl?: string | null;
   readonly sentAt?: IsoDateTime | null;
+  /** The final protocol went out after its last finalization (§ 003019). */
+  readonly isSent?: boolean;
   /** The protocol is held back from the public protocol page. */
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */
@@ -2293,6 +2301,8 @@ export interface Protocol {
   /** Redacted public variant for non-public agenda items. Otherwise null. */
   readonly publicPdfUrl: string | null;
   readonly sentAt: IsoDateTime | null;
+  /** The final protocol went out after its last finalization (§ 003019). */
+  readonly isSent?: boolean;
   /** Held back from the public protocol page (only matters for a public gremium). */
   readonly publicWithheld?: boolean;
   /** The gremium publishes its final protocols on the public protocol page. */

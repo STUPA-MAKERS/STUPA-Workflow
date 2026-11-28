@@ -314,6 +314,8 @@ export class MeetingPageComponent {
   private readonly protocolBar = viewChild(ProtocolBarViewComponent);
   /** The page session: it saves the protocol actions of the head (spec 001304). */
   private readonly session = inject(MeetingSessionService, { optional: true });
+  /** The send of the final protocol is on its way. */
+  protected readonly sending = computed(() => this.session?.finalSending() ?? false);
   private readonly files = inject(FileOpenService);
   private readonly kitIntl = inject(UI_KIT_INTL);
   protected readonly hasSession = this.session !== null;
@@ -333,6 +335,10 @@ export class MeetingPageComponent {
 
   protected sendProtocolDraft(): void {
     this.session?.sendProtocolDraft();
+  }
+
+  protected sendProtocol(): void {
+    this.session?.sendProtocol();
   }
 
   protected reopenProtocol(): void {

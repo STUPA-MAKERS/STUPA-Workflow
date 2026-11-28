@@ -305,11 +305,11 @@ describe('MeetingPageComponent', () => {
     it('finalizes the draft of a closed meeting as a step of its own', async () => {
       const { on, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & senden' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren' }));
       expect(on.finalize).toHaveBeenCalled();
       fixture.componentRef.setInput('protocol', protocol({ status: 'rendering', isLocked: true }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
     });
 
     it('offers no main action without the lead right', async () => {
@@ -509,10 +509,10 @@ describe('MeetingPageComponent', () => {
       expect(on.closeSession).toHaveBeenCalled();
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Finalisieren & senden' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Finalisieren' })).toBeNull();
       menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Finalisieren & senden' }));
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Finalisieren' }));
       expect(on.finalize).toHaveBeenCalled();
     });
 
@@ -532,6 +532,7 @@ describe('MeetingPageComponent', () => {
         isLocked: true,
         pdfUrl: '/p.pdf',
         sentAt: '2026-10-16T08:00:00Z',
+        isSent: true,
         ...over,
       });
 
@@ -565,17 +566,17 @@ describe('MeetingPageComponent', () => {
       const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
       expect(head).toHaveTextContent('Protokoll-Entwurf');
       expect(head).not.toHaveTextContent('Geschlossen');
-      expect(within(head).getByRole('button', { name: 'Finalisieren & senden' })).toBeEnabled();
+      expect(within(head).getByRole('button', { name: 'Finalisieren' })).toBeEnabled();
       const menu = await openMenu();
       expect(within(menu).getByText('Protokoll')).toBeInTheDocument();
       expect(within(menu).getByRole('menuitem', { name: 'PDF intern' })).toBeInTheDocument();
       expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
-      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & senden' })).toBeNull();
+      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren' })).toBeNull();
     });
 
     it('shows the finalize disabled with the missing right to a writer without it', async () => {
       await setup({ meeting: meeting({ status: 'closed', canFinalize: false }) }, [MEDIA.wide]);
-      const button = screen.getByRole('button', { name: 'Finalisieren & senden' });
+      const button = screen.getByRole('button', { name: 'Finalisieren' });
       expect(button).toBeDisabled();
       expect(button).toHaveAttribute(
         'title',
@@ -598,9 +599,9 @@ describe('MeetingPageComponent', () => {
       expect(within(menu).getByRole('menuitem', { name: 'PDF öffentlich' })).toBeInTheDocument();
       expect(within(menu).queryByRole('menuitem', { name: 'PDF intern' })).toBeNull();
       await userEvent.keyboard('{Escape}');
-      fixture.componentRef.setInput('protocol', final({ sentAt: null }));
+      fixture.componentRef.setInput('protocol', final({ sentAt: null, isSent: false }));
       fixture.detectChanges();
-      expect(head).toHaveTextContent('Protokoll final, nicht versandt (keine Empfänger)');
+      expect(head).toHaveTextContent('Protokoll final, nicht versandt');
       expect(within(head).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
     });
 
@@ -629,6 +630,8 @@ describe('MeetingPageComponent', () => {
       function fakeSession() {
         return {
           approvalSaving: signal(false),
+          finalSending: signal(false),
+          sendProtocol: jest.fn(),
           reopenProtocol: jest.fn(),
           setPublicWithheld: jest.fn(),
           sendProtocolDraft: jest.fn(),
@@ -659,6 +662,16 @@ describe('MeetingPageComponent', () => {
         expect(session.sendProtocolDraft).toHaveBeenCalledTimes(1);
         await choose('PDF intern');
         expect(files.open).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pdf', url: expect.stringMatching(/draft-pdf$/) }));
+      });
+
+      /** STUPA-Workflow:003019 */
+      it('sends a final protocol that did not go out from the head, after the confirmation', async () => {
+        const { session } = await withSession(final({ sentAt: null, isSent: false }));
+        const head = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
+        await userEvent.click(within(head).getByRole('button', { name: 'Senden' }));
+        const confirm = screen.getByRole('dialog', { name: 'Protokoll senden?' });
+        await userEvent.click(within(confirm).getByRole('button', { name: 'Senden' }));
+        expect(session.sendProtocol).toHaveBeenCalledTimes(1);
       });
 
       it('marks the protocol as approved in the dialog of the page, and closes it on the mark', async () => {

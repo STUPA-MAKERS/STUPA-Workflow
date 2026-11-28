@@ -111,6 +111,12 @@ class _FakeService:
         self.status = "final"
         return self._out(status="final")
 
+    async def send(
+        self, protocol_id: UUID, *, now: datetime, actor: str
+    ) -> tuple[int, ProtocolOut]:
+        self.calls.append(f"send:{protocol_id}:{actor}")
+        return 3, self._out(status="final")
+
     async def set_public_withheld(
         self, protocol_id: UUID, withheld: bool, *, actor: str
     ) -> ProtocolOut:
@@ -315,6 +321,19 @@ def test_finalize_protocol_refused_while_rendering(
     assert r.json()["code"] == "protocol_not_draft"
     assert pool.jobs == []
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
+
+
+def test_send_protocol_mails_behind_the_finalize_gate(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """§F/meetings/protocols/003019: the send needs ``protocol.finalize`` and commits."""
+    _writer(app)
+    r = client.post(f"/api/protocols/{PROTOCOL_ID}/send")
+    assert r.status_code == 200, r.text
+    assert r.json()["recipients"] == 3
+    assert r.json()["protocol"]["status"] == "final"
+    assert fake_service.authz == [f"finalize:{PROTOCOL_ID}"]
+    assert fake_service.calls == [f"send:{PROTOCOL_ID}:p"]
 
 
 def test_get_protocol_service_wires_state_infra() -> None:

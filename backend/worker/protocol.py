@@ -1,12 +1,12 @@
 """arq worker task: finalize a protocol asynchronously, so `finalize` never blocks.
 
 `render_protocol` builds the `ProtocolService` from the `ctx` dependencies (typst, MinIO
-and the mail queue). It runs the render and the send after the router set the protocol
+and the mail queue). It runs the render after the router set the protocol
 to `rendering` and enqueued the job. A transient error (typst 5xx, transport, storage)
 raises `arq.Retry` with a linear backoff up to `pdf_max_tries`. A permanent error resets
 the protocol to `draft`. The protocol is then finalizable again and never stays stuck in
-`rendering`. The send belongs to the atomic finalization, so a failure rolls back
-everything. After a success and after a rollback the task broadcasts `meeting_state` on
+`rendering`. The finalization sends no mail: the send is an action of its own
+(spec 003019). After a success and after a rollback the task broadcasts `meeting_state` on
 `meeting:{id}`, so live followers see the status change.
 """
 
@@ -108,13 +108,13 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
 
 
 async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
-    """Finalize a protocol in the `rendering` status: render the PDF and send it.
+    """Finalize a protocol in the `rendering` status: render and store the PDF.
 
     A transient error retries up to `pdf_max_tries`. A permanent error rolls the protocol
     back to `draft`.
 
     Returns:
-        `"final"` after the send, `"dead"` after the last failed try, or `"failed"` after
+        `"final"` after the render, `"dead"` after the last failed try, or `"failed"` after
         a permanent error.
 
     Any other error is permanent (for example a malformed formula).

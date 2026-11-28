@@ -275,6 +275,35 @@ describe('MeetingSessionService', () => {
     http.match(() => true);
   });
 
+  /** § 003019 */
+  it('sends the final protocol once, takes the sent protocol and reports a refusal', () => {
+    const { http, session, toasts } = setup();
+    session.sendProtocol();
+    http.verify();
+    session.protocol.set({ ...PROTOCOL, status: 'final' as const, isFinal: true, isLocked: true });
+    session.sendProtocol();
+    session.sendProtocol();
+    const post = http.expectOne('/api/protocols/p-1/send');
+    expect(post.request.method).toBe('POST');
+    expect(session.finalSending()).toBe(true);
+    post.flush({
+      recipients: 7,
+      protocol: { ...PROTOCOL, status: 'final', sentAt: '2026-11-28T08:00:00Z', isSent: true },
+    });
+    expect(session.finalSending()).toBe(false);
+    expect(session.protocol()?.isSent).toBe(true);
+    expect(toasts()).toContain('Protokoll an 7 Adressen gesendet.');
+    session.sendProtocol();
+    http
+      .expectOne('/api/protocols/p-1/send')
+      .flush({ code: 'protocol_no_recipients' }, { status: 409, statusText: 'Conflict' });
+    expect(session.finalSending()).toBe(false);
+    expect(toasts()).toContain(
+      'Das Gremium hat keine Empfänger mit E-Mail-Adresse. Das Protokoll ging an niemanden.',
+    );
+    http.match(() => true);
+  });
+
   /** A member receives no code and no requests, so the meeting keeps its values. */
   it('passes the lead events to the guest list and takes the guest counts', () => {
     TestBed.configureTestingModule({
