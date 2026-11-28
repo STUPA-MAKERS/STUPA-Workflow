@@ -54,7 +54,6 @@
           <app-load-error [message]="'tasks.error' | t" (retry)="retry()" />
         }
         @if (loading()) {
-          <!-- The skeleton has the shape of the list: one month heading and its rows. -->
           <div class="skel-in">
             <app-list-group skeleton="7rem" />
             <app-skeleton variant="items" [count]="6" [grouped]="!split()" [label]="'tasks.loading' | t" />

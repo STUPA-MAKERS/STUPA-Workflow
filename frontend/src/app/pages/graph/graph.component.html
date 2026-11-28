@@ -129,7 +129,6 @@
           </app-button-group>
         </div>
       </div>
-      <!-- The state of the build-up stands over the zoom buttons, at the end edge (spec 002790). -->
       @if (drawing() && growing()) {
         <p class="gr__state gr__growing" role="status">{{ 'graph.growing' | t }}</p>
       } @else if (drawing() && cursor()) {
@@ -141,8 +140,6 @@
 
     <div class="gr__body" [attr.aria-busy]="loading() || null">
       @if (loading()) {
-        <!-- The empty canvas with a few faint nodes at its centre, where the layout puts the
-             first ones, and the zoom tools in their corner. -->
         <div class="gr__skel skel-in">
           <span class="sr-only" role="status">{{ 'graph.loading' | t }}</span>
           <svg class="gr__skelLines" viewBox="-100 -100 200 200" aria-hidden="true" focusable="false">
@@ -188,7 +185,6 @@
   </section>
 </div>
 
-<!-- On a phone the chosen element shows in a sheet. -->
 @if (phone()) {
   <app-side-sheet
     side="bottom"

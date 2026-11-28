@@ -78,9 +78,6 @@
   }
 
   <div class="mp__main">
-    <!-- On a phone an open vote takes the place of the text (spec 001461); the sheet stays
-         alive behind it, so the editor keeps its state. A member without the write right reads
-         the text of the item as it is typed (follow, spec 002930). -->
     @if (phoneVote(); as v) {
       <div class="mp__swap" role="group" [attr.aria-label]="'meetings.vote.inPlace' | t">
         <app-segmented
@@ -213,8 +210,6 @@
   />
 </ng-template>
 
-<!-- The vote cards of the open item: a side sheet at every width (a bottom sheet on a phone)
-     that the dock opens, so the protocol text has the page to itself (spec 001460). -->
 <ng-template #votesTpl>
   @for (vote of votes(); track vote.id) {
     <ng-container
@@ -291,9 +286,6 @@
   </ng-template>
 </app-side-sheet>
 
-<!-- Above the phone width small tabs at the end edge open the sheets: the votes for everybody
-     but the minute-taker, who has the vote button in the dock (spec 001460), and the linked rows
-     of the item and the attendance (spec 001800). They stand one above the other. -->
 @if (!phone() && (showVoteTab() || showLinkTab() || showAttendanceTab())) {
   <div class="mp__edgeTabs">
     @if (showLinkTab()) {
@@ -339,8 +331,6 @@
   </div>
 }
 
-<!-- The linked rows of the open item: the Antrag or the Haushaltsplan first, then the links
-     (spec 001800). -->
 <app-side-sheet
   [side]="phone() ? 'bottom' : 'end'"
   [heading]="'todos.linked.top' | t"
@@ -378,7 +368,6 @@
   </ng-template>
 </app-side-sheet>
 
-<!-- "Abstimmung vorbereiten" stands in the head, in one group with the close button (spec 001802). -->
 <app-side-sheet
   [side]="phone() ? 'bottom' : 'end'"
   [heading]="'meetings.vote.count' | t"
@@ -397,8 +386,6 @@
   </ng-template>
 </app-side-sheet>
 
-<!-- The format tools of the sheet for the dock ("Aa" on a phone). A press keeps the focus in
-     the text, so the tool applies at the cursor. -->
 <ng-template #formatTpl>
   @if (sheet(); as ts) {
     @for (group of ts.toolGroups; track $index) {
@@ -475,7 +462,6 @@
   }
 </ng-template>
 
-<!-- Who has the meeting open: the first chip of the dock on a wider screen. -->
 <ng-template #presenceTpl let-tight>
   <div class="mp__presence">
     <button
@@ -504,7 +490,6 @@
   </div>
 </ng-template>
 
-<!-- The QR code and the beamer as icon buttons of the dock on a wider screen. -->
 <ng-template #showTpl>
   <ng-container btnGrpContent>
     @if (meeting().publicJoin && meeting().canManage && meeting().status !== 'closed') {
