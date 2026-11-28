@@ -291,9 +291,9 @@
   </ng-template>
 </app-side-sheet>
 
-<!-- Above the phone width small tabs at the end edge open the sheets: the votes for everybody
-     but the minute-taker, who has the vote button in the dock (spec 001460), and the linked rows
-     of the item and the attendance (spec 001800). They stand one above the other. -->
+<!-- Above the phone width small tabs at the end edge open the sheets: the votes for every person
+     (spec 001460), the linked rows of the item and the attendance (spec 001800). They stand one
+     above the other. -->
 @if (!phone() && (showVoteTab() || showLinkTab() || showAttendanceTab())) {
   <div class="mp__edgeTabs">
     @if (showLinkTab()) {
