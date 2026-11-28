@@ -21,7 +21,7 @@ from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.plan_anlage import attach_plans
 from app.modules.protocol.public import meeting_day
 from app.modules.protocol.schemas import ProtocolOut
-from app.modules.protocol.service.common import _mark_final
+from app.modules.protocol.service.common import _mark_final, _mark_sent
 from app.modules.protocol.service.render import RenderOps
 from app.modules.protocol.webhook_fields import emit_protocol_finalized
 from app.modules.site_config.features import Feature, feature_on
@@ -186,12 +186,11 @@ class FinalizeOps(RenderOps):
             raise ConflictError(
                 "The Gremium has no recipient for the protocol.", code="protocol_no_recipients"
             )
-        key = protocol.pdf_storage_key
-        if protocol.public_pdf_storage_key is not None and await self._mails_public(protocol):
-            key = protocol.public_pdf_storage_key
+        public = protocol.public_pdf_storage_key is not None and await self._mails_public(protocol)
+        key = protocol.public_pdf_storage_key if public else protocol.pdf_storage_key
         pdf = await self._stored_pdf(key) if key is not None else None
         await self._send(protocol, pdf, recipients, at=now)
-        protocol.sent_at = now
+        _mark_sent(protocol, now)
         await audit_record(
             self.session,
             actor=actor,

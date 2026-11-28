@@ -86,6 +86,11 @@ def _mark_final(protocol: Protocol, now: datetime) -> None:
     protocol.finalized_at = now
 
 
+def _mark_sent(protocol: Protocol, now: datetime) -> None:
+    """Mark the final protocol as sent at `now`, after its mail went to the queue (003019)."""
+    protocol.sent_at = now
+
+
 def is_sent(protocol: Protocol) -> bool:
     """Return True when the final protocol went out after its last finalization (003019)."""
     sent, final = protocol.sent_at, protocol.finalized_at
