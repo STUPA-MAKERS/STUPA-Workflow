@@ -194,12 +194,9 @@ class ProtocolServiceBase:
     async def _mail_recipients(self, protocol: Protocol) -> list[str]:
         """Return the addresses that get the mail of the final protocol.
 
-        The list is empty without a mail queue and for a Gremium without a recipient.
-        The send then refuses (spec 003019), so the page never says that the protocol
-        was sent.
+        The list is empty for a Gremium without a recipient. The send then refuses
+        (spec 003019), so the page never says that the protocol was sent.
         """
-        if self.mail_queue is None:
-            return []
         members = await self._recipients(protocol.gremium_id)
         return list(await filter_recipients_by_preference(self.session, members, "protocol"))
 

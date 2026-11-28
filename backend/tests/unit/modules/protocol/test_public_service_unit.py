@@ -167,7 +167,7 @@ async def test_finalize_public_gremium_renders_public_version(
         return f"%PDF-{markdown}".encode()
 
     async def _send(
-        protocol: Protocol, pdf: bytes | None, to: object = None, *, at: datetime
+        protocol: Protocol, pdf: bytes | None, recipients: object, *, queue: object, at: datetime
     ) -> None:
         mailed.append(pdf)
 

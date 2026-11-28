@@ -322,9 +322,8 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: gremium},
-        results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None, at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
 
     assert len(mail.sent) == 1
     text = mail.sent[0].text
@@ -338,11 +337,10 @@ async def test_a_second_send_goes_out_again() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result("a@x.de"), result(), result("a@x.de"), result()],
     )
     svc = _service(session, mail_queue=mail)
-    await svc._send(proto, None, at=NOW)
-    await svc._send(proto, None, at=NOW + timedelta(days=1))
+    await svc._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
+    await svc._send(proto, None, ["a@x.de"], queue=mail, at=NOW + timedelta(days=1))
     first, second = (m.idempotency_key for m in mail.sent)
     assert first != second
 
@@ -355,9 +353,8 @@ async def test_protocol_mail_hides_a_withheld_public_version() -> None:
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: gremium},
-        results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None, at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
 
     assert "/protocols/" not in mail.sent[0].text
 
@@ -568,6 +565,74 @@ async def test_start_finalize_marks_rendering_and_audits(
         "gremiumId": str(GID),
         "publicWithheld": False,
     }
+
+
+@pytest.mark.parametrize("status", ["planned", "live"])
+async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
+    """No finalization while the meeting runs."""
+    proto = _protocol()
+    session = FakeSession(store={MID: _closed_meeting(status)}, results=[result(proto)])
+    with pytest.raises(ConflictError) as ei:
+        await _service(session).start_finalize(PID, actor="lead")
+    assert ei.value.code == "meeting_not_closed"
+    assert proto.status == "draft"
+    assert session.committed == 0
+
+
+@pytest.mark.parametrize("status", ["rendering", "final"])
+async def test_start_finalize_only_once(status: str) -> None:
+    """One finalization, also with several keepers.
+
+    There is no double enqueue and no write.
+    """
+    proto = _protocol(status=status)
+    session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
+    with pytest.raises(ConflictError) as ei:
+        await _service(session).start_finalize(PID, actor="lead")
+    assert ei.value.code == "protocol_not_draft"
+    assert session.committed == 0
+
+
+async def test_revert_to_draft_resets_rendering() -> None:
+    proto = _protocol(status="rendering")
+    session = FakeSession(results=[result(proto)])
+    await _service(session).revert_to_draft(PID)
+    assert proto.status == "draft"
+    assert session.committed == 1
+
+
+async def test_revert_to_draft_keeps_final_untouched() -> None:
+    proto = _protocol(status="final")
+    session = FakeSession(results=[result(proto)])
+    await _service(session).revert_to_draft(PID)
+    assert proto.status == "final"
+    assert session.committed == 0
+
+
+async def test_update_markdown_while_rendering_conflict() -> None:
+    """During the background render the content is frozen (409)."""
+    session = FakeSession(results=[result(_protocol(status="rendering"))])
+    with pytest.raises(ConflictError):
+        await _service(session).update_markdown(PID, "# Neu")
+
+
+async def test_embed_votes_while_rendering_conflict() -> None:
+    session = FakeSession(results=[result(_protocol(status="rendering"))])
+    with pytest.raises(ConflictError):
+        await _service(session).embed_votes(PID, [VID])
+
+
+async def test_finalize_from_rendering_completes() -> None:
+    """The worker path: the status `rendering` renders through to `final`."""
+    proto = _protocol(status="rendering")
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium()},
+        results=[result(proto), result(), result(), result("a@x.de"), result()],
+    )
+    out = await _service(
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=FakeMailQueue()
+    ).finalize(PID, now=NOW)
+    assert out.status == "final"
 
 
 async def test_send_recipients_union_members_plus_maillist(

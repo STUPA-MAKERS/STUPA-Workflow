@@ -17,6 +17,7 @@ from app.modules.notifications.brand import load_mail_brand
 from app.modules.notifications.compose import branded_mail
 from app.modules.notifications.links import protocol_link, public_protocol_url
 from app.modules.notifications.mail import MailAttachment, compute_idempotency_key
+from app.modules.notifications.queue import MailQueue
 from app.modules.protocol.filename import protocol_pdf_filename
 from app.modules.protocol.plan_anlage import attach_plans
 from app.modules.protocol.public import meeting_day
@@ -179,7 +180,8 @@ class FinalizeOps(RenderOps):
         protocol = await self._get(protocol_id, for_update=True)
         if protocol.status != "final":
             raise ConflictError("Only a final protocol can be sent.", code="protocol_not_final")
-        if self.mail_queue is None:
+        queue = self.mail_queue
+        if queue is None:
             raise ServiceUnavailableError("The protocol cannot be sent now.")
         recipients = await self._mail_recipients(protocol)
         if not recipients:
@@ -189,7 +191,7 @@ class FinalizeOps(RenderOps):
         public = protocol.public_pdf_storage_key is not None and await self._mails_public(protocol)
         key = protocol.public_pdf_storage_key if public else protocol.pdf_storage_key
         pdf = await self._stored_pdf(key) if key is not None else None
-        await self._send(protocol, pdf, recipients, at=now)
+        await self._send(protocol, pdf, recipients, queue=queue, at=now)
         _mark_sent(protocol, now)
         await audit_record(
             self.session,
@@ -231,14 +233,14 @@ class FinalizeOps(RenderOps):
         self,
         protocol: Protocol,
         pdf: bytes | None,
-        to: Sequence[str] | None = None,
+        recipients: Sequence[str],
         *,
+        queue: MailQueue,
         at: datetime,
     ) -> None:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
 
-        `to` holds the recipients that the send already read. Without it the method
-        reads them itself.
+        `recipients` holds the addresses that the send already read and checked.
 
         The key holds the time of the send, so each send goes out (spec 003019).
 
@@ -255,11 +257,6 @@ class FinalizeOps(RenderOps):
         The public link follows the rule of `public.visible_clause`, applied to the
         protocol in hand.
         """
-        if self.mail_queue is None:
-            return
-        recipients = to if to is not None else await self._mail_recipients(protocol)
-        if not recipients:
-            return
         gremium = await self.session.get(Gremium, protocol.gremium_id)
         gremium_name = gremium.name if gremium is not None else None
         meeting = await self.session.get(Meeting, protocol.meeting_id)
@@ -309,7 +306,7 @@ class FinalizeOps(RenderOps):
             if pdf is not None
             else ()
         )
-        await self.mail_queue.enqueue(
+        await queue.enqueue(
             branded_mail(
                 brand=await load_mail_brand(self.session, settings),
                 settings=settings,

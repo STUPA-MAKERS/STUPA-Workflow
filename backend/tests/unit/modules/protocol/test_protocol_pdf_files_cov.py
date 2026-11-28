@@ -609,7 +609,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     proto = _protocol(status="final")
     mail = FakeMailQueue()
     session = FakeSession(store={MID: _meeting(), GID: _gremium()})
-    await _service(session, mail_queue=mail)._send(proto, b"%PDF", ["a@x.de"], at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, b"%PDF", ["a@x.de"], queue=mail, at=NOW)
     msg = mail.sent[0]
     assert "StuPa" in msg.subject
     assert "12.06.2026" in msg.subject
@@ -628,7 +628,7 @@ async def test_send_without_gremium_name_and_meeting() -> None:
     proto = _protocol(status="final")
     mail = FakeMailQueue()
     session = FakeSession(store={GID: _gremium(name=None)})
-    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], at=NOW)
+    await _service(session, mail_queue=mail)._send(proto, None, ["a@x.de"], queue=mail, at=NOW)
     msg = mail.sent[0]
     assert msg.subject == "Sitzungsprotokoll"
     assert "liegt als PDF bei" not in msg.text
