@@ -1325,25 +1325,37 @@ describe('MeetingPageComponent', () => {
       expect(within(sheet).getByRole('button', { name: 'Abstimmung öffnen' })).toBeInTheDocument();
     });
 
-    /** Spec 001460: only the minute-taker has the vote button in the dock; the others the edge tab or the menu. */
-    it('gives the dock vote button only to the minute-taker', async () => {
+    /** Spec 001460: above the phone width every person, the minute-taker too, has the edge tab and no dock button. */
+    it('gives every person the vote edge tab above the phone width', async () => {
       const { fixture } = await setup(
         { meeting: meeting({ votes: [vote({ status: 'draft' })] }) },
         [MEDIA.wide],
       );
       const host = fixture.nativeElement as HTMLElement;
-      expect(host.querySelector('.mp__edgeTab--votes')).toBeNull();
-      expect(screen.getByRole('button', { name: 'Abstimmungen' })).toBeInTheDocument();
-      fixture.componentRef.setInput(
-        'meeting',
-        meeting({ isProtokollant: false, votes: [vote({ status: 'draft' })] }),
-      );
-      fixture.detectChanges();
+      for (const isProtokollant of [true, false]) {
+        fixture.componentRef.setInput(
+          'meeting',
+          meeting({ isProtokollant, votes: [vote({ status: 'draft' })] }),
+        );
+        fixture.detectChanges();
+        const tab = host.querySelector('.mp__edgeTab--votes') as HTMLElement;
+        expect(tab).not.toBeNull();
+        expect(screen.getAllByRole('button', { name: 'Abstimmungen' })).toEqual([tab]);
+      }
+      await userEvent.click(host.querySelector('.mp__edgeTab--votes') as HTMLElement);
+      expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--end');
+    });
+
+    /** Spec 001804: the vote tab also shows while no item is open; the sheet shows the empty state. */
+    it('shows the vote tab without an open item', async () => {
+      const { fixture } = await setup({ top: null }, [MEDIA.wide]);
+      const host = fixture.nativeElement as HTMLElement;
       const tab = host.querySelector('.mp__edgeTab--votes') as HTMLElement;
       expect(tab).not.toBeNull();
-      expect(screen.getAllByRole('button', { name: 'Abstimmungen' })).toEqual([tab]);
       await userEvent.click(tab);
-      expect(screen.getByRole('dialog', { name: 'Abstimmungen' })).toHaveClass('ss--end');
+      const sheet = screen.getByRole('dialog', { name: 'Abstimmungen' });
+      expect(within(sheet).getByText('Keine Abstimmungen')).toBeInTheDocument();
+      expect(sheet.querySelectorAll('.ss__actions app-button')).toHaveLength(1);
     });
 
     /** Spec 001802: the add button sits in the head of the vote sheet; no vote shows the empty state. */

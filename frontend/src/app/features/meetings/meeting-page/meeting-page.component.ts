@@ -359,12 +359,11 @@ export class MeetingPageComponent {
     return this.editable() && t ? !!t.doneAt : null;
   });
   /**
-   * The vote icon button of the dock, for the minute-taker only: the number of votes, or
-   * `null`. Everybody else opens the votes from the tab at the end edge, on a phone from the
-   * session menu (spec 001460).
+   * The vote icon button of the dock: on a phone for the minute-taker, or `null`. Above the
+   * phone width the tab at the end edge opens the votes for every person (spec 001460).
    */
   protected readonly dockVotes = computed<number | null>(() =>
-    this.meeting().isProtokollant && this.showVotes() ? this.votes().length : null,
+    this.phone() && this.meeting().isProtokollant && this.votingOn ? this.votes().length : null,
   );
   /** The open vote that a phone shows in the place of the text, or `null` (spec 001461). */
   protected readonly phoneVote = computed<MeetingVote | null>(() =>
@@ -538,7 +537,7 @@ export class MeetingPageComponent {
         label: t('meetings.page.recordAttendance'),
         icon: 'users',
       }),
-      ...when(this.showVotes() && this.phone() && (noDock || !m.isProtokollant), {
+      ...when(this.votingOn && this.phone(), {
         id: 'votes',
         label: t('meetings.vote.count'),
         icon: 'vote',
@@ -700,21 +699,12 @@ export class MeetingPageComponent {
   });
 
   /**
-   * The vote sheet can open for every open item, also without a vote and in a closed meeting
-   * with a final protocol: the sheet then shows its empty state (specs 001802, 001804).
-   */
-  protected readonly showVotes = computed(() => !!this.top() && this.votingOn);
-
-  /**
-   * The edge tab of the votes: above the phone width, for everybody but the minute-taker
-   * (spec 001460); in a closed meeting for the minute-taker too (spec 001804).
+   * The edge tab of the votes: above the phone width for every person in every state of the
+   * meeting, also without an open item or a vote; the sheet then shows its empty state
+   * (specs 001460, 001802, 001804). It hides only while the sheet is open.
    */
   protected readonly showVoteTab = computed(
-    () =>
-      !this.phone() &&
-      this.showVotes() &&
-      !this.votesOpen() &&
-      (this.dockVotes() === null || this.meeting().status === 'closed'),
+    () => this.votingOn && !this.phone() && !this.votesOpen(),
   );
   /** The edge tab of the linked rows: above the phone width, while an item is open (spec 001800). */
   protected readonly showLinkTab = computed(
