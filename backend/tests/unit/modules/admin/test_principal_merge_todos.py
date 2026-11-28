@@ -33,6 +33,7 @@ def test_the_merge_lists_the_todo_columns() -> None:
         "Link.created_by",
         "TodoEventSeries.created_by",
         "Event.created_by",
+        "PretixEventLink.created_by",
     }
     assert "TodoAssignee.principal_id" in {str(c) for c in merge_mod.COMBINED_COLUMNS}
     assert "todo_board.owner_id" in merge_mod.EXCLUDED_COLUMNS
